@@ -84,6 +84,13 @@ def _capability(tool_name: str) -> str:
 def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
         jobs: JobStore | None = None, context: str = "", mission_id: str = "",
         job: Job | None = None) -> RunResult:
+    if spec.model.get("lane") == "content_only":
+        if spec.tools:
+            raise PermissionError(f"{spec.model.get('model_id')} is a content-lane model: "
+                                  "it drafts text and never gets tools")
+        gateway.audit.append("model.content_lane", spec.agent_id,
+                             {"model_id": spec.model.get("model_id"),
+                              "mission_id": mission_id})
     jobs = jobs or JobStore()
     job = job or jobs.create(mission_id or "adhoc", objective, spec.agent_id, ["agent_loop"],
                              model=spec.model.get("model_id"), tools=spec.tools)

@@ -578,7 +578,11 @@ def cmd_governor(a):
         if g.cfg.get("reviewer_model"):
             from .runtime import provider_for
             try:
-                reviewer, _ = provider_for(g.cfg["reviewer_model"])
+                reviewer, rec = provider_for(g.cfg["reviewer_model"])
+                if rec.get("lane") == "content_only" or rec.get("trust_level") == "ABLITERATED":
+                    reviewer = None
+                    raise PermissionError("a content-lane / abliterated model cannot be "
+                                          "the Governor's validator")
             except (KeyError, PermissionError) as e:
                 print(f"validator model unavailable: {e}", file=sys.stderr)
         g.reviewer = reviewer

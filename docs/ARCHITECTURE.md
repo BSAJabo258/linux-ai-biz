@@ -84,6 +84,7 @@ When findings are combined, the worst state wins. An empty evaluation is UNKNOWN
 | §42 MAYA Memory Lane | `memory.py` (hash-linked Markdown records, BM25 search, resume phrases, deterministic export) |
 | §43, §94 capability graph + legal-change impact | `capgraph.py` (`bau graph impact <reg_id>`) |
 | §44-47 models, router, trust, Heretic | `registry.py`, `models/providers.py` (Claude via official SDK with refusal fallbacks; llama.cpp/Ollama; scripted), `models/router.py`, `models/heretic.py` |
+| Content lane (owner decision, amends §46-47) | an ABLITERATED local model may be approved with `lane: content_only` + `use_for` (creative_writing, script, lyrics, comedy, ad_copy, image_prompt, storyboard). The router uses it only for those jobs, never with tools or data beyond PUBLIC/INTERNAL, and prefers it there; agents refuse to give it tools; every use is audited (`model.content_lane`); it can never be the Governor's validator. Example: `examples/content-lane-model.yaml` |
 | §48, §102 agents + budgets | `agents.py`, `economics.Budgets` |
 | §49, §55, §73 permissions / revocation / money | `security/permissions.py` (SSH-signed human approvals, `bau approve`), `accounting.prepare_payout` |
 | §50 Universal Gateway | `gateway.py` (one ordered check path, audit on allow and deny) |

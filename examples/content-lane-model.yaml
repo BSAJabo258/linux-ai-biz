@@ -1,0 +1,32 @@
+# Content lane: a local abliterated model used ONLY for the jobs listed in use_for.
+# Fill in the real Hugging Face repo, licence and file hash, run the benchmark on
+# your machine, then:  bau registry add model examples/content-lane-model.yaml
+# It is never used for decisions, tools, customer data, legal/claims work, or as the
+# Governor's validator. Everything it writes is a draft that goes through the normal
+# content checks and human (or Governor) review before anything is published.
+model_id: qwen-27b-abliterated
+name: Qwen 27B abliterated (content lane)
+version: set-me
+provider: local
+source: https://huggingface.co/<owner>/<repo>   # exact repo + revision
+license: set-me                                  # check the model card; must allow commercial use
+commercial_use: false                            # set true only after the licence check
+deployment: local
+adapter: local_http
+endpoint: http://127.0.0.1:8081
+api_model: local
+trust_level: ABLITERATED
+privacy: local
+lane: content_only
+use_for: [creative_writing, script, lyrics]      # pick from: creative_writing, script, lyrics,
+                                                 # comedy, ad_copy, image_prompt, storyboard
+tools: false
+context: 32768
+input_types: [text]
+quality: 0.7
+latency_ms: 3000
+cost_in_per_mtok: 0
+cost_out_per_mtok: 0
+artifact_hash: set-me                            # sha256 of the GGUF you downloaded
+benchmark: null                                  # required before approval: tok/s on this laptop
+status: REGISTERED                               # becomes APPROVED via: bau set-status model ...

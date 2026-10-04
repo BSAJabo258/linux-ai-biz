@@ -136,6 +136,7 @@ bau governor digest --hours 72                 # after time away: what broke, wh
 bau governor hold "going offline"              # stop everything except read-only; `release` lifts it
 bau set-status model claude-opus-5-5 APPROVED  # after reviewing terms; repeat for local models
 bau models route reasoning --data PERSONAL     # see which model the router would use, and why
+bau registry add model examples/content-lane-model.yaml  # optional: abliterated model, content jobs only (fill it in first)
 bau genesis import ~/exports/chatgpt/conversations.json
 bau genesis import ~/exports/claude/conversations.json
 bau genesis extract --to-memory                # drafts in /var/lib/bau/history/canonical/
