@@ -554,6 +554,55 @@ def cmd_gateway(a):
     return EXIT_OK
 
 
+def _resume_agent_job(job) -> bool | None:
+    """Governor executor: re-run an interrupted agent job through the gateway."""
+    from . import agents
+    from .jobs import JobStore
+    from .registry import CapabilityRegistry
+    from .runtime import TOOL_SPECS, build_gateway, provider_for
+    rec = CapabilityRegistry().data["agent"].get(job.agent)
+    if rec is None or rec.get("status") not in ("APPROVED", "ACTIVE"):
+        return None
+    provider, model = provider_for(job.model or rec["model"])
+    spec = agents.AgentSpec.from_registry(rec, model, TOOL_SPECS)
+    res = agents.run(spec, job.objective, provider, build_gateway(), JobStore(),
+                     mission_id=job.mission_id, job=job)
+    return res.status == "COMPLETED"
+
+
+def cmd_governor(a):
+    from .governor import Governor, hold_reason
+    if a.gov_cmd == "tick":
+        reviewer = None
+        g = Governor()
+        if g.cfg.get("reviewer_model"):
+            from .runtime import provider_for
+            try:
+                reviewer, _ = provider_for(g.cfg["reviewer_model"])
+            except (KeyError, PermissionError) as e:
+                print(f"validator model unavailable: {e}", file=sys.stderr)
+        g.reviewer = reviewer
+        rep = g.tick(executor=None if a.no_resume else _resume_agent_job)
+        _out(rep)
+        return EXIT_BLOCKED if rep["hold"] else EXIT_OK
+    g = Governor()
+    if a.gov_cmd == "status":
+        _out({"hold": hold_reason(),
+              "open_findings": g.open_findings(), "config": g.cfg})
+    elif a.gov_cmd == "digest":
+        _out(g.digest(a.hours))
+    elif a.gov_cmd == "hold":
+        g.hold(a.reason, by=f"human:{getpass.getuser()}")
+        _out({"hold": a.reason})
+    elif a.gov_cmd == "release":
+        g.release(_human())
+        _out({"hold": None})
+    elif a.gov_cmd == "close":
+        g.close(a.finding_id, _human(), a.note or "")
+        _out({"closed": a.finding_id})
+    return EXIT_OK
+
+
 # ------------------------------------------------------------------ parser
 
 def register(sub: argparse._SubParsersAction) -> None:
@@ -855,6 +904,21 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = gr.add_parser("impact")
     x.add_argument("reg_id")
     s.set_defaults(fn=cmd_graph)
+
+    s = sub.add_parser("governor", help="watchdog that keeps BAU running while you are away")
+    gv = s.add_subparsers(dest="gov_cmd", required=True)
+    x = gv.add_parser("tick", help="run all checks and safe repairs once (timer runs this)")
+    x.add_argument("--no-resume", action="store_true", help="re-queue jobs but do not rerun")
+    gv.add_parser("status")
+    x = gv.add_parser("digest", help="while-you-were-away report")
+    x.add_argument("--hours", type=float, default=24)
+    x = gv.add_parser("hold", help="stop everything except read-only actions")
+    x.add_argument("reason")
+    gv.add_parser("release", help="human: lift a hold")
+    x = gv.add_parser("close", help="human: close a finding you have dealt with")
+    x.add_argument("finding_id")
+    x.add_argument("--note")
+    s.set_defaults(fn=cmd_governor)
 
     s = sub.add_parser("gateway", help="list gateway capabilities")
     s.set_defaults(fn=cmd_gateway)

@@ -141,8 +141,8 @@ aa-enabled -q 2>/dev/null || log "WARNING: AppArmor is not enabled"
 # ---------------------------------------------------------------- 7. services
 install -m 0644 "${HERE}"/systemd/*.service "${HERE}"/systemd/*.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable bau-recover.service bau-regwatch.timer bau-ui.service >/dev/null
-systemctl start bau-regwatch.timer bau-ui.service
+systemctl enable bau-recover.service bau-regwatch.timer bau-governor.timer bau-ui.service >/dev/null
+systemctl start bau-regwatch.timer bau-governor.timer bau-ui.service
 
 # ---------------------------------------------------------------- 8. wipe-gate evidence
 audit() { runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \

@@ -68,6 +68,7 @@ When findings are combined, the worst state wins. An empty evaluation is UNKNOWN
 | §5 wipe gate | `wipe_gate.py`, `write-usb.sh` record, `install.sh` import |
 | §6 K3 | registered as OFFLOAD in `data/registry_defaults.yaml`; reached through `models/providers.LocalHTTPProvider` |
 | §7-8, §113, §122, §125 Jarvis + missions | `jarvis.py`, `data/missions.yaml` (compliance dependencies per mission type) |
+| Governor (owner-away oversight) | `governor.py`, `bau-governor.timer`, `bau governor ...` (see below) |
 | §9-12, §74-75, §114-118 compliance engine | `regulations.py`, `policy.py`, `decision.py`, `jurisdiction.py` |
 | §13-16, §77, §80-81 AI disclosure + likeness | `disclosure.py`, `policies/ai_disclosure.yaml`, media gateway provenance |
 | §17-18, §26, §82-83, §101 data governance | `datagov.py` (data objects, use rights, provider boundary, tracking registry) |
@@ -120,6 +121,40 @@ listed in `bau status`:
 
 Third-party projects named in the spec (aiOS, open-context, Open-Generative-AI, God's Eye UI, Heretic, MAYA repos) plug in through the adapters above only after Sentinel review.
 
+## Two tiers: operator and Governor
+
+BAU is run by two AIs with different jobs:
+
+* **Operator** (Jarvis + agents) plans missions and does the work, always through the
+  Universal Gateway.
+* **Governor** (`governor.py`) watches the operator in the owner's place. Every 10 minutes
+  (`bau-governor.timer` -> `bau governor tick`) it checks, in order: audit-chain integrity,
+  stuck/interrupted jobs, failed or paused missions, agents hitting the gateway or tripping
+  injection detection, 24h spend, red Mission Control items, disk space, and service health.
+  If `config/governor.yaml` names an approved `reviewer_model`, a validator model also reads
+  every finished mission's result, ideally a different model from the operator.
+
+What the Governor fixes on its own is limited to moves that make the system safer or restore
+it: mark a stuck job INTERRUPTED and resume it from its checkpoint (at most
+`max_auto_resumes` times), re-queue jobs when the network returns, QUARANTINE an agent, or
+put BAU on **HOLD** (the gateway then runs only READ_ONLY capabilities and Jarvis starts
+nothing). Everything else becomes a finding for the owner (`bau governor digest`).
+
+The Governor has **no approval rights**. Approvals stay human-signed (SSH key), and only a
+human can release a hold, restore a quarantined agent (`bau set-status`) or close a finding.
+That asymmetry (it can stop things but never authorise them) is what makes it safe to run
+unattended.
+
+| Setting (`config/governor.yaml`) | Default |
+|---|---|
+| `stale_job_minutes` | 30 |
+| `max_auto_resumes` | 3 |
+| `denials_per_hour` (quarantine threshold) | 5 |
+| `daily_spend_hold_usd` | 50 |
+| `min_free_disk_pct` | 10 |
+| `services` | `bau-ui.service`, `bau-regwatch.timer` |
+| `reviewer_model` | none |
+
 ## Runtime layout
 
 | Path | Owner / mode | Contents |
@@ -128,6 +163,8 @@ Third-party projects named in the spec (aiOS, open-context, Open-Generative-AI, 
 | `/var/lib/bau` (`BAU_HOME`) | `bau:bau` 2770 | regulations, policies, audit, evidence, consent, suppression, dsr, jobs, reports... (spec §91 `.bau/` layout) |
 | `/etc/bau/audit.key`, `unsubscribe.key` | `root:bau` 0640 | machine-generated |
 | `bau-ui.service` | runs as `bau`, localhost only | Mission Control on http://127.0.0.1:8765 |
+| `bau-governor.timer` | runs as `bau`, every 10 min | Governor tick; state in `BAU_HOME/governor/` |
+| `/etc/bau/models.env` (optional) | `root:bau` 0640 | API keys for the Governor's resume runs and validator model |
 | `/etc/bau/allowed_signers` | `root:bau` 0644 | public keys of the humans who may approve; only root can add one |
 | `~bauadmin/.ssh/bau_approval_ed25519` | the admin, passphrase-protected | the admin's personal approval signing key |
 

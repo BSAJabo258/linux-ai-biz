@@ -1,0 +1,22 @@
+[Unit]
+Description=BAU Governor tick (health checks, safe repairs, findings for the owner)
+After=network-online.target bau-recover.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bau
+Group=bau
+Environment=BAU_HOME=/var/lib/bau
+Environment=BAU_AUDIT_KEY=/etc/bau/audit.key
+EnvironmentFile=-/etc/bau/models.env
+ExecStart=/usr/local/bin/bau governor tick
+# Exit 3 means "on HOLD" - a reported state, not a unit failure.
+SuccessExitStatus=3
+UMask=0007
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/bau
+CapabilityBoundingSet=

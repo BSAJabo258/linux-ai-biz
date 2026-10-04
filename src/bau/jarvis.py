@@ -181,6 +181,10 @@ class Jarvis:
         """``executor(mission) -> dict`` does the work (an agent run, a factory run, ...)."""
         if m.status != "READY":
             raise PermissionError(f"mission {m.mission_id} is {m.status}; only READY runs")
+        from .governor import hold_reason
+        held = hold_reason(self.home)
+        if held:
+            raise PermissionError(f"BAU is on HOLD ({held}); a human must release it")
         m.status = "RUNNING"
         self.save(m)
         try:

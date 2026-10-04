@@ -7,4 +7,4 @@ extractors (email, SMS, subscriptions, AI disclosure, privacy, IP, tax)
 that feed it.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

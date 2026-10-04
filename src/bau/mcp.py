@@ -16,6 +16,7 @@ import subprocess
 import threading
 from typing import Any
 
+from . import __version__
 from .gateway import Gateway, Handler
 from .models.providers import ToolSpec
 
@@ -72,7 +73,7 @@ class McpClient:
     def initialize(self) -> dict[str, Any]:
         res = self._request("initialize", {"protocolVersion": PROTOCOL_VERSION,
                                            "capabilities": {},
-                                           "clientInfo": {"name": "bau", "version": "0.2"}})
+                                           "clientInfo": {"name": "bau", "version": __version__}})
         self._notify("notifications/initialized")
         return res
 

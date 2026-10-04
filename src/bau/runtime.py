@@ -18,6 +18,7 @@ import yaml
 
 from .economics import Budgets, Ledger
 from .gateway import Gateway, Handler
+from .governor import hold_reason
 from .home import bau_home, shipped_data
 from .memory import MemoryLane
 from .models.providers import Provider, ToolSpec, build
@@ -80,7 +81,7 @@ def build_gateway(home: Path | None = None, trust=None) -> Gateway:
             table.agent_ceiling[a["agent_id"]] = "LOW_RISK"
     gw = Gateway(table=table, ledger=Ledger(home), budgets=Budgets.load(
         home / "config" / "budgets.yaml"), providers=reg.data["provider"],
-        trust=trust, agent_tools=agent_tools)
+        trust=trust, agent_tools=agent_tools, hold=lambda: hold_reason(home))
     memory = MemoryLane(home)
     drafts = home / "artifacts" / "drafts"
     media_in = home / "artifacts" / "media_inbox"

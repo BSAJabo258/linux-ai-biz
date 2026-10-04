@@ -5,6 +5,7 @@ allowed or denied - is written to the audit chain:
 
   1. capability registered and handler bound      (no hidden execution paths)
   2. agent may use this tool                       (agent's own tool list)
+  2b. governor HOLD: only READ_ONLY capabilities run while it is on
   3. not revoked; permission level; human approval (spec §49, §55)
   4. network trust allows this level              (spec §52)
   5. data may leave to this provider               (spec §83, §101)
@@ -71,7 +72,8 @@ class Gateway:
                  ledger: Ledger | None = None, budgets: Budgets | None = None,
                  providers: dict[str, dict[str, Any]] | None = None,
                  authority: Any = None, trust: Callable[[], network.Trust] | None = None,
-                 agent_tools: dict[str, list[str]] | None = None):
+                 agent_tools: dict[str, list[str]] | None = None,
+                 hold: Callable[[], str | None] | None = None):
         self.table = table or CapabilityTable()
         self.audit = audit or AuditLog()
         self.ledger = ledger or Ledger()
@@ -80,6 +82,7 @@ class Gateway:
         self.authority = authority
         self.trust = trust or (lambda: network.TrustPolicy().classify(network.detect()))
         self.agent_tools = agent_tools or {}
+        self.hold = hold or (lambda: None)
         self.handlers: dict[str, Handler] = {}
 
     def register(self, capability: str, handler: Handler) -> None:
@@ -104,6 +107,10 @@ class Gateway:
         allowed = self.agent_tools.get(req.agent)
         if allowed is not None and req.capability not in allowed:
             raise self._deny(req, "agent_tools", f"{req.agent} is not granted {req.capability}")
+        held = self.hold()
+        if held and self.table.levels.get(req.capability, h.level) != "READ_ONLY":
+            raise self._deny(req, "governor_hold", f"BAU is on HOLD ({held}); "
+                             "only read-only actions run until a human releases it")
         b = blast.score(req.blast) if req.blast else {"level": "LOW",
                                                        "requires_approval": False}
         try:

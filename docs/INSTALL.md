@@ -131,6 +131,9 @@ bau email preflight ... --approval approval.json
 
 ```bash
 bau ui                                         # or open http://127.0.0.1:8765 (bau-ui.service)
+bau governor status                            # the watchdog (bau-governor.timer, every 10 min)
+bau governor digest --hours 72                 # after time away: what broke, what it fixed, what needs you
+bau governor hold "going offline"              # stop everything except read-only; `release` lifts it
 bau set-status model claude-opus-5-5 APPROVED  # after reviewing terms; repeat for local models
 bau models route reasoning --data PERSONAL     # see which model the router would use, and why
 bau genesis import ~/exports/chatgpt/conversations.json
