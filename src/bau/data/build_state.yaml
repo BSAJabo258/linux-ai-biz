@@ -1,0 +1,41 @@
+# Spec §106 acceptance suite / §107 critical failure conditions.
+# status: done (verified ON THE MACHINE by the operator) | implemented (code shipped,
+# not yet verified on the machine) | partial | not_started.
+# critical: true = spec §107 condition; it keeps the dashboard RED until done.
+- {item: Boots and reboots, status: not_started, critical: true}
+- {item: Hardware baseline exists, status: implemented, critical: false, how: bau hw audit}
+- {item: Backup restores (verified read-back), status: implemented, critical: true, how: bau backup verify}
+- {item: Recovery works (golden image restore tested), status: not_started, critical: true}
+- {item: Network security passes (nftables default-deny inbound), status: implemented, critical: true, how: installer hardening}
+- {item: Full-disk encryption enabled, status: implemented, critical: true, how: preseed crypto LVM}
+- {item: Secrets out of source and logs, status: implemented, critical: true, how: bau secrets scan; audit PII guard}
+- {item: Audit chain works and verifies, status: implemented, critical: true, how: bau audit verify}
+- {item: Audit chain anchored off-machine, status: not_started, critical: false, how: bau audit anchor}
+- {item: Regulation registry with official sources, status: implemented, critical: true, how: bau reg validate}
+- {item: Every in-force regulation reviewed by counsel (ACTIVE), status: not_started, critical: true, how: bau reg promote}
+- {item: Policy compiler works, status: implemented, critical: true, how: bau gate check}
+- {item: Unknowns block or escalate, status: implemented, critical: true}
+- {item: Email/SMS compliance gate, status: implemented, critical: true, how: bau email preflight}
+- {item: FCC wireless-domain list loaded, status: not_started, critical: true, how: bau email import-wireless-list}
+- {item: Sending domain SPF/DKIM/DMARC verified, status: not_started, critical: true, how: bau email check-dns}
+- {item: AI disclosure works, status: implemented, critical: true, how: bau disclosure check}
+- {item: Cancellation workflow works and is regression-tested, status: partial, critical: true, how: state machine shipped; needs the real storefront}
+- {item: Data-rights workflow with deletion propagation, status: implemented, critical: true, how: bau dsr}
+- {item: IP ledger and royalty engine, status: implemented, critical: true, how: bau monetize check}
+- {item: Tax nexus rules verified by a CPA, status: not_started, critical: true, how: fill tax/nexus_rules.yaml}
+- {item: Financial controls (money movement needs human approval), status: implemented, critical: true, how: permissions + approval key}
+- {item: Repository Sentinel and license gate, status: implemented, critical: true, how: bau sentinel scan}
+- {item: Untrusted code only in rootless sandbox, status: partial, critical: true, how: podman installed; sandbox runner profiles not yet written}
+- {item: Model / agent / MCP registries, status: implemented, critical: false, how: bau registry}
+- {item: K3 works locally or registered as offload, status: not_started, critical: false}
+- {item: Checkpoint and resume, status: implemented, critical: false, how: bau jobs / bau recover}
+- {item: Historical AI corpus imported (Project Genesis), status: not_started, critical: false}
+- {item: Canonical BAU documents generated, status: partial, critical: false}
+- {item: Memory (MAYA Memory Lane), status: not_started, critical: false}
+- {item: Jarvis executive orchestration, status: not_started, critical: false}
+- {item: Model router, status: not_started, critical: false}
+- {item: Media / spatial adapters, status: not_started, critical: false}
+- {item: Accessibility - keyboard-only and screen reader pass, status: partial, critical: false, how: CLI is keyboard-only; GNOME + Orca installed; no GUI yet}
+- {item: One business factory end-to-end, status: not_started, critical: false}
+- {item: One real revenue mission with evidence package, status: not_started, critical: false}
+- {item: Golden baseline created, status: not_started, critical: false}

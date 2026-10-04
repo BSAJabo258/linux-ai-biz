@@ -1,0 +1,165 @@
+# Publication of generated content (spec §14-16, §77, §80) and chatbots.
+coverage:
+  publish: [US, EU]
+  chatbot: [US, EU]
+
+policies:
+- id: pub.likeness_consent
+  domain: publish
+  scope: artifact
+  stage: 10
+  title: Consent/licence for any real person's likeness or voice
+  regs: [us-right-of-publicity]
+  jurisdictions: [ANY]
+  when: {fact: artifact.likeness_used, eq: true}
+  require:
+    - {fact: artifact.consent_status, eq: granted}
+  remediation: Spec §16 - no consent, ambiguous consent, or expired licence blocks.
+
+- id: pub.provenance_record
+  domain: publish
+  scope: artifact
+  stage: 20
+  title: Provenance record exists for generated content
+  regs: []
+  jurisdictions: [ANY]
+  when: {fact: artifact.ai_generated, eq: true}
+  require:
+    - {fact: artifact.provenance_record, eq: true}
+
+- id: pub.provenance_preserved
+  domain: publish
+  scope: artifact
+  stage: 30
+  title: Pipeline did not strip provenance markings the input carried
+  regs: [us-ca-ai-transparency-act, eu-ai-act-art50]
+  jurisdictions: [ANY]
+  require:
+    - {fact: artifact.provenance_preserved, eq: true}
+  remediation: Re-encode with metadata passthrough or re-sign the C2PA manifest.
+
+- id: pub.eu.machine_marking
+  domain: publish
+  scope: artifact
+  stage: 40
+  title: "EU Art. 50(2): synthetic media machine-readable marking"
+  regs: [eu-ai-act-art50]
+  jurisdictions: [EU]
+  when: {fact: artifact.synthetic_media, eq: true}
+  require:
+    - {fact: artifact.machine_readable_marking, eq: true}
+
+- id: pub.eu.deepfake
+  domain: publish
+  scope: artifact
+  stage: 50
+  title: "EU Art. 50(4): deepfakes visibly disclosed"
+  regs: [eu-ai-act-art50]
+  jurisdictions: [EU]
+  when: {fact: artifact.deepfake, eq: true}
+  require:
+    - {fact: artifact.visible_disclosure, eq: true}
+
+- id: pub.eu.public_interest_text
+  domain: publish
+  scope: artifact
+  stage: 55
+  title: "EU Art. 50(4): AI text on matters of public interest disclosed (unless human editorial responsibility)"
+  regs: [eu-ai-act-art50]
+  jurisdictions: [EU]
+  when:
+    all:
+      - {fact: artifact.ai_generated, eq: true}
+      - {fact: artifact.media_type, eq: text}
+      - {fact: context.public_interest_text, eq: true}
+      - {fact: context.human_editorial_responsibility, eq: false}
+  require:
+    - {fact: artifact.visible_disclosure, eq: true}
+
+- id: pub.ny.synthetic_performer
+  domain: publish
+  scope: artifact
+  stage: 60
+  title: "New York: synthetic performer in an ad conspicuously disclosed"
+  regs: [us-ny-synthetic-performer]
+  jurisdictions: [US-NY]
+  when:
+    all:
+      - {fact: context.is_advertisement, eq: true}
+      - {fact: context.synthetic_performer, eq: true}
+      - {fact: context.audio_only, eq: false}
+  require:
+    - {fact: artifact.visible_disclosure, eq: true}
+
+- id: pub.ca.synthetic_performer
+  domain: publish
+  scope: artifact
+  stage: 61
+  title: "California SB 1050: synthetic performer in a video/audio ad disclosed"
+  regs: [us-ca-sb1050-synthetic-performer]
+  jurisdictions: [US-CA]
+  when:
+    all:
+      - {fact: context.is_advertisement, eq: true}
+      - {fact: context.synthetic_performer, eq: true}
+  require:
+    - {fact: artifact.visible_disclosure, eq: true}
+
+- id: pub.no_fake_reviews
+  domain: publish
+  scope: artifact
+  stage: 70
+  title: No AI-generated reviews or testimonials
+  regs: [us-ftc-reviews-rule]
+  jurisdictions: [ANY]
+  when: {fact: context.is_review_or_testimonial, eq: true}
+  require:
+    - {fact: artifact.ai_generated, eq: false}
+
+- id: pub.platform_label
+  domain: publish
+  scope: artifact
+  stage: 80
+  title: Platform's own AI/altered-content label set
+  regs: [industry-platform-ai-labels]
+  jurisdictions: [ANY]
+  when:
+    all:
+      - {fact: artifact.synthetic_media, eq: true}
+      - {fact: context.platform_requires_ai_label, eq: true}
+  require:
+    - {fact: context.platform_label_set, eq: true}
+
+- id: pub.bau_label_default
+  domain: publish
+  scope: artifact
+  stage: 90
+  title: "BAU default: generated media carries a visible AI label (spec §77 front-line visibility)"
+  regs: []
+  jurisdictions: [ANY]
+  when: {fact: artifact.synthetic_media, eq: true}
+  require:
+    - {fact: artifact.visible_disclosure, eq: true}
+  on_fail: PASS_WITH_REVIEW
+
+# ---------- chatbots / AI agents talking to people ----------
+- id: bot.disclose
+  domain: chatbot
+  scope: session
+  stage: 10
+  title: People are told they are talking to AI at the start
+  regs: [eu-ai-act-art50, us-ca-ab1609-chatbot, us-ca-sb243-companion-chatbot]
+  jurisdictions: [ANY]
+  require:
+    - {fact: bot.discloses_ai_at_start, eq: true}
+
+- id: bot.companion_minors
+  domain: chatbot
+  scope: session
+  stage: 20
+  title: No companion chatbot where minors may be users
+  regs: [us-ca-sb243-companion-chatbot, us-ca-minors-2026]
+  jurisdictions: [ANY]
+  when: {fact: bot.companion, eq: true}
+  require:
+    - {fact: bot.minor_possible, eq: false}

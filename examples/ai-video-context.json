@@ -1,0 +1,6 @@
+{
+  "audience": [{"country": "US"}, {"country": "FR"}],
+  "is_advertisement": false, "synthetic_performer": false,
+  "is_review_or_testimonial": false,
+  "platform_requires_ai_label": true, "platform_label_set": true
+}

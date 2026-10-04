@@ -1,0 +1,315 @@
+# Commercial email gate. Stages run in this order; all must pass before SEND.
+# 10 classify | 20 list source | 30 jurisdiction | 40 consent | 50 suppression
+# 60 identity+auth | 70 subject | 80 content | 90 postal | 100 unsubscribe | 110 reputation
+
+coverage:
+  email: [US, CA, EU, GB, AU]
+
+orderings:
+  consent_model: [opt_out_with_relationship, implied_or_express, opt_in_or_soft, express_only]
+
+policies:
+# ---------- message scope ----------
+- id: email.classify
+  domain: email
+  scope: message
+  stage: 10
+  title: Message classified (commercial / transactional / mixed)
+  regs: [us-canspam]
+  jurisdictions: [ANY]
+  require:
+    - {fact: message.category, in: [commercial, transactional, mixed]}
+  on_fail: INCOMPLETE_FACTS
+  remediation: Declare the primary purpose. Mixed messages whose subject or opening is commercial are commercial.
+
+- id: email.list_source
+  domain: email
+  scope: message
+  stage: 20
+  title: List built from first-party, provable sign-ups
+  regs: [us-canspam, ca-casl, eu-eprivacy-gdpr-marketing, industry-mailbox-bulk-sender]
+  jurisdictions: [ANY]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: message.list_source_ok, eq: true}
+  remediation: Never send to harvested, scraped, dictionary-generated, purchased or rented lists.
+
+- id: email.no_explicit_content
+  domain: email
+  scope: message
+  stage: 80
+  title: No sexually explicit content
+  regs: [us-canspam]
+  jurisdictions: [ANY]
+  require:
+    - {fact: message.sexually_explicit, eq: false}
+
+- id: email.identity
+  domain: email
+  scope: message
+  stage: 60
+  title: Honest From / Reply-To on domains we own
+  regs: [us-canspam, ca-casl]
+  jurisdictions: [ANY]
+  require:
+    - {fact: message.from_domain_owned, eq: true}
+    - {fact: message.reply_to_owned, eq: true}
+    - {fact: message.from_name_present, eq: true}
+
+- id: email.auth.spf_dkim
+  domain: email
+  scope: message
+  stage: 61
+  title: SPF and DKIM both configured
+  regs: [industry-mailbox-bulk-sender]
+  jurisdictions: [ANY]
+  require:
+    - {fact: sender.spf_present, eq: true}
+    - {fact: sender.spf_single_record, eq: true}
+    - {fact: sender.spf_not_permissive, eq: true}
+    - {fact: sender.dkim_present, eq: true}
+  remediation: Run `bau email check-dns <domain> --selector <s>` and fix DNS before sending.
+
+- id: email.auth.dmarc
+  domain: email
+  scope: message
+  stage: 62
+  title: DMARC published, reporting, and aligned with From
+  regs: [industry-mailbox-bulk-sender]
+  jurisdictions: [ANY]
+  require:
+    - {fact: sender.dmarc_present, eq: true}
+    - {fact: sender.dmarc_rua, eq: true}
+    - {fact: sender.dmarc_policy, in: [none, quarantine, reject]}
+    - {fact: sender.dmarc_aligned, eq: true}
+    - {fact: sender.tls, eq: true}
+
+- id: email.subject
+  domain: email
+  scope: message
+  stage: 70
+  title: Subject line not deceptive
+  regs: [us-canspam]
+  jurisdictions: [ANY]
+  require:
+    - {fact: message.subject_flags, eq: []}
+  on_fail: PASS_WITH_REVIEW
+  remediation: Fake "RE:/FW:", fake account alarms, fake prizes are deceptive. A human must approve or rewrite.
+
+- id: email.claims
+  domain: email
+  scope: message
+  stage: 80
+  title: Every risky claim substantiated in the claims registry
+  regs: [us-ftc-act-s5, us-ftc-ai-claims]
+  jurisdictions: [ANY]
+  require:
+    - {fact: message.unsubstantiated_claims, eq: []}
+  remediation: Remove the claim or add evidence to the claims registry (spec §25).
+
+- id: email.testimonials
+  domain: email
+  scope: message
+  stage: 81
+  title: Testimonials real, verified, connections disclosed
+  regs: [us-ftc-reviews-rule, us-ftc-endorsement-guides]
+  jurisdictions: [ANY]
+  when: {fact: message.contains_testimonial, eq: true}
+  require:
+    - {fact: message.testimonials_verified, eq: true}
+    - {fact: message.material_connection_disclosed, eq: true}
+
+- id: email.synthetic_performer
+  domain: email
+  scope: message
+  stage: 82
+  title: AI-generated performer in an ad is disclosed
+  regs: [us-ny-synthetic-performer, us-ca-sb1050-synthetic-performer]
+  jurisdictions: [US-NY, US-CA]
+  when: {fact: message.synthetic_performer, eq: true}
+  require:
+    - {fact: message.synthetic_performer_disclosed, eq: true}
+
+- id: email.postal_address
+  domain: email
+  scope: message
+  stage: 90
+  title: Valid physical postal address in the message
+  regs: [us-canspam, ca-casl]
+  jurisdictions: [US, CA]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: message.physical_address_present, eq: true}
+
+- id: email.unsubscribe.mechanism
+  domain: email
+  scope: message
+  stage: 100
+  title: Visible unsubscribe link - no login, no fee, works 30+ days, honoured within 2 days
+  regs: [us-canspam, ca-casl, eu-eprivacy-gdpr-marketing, uk-pecr-duaa, au-spam-act, industry-mailbox-bulk-sender]
+  jurisdictions: [ANY]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: message.unsubscribe_link_present, eq: true}
+    - {fact: message.unsubscribe_requires_login, eq: false}
+    - {fact: message.unsubscribe_fee, eq: false}
+    - {fact: message.unsubscribe_window_days, gte: 30}
+    - {fact: message.unsubscribe_processing_days, lte: 2}
+  remediation: BAU honours opt-outs immediately; 2 days is the strictest external limit (mailbox providers).
+
+- id: email.unsubscribe.one_click
+  domain: email
+  scope: message
+  stage: 101
+  title: RFC 8058 one-click unsubscribe headers
+  regs: [industry-mailbox-bulk-sender]
+  jurisdictions: [ANY]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: message.list_unsubscribe_https, eq: true}
+    - {fact: message.list_unsubscribe_post, eq: true}
+  remediation: Use bau.comms.email.unsubscribe_headers().
+
+- id: email.reputation.hard
+  domain: email
+  scope: message
+  stage: 110
+  title: Spam complaint rate under 0.3%
+  regs: [industry-mailbox-bulk-sender]
+  jurisdictions: [ANY]
+  require:
+    - {fact: sender.complaint_rate, lt: 0.003}
+  remediation: Stop sending; clean the list; find the cause before resuming.
+
+- id: email.reputation.soft
+  domain: email
+  scope: message
+  stage: 111
+  title: Spam complaint rate under 0.1% target
+  regs: [industry-mailbox-bulk-sender]
+  jurisdictions: [ANY]
+  require:
+    - {fact: sender.complaint_rate, lt: 0.001}
+  on_fail: PASS_WITH_REVIEW
+
+# ---------- recipient scope ----------
+- id: email.r.minor
+  domain: email
+  scope: recipient
+  stage: 35
+  title: No marketing to known minors
+  regs: [us-coppa]
+  jurisdictions: [ANY]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: recipient.known_minor, eq: false}
+
+- id: email.r.consent.us
+  domain: email
+  scope: recipient
+  stage: 40
+  title: "US: opt-in or existing customer relationship (BAU policy above CAN-SPAM's opt-out floor)"
+  regs: [us-canspam, industry-mailbox-bulk-sender]
+  jurisdictions: [US]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: recipient.consent_basis, in: [express_opt_in, double_opt_in, prior_express_written, implied_purchase, existing_relationship]}
+  sets: {consent_model: opt_out_with_relationship}
+
+- id: email.r.consent.ca
+  domain: email
+  scope: recipient
+  stage: 41
+  title: "Canada: CASL express or unexpired implied consent"
+  regs: [ca-casl]
+  jurisdictions: [CA]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: recipient.consent_basis, in: [express_opt_in, double_opt_in, implied_purchase, implied_inquiry]}
+  sets: {consent_model: implied_or_express}
+
+- id: email.r.consent.eu
+  domain: email
+  scope: recipient
+  stage: 42
+  title: "EU/EEA: opt-in consent or soft opt-in"
+  regs: [eu-eprivacy-gdpr-marketing]
+  jurisdictions: [EU]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: recipient.consent_basis, in: [express_opt_in, double_opt_in, soft_opt_in]}
+  sets: {consent_model: opt_in_or_soft}
+
+- id: email.r.consent.gb
+  domain: email
+  scope: recipient
+  stage: 43
+  title: "UK: PECR consent or soft opt-in"
+  regs: [uk-pecr-duaa]
+  jurisdictions: [GB]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: recipient.consent_basis, in: [express_opt_in, double_opt_in, soft_opt_in]}
+  sets: {consent_model: opt_in_or_soft}
+
+- id: email.r.consent.au
+  domain: email
+  scope: recipient
+  stage: 44
+  title: "Australia: express or inferred consent"
+  regs: [au-spam-act]
+  jurisdictions: [AU]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: recipient.consent_basis, in: [express_opt_in, double_opt_in, implied_purchase]}
+  sets: {consent_model: implied_or_express}
+
+- id: email.r.suppression
+  domain: email
+  scope: recipient
+  stage: 50
+  title: Recipient not on the global suppression list
+  regs: [us-canspam, ca-casl, eu-eprivacy-gdpr-marketing, uk-pecr-duaa, au-spam-act]
+  jurisdictions: [ANY]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: recipient.suppressed, eq: false}
+
+- id: email.r.wireless_list_current
+  domain: email
+  scope: recipient
+  stage: 51
+  title: FCC wireless-domain list loaded and under 30 days old
+  regs: [us-fcc-wireless-domains]
+  jurisdictions: [US]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - {fact: wireless_list.age_days, lte: 30}
+  remediation: Download the FCC list and run `bau email import-wireless-list FILE`.
+
+- id: email.r.wireless_domain
+  domain: email
+  scope: recipient
+  stage: 52
+  title: No commercial email to wireless-carrier domains without express prior authorization
+  regs: [us-fcc-wireless-domains]
+  jurisdictions: [US]
+  when: {fact: message.category, in: [commercial, mixed]}
+  require:
+    - any:
+      - {fact: recipient.wireless_domain, eq: false}
+      - {fact: recipient.wireless_authorized, eq: true}
+
+- id: email.r.ad_identification
+  domain: email
+  scope: recipient
+  stage: 80
+  title: Identified as an advertisement (required unless recipient opted in)
+  regs: [us-canspam]
+  jurisdictions: [US]
+  when:
+    all:
+      - {fact: message.category, in: [commercial, mixed]}
+      - {fact: recipient.consent_express, eq: false}
+  require:
+    - {fact: message.ad_identified, eq: true}

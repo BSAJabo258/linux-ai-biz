@@ -1,0 +1,98 @@
+# Marketing text messages. Only US rules are modelled; any other country is UNKNOWN.
+coverage:
+  sms: [US]
+
+policies:
+- id: sms.classify
+  domain: sms
+  scope: message
+  stage: 10
+  title: Text classified (marketing / informational / transactional)
+  regs: [us-tcpa]
+  jurisdictions: [ANY]
+  require:
+    - {fact: message.category, in: [marketing, informational, transactional]}
+  on_fail: INCOMPLETE_FACTS
+
+- id: sms.suppression
+  domain: sms
+  scope: message
+  stage: 20
+  title: Number not suppressed / revoked
+  regs: [us-fcc-tcpa-revocation]
+  jurisdictions: [ANY]
+  require:
+    - {fact: recipient.suppressed, eq: false}
+
+- id: sms.consent
+  domain: sms
+  scope: message
+  stage: 30
+  title: Prior express written consent for marketing texts
+  regs: [us-tcpa, us-fl-ftsa, us-tx-sb140]
+  jurisdictions: [US]
+  when: {fact: message.category, eq: marketing}
+  require:
+    - {fact: recipient.consent_basis, eq: prior_express_written}
+
+- id: sms.dnc
+  domain: sms
+  scope: message
+  stage: 40
+  title: Scrubbed against National DNC + internal DNC
+  regs: [us-tcpa]
+  jurisdictions: [US]
+  when: {fact: message.category, eq: marketing}
+  require:
+    - {fact: recipient.dnc_checked, eq: true}
+    - any:
+      - {fact: recipient.on_dnc, eq: false}
+      - {fact: recipient.consent_basis, eq: prior_express_written}
+
+- id: sms.quiet_hours.federal
+  domain: sms
+  scope: message
+  stage: 50
+  title: Between 8am and 9pm recipient local time
+  regs: [us-tcpa]
+  jurisdictions: [US]
+  when: {fact: message.category, eq: marketing}
+  require:
+    - {fact: recipient.local_hour, gte: 8}
+    - {fact: recipient.local_hour, lt: 21}
+  remediation: Recipient timezone is required; unknown timezone blocks the send.
+
+- id: sms.quiet_hours.florida
+  domain: sms
+  scope: message
+  stage: 51
+  title: "Florida: between 8am and 8pm"
+  regs: [us-fl-ftsa]
+  jurisdictions: [US-FL]
+  when: {fact: message.category, eq: marketing}
+  require:
+    - {fact: recipient.local_hour, gte: 8}
+    - {fact: recipient.local_hour, lt: 20}
+
+- id: sms.frequency.florida
+  domain: sms
+  scope: message
+  stage: 52
+  title: "Florida: at most 3 messages on the same subject per 24 hours"
+  regs: [us-fl-ftsa]
+  jurisdictions: [US-FL]
+  when: {fact: message.category, eq: marketing}
+  require:
+    - {fact: recipient.messages_last_24h, lt: 3}
+
+- id: sms.content
+  domain: sms
+  scope: message
+  stage: 60
+  title: Sender identified and STOP instructions included
+  regs: [us-tcpa]
+  jurisdictions: [ANY]
+  when: {fact: message.category, eq: marketing}
+  require:
+    - {fact: message.sender_identified, eq: true}
+    - {fact: message.opt_out_instructions, eq: true}

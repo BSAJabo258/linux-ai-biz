@@ -1,0 +1,21 @@
+{
+  "campaign_id": "2026-10-planners",
+  "category": "commercial",
+  "purpose": "marketing",
+  "list_source": "own_opt_in",
+  "from_name": "BAU Media",
+  "from_address": "news@yourdomain.example",
+  "reply_to": "support@yourdomain.example",
+  "subject": "October planner pack is out",
+  "body_text": "Advertisement.\nOur October planner pack is here.\n\nBAU Media LLC, 100 Main St, Detroit, MI 48226\nUnsubscribe: https://yourdomain.example/u/TOKEN",
+  "ad_identified": true,
+  "physical_address": "BAU Media LLC, 100 Main St, Detroit, MI 48226",
+  "unsubscribe_url": "https://yourdomain.example/u/TOKEN",
+  "sexually_explicit": false,
+  "contains_testimonial": false,
+  "synthetic_performer": false,
+  "headers": {
+    "List-Unsubscribe": "<https://yourdomain.example/u/TOKEN>, <mailto:unsubscribe@yourdomain.example>",
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+  }
+}

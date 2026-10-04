@@ -1,0 +1,121 @@
+# IP, tax and records, payments, security, sanctions, AI governance.
+
+- reg_id: us-copyright-ai
+  jurisdiction: US
+  authority: U.S. Copyright Office
+  law: Copyright Office guidance on works containing AI-generated material; Copyright and AI Report Part 2 (Jan 2025)
+  legal_status: guidance
+  bau_status: IMPLEMENTED
+  effective_date: 2023-03-16
+  obligations:
+    - Only human-authored expression is protectable; disclose AI-generated material in registration applications
+    - Record human selection, arrangement and modification
+  penalties: Registrations can be cancelled for failure to disclose
+  source_url: https://www.copyright.gov/ai/
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: us-dmca-512
+  jurisdiction: US
+  authority: U.S. Copyright Office
+  law: DMCA safe harbor, 17 U.S.C. 512 - designated agent
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 1998-10-28
+  obligations:
+    - Any service hosting user-uploaded content registers a designated agent and renews every 3 years
+    - Notice-and-takedown and repeat-infringer policies
+  penalties: Loss of safe harbor
+  source_url: https://www.copyright.gov/dmca-directory/
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: false
+
+- reg_id: us-irs-records
+  jurisdiction: US
+  authority: IRS
+  law: Recordkeeping requirements (26 U.S.C. 6001); information returns incl. Form 1099-MISC/1099-NEC
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 1954-08-16
+  obligations:
+    - Keep records that substantiate income, deductions and credits (generally 3 years; 6-7 in some cases; employment 4 years)
+    - Report royalties of $10 or more on Form 1099-MISC; collect W-9/W-8 before paying
+    - Backup withholding when a payee fails to provide a TIN
+  penalties: Accuracy-related and information-return penalties
+  source_url: https://www.irs.gov/businesses/small-businesses-self-employed/recordkeeping
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: pci-dss-4
+  jurisdiction: ANY
+  authority: PCI Security Standards Council / card networks
+  law: PCI DSS v4.0.1
+  legal_status: industry_requirement
+  bau_status: MAPPED
+  effective_date: 2025-03-31
+  obligations:
+    - Never store card numbers or CVV; use a PCI-validated processor's hosted fields/checkout
+    - Complete the applicable SAQ (usually SAQ A when fully outsourced) annually
+    - Script integrity on payment pages (requirements 6.4.3 and 11.6.1)
+  penalties: Card-network fines; loss of processing
+  source_url: https://www.pcisecuritystandards.org/document_library/
+  source_type: industry_policy
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: false
+
+- reg_id: us-breach-notification
+  jurisdiction: US
+  authority: All 50 states, DC, territories; FTC Health Breach Notification Rule
+  law: State data breach notification statutes
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 2018-03-28
+  obligations:
+    - Notify affected residents (and often the AG) without unreasonable delay; some states set 30-60 day deadlines
+    - Preserve evidence; do not delete logs after an incident
+  penalties: Vary by state
+  source_url: https://www.ftc.gov/business-guidance/resources/data-breach-response-guide-business
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: us-ofac-sanctions
+  jurisdiction: US
+  authority: U.S. Treasury OFAC
+  law: Sanctions programs (IEEPA, TWEA) - SDN list
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 1977-12-28
+  obligations:
+    - Do not sell to, pay, or contract with sanctioned persons or comprehensively sanctioned regions
+    - Screen payees and high-value customers; payment processors screen but do not remove your liability
+  penalties: Strict liability civil penalties; criminal for willful violations
+  source_url: https://ofac.treasury.gov/
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: nist-ai-rmf
+  jurisdiction: ANY
+  authority: NIST
+  law: AI Risk Management Framework 1.0 and Generative AI Profile (NIST AI 600-1)
+  legal_status: standard
+  bau_status: MAPPED
+  effective_date: 2023-01-26
+  obligations:
+    - GOVERN, MAP, MEASURE, MANAGE functions mapped to BAU subsystems
+  penalties: None (voluntary framework)
+  source_url: https://www.nist.gov/itl/ai-risk-management-framework
+  source_type: standard
+  last_verified: 2026-10-04
+  next_review: 2027-10-04
+  legal_review_required: false
