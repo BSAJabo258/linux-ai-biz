@@ -63,7 +63,7 @@ const VIEWS = [
   ["status", "Status", "/api/status"], ["missions", "Missions", "/api/missions"],
   ["legal", "Legal review", "/api/legal-queue"], ["regulations", "Regulations", "/api/regulations"],
   ["jobs", "Jobs", "/api/jobs"], ["economics", "Economics", "/api/economics"],
-  ["incidents", "Incidents", "/api/incidents"]];
+  ["incidents", "Incidents", "/api/incidents"], ["governor", "Governor", "/api/governor"]];
 const COMMANDS = ["bau status", "bau reg due", "bau audit verify", "bau mission list",
   "bau email preflight --message m.json --recipients r.json --sender s.json --evidence",
   "bau approve --capability CAP --request-id ID --requester AGENT --bind FILE --out approval.json",
@@ -97,7 +97,12 @@ function render(key, data) {
   else if (key === "regulations") v.append(table(data, ["reg_id", "jurisdiction", "legal_status", "bau_status", "applicability", "next_review"]));
   else if (key === "jobs") v.append(table(data, ["job_id", "agent", "status", "objective", "cost_usd"]));
   else if (key === "economics") v.append(el("pre", {}, JSON.stringify(data, null, 2)));
-  else if (key === "incidents") v.append(table(data, ["id", "class", "severity", "stage", "title"]));
+  else if (key === "governor") {
+    v.append(el("section", {}, el("h3", {}, "Hold: ", el("span", { class: "badge " + (data.hold ? "BLACK" : "GREEN") }, data.hold || "none")),
+      table(Object.entries(data.counts).map(([severity, n]) => ({ severity, n })), ["severity", "n"])));
+    v.append(el("section", {}, el("h3", {}, "Needs you"), table(data.needs_you, ["severity", "check", "subject", "detail", "at"])));
+    v.append(el("section", {}, el("h3", {}, "Fixed by the Governor (72h)"), table(data.fixed, ["check", "subject", "detail", "remedy", "at"])));
+  } else if (key === "incidents") v.append(table(data, ["id", "class", "severity", "stage", "title"]));
 }
 async function show(i) {
   current = i; const [key, label, url] = VIEWS[i];

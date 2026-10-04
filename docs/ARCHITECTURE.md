@@ -138,7 +138,8 @@ What the Governor fixes on its own is limited to moves that make the system safe
 it: mark a stuck job INTERRUPTED and resume it from its checkpoint (at most
 `max_auto_resumes` times), re-queue jobs when the network returns, QUARANTINE an agent, or
 put BAU on **HOLD** (the gateway then runs only READ_ONLY capabilities and Jarvis starts
-nothing). Everything else becomes a finding for the owner (`bau governor digest`).
+nothing). Everything else becomes a finding for the owner (`bau governor digest`,
+or the **Governor** view in Mission Control; a HOLD also shows as a BLACK status row).
 
 The Governor has **no approval rights**. Approvals stay human-signed (SSH key), and only a
 human can release a hold, restore a quarantined agent (`bau set-status`) or close a finding.

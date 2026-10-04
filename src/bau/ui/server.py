@@ -50,6 +50,13 @@ def _api(path: str, home: Path) -> Any:
         from ..economics import Ledger, metrics, usage_dashboard
         led = Ledger(home)
         return {"metrics": metrics(led), "usage": usage_dashboard(led, home)}
+    if path == "/api/governor":
+        from ..audit import AuditLog
+        from ..governor import Governor
+        g = Governor(home, audit=AuditLog(home / "audit" / "chain.jsonl"))
+        d = g.digest(72)
+        return {"hold": d["hold"], "needs_you": d["needs_you"], "fixed": d["fixed"][-50:],
+                "counts": d["counts"]}
     if path == "/api/incidents":
         from ..incidents import Incidents
         return Incidents(home).open_items()

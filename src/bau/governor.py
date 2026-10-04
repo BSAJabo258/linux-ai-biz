@@ -290,9 +290,9 @@ class Governor:
         out = []
         for it in dashboard(self.home)["items"]:
             # "build:" rows are the install checklist (bau status), not runtime faults;
-            # the audit chain has its own check above.
+            # the audit chain has its own check above; "governor:" rows are our own.
             if it["color"] in ("RED", "BLACK") and not it["item"].startswith(
-                    ("audit chain", "build:")):
+                    ("audit chain", "build:", "governor:")):
                 out.append(Finding("status", "CRITICAL" if it["color"] == "BLACK" else
                                    "ACTION", "mission-control", it["item"][:300]))
         return out

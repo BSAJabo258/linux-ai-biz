@@ -156,3 +156,22 @@ def test_findings_close_requires_human(tmp_path):
     with pytest.raises(PermissionError):
         g.close("fnd_1", "agent:x")
     g.close("fnd_1", "human:owner", "dealt with")
+
+
+def test_mission_control_shows_governor(tmp_path):
+    from bau.status import dashboard
+    from bau.ui.server import _api
+    g = gov(tmp_path)
+    g.findings.append({"id": "fnd_x", "at": "2026-10-04T00:00:00+00:00", "check": "jobs",
+                       "severity": "ACTION", "subject": "job_1", "detail": "stuck",
+                       "remedy": ""})
+    st = g._state()
+    st["open"] = {"k": "fnd_x"}
+    (tmp_path / "governor" / "state.json").write_text(json.dumps(st))
+    g.hold("spend")
+    items = [i for i in dashboard(tmp_path)["items"] if i["item"].startswith("governor:")]
+    assert [i["color"] for i in items] == ["BLACK", "ORANGE"]
+    api = _api("/api/governor", tmp_path)
+    assert api["hold"] == "spend" and api["needs_you"][0]["subject"] == "job_1"
+    # The Governor does not re-report its own dashboard rows as new problems.
+    assert not [f for f in g._dashboard({}, None, None) if "governor:" in f.detail]

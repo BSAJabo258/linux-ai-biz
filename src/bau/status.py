@@ -79,6 +79,18 @@ def dashboard(home: Path | None = None, on: dt.date | None = None) -> dict[str, 
                 add("BLACK" if inc.get("severity") == "critical" else "RED",
                     f"incident {inc.get('id')}: {inc.get('title')}")
 
+    from .governor import Governor, hold_reason
+    held = hold_reason(home)
+    if held:
+        add("BLACK", f"governor: BAU is on HOLD ({held}) - only read-only actions run; "
+                     "`bau governor release` after you have looked")
+    gov_dir = home / "governor"
+    if (gov_dir / "findings.jsonl").exists():
+        for f in Governor(home, audit=AuditLog(home / "audit" / "chain.jsonl")
+                          ).open_findings():
+            if f["severity"] in ("ACTION", "CRITICAL") and not f["remedy"]:
+                add("ORANGE", f"governor: {f['check']} {f['subject']}: {f['detail']}"[:300])
+
     for b in build_state(home):
         if b["status"] != "done":
             add("RED" if b.get("critical") else "YELLOW",
