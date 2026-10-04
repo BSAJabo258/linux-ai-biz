@@ -1,0 +1,71 @@
+#### BAU base OS preseed (Debian 13 "trixie" or later stable).
+#
+# Deliberately NOT preseeded, so a human must answer at install time:
+#   * which disk to install to, and every "write changes / erase disk" confirmation
+#   * the disk-encryption passphrase
+#   * the administrator password (no secret ever lives in this file - spec §1.4)
+#   * the time zone
+# Everything else is fixed so every BAU machine is built the same way.
+
+### Localisation
+d-i debian-installer/locale string en_US.UTF-8
+d-i keyboard-configuration/xkb-keymap select us
+
+### Network (DHCP; no inbound services are installed)
+d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string bau
+d-i netcfg/get_domain string localdomain
+d-i netcfg/wireless_wep string
+
+### Mirror
+d-i mirror/country string manual
+d-i mirror/http/hostname string deb.debian.org
+d-i mirror/http/directory string /debian
+d-i mirror/http/proxy string
+
+### Accounts: root disabled, admin uses sudo. Password is asked interactively.
+d-i passwd/root-login boolean false
+d-i passwd/user-fullname string BAU Administrator
+d-i passwd/username string bauadmin
+d-i passwd/user-default-groups string audio cdrom video plugdev netdev sudo
+
+### Clock: UTC hardware clock with network time (date-aware compliance needs a correct clock)
+d-i clock-setup/utc boolean true
+d-i clock-setup/ntp boolean true
+
+### Partitioning: full-disk encryption (LUKS) + LVM, separate /home.
+### The disk is NOT chosen here and NO confirmation is preseeded: the installer
+### shows the target disk and you must confirm the erase yourself.
+d-i partman-auto/method string crypto
+d-i partman-auto-lvm/guided_size string max
+d-i partman-auto/choose_recipe select home
+d-i partman-auto-lvm/new_vg_name string bau-vg
+
+### Apt
+d-i apt-setup/non-free-firmware boolean true
+d-i apt-setup/services-select multiselect security, updates
+d-i apt-setup/cdrom/set-first boolean false
+
+### Software. GNOME ships the Orca screen reader and full keyboard navigation (spec §28-29).
+tasksel tasksel/first multiselect standard, gnome-desktop
+d-i pkgsel/include string sudo apparmor apparmor-utils apparmor-profiles apparmor-profiles-extra \
+  nftables podman uidmap slirp4netns passt fuse-overlayfs \
+  python3 python3-venv python3-pip python3-yaml \
+  cryptsetup tpm2-tools mokutil chrony auditd unattended-upgrades apt-listchanges \
+  openssh-client rsync smartmontools pciutils usbutils lshw dnsutils curl gnupg git xorriso orca \
+  ffmpeg
+d-i pkgsel/upgrade select full-upgrade
+popularity-contest popularity-contest/participate boolean false
+
+### Boot loader
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/bootdev string default
+
+### Hand-off: stage the first-boot notice and baseline firewall. No network access,
+### no BAU code - that comes from USB #2, verified by checksum.
+d-i preseed/late_command string \
+  mkdir -p /target/opt/bau-bootstrap; \
+  cp -r /cdrom/bau/. /target/opt/bau-bootstrap/; \
+  in-target /bin/sh /opt/bau-bootstrap/firstboot-setup.sh
+
+d-i finish-install/reboot_in_progress note

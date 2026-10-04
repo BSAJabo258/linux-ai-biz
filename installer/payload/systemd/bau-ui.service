@@ -1,0 +1,27 @@
+[Unit]
+Description=BAU Mission Control (read-only dashboard on http://127.0.0.1:8765)
+After=network.target
+
+[Service]
+User=bau
+Group=bau
+Environment=BAU_HOME=/var/lib/bau
+Environment=BAU_AUDIT_KEY=/etc/bau/audit.key
+ExecStart=/usr/local/bin/bau ui --port 8765
+Restart=on-failure
+UMask=0007
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/bau
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,5 @@
+[
+  {"address": "customer1@example.com", "country": "US", "region": "MI"},
+  {"address": "kunde@example.de", "country": "DE"},
+  {"address": "unknown-location@example.org"}
+]

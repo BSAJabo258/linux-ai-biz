@@ -1,0 +1,176 @@
+# Privacy, data rights, minors, accessibility.
+
+- reg_id: us-ca-ccpa-cpra
+  jurisdiction: US-CA
+  authority: CPPA / California AG
+  law: California Consumer Privacy Act as amended by CPRA (Civ. Code 1798.100 et seq.)
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2023-01-01
+  obligations:
+    - Notice at collection; privacy policy; rights to know, delete, correct, opt out of sale/sharing, limit sensitive PI
+    - Respond within 45 days (extendable 45); honour Global Privacy Control
+  penalties: Up to $2,500 / $7,500 per violation (CPI-adjusted)
+  source_url: https://oag.ca.gov/privacy/ccpa
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: us-ca-sb923-deletion
+  jurisdiction: US-CA
+  authority: California Legislature
+  law: SB 923 (2026) - CCPA deletion right covers all personal information; webform for online-only businesses
+  legal_status: enacted
+  bau_status: MAPPED
+  effective_date: null
+  obligations:
+    - Deletion applies to all PI about the consumer regardless of source
+    - Online-only businesses must offer a webform for requests
+  penalties: As CCPA
+  source_url: https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260SB923
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2026-11-04
+  legal_review_required: true
+  verification_note: Signed 2026-09-27 per Kelley Drye; operative date unconfirmed.
+
+- reg_id: us-state-privacy-generic
+  jurisdiction: US
+  authority: State legislatures (about 20 states with comprehensive privacy laws)
+  law: State comprehensive privacy laws (VA, CO, CT, UT, TX, OR, MT, IA, DE, NH, NJ, TN, MN, MD, IN, KY, RI, NE, ...)
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 2023-01-01
+  obligations:
+    - Thresholds differ by state; most give access/delete/correct/portability/opt-out rights with 45-day responses
+    - Appeals process; data protection assessments for targeted advertising/profiling/sensitive data
+  penalties: AG enforcement; amounts vary by state
+  source_url: https://iapp.org/resources/article/us-state-privacy-legislation-tracker/
+  source_type: secondary_analysis
+  last_verified: 2026-10-04
+  next_review: 2026-12-04
+  legal_review_required: true
+  notes: Placeholder for per-state records. Each state needs its own record before BAU markets to its residents at scale.
+
+- reg_id: eu-gdpr
+  jurisdiction: EU
+  authority: EDPB / national DPAs
+  law: General Data Protection Regulation (EU) 2016/679
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2018-05-25
+  obligations:
+    - Lawful basis for each purpose; data minimisation; records of processing
+    - Data subject rights answered within one month (extendable two)
+    - Breach notification to the authority within 72 hours
+    - Transfer safeguards for data leaving the EEA
+  penalties: Up to EUR 20M or 4% of global turnover
+  source_url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: uk-gdpr-dpa
+  jurisdiction: GB
+  authority: ICO
+  law: UK GDPR and Data Protection Act 2018, as amended by the Data (Use and Access) Act 2025
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 2021-01-01
+  obligations:
+    - As GDPR with UK-specific changes (recognised legitimate interests, complaints handling)
+  penalties: Up to GBP 17.5M or 4%
+  source_url: https://ico.org.uk/for-organisations/
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: ca-pipeda
+  jurisdiction: CA
+  authority: Office of the Privacy Commissioner of Canada
+  law: PIPEDA (S.C. 2000, c. 5)
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 2001-01-01
+  obligations:
+    - Consent for collection/use/disclosure; access requests answered within 30 days
+  penalties: Court-ordered damages; fines for specific offences
+  source_url: https://laws-lois.justice.gc.ca/eng/acts/P-8.6/
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: us-coppa
+  jurisdiction: US
+  authority: FTC
+  law: COPPA Rule (16 CFR Part 312), 2025 amendments
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 2025-06-23
+  obligations:
+    - Verifiable parental consent before collecting personal information from children under 13
+    - Separate consent for third-party disclosure (e.g. targeted ads); written security program; data retention limits
+    - Full compliance with the 2025 amendments required by 2026-04-22
+  penalties: Up to $53,088 per violation
+  source_url: https://www.ecfr.gov/current/title-16/part-312
+  source_type: final_regulation
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: us-ca-minors-2026
+  jurisdiction: US-CA
+  authority: California Legislature
+  law: AB 1709 (addictive features, under 16), AB 2246 (minor online safety), AB 1856 (age signals) - signed Sept 2026
+  legal_status: enacted
+  bau_status: MAPPED
+  effective_date: null
+  obligations:
+    - No algorithmic feeds, autoplay or push notifications for under-16 users without required consent
+    - No default profiling of minors under 18
+    - Treat received age-bracket signals as actual knowledge of age
+  penalties: AB 1709 up to $50,000 per affected minor
+  source_url: https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260AB1709
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2026-11-04
+  legal_review_required: true
+  verification_note: From Kelley Drye session wrap-up; operative dates unconfirmed. BAU's default is to not market to minors at all.
+
+- reg_id: eu-accessibility-act
+  jurisdiction: EU
+  authority: European Commission / member states
+  law: European Accessibility Act, Directive (EU) 2019/882
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 2025-06-28
+  obligations:
+    - E-commerce services, e-books and related consumer services sold to EU consumers must be accessible (EN 301 549 / WCAG-aligned)
+    - Micro-enterprises (<10 staff and <=EUR 2M turnover) providing services are exempt
+  penalties: Set by each member state
+  source_url: https://eur-lex.europa.eu/eli/dir/2019/882/oj
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: wcag-2-2
+  jurisdiction: ANY
+  authority: W3C
+  law: Web Content Accessibility Guidelines 2.2 (target level AA)
+  legal_status: standard
+  bau_status: IMPLEMENTED
+  effective_date: 2023-10-05
+  obligations:
+    - Keyboard operable, visible focus, no keyboard traps, sufficient contrast, text alternatives, captions
+    - Target size, dragging alternatives, consistent help, accessible authentication (2.2 additions)
+  penalties: None directly; referenced by ADA litigation, EAA, Section 508, DOJ Title II rule
+  source_url: https://www.w3.org/TR/WCAG22/
+  source_type: standard
+  last_verified: 2026-10-04
+  next_review: 2027-10-04
+  legal_review_required: false

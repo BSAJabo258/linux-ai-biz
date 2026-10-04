@@ -1,0 +1,130 @@
+# Subscriptions, negative options, advertising claims, reviews.
+
+- reg_id: us-ftc-act-s5
+  jurisdiction: US
+  authority: FTC
+  law: FTC Act Section 5 (15 U.S.C. 45) - unfair or deceptive acts or practices
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 1914-09-26
+  obligations:
+    - Claims must be truthful, not misleading, and substantiated before they are made
+    - AI capability claims are subject to the same substantiation standard ("AI-washing" enforcement)
+    - Material terms must be clear and conspicuous
+  penalties: Injunctions, redress; civil penalties where a rule or order is violated
+  source_url: https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title15-section45
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: us-ftc-rosca
+  jurisdiction: US
+  authority: FTC
+  law: Restore Online Shoppers' Confidence Act (15 U.S.C. 8401-8405)
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2010-12-29
+  obligations:
+    - Clearly and conspicuously disclose all material terms before obtaining billing information
+    - Obtain express informed consent before charging
+    - Provide simple mechanisms to stop recurring charges
+  penalties: Civil penalties per violation (FTC Act 5(m)); e.g. Shutterstock $35M settlement (May 2026)
+  source_url: https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title15-chapter110
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  notes: This - not the vacated click-to-cancel rule - is the federal basis of current subscription enforcement.
+
+- reg_id: us-ftc-click-to-cancel-2024
+  jurisdiction: US
+  authority: FTC
+  law: 2024 amendments to the Negative Option Rule (16 CFR 425) - "click-to-cancel"
+  legal_status: vacated
+  bau_status: MAPPED
+  effective_date: 2025-07-14
+  obligations:
+    - (vacated) Simple cancellation at least as easy as sign-up; save-offer limits; consent recordkeeping
+  penalties: None - vacated in full by the 8th Circuit on 2025-07-08 before taking effect
+  source_url: https://www.ecfr.gov/current/title-16/part-425
+  source_type: court_decision
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  notes: Kept so nobody cites it as current law. BAU still implements its controls voluntarily because ROSCA, state ARLs and FTC orders require substantially the same.
+
+- reg_id: us-ftc-negative-option-anprm-2026
+  jurisdiction: US
+  authority: FTC
+  law: Negative Option Rule - Advance Notice of Proposed Rulemaking (March 2026)
+  legal_status: proposed
+  bau_status: PROPOSED
+  effective_date: null
+  obligations:
+    - Watch only - an ANPRM is not law (spec §93)
+  penalties: None until a final rule issues
+  source_url: https://www.ecfr.gov/current/title-16/part-425
+  source_type: secondary_analysis
+  last_verified: 2026-10-04
+  next_review: 2026-12-04
+  legal_review_required: true
+  notes: ANPRM issued 2026-03-11 per secondary sources (Sidley, Jones Day, Crowell). Regulation watcher must track the NPRM.
+
+- reg_id: us-ca-arl
+  jurisdiction: US-CA
+  authority: California Legislature / Attorney General
+  law: California Automatic Renewal Law, Bus. & Prof. Code 17600-17606, as amended by AB 2863
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2025-07-01
+  obligations:
+    - Clear and conspicuous auto-renewal terms before the subscription is fulfilled
+    - Affirmative consent to the automatic renewal terms specifically
+    - Acknowledgment with terms, cancellation policy and how to cancel
+    - Online cancellation available if the consumer signed up online ("click to cancel")
+    - At most one save offer unless the consumer asks for more; cancel must be available at once
+    - Annual reminder for subscriptions; notice before free trial over 31 days converts; notice before price changes
+    - Keep consent records for 3 years or 1 year after termination, whichever is longer
+  penalties: Unfair competition law remedies; goods sent without valid consent are deemed unconditional gifts
+  source_url: https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202320240AB2863
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  verification_note: Obligations summarised from established analysis of AB 2863; confirm reminder windows against statute text.
+
+- reg_id: us-ftc-reviews-rule
+  jurisdiction: US
+  authority: FTC
+  law: Trade Regulation Rule on the Use of Consumer Reviews and Testimonials (16 CFR Part 465)
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2024-10-21
+  obligations:
+    - No fake or AI-generated reviews/testimonials attributed to people who do not exist or did not have the experience
+    - No buying positive or negative reviews; no undisclosed insider reviews
+    - No review suppression; no fake social-media indicators (bought followers/views)
+  penalties: Civil penalties per violation (up to $53,088)
+  source_url: https://www.ecfr.gov/current/title-16/part-465
+  source_type: final_regulation
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: us-ftc-endorsement-guides
+  jurisdiction: US
+  authority: FTC
+  law: Guides Concerning the Use of Endorsements and Testimonials in Advertising (16 CFR Part 255, 2023)
+  legal_status: guidance
+  bau_status: IMPLEMENTED
+  effective_date: 2023-07-26
+  obligations:
+    - Disclose material connections (payment, free product, affiliate links) clearly and conspicuously
+    - Endorsements must reflect honest opinions of actual users
+  penalties: Enforced through FTC Act s.5
+  source_url: https://www.ecfr.gov/current/title-16/part-255
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: false

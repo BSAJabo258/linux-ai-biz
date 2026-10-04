@@ -1,0 +1,200 @@
+# AI transparency, synthetic media, chatbots, ADMT.
+
+- reg_id: eu-ai-act-art50
+  jurisdiction: EU
+  authority: European Commission / AI Office
+  law: Regulation (EU) 2024/1689 (AI Act) Article 50 - transparency obligations
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2026-08-02
+  obligations:
+    - "50(1): people must be informed they are interacting with an AI system unless obvious"
+    - "50(2): providers mark synthetic audio/image/video/text in a machine-readable, detectable format (systems already on the market: by 2026-12-02 under the Digital Omnibus)"
+    - "50(4): deployers disclose deepfakes; and AI-generated text published to inform the public on matters of public interest unless under human editorial responsibility"
+    - Disclosure at the latest at first interaction or exposure, clear and distinguishable, accessible
+  penalties: Up to EUR 15M or 3% of global turnover
+  source_url: https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2026-12-01
+  legal_review_required: true
+  verification_note: Omnibus effect on Art. 50 from secondary sources (Jones Walker, CSA, Plesner); confirm against Regulation (EU) 2026/1744 text.
+
+- reg_id: eu-ai-act-high-risk
+  jurisdiction: EU
+  authority: European Commission / AI Office
+  law: AI Act high-risk obligations (Annex III), as delayed by the Digital Omnibus (Regulation (EU) 2026/1744)
+  legal_status: enacted
+  bau_status: MAPPED
+  effective_date: 2027-12-02
+  obligations:
+    - Risk management, data governance, technical documentation, logging, human oversight, accuracy/robustness for high-risk uses (employment, credit, education, essential services...)
+    - Annex I product-embedded systems from 2028-08-02
+  penalties: Up to EUR 15M or 3%
+  source_url: https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: us-ca-ai-transparency-act
+  jurisdiction: US-CA
+  authority: California Legislature
+  law: California AI Transparency Act (SB 942) as amended by AB 853
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2026-08-02
+  covered_entities: Covered GenAI providers with over 1,000,000 monthly users; GenAI hosting platforms from 2027-01-01; capture-device makers later
+  obligations:
+    - Covered providers offer a free detection tool and embed latent disclosures in image/video/audio
+    - Licensees must not strip latent disclosures - BAU must preserve provider provenance markings end to end
+  penalties: $5,000 per violation per day (civil, AG/city attorney)
+  source_url: https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260AB853
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  notes: BAU is most likely a licensee/user, not a covered provider; the obligation that bites is not removing markings.
+
+- reg_id: us-ny-synthetic-performer
+  jurisdiction: US-NY
+  authority: New York Legislature
+  law: N.Y. General Business Law - synthetic performer disclosure in advertising (S.8420-A)
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2026-06-09
+  obligations:
+    - Conspicuously disclose any AI-generated synthetic performer in an advertisement
+    - Exemptions include audio-only ads, ads for expressive works consistent with the work, AI used only for translation
+  penalties: $1,000 first violation, $5,000 each subsequent
+  source_url: https://www.nysenate.gov/legislation/bills/2025/S8420/amendment/A
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: us-ca-sb1050-synthetic-performer
+  jurisdiction: US-CA
+  authority: California Legislature
+  law: SB 1050 (2026) - synthetic performer disclosure in video/audio advertising
+  legal_status: enacted
+  bau_status: IMPLEMENTED
+  effective_date: null
+  obligations:
+    - Clear and conspicuous disclosure when a video or audio advertisement includes an AI-generated performer
+    - Stop running an advertisement found in violation
+  penalties: To be confirmed from statute text
+  source_url: https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260SB1050
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2026-11-04
+  legal_review_required: true
+  verification_note: Signed 2026-09-16 (Governor's office). Operative date not yet confirmed - BAU enforces it now as a precaution. Unlike NY, covers audio ads.
+
+- reg_id: us-ca-ab1609-chatbot
+  jurisdiction: US-CA
+  authority: California Legislature
+  law: AB 1609 (2026) - customer service chatbots at large businesses
+  legal_status: enacted
+  bau_status: MAPPED
+  effective_date: null
+  covered_entities: Businesses with $500M+ annual revenue
+  obligations:
+    - Disclose that the customer is talking to an automated chatbot
+    - Connect to a human within 15 minutes or schedule a callback within 1 day
+    - List contact information on the website
+  penalties: To be confirmed
+  source_url: https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260AB1609
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2026-11-04
+  legal_review_required: true
+  verification_note: Signed 2026-09-28. BAU is far below the revenue threshold today but discloses chatbots everywhere anyway.
+
+- reg_id: us-ca-sb243-companion-chatbot
+  jurisdiction: US-CA
+  authority: California Legislature
+  law: SB 243 (2025) - companion chatbots
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 2026-01-01
+  obligations:
+    - Clear notice that a companion chatbot is AI; heightened protections for minors; crisis protocols
+  penalties: Private right of action
+  source_url: https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260SB243
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  notes: Customer-service and business bots are excluded. SB 1119 (2026) adds companion-chatbot requirements from 2027-07-01.
+
+- reg_id: us-ca-ccpa-admt
+  jurisdiction: US-CA
+  authority: CPPA
+  law: CCPA regulations on ADMT, risk assessments and cybersecurity audits (approved Sept 2025)
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 2026-01-01
+  obligations:
+    - Risk assessments for covered processing from 2026-01-01 (attestations due 2028-04-01)
+    - ADMT significant-decision requirements (pre-use notice, opt-out, access) from 2027-01-01
+    - Cybersecurity audits from 2028-04-01 (>$100M revenue), 2029-04-01 ($50-100M), 2030-04-01 (<$50M)
+  penalties: Up to $2,500 per violation, $7,500 intentional or involving minors (CPI-adjusted)
+  source_url: https://cppa.ca.gov/regulations/
+  source_type: final_regulation
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  verification_note: Audit tiers vary between secondary sources (some say 2027 for $50-100M); confirm in 11 CCR 7121.
+
+- reg_id: us-ftc-ai-claims
+  jurisdiction: US
+  authority: FTC
+  law: FTC Act s.5 applied to AI ("Operation AI Comply" and later actions)
+  legal_status: guidance
+  bau_status: IMPLEMENTED
+  effective_date: 2024-09-25
+  obligations:
+    - Do not overstate what AI does; substantiate claims of autonomy, accuracy, earnings
+    - Do not sell tools whose purpose is deceptive content (e.g. fake review generators)
+  penalties: As FTC Act s.5
+  source_url: https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title15-section45
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: false
+
+- reg_id: us-right-of-publicity
+  jurisdiction: US
+  authority: State legislatures and courts
+  law: State right-of-publicity and digital-replica laws (e.g. Cal. Civ. Code 3344 and 3344.1; N.Y. Civ. Rights Law 50-51; Tennessee ELVIS Act 2024)
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 1985-01-01
+  obligations:
+    - Written consent/licence before using a person's name, face, voice or likeness commercially
+    - Digital replicas of performers (living or deceased) need specific authorization
+  penalties: Statutory and actual damages, injunctions; vary by state
+  source_url: https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=3344
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  notes: CA SB 1111 (2026, pending) would extend "voice or likeness" to computer-generated representations.
+
+- reg_id: industry-platform-ai-labels
+  jurisdiction: ANY
+  authority: YouTube, Meta, TikTok and other publishing platforms
+  law: Platform altered/synthetic-content disclosure policies
+  legal_status: industry_requirement
+  bau_status: IMPLEMENTED
+  effective_date: 2024-03-18
+  obligations:
+    - Use the platform's own AI/altered-content disclosure setting when content is realistic and synthetic
+    - Keep each platform's policy version in the platform registry (spec §80)
+  penalties: Labels applied by platform, demonetization, removal, account strikes
+  source_url: https://support.google.com/youtube/answer/14328491
+  source_type: industry_policy
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: false

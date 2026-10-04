@@ -1,0 +1,89 @@
+# Business factories (spec §60-65). Every factory ships INACTIVE (spec §60:
+# do not activate everything at once). Stage types:
+#   agent    - an agent drafts/produces; output is reviewed by later stages
+#   gate     - a policy domain must pass (facts come from the run context)
+#   checklist- named items the operator confirms (recorded with who confirmed)
+#   approval - a human-signed approval is required to continue
+#   tool     - a gateway capability is invoked
+faceless_media:
+  description: Faceless media channel (spec §62)
+  mission_type: publish_video
+  stages:
+    - {id: niche, type: agent, agent: research, prompt: "Propose a niche and audience with evidence."}
+    - {id: opportunity, type: agent, agent: research, prompt: "Score the opportunity with sources."}
+    - {id: topic, type: agent, agent: research, prompt: "Pick one topic for the next video."}
+    - {id: research, type: agent, agent: research, prompt: "Research the topic; cite every source."}
+    - {id: fact_check, type: agent, agent: qa, prompt: "Check every claim against its source; list unsupported claims."}
+    - {id: script, type: agent, agent: writer, prompt: "Write the script using only checked facts."}
+    - {id: editorial_qa, type: checklist, items: [claims_substantiated, no_fake_testimonials, tone_reviewed]}
+    - {id: storyboard, type: agent, agent: media, prompt: "Storyboard the script scene by scene."}
+    - {id: production, type: checklist, items: [voice_produced, visuals_produced, music_licensed, edit_done, thumbnail_done]}
+    - {id: metadata, type: agent, agent: writer, prompt: "Write title and description; no clickbait, no unsupported claims."}
+    - {id: ai_disclosure, type: gate, domain: publish}
+    - {id: accessibility, type: checklist, items: [captions, transcript, contrast_checked]}
+    - {id: rights_check, type: gate, domain: monetize}
+    - {id: final_qa, type: checklist, items: [watched_end_to_end, links_checked]}
+    - {id: approval, type: approval, capability: publish.video}
+    - {id: publish, type: tool, capability: publish.video}
+digital_assets:
+  description: Templates, planners, kits, packs (spec §64)
+  mission_type: sell_digital_asset
+  stages:
+    - {id: market, type: agent, agent: research, prompt: "Find a demand signal for a digital asset; cite evidence."}
+    - {id: design, type: agent, agent: writer, prompt: "Specify the asset and its contents."}
+    - {id: production, type: checklist, items: [asset_built, fonts_licensed, stock_licensed]}
+    - {id: rights_check, type: gate, domain: monetize}
+    - {id: ai_disclosure, type: gate, domain: publish}
+    - {id: accessibility, type: checklist, items: [accessible_pdf_or_alt_text]}
+    - {id: approval, type: approval, capability: publish.text}
+    - {id: listing, type: tool, capability: publish.text}
+books:
+  description: Book factory (spec §63)
+  mission_type: sell_digital_asset
+  stages:
+    - {id: market, type: agent, agent: research, prompt: "Assess the market for the topic with evidence."}
+    - {id: outline, type: agent, agent: writer, prompt: "Outline the book."}
+    - {id: chapters, type: agent, agent: writer, prompt: "Draft chapters from the outline."}
+    - {id: fact_check, type: agent, agent: qa, prompt: "Fact-check every chapter; list unsupported claims."}
+    - {id: editorial, type: checklist, items: [human_edit_pass, consistency_pass]}
+    - {id: cover, type: checklist, items: [cover_rights_cleared]}
+    - {id: rights_check, type: gate, domain: monetize}
+    - {id: ai_disclosure, type: gate, domain: publish}
+    - {id: accessibility, type: checklist, items: [epub_accessibility_metadata, alt_text]}
+    - {id: proof, type: checklist, items: [proof_read]}
+    - {id: approval, type: approval, capability: publish.text}
+    - {id: distribution, type: tool, capability: publish.text}
+music_entertainment:
+  description: Music and music-video releases (spec §58)
+  mission_type: publish_video
+  stages:
+    - {id: audio_analysis, type: tool, capability: media.analyze_audio}
+    - {id: storyboard, type: agent, agent: media, prompt: "Storyboard scenes for each analysed section."}
+    - {id: production, type: checklist, items: [scenes_rendered, edit_on_beat_grid, music_rights_cleared]}
+    - {id: rights_check, type: gate, domain: monetize}
+    - {id: ai_disclosure, type: gate, domain: publish}
+    - {id: approval, type: approval, capability: publish.video}
+    - {id: publish, type: tool, capability: publish.video}
+automation_services:
+  description: Automation services for businesses (spec §65)
+  mission_type: automation_service
+  stages:
+    - {id: discovery, type: agent, agent: research, prompt: "Summarise the customer's process and pain points from the notes provided."}
+    - {id: qualification, type: checklist, items: [customer_identity_verified, sanctions_screened, scope_agreed]}
+    - {id: process_map, type: agent, agent: writer, prompt: "Map the current process."}
+    - {id: design, type: agent, agent: writer, prompt: "Design the automation; list data it touches."}
+    - {id: security_privacy, type: checklist, items: [data_inventory_done, dpa_signed_if_personal_data, least_privilege_credentials]}
+    - {id: prototype_qa, type: checklist, items: [prototype_built, tests_pass]}
+    - {id: customer_approval, type: approval, capability: project.deliver}
+    - {id: deploy, type: tool, capability: project.deliver}
+gods_eye_media:
+  description: Public-data geographic storytelling (spec §59)
+  mission_type: publish_video
+  stages:
+    - {id: data, type: tool, capability: spatial.public_data}
+    - {id: script, type: agent, agent: writer, prompt: "Write an educational narrative from the public data; no individuals."}
+    - {id: production, type: checklist, items: [scene_rendered, data_licences_compatible]}
+    - {id: ai_disclosure, type: gate, domain: publish}
+    - {id: rights_check, type: gate, domain: monetize}
+    - {id: approval, type: approval, capability: publish.video}
+    - {id: publish, type: tool, capability: publish.video}

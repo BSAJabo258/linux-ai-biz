@@ -1,0 +1,67 @@
+# Mission types (spec §113: compliance is a dependency).
+# A mission is READY only when every gate domain listed under `requires` passes
+# for the facts supplied. `high_impact` (spec §33) forces human review.
+# `legal_review` opens a legal-queue item (spec §120) that must be resolved first.
+
+publish_video:
+  description: Publish a generated or edited video to a platform
+  requires: [publish, monetize]
+  capabilities: [publish.video]
+  high_impact: false
+  data_classes: [PUBLIC]
+send_email_campaign:
+  description: Send a commercial email campaign
+  requires: [email]
+  capabilities: [email.send.commercial]
+  high_impact: false
+  data_classes: [PERSONAL]
+send_sms_campaign:
+  description: Send marketing text messages
+  requires: [sms]
+  capabilities: [sms.send.marketing]
+  high_impact: false
+  data_classes: [PERSONAL]
+launch_subscription:
+  description: Put a recurring-billing product on sale
+  requires: [subscription]
+  capabilities: [publish.text]
+  high_impact: false
+  data_classes: [PERSONAL, FINANCIAL]
+sell_digital_asset:
+  description: Sell a template, pack, book or other digital asset
+  requires: [monetize, publish]
+  capabilities: [publish.text]
+  high_impact: false
+  data_classes: [PUBLIC]
+deploy_chatbot:
+  description: Put an AI assistant in front of customers
+  requires: [chatbot]
+  capabilities: [publish.text]
+  high_impact: false
+  data_classes: [PERSONAL]
+pay_royalties:
+  description: Pay out royalties or revenue shares
+  requires: [monetize]
+  capabilities: [move.money]
+  high_impact: true
+  data_classes: [FINANCIAL]
+automation_service:
+  description: Deliver an automation to a customer
+  requires: []
+  capabilities: [project.deliver]
+  high_impact: false
+  data_classes: [CONFIDENTIAL]
+consequential_decision:
+  description: Any decision about a person's employment, housing, credit, insurance,
+    education, health care or eligibility (spec §32-33)
+  requires: []
+  capabilities: []
+  high_impact: true
+  legal_review: high_impact_ai
+  data_classes: [SENSITIVE_PERSONAL]
+research:
+  description: Research, analysis or drafting with no external effect
+  requires: []
+  capabilities: []
+  high_impact: false
+  data_classes: [INTERNAL]

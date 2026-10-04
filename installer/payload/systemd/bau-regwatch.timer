@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the BAU regulation watcher daily
+
+[Timer]
+OnCalendar=*-*-* 06:17:00
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target

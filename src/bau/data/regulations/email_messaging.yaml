@@ -1,0 +1,225 @@
+# Outbound messaging: email, SMS, calls.
+# Verification: researched 2026-10-04 against official pages and secondary legal
+# analysis. bau_status IMPLEMENTED = BAU has code + policies for it; it becomes
+# ACTIVE only after a human reviewer signs off (`bau reg promote`).
+
+- reg_id: us-canspam
+  jurisdiction: US
+  authority: FTC
+  law: CAN-SPAM Act of 2003 (15 U.S.C. 7701-7713); 16 CFR Part 316
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2004-01-01
+  covered_products: [commercial email, mixed-purpose email whose primary purpose is commercial]
+  obligations:
+    - No false or misleading header information (From, To, Reply-To, routing)
+    - No deceptive subject lines
+    - Identify the message as an advertisement (unless recipient gave affirmative consent)
+    - Include a valid physical postal address
+    - Clear opt-out mechanism, working for at least 30 days after sending
+    - Honour opt-outs within 10 business days; no fee, no info beyond address, no login
+    - Never sell or transfer an opted-out address
+    - Sender remains liable for vendors/ESPs sending on its behalf
+    - Sexually explicit content requires the "SEXUALLY-EXPLICIT:" subject label (BAU blocks it entirely)
+  prohibited_actions: [address harvesting, dictionary attacks, open relays, scripted account creation for sending]
+  penalties: Up to $53,088 per violating email (FTC 2025 inflation adjustment; unchanged for 2026 per OMB guidance). Aggravated violations can be criminal.
+  source_url: https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  verification_note: Penalty amount confirmed via secondary sources citing FTC Rule 1.98; re-check each January.
+
+- reg_id: us-fcc-wireless-domains
+  jurisdiction: US
+  authority: FCC
+  law: 47 CFR 64.3100 (CAN-SPAM wireless provisions)
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2005-03-11
+  obligations:
+    - Do not send commercial messages to domains on the FCC wireless domain list without express prior authorization
+    - Check the current list; newly listed domains are protected after 30 days
+  penalties: FCC enforcement under the Communications Act
+  source_url: https://www.ecfr.gov/current/title-47/section-64.3100
+  source_type: final_regulation
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  verification_note: Load the current FCC list with `bau email import-wireless-list`; BAU blocks US sends while the list is missing or over 30 days old.
+
+- reg_id: industry-mailbox-bulk-sender
+  jurisdiction: ANY
+  authority: Google (Gmail), Yahoo, Microsoft (Outlook.com)
+  law: Bulk sender requirements (Gmail/Yahoo from 2024-02-01; Microsoft from 2025-05-05; strict rejection enforcement from Nov 2025)
+  legal_status: industry_requirement
+  bau_status: IMPLEMENTED
+  effective_date: 2024-02-01
+  obligations:
+    - SPF and DKIM both pass for the sending domain
+    - DMARC record published (p=none minimum) with rua reporting; From domain aligned
+    - Valid forward and reverse DNS, TLS for transmission
+    - RFC 8058 one-click unsubscribe (List-Unsubscribe + List-Unsubscribe-Post) on marketing mail, honoured within 2 days
+    - Spam complaint rate kept below 0.3% (target below 0.1%)
+  penalties: Throttling, spam-foldering, temporary and permanent rejection
+  source_url: https://support.google.com/a/answer/81126
+  source_type: industry_policy
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: false
+  notes: Yahoo https://senders.yahooinc.com/best-practices/ ; Microsoft announced equivalent rules for Outlook.com in 2025.
+
+- reg_id: us-tcpa
+  jurisdiction: US
+  authority: FCC
+  law: Telephone Consumer Protection Act (47 U.S.C. 227); 47 CFR 64.1200
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 1991-12-20
+  obligations:
+    - Prior express written consent for marketing texts/calls using autodialers or artificial/prerecorded (incl. AI-generated) voice
+    - No telephone solicitations before 8am or after 9pm recipient local time
+    - Scrub against the National Do Not Call Registry and an internal DNC list
+    - Identify the sender; provide an opt-out mechanism
+  penalties: Private right of action, $500 per violation, up to $1,500 if willful; government enforcement
+  source_url: https://www.ecfr.gov/current/title-47/section-64.1200
+  source_type: final_regulation
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  notes: The FCC's 2023 "one-to-one consent" rule was vacated by the 11th Circuit (Jan 2025) and is not modelled as law.
+
+- reg_id: us-fcc-tcpa-revocation
+  jurisdiction: US
+  authority: FCC
+  law: TCPA consent revocation rules (FCC 24-24, 47 CFR 64.1200(a)(10)-(12))
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2025-04-11
+  obligations:
+    - Accept revocation by any reasonable means (STOP, QUIT, END, REVOKE, OPT OUT, CANCEL, UNSUBSCRIBE, or plain words)
+    - Honour revocation within 10 business days
+    - At most one confirmation text, within 5 minutes, without marketing content
+    - Revocation applies across unrelated message types (temporary waiver ran to 2026-04-11; BAU treats every revocation as global)
+  penalties: As TCPA
+  source_url: https://www.ecfr.gov/current/title-47/section-64.1200
+  source_type: final_regulation
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  verification_note: Waiver expiry confirmed via secondary sources; confirm no further FCC extension.
+
+- reg_id: us-tx-sb140
+  jurisdiction: US-TX
+  authority: Texas Legislature / Secretary of State
+  law: Texas SB 140 (89th Leg.) - telephone solicitation includes text messages
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2025-09-01
+  obligations:
+    - Text/MMS marketing is "telephone solicitation" under Texas law
+    - Register with the Secretary of State unless exempt; consent-based text programs are exempt per Nov 2025 settlement guidance
+    - Keep consent evidence to rely on the exemption
+  penalties: DTPA private right of action
+  source_url: https://capitol.texas.gov/BillLookup/History.aspx?LegSess=89R&Bill=SB140
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: us-fl-ftsa
+  jurisdiction: US-FL
+  authority: Florida Legislature
+  law: Florida Telephone Solicitation Act, Fla. Stat. 501.059 (as amended 2021/2023)
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2021-07-01
+  obligations:
+    - Prior express written consent for automated marketing texts/calls
+    - No solicitations before 8am or after 8pm recipient local time
+    - No more than 3 solicitations on the same subject in 24 hours
+    - Honour STOP replies within 15 days (2023 amendment cure provision)
+  penalties: Private right of action, $500 per violation, up to $1,500 if willful
+  source_url: https://www.flsenate.gov/Laws/Statutes/2024/501.059
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  verification_note: Drawn from established knowledge, not re-verified against the 2026 statute text.
+
+- reg_id: ca-casl
+  jurisdiction: CA
+  authority: CRTC / Competition Bureau / OPC
+  law: Canada's Anti-Spam Legislation (S.C. 2010, c. 23)
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2014-07-01
+  obligations:
+    - Consent (express, or implied for limited periods) before sending a commercial electronic message
+    - Implied consent from a purchase lasts 2 years; from an inquiry 6 months
+    - Identify sender and provide contact information
+    - Unsubscribe mechanism, honoured within 10 business days
+    - Sender bears the burden of proving consent
+  penalties: Administrative monetary penalties up to CAD $10M per violation for businesses
+  source_url: https://laws-lois.justice.gc.ca/eng/acts/E-1.6/
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: eu-eprivacy-gdpr-marketing
+  jurisdiction: EU
+  authority: European Commission / national DPAs
+  law: ePrivacy Directive 2002/58/EC Art. 13; GDPR (EU) 2016/679
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2018-05-25
+  obligations:
+    - Prior opt-in consent for marketing email to individuals (freely given, specific, informed, unambiguous)
+    - Soft opt-in only for existing customers, similar products, with opt-out offered at collection and in every message
+    - Easy withdrawal of consent; record consent evidence
+    - Member-state implementations differ (e.g. B2B rules) - national law must be checked
+  penalties: GDPR up to EUR 20M or 4% of global turnover
+  source_url: https://eur-lex.europa.eu/eli/dir/2002/58/oj
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+
+- reg_id: uk-pecr-duaa
+  jurisdiction: GB
+  authority: ICO
+  law: PECR 2003 as amended by the Data (Use and Access) Act 2025
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2026-02-05
+  obligations:
+    - Consent or soft opt-in for marketing email/SMS to individuals
+    - Charities may now use a soft opt-in for supporters
+    - Opt-out in every message
+    - Some cookie categories no longer need consent (strictly necessary, first-party analytics, preferences, security)
+  penalties: PECR fines raised from GBP 500,000 to GBP 17.5M or 4% of global turnover
+  source_url: https://ico.org.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/
+  source_type: official_guidance
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true
+  verification_note: Commencement date from secondary sources; confirm commencement regulations.
+
+- reg_id: au-spam-act
+  jurisdiction: AU
+  authority: ACMA
+  law: Spam Act 2003 (Cth)
+  legal_status: effective
+  bau_status: IMPLEMENTED
+  effective_date: 2004-04-10
+  obligations:
+    - Consent (express or inferred) required
+    - Accurate sender identification
+    - Functional unsubscribe honoured within 5 business days
+  penalties: Infringement notices and court penalties (e.g. 2025 Lululemon matter over AUD 700,000)
+  source_url: https://www.legislation.gov.au/C2004A01214/latest
+  source_type: statute
+  last_verified: 2026-10-04
+  next_review: 2027-01-04
+  legal_review_required: true

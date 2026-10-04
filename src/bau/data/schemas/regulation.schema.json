@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BAU regulation record (spec \u00a711)",
+  "type": "object",
+  "required": [
+    "reg_id",
+    "jurisdiction",
+    "authority",
+    "law",
+    "legal_status",
+    "bau_status",
+    "obligations",
+    "source_url",
+    "source_type",
+    "last_verified",
+    "next_review",
+    "legal_review_required"
+  ],
+  "properties": {
+    "reg_id": {
+      "type": "string"
+    },
+    "jurisdiction": {
+      "type": "string",
+      "description": "ISO 3166 code, ISO 3166-2 subdivision (US-CA), EU, or ANY"
+    },
+    "authority": {
+      "type": "string"
+    },
+    "law": {
+      "type": "string"
+    },
+    "section": {
+      "type": "string"
+    },
+    "legal_status": {
+      "enum": [
+        "proposed",
+        "enacted",
+        "effective",
+        "partially_effective",
+        "enjoined",
+        "vacated",
+        "superseded",
+        "repealed",
+        "industry_requirement",
+        "standard",
+        "guidance"
+      ]
+    },
+    "bau_status": {
+      "enum": [
+        "PROPOSED",
+        "VERIFIED",
+        "MAPPED",
+        "IMPLEMENTED",
+        "TESTED",
+        "ACTIVE",
+        "RETIRED"
+      ]
+    },
+    "effective_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "enforcement_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "expiration_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "covered_entities": {},
+    "covered_products": {},
+    "obligations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "prohibited_actions": {
+      "type": "array"
+    },
+    "penalties": {
+      "type": "string"
+    },
+    "source_url": {
+      "type": "string",
+      "pattern": "^https://"
+    },
+    "source_type": {
+      "enum": [
+        "statute",
+        "final_regulation",
+        "official_guidance",
+        "official_interpretation",
+        "court_decision",
+        "standard",
+        "industry_policy",
+        "secondary_analysis",
+        "news",
+        "social_media"
+      ]
+    },
+    "last_verified": {
+      "type": "string",
+      "format": "date"
+    },
+    "next_review": {
+      "type": "string",
+      "format": "date"
+    },
+    "legal_review_required": {
+      "type": "boolean"
+    },
+    "reviewed_by": {
+      "type": "string"
+    },
+    "verification_note": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

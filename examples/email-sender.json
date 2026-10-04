@@ -1,0 +1,9 @@
+{
+  "owned_domains": ["yourdomain.example"],
+  "spf_present": true, "spf_single_record": true, "spf_not_permissive": true,
+  "dkim_present": true, "dmarc_present": true, "dmarc_policy": "quarantine",
+  "dmarc_rua": true, "dmarc_aligned": true, "tls": true,
+  "complaint_rate": 0.0004,
+  "unsubscribe_requires_login": false, "unsubscribe_fee": false,
+  "unsubscribe_window_days": 60, "unsubscribe_processing_days": 0
+}

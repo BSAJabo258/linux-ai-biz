@@ -1,0 +1,17 @@
+{
+  "recurring": true,
+  "price_disclosed": true, "billing_frequency_disclosed": true, "renewal_terms_disclosed": true,
+  "total_commitment_disclosed": true, "cancellation_fees_disclosed": true,
+  "material_limitations_disclosed": true, "cancellation_method_disclosed": true,
+  "disclosed_before_billing_info": true,
+  "trial": {"length_days": 7, "end_date_disclosed": true, "reminder_before_end": true},
+  "consent": {"separate_affirmative_action": true, "prechecked": false, "evidence_retained": true},
+  "acknowledgment_receipt": true,
+  "signup_channels": ["online"], "cancellation_channels": ["online"],
+  "signup_steps": 4, "cancellation_steps": 3,
+  "cancellation_requires_survey": false, "save_offers_max": 1,
+  "annual_reminder": true, "price_change_notice_days": 14,
+  "refund_policy_visible": true, "contact_visible": true, "terms_accessible": true,
+  "privacy_policy_accessible": true, "accessibility_tested": true,
+  "cancellation_test_passed_at": "2026-10-01"
+}

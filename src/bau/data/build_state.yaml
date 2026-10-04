@@ -1,0 +1,44 @@
+# Spec §106 acceptance suite / §107 critical failure conditions.
+# status: done (verified ON THE MACHINE by the operator) | implemented (code shipped and
+# tested in CI, not yet verified on the machine) | partial | not_started.
+# critical: true = spec §107 condition; it keeps the dashboard RED until done.
+- {item: Boots and reboots, status: not_started, critical: true}
+- {item: Hardware baseline exists, status: implemented, critical: false, how: bau hw audit}
+- {item: Backup restores (verified read-back), status: implemented, critical: true, how: bau backup verify}
+- {item: Recovery works (golden image restore tested), status: implemented, critical: true, how: bau baseline create/verify + restore drill on the machine}
+- {item: Network security passes (nftables default-deny inbound + network trust), status: implemented, critical: true, how: installer hardening; bau network status}
+- {item: Full-disk encryption enabled, status: implemented, critical: true, how: preseed crypto LVM}
+- {item: Secrets out of source and logs, status: implemented, critical: true, how: bau secrets scan; audit PII guard; sandbox/MCP refuse secrets in config}
+- {item: Audit chain works and verifies, status: implemented, critical: true, how: bau audit verify}
+- {item: Audit chain anchored off-machine, status: not_started, critical: false, how: bau audit anchor}
+- {item: Regulation registry with official sources, status: implemented, critical: true, how: bau reg validate}
+- {item: Every in-force regulation reviewed by counsel (ACTIVE), status: not_started, critical: true, how: bau reg promote}
+- {item: Policy compiler works, status: implemented, critical: true, how: bau gate check}
+- {item: Unknowns block or escalate, status: implemented, critical: true}
+- {item: Email/SMS compliance gate, status: implemented, critical: true, how: bau email preflight}
+- {item: FCC wireless-domain list loaded, status: not_started, critical: true, how: bau email import-wireless-list}
+- {item: Sending domain SPF/DKIM/DMARC verified, status: not_started, critical: true, how: bau email check-dns}
+- {item: AI disclosure works, status: implemented, critical: true, how: bau disclosure check; media gateway provenance}
+- {item: Cancellation workflow works and is regression-tested, status: partial, critical: true, how: state machine shipped; needs the real storefront}
+- {item: Data-rights workflow with deletion propagation, status: implemented, critical: true, how: bau dsr}
+- {item: IP ledger and royalty engine, status: implemented, critical: true, how: bau monetize check; bau books payout}
+- {item: Tax nexus rules verified by a CPA, status: not_started, critical: true, how: fill tax/nexus_rules.yaml}
+- {item: Financial controls (money movement needs human approval + sanctions screen), status: implemented, critical: true, how: gateway move.money CRITICAL; bau sanctions screen}
+- {item: Repository Sentinel and license gate, status: implemented, critical: true, how: bau sentinel scan}
+- {item: Untrusted code only in rootless sandbox, status: implemented, critical: true, how: bau sandbox (podman, no network, read-only, caps dropped)}
+- {item: Model / agent / MCP registries, status: implemented, critical: false, how: bau registry; bau set-status}
+- {item: MCP / tool router through the gateway, status: implemented, critical: false, how: bau.mcp (approved servers only)}
+- {item: Model router (local + cloud, privacy-aware), status: implemented, critical: false, how: bau models route}
+- {item: At least one model APPROVED by a human, status: not_started, critical: false, how: bau set-status model claude-opus-5-5 APPROVED}
+- {item: K3 works locally or registered as offload, status: implemented, critical: false, how: registered as OFFLOAD; benchmark on your hardware}
+- {item: Checkpoint and resume, status: implemented, critical: false, how: bau jobs / bau recover}
+- {item: Historical AI corpus imported (Project Genesis), status: not_started, critical: false, how: bau genesis import <export>; bau genesis extract}
+- {item: Canonical BAU documents generated and reviewed, status: implemented, critical: false, how: bau genesis extract (drafts need human review)}
+- {item: Memory (MAYA Memory Lane), status: implemented, critical: false, how: bau memory}
+- {item: Jarvis executive orchestration, status: implemented, critical: false, how: bau mission plan/approve}
+- {item: Media / spatial adapters, status: implemented, critical: false, how: media gateway, ffmpeg, God's Eye public feeds; Open-Generative-AI adapter waits on Sentinel}
+- {item: Accessibility - keyboard-only and screen reader pass, status: partial, critical: false, how: CLI + Mission Control lint clean; manual screen-reader pass required (spec §30)}
+- {item: Legal pages generated and approved by counsel, status: not_started, critical: false, how: bau legal-pages generate / approve}
+- {item: One business factory end-to-end, status: not_started, critical: false, how: bau factory activate + run (tested in CI with fixtures)}
+- {item: One real revenue mission with evidence package, status: not_started, critical: false}
+- {item: Golden baseline created, status: not_started, critical: false, how: bau baseline create}

@@ -1,0 +1,175 @@
+# Subscriptions (spec §22-23, §79) and monetization of IP (spec §66-67, §81).
+coverage:
+  subscription: [US]
+
+policies:
+- id: sub.disclosure
+  domain: subscription
+  scope: offer
+  stage: 10
+  title: Material terms disclosed clearly before billing info is collected
+  regs: [us-ftc-rosca, us-ftc-act-s5, us-ca-arl]
+  jurisdictions: [US]
+  when: {fact: offer.recurring, eq: true}
+  require:
+    - {fact: offer.price_disclosed, eq: true}
+    - {fact: offer.billing_frequency_disclosed, eq: true}
+    - {fact: offer.renewal_terms_disclosed, eq: true}
+    - {fact: offer.total_commitment_disclosed, eq: true}
+    - {fact: offer.cancellation_fees_disclosed, eq: true}
+    - {fact: offer.material_limitations_disclosed, eq: true}
+    - {fact: offer.cancellation_method_disclosed, eq: true}
+    - {fact: offer.disclosed_before_billing_info, eq: true}
+  remediation: "Shutterstock (2026): 'annual, paid monthly' sold as monthly with hidden cancellation fees cost $35M."
+
+- id: sub.consent
+  domain: subscription
+  scope: offer
+  stage: 20
+  title: Express informed consent to the recurring charge, separately captured, with evidence
+  regs: [us-ftc-rosca, us-ca-arl]
+  jurisdictions: [US]
+  when: {fact: offer.recurring, eq: true}
+  require:
+    - {fact: offer.consent_separate, eq: true}
+    - {fact: offer.consent_prechecked, eq: false}
+    - {fact: offer.consent_evidence_retained, eq: true}
+    - {fact: offer.acknowledgment_receipt, eq: true}
+
+- id: sub.trial
+  domain: subscription
+  scope: offer
+  stage: 30
+  title: Trial end date and conversion terms disclosed
+  regs: [us-ftc-rosca, us-ca-arl]
+  jurisdictions: [US]
+  when:
+    all:
+      - {fact: offer.recurring, eq: true}
+      - {fact: offer.has_trial, eq: true}
+  require:
+    - {fact: offer.trial_end_date_disclosed, eq: true}
+
+- id: sub.cancel.simple
+  domain: subscription
+  scope: offer
+  stage: 40
+  title: Cancellation online, no harder than sign-up, no mandatory survey
+  regs: [us-ftc-rosca, us-ca-arl]
+  jurisdictions: [US]
+  when: {fact: offer.recurring, eq: true}
+  require:
+    - {fact: offer.online_cancel_if_online_signup, eq: true}
+    - {fact: offer.cancel_not_harder, eq: true}
+    - {fact: offer.cancellation_requires_survey, eq: false}
+    - {fact: offer.save_offers_max, lte: 1}
+
+- id: sub.cancel.tested
+  domain: subscription
+  scope: offer
+  stage: 50
+  title: Cancellation path passed an automated end-to-end test in the last 30 days
+  regs: []
+  jurisdictions: [ANY]
+  when: {fact: offer.recurring, eq: true}
+  require:
+    - {fact: offer.cancellation_test_age_days, lte: 30}
+  remediation: Spec §79 - run the signup->bill->cancel->stop-billing->delete->export regression.
+
+- id: sub.california
+  domain: subscription
+  scope: offer
+  stage: 60
+  title: "California ARL: annual reminder, price-change notice"
+  regs: [us-ca-arl]
+  jurisdictions: [US-CA]
+  when: {fact: offer.recurring, eq: true}
+  require:
+    - {fact: offer.annual_reminder, eq: true}
+    - {fact: offer.price_change_notice_days, gte: 7}
+
+- id: sub.california.long_trial
+  domain: subscription
+  scope: offer
+  stage: 61
+  title: "California ARL: reminder before a trial longer than 31 days converts"
+  regs: [us-ca-arl]
+  jurisdictions: [US-CA]
+  when:
+    all:
+      - {fact: offer.recurring, eq: true}
+      - {fact: offer.trial_length_days, gt: 31}
+  require:
+    - {fact: offer.trial_end_reminder, eq: true}
+
+- id: sub.storefront
+  domain: subscription
+  scope: offer
+  stage: 70
+  title: Refund policy, contact, terms, privacy policy visible; accessibility tested
+  regs: [us-ftc-act-s5, wcag-2-2]
+  jurisdictions: [ANY]
+  require:
+    - {fact: offer.refund_policy_visible, eq: true}
+    - {fact: offer.contact_visible, eq: true}
+    - {fact: offer.terms_accessible, eq: true}
+    - {fact: offer.privacy_policy_accessible, eq: true}
+    - {fact: offer.accessibility_tested, eq: true}
+
+# ---------- monetization of an IP asset ----------
+- id: mon.ownership
+  domain: monetize
+  scope: asset
+  stage: 10
+  title: Ownership known and complete
+  regs: []
+  jurisdictions: [ANY]
+  require:
+    - {fact: ip.owner_known, eq: true}
+    - {fact: ip.ownership_sums_to_100, eq: true}
+  remediation: Spec §74 - IP_owner UNKNOWN blocks monetization.
+
+- id: mon.license
+  domain: monetize
+  scope: asset
+  stage: 20
+  title: Licence known; commercial rights held; model licence allows commercial use
+  regs: []
+  jurisdictions: [ANY]
+  require:
+    - {fact: ip.license_known, eq: true}
+    - {fact: ip.commercial_rights, eq: true}
+    - {fact: ip.model_license_commercial, eq: true}
+
+- id: mon.rights
+  domain: monetize
+  scope: asset
+  stage: 30
+  title: Every content right cleared or marked not used
+  regs: [us-right-of-publicity]
+  jurisdictions: [ANY]
+  require:
+    - {fact: ip.unresolved_rights_count, eq: 0}
+
+- id: mon.human_authorship
+  domain: monetize
+  scope: asset
+  stage: 40
+  title: Human contribution recorded
+  regs: [us-copyright-ai]
+  jurisdictions: [ANY]
+  require:
+    - {fact: ip.human_contribution_recorded, eq: true}
+  on_fail: PASS_WITH_REVIEW
+
+- id: mon.copyright_claim
+  domain: monetize
+  scope: asset
+  stage: 50
+  title: No copyright claimed over AI-generated material without counsel review
+  regs: [us-copyright-ai]
+  jurisdictions: [ANY]
+  when: {fact: ip.ai_contribution, eq: generated}
+  require:
+    - {fact: ip.copyright_claim_reviewed, eq: true}
+  on_fail: PASS_WITH_REVIEW

@@ -1,0 +1,11 @@
+{
+  "artifact_id": "vid-0001", "media_type": "video",
+  "ai_generated": true, "ai_assisted": false, "human_authored": false, "human_modified": true,
+  "model_id": "local-video-model@1.0", "provider": "local",
+  "generation_timestamp": "2026-10-04T15:00:00Z", "generation_job": "job_example",
+  "synthetic_media": true, "deepfake": false, "likeness_used": false, "voice_clone": false,
+  "consent_status": "not_required",
+  "input_had_provenance_marking": false, "machine_readable_marking": true,
+  "visible_disclosure_text": "AI-GENERATED VIDEO",
+  "human_contribution": ["script", "edit selection", "music choice"]
+}

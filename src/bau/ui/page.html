@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BAU Mission Control</title>
+<style>
+:root { --bg:#0f1115; --fg:#eef1f5; --muted:#b4bcc8; --card:#1a1e26; --line:#2e3542;
+  --green:#5fd38d; --yellow:#f2d35b; --orange:#f5a356; --red:#ff7a7a; --black:#ffffff;
+  --focus:#7fb4ff; }
+@media (prefers-color-scheme: light) { :root { --bg:#ffffff; --fg:#111418; --muted:#3d4653;
+  --card:#f3f5f8; --line:#c9d0da; --green:#0b6b34; --yellow:#7a5d00; --orange:#9a4a00;
+  --red:#a40e0e; --black:#000000; --focus:#0b4fd6; } }
+@media (prefers-contrast: more) { :root { --line:currentColor; } }
+@media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, sans-serif; }
+.skip { position:absolute; left:-999px; top:0; background:var(--fg); color:var(--bg); padding:8px 12px; }
+.skip:focus { left:8px; top:8px; z-index:10; }
+header, main { max-width:1100px; margin:0 auto; padding:16px; }
+nav ul { display:flex; flex-wrap:wrap; gap:8px; list-style:none; padding:0; margin:8px 0 0; }
+button, a { color:inherit; }
+button { font:inherit; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:6px 12px; cursor:pointer; }
+button[aria-pressed="true"] { border-color:var(--focus); font-weight:600; }
+:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin:12px 0; }
+table { width:100%; border-collapse:collapse; }
+th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+.badge { display:inline-block; min-width:5.5em; font-weight:700; }
+.GREEN{color:var(--green)} .YELLOW{color:var(--yellow)} .ORANGE{color:var(--orange)}
+.RED{color:var(--red)} .BLACK{color:var(--black); text-decoration:underline}
+.muted { color:var(--muted); }
+dialog { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:8px; width:min(640px,92vw); }
+dialog input { width:100%; font:inherit; padding:8px; background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:6px; }
+dialog ul { list-style:none; padding:0; max-height:50vh; overflow:auto; }
+dialog li[aria-selected="true"] { background:var(--line); }
+kbd { border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header>
+  <h1>BAU Mission Control</h1>
+  <p class="muted">Read-only view. Changes and approvals are made with the <code>bau</code> command at a terminal.
+  Press <kbd>Ctrl</kbd>+<kbd>K</kbd> for the command palette, <kbd>1</kbd>-<kbd>7</kbd> to switch views.</p>
+  <nav aria-label="Views"><ul id="tabs"></ul></nav>
+</header>
+<main id="content" tabindex="-1">
+  <h2 id="view-title">Status</h2>
+  <p id="live" role="status" aria-live="polite" class="muted"></p>
+  <div id="view"></div>
+</main>
+<dialog id="palette" aria-labelledby="palette-title">
+  <h2 id="palette-title">Command palette</h2>
+  <label for="palette-input">Filter views and commands</label>
+  <input id="palette-input" type="text" autocomplete="off" aria-controls="palette-list">
+  <ul id="palette-list" role="listbox" aria-label="Results"></ul>
+  <p class="muted">Arrows to move, Enter to choose, Escape to close. Commands are copied for you to run in a terminal.</p>
+</dialog>
+<script>
+"use strict";
+const VIEWS = [
+  ["status", "Status", "/api/status"], ["missions", "Missions", "/api/missions"],
+  ["legal", "Legal review", "/api/legal-queue"], ["regulations", "Regulations", "/api/regulations"],
+  ["jobs", "Jobs", "/api/jobs"], ["economics", "Economics", "/api/economics"],
+  ["incidents", "Incidents", "/api/incidents"], ["governor", "Governor", "/api/governor"]];
+const COMMANDS = ["bau status", "bau reg due", "bau audit verify", "bau mission list",
+  "bau email preflight --message m.json --recipients r.json --sender s.json --evidence",
+  "bau approve --capability CAP --request-id ID --requester AGENT --bind FILE --out approval.json",
+  "bau legal-queue list", "bau baseline verify MANIFEST", "bau recover"];
+const el = (t, a = {}, ...kids) => { const e = document.createElement(t);
+  for (const [k, v] of Object.entries(a)) e.setAttribute(k, v);
+  for (const c of kids) e.append(c instanceof Node ? c : document.createTextNode(String(c ?? "")));
+  return e; };
+let current = 0;
+function table(rows, cols) {
+  if (!rows || !rows.length) return el("p", {}, "Nothing to show.");
+  const t = el("table"); const head = el("tr");
+  cols.forEach(c => head.append(el("th", { scope: "col" }, c)));
+  t.append(el("thead", {}, head)); const body = el("tbody");
+  rows.forEach(r => { const tr = el("tr"); cols.forEach(c => {
+    const v = r[c]; const td = el("td");
+    if (c === "color") td.append(el("span", { class: "badge " + v }, v));
+    else td.append(typeof v === "object" ? JSON.stringify(v) : (v ?? ""));
+    tr.append(td); }); body.append(tr); });
+  t.append(body); return t;
+}
+function render(key, data) {
+  const v = document.getElementById("view"); v.replaceChildren();
+  if (key === "status") {
+    v.append(el("section", {}, el("h3", {}, "Overall: ", el("span", { class: "badge " + data.overall }, data.overall)),
+      el("p", {}, "Production ready: " + (data.production_ready ? "yes" : "no")),
+      table(Object.entries(data.counts).map(([color, n]) => ({ color, n })), ["color", "n"])));
+    v.append(el("section", {}, el("h3", {}, "Items"), table(data.items, ["color", "item"])));
+  } else if (key === "missions") v.append(table(data, ["mission_id", "mission_type", "status", "next_action"]));
+  else if (key === "legal") v.append(table(data, ["id", "trigger", "subject", "status", "opened_at"]));
+  else if (key === "regulations") v.append(table(data, ["reg_id", "jurisdiction", "legal_status", "bau_status", "applicability", "next_review"]));
+  else if (key === "jobs") v.append(table(data, ["job_id", "agent", "status", "objective", "cost_usd"]));
+  else if (key === "economics") v.append(el("pre", {}, JSON.stringify(data, null, 2)));
+  else if (key === "governor") {
+    v.append(el("section", {}, el("h3", {}, "Hold: ", el("span", { class: "badge " + (data.hold ? "BLACK" : "GREEN") }, data.hold || "none")),
+      table(Object.entries(data.counts).map(([severity, n]) => ({ severity, n })), ["severity", "n"])));
+    v.append(el("section", {}, el("h3", {}, "Needs you"), table(data.needs_you, ["severity", "check", "subject", "detail", "at"])));
+    v.append(el("section", {}, el("h3", {}, "Fixed by the Governor (72h)"), table(data.fixed, ["check", "subject", "detail", "remedy", "at"])));
+  } else if (key === "incidents") v.append(table(data, ["id", "class", "severity", "stage", "title"]));
+}
+async function show(i) {
+  current = i; const [key, label, url] = VIEWS[i];
+  document.querySelectorAll("#tabs button").forEach((b, j) => b.setAttribute("aria-pressed", String(j === i)));
+  document.getElementById("view-title").textContent = label;
+  const live = document.getElementById("live"); live.textContent = "Loading " + label + "...";
+  try { const r = await fetch(url, { headers: { "X-BAU": "1" } }); const data = await r.json();
+    render(key, data); live.textContent = label + " loaded."; }
+  catch (e) { live.textContent = "Could not load " + label + "."; }
+  document.getElementById("content").focus();
+}
+const tabs = document.getElementById("tabs");
+VIEWS.forEach(([k, label], i) => { const b = el("button", { type: "button", "aria-pressed": "false" }, `${i + 1}. ${label}`);
+  b.addEventListener("click", () => show(i)); tabs.append(el("li", {}, b)); });
+const dlg = document.getElementById("palette"), input = document.getElementById("palette-input"), list = document.getElementById("palette-list");
+let items = [], sel = 0;
+function fill() { const q = input.value.toLowerCase();
+  items = [...VIEWS.map((v, i) => ({ label: "View: " + v[1], run: () => show(i) })),
+           ...COMMANDS.map(c => ({ label: "Copy: " + c, run: () => navigator.clipboard?.writeText(c) }))]
+    .filter(x => x.label.toLowerCase().includes(q));
+  sel = 0; list.replaceChildren(...items.map((x, i) => el("li", { role: "option", id: "opt" + i, "aria-selected": String(i === sel) }, x.label)));
+  input.setAttribute("aria-activedescendant", items.length ? "opt0" : ""); }
+function move(d) { if (!items.length) return; sel = (sel + d + items.length) % items.length;
+  list.querySelectorAll("li").forEach((li, i) => li.setAttribute("aria-selected", String(i === sel)));
+  input.setAttribute("aria-activedescendant", "opt" + sel); list.children[sel].scrollIntoView({ block: "nearest" }); }
+input.addEventListener("input", fill);
+input.addEventListener("keydown", e => { if (e.key === "ArrowDown") { e.preventDefault(); move(1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); move(-1); }
+  else if (e.key === "Enter" && items[sel]) { e.preventDefault(); dlg.close(); items[sel].run(); } });
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); input.value = ""; fill(); dlg.showModal(); input.focus(); return; }
+  if (dlg.open || e.target.tagName === "INPUT") return;
+  const n = Number(e.key); if (n >= 1 && n <= VIEWS.length) show(n - 1); });
+show(0);
+</script>
+</body>
+</html>

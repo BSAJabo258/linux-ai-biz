@@ -1,0 +1,4 @@
+// Security updates install automatically (spec §90 permits security patches;
+// feature upgrades of critical components go through TEST -> CANARY -> PROMOTE).
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
