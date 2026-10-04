@@ -20,7 +20,8 @@ LAYOUT = [
     "config", "policies", "schemas", "registry", "memory", "history", "compliance",
     "regulations", "ip", "tax", "data", "security", "audit", "evidence", "jobs",
     "checkpoints", "artifacts", "tests", "benchmarks", "snapshots", "reports",
-    "consent", "suppression", "dsr", "approvals",
+    "consent", "suppression", "dsr", "approvals", "economics", "artifacts/drafts",
+    "artifacts/media_inbox", "artifacts/exports",
 ]
 
 

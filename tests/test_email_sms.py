@@ -250,7 +250,8 @@ def test_sms_revocation_is_global(active_engine, tmp_path):
     assert not sms.is_revocation("what time do you close?")
     assert sms.handle_inbound("STOP", "+13135550100", ledger, supp)
     assert supp.is_suppressed("+13135550100", "email")  # revocation covers every channel
-    assert ledger.current("+13135550100", "sms", "marketing", WHEN) is None
+    after = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=1)  # opt-out uses the real clock
+    assert ledger.current("+13135550100", "sms", "marketing", after) is None
 
 
 def test_sms_outside_us_is_unknown(active_engine, tmp_path):

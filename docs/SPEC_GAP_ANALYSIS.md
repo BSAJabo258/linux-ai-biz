@@ -130,10 +130,4 @@ These amend the master spec. Where they conflict with v1.0, v1.1 governs.
 5. The sandbox runner profiles for untrusted code are not written (Podman is installed).
 6. The real storefront's cancellation path does not exist yet, so it cannot be regression-tested.
 
-Not built yet, and outside this foundation:
-- Jarvis orchestration, the model router and Project Genesis;
-- MAYA Memory Lane;
-- the media (Open-Generative-AI) and spatial (God's Eye) adapters;
-- the business factories.
-
-Each of these must enter through Sentinel (§37), because each depends on third-party repositories that have not been reviewed.
+All spec layers now have tested code: Jarvis, agents, model router, MCP router, MAYA memory, Project Genesis, media/music/spatial, factories, Opportunity Miner, economics, accounting, sanctions, incidents, legal pages, platforms, sandbox, accessibility, golden baseline and Mission Control. Third-party projects named in the spec (aiOS, open-context, Open-Generative-AI, God's Eye UI, Heretic, MAYA repos) connect through adapters only after Sentinel review.

@@ -1,0 +1,141 @@
+# Default capability registry seed (copied into BAU_HOME/registry by `bau init`).
+# Nothing here is trusted yet: models and providers start REGISTERED and a human
+# promotes them (`bau registry set-status ...`) after reviewing terms and benchmarks.
+provider:
+  anthropic:
+    provider_id: anthropic
+    data_sent: [prompts, tool results, documents you include]
+    data_retained: per Anthropic commercial terms / org retention settings
+    training_on_customer_data: false
+    jurisdiction: US
+    commercial_rights: customer owns outputs per commercial terms (verify current terms)
+    terms_url: https://www.anthropic.com/legal/commercial-terms
+    dpa_signed: false
+    status: REGISTERED
+  local:
+    provider_id: local
+    data_sent: [nothing leaves the machine]
+    data_retained: local
+    training_on_customer_data: false
+    jurisdiction: local
+    commercial_rights: per model licence
+    terms_url: https://github.com/ggml-org/llama.cpp
+    status: APPROVED
+model:
+  claude-opus-5-5:
+    model_id: claude-opus-5-5
+    name: Claude Opus 5.5
+    version: "5.5"
+    provider: anthropic
+    source: Anthropic API
+    license: Anthropic commercial terms
+    commercial_use: true
+    deployment: cloud
+    adapter: anthropic
+    api_model: claude-opus-5-5
+    effort: high
+    trust_level: OFFICIAL
+    privacy: cloud
+    context: 1000000
+    tools: true
+    input_types: [text, image, pdf]
+    quality: 0.95
+    latency_ms: 8000
+    cost_in_per_mtok: 4.0
+    cost_out_per_mtok: 20.0
+    status: REGISTERED
+  local-llm:
+    model_id: local-llm
+    name: Local model via llama.cpp llama-server
+    version: "set-me"
+    provider: local
+    source: GGUF file you choose (must pass Sentinel + licence review)
+    license: set-me
+    commercial_use: false
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: local
+    trust_level: UNKNOWN
+    privacy: local
+    context: 32768
+    tools: true
+    input_types: [text]
+    quality: 0.6
+    latency_ms: 3000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+  k3:
+    model_id: k3
+    name: K3 local intelligence reserve (spec §6)
+    version: "set-me"
+    provider: local
+    source: set-me (verify model card, size and licence before use)
+    license: set-me
+    commercial_use: false
+    deployment: remote
+    adapter: local_http
+    endpoint: http://k3-offload.local:8080
+    api_model: k3
+    trust_level: UNKNOWN
+    privacy: self-hosted
+    context: 131072
+    tools: true
+    input_types: [text]
+    quality: 0.85
+    latency_ms: 20000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    notes: Registered as OFFLOAD/REMOTE/EMERGENCY - a laptop cannot hold a model of this class
+      locally (spec §6). Point endpoint at hardware you control and benchmark it first.
+agent:
+  research:
+    agent_id: research
+    version: "1"
+    purpose: Research with cited sources. Never invent a source.
+    model: claude-opus-5-5
+    permissions: [READ_ONLY]
+    budget_usd_per_day: 5
+    network_scope: allowlisted research sources
+    tools: [memory.search, search.regulations, spatial.public_data]
+    approval_policy: none (read-only)
+    risk_level: LOW
+    status: APPROVED
+  writer:
+    agent_id: writer
+    version: "1"
+    purpose: Draft scripts, copy and documents from verified facts only.
+    model: claude-opus-5-5
+    permissions: [READ_ONLY, LOW_RISK]
+    budget_usd_per_day: 5
+    network_scope: none
+    tools: [memory.search, artifact.write_draft]
+    approval_policy: drafts only; publication is a separate approved step
+    risk_level: LOW
+    status: APPROVED
+  qa:
+    agent_id: qa
+    version: "1"
+    purpose: Fact-check and quality-check drafts; list every unsupported claim.
+    model: claude-opus-5-5
+    permissions: [READ_ONLY]
+    budget_usd_per_day: 3
+    network_scope: none
+    tools: [memory.search, search.regulations]
+    approval_policy: none (read-only)
+    risk_level: LOW
+    status: APPROVED
+  media:
+    agent_id: media
+    version: "1"
+    purpose: Plan storyboards and edits; never publish.
+    model: claude-opus-5-5
+    permissions: [READ_ONLY, LOW_RISK]
+    budget_usd_per_day: 5
+    network_scope: none
+    tools: [memory.search, media.analyze_audio, artifact.write_draft]
+    approval_policy: drafts only
+    risk_level: LOW
+    status: APPROVED

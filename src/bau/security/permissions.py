@@ -159,12 +159,16 @@ class CapabilityTable:
         self.revoked.discard(capability)
 
     def authorize(self, agent: str, capability: str, approval: Approval | None = None,
-                  authority: ApprovalAuthority | SshApprovals | None = None) -> str:
+                  authority: ApprovalAuthority | SshApprovals | None = None,
+                  min_level: str | None = None) -> str:
+        """``min_level`` raises the bar for this one call (e.g. a HIGH blast radius)."""
         if capability in self.revoked:
             raise PermissionDenied(f"{capability} is revoked")
         level = self.levels.get(capability)
         if level is None:
             raise PermissionDenied(f"{capability} is not a registered capability")
+        if min_level is not None and LEVELS.index(min_level) > LEVELS.index(level):
+            level = min_level
         ceiling = self.agent_ceiling.get(agent, "LOW_RISK")
         needs_approval = LEVELS.index(level) >= LEVELS.index("APPROVAL_REQUIRED")
         if LEVELS.index(level) > LEVELS.index(ceiling) and not needs_approval:

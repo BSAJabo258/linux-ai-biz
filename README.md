@@ -1,8 +1,15 @@
 # BAU/BSA: Compliance-First AI Business Computer
 
-The foundation of the BAU/BSA autonomous business platform:
+The BAU/BSA autonomous business platform:
 - a **USB installer** that turns a laptop into an encrypted, hardened Debian machine;
-- the **BAU control plane**, where compliance is part of the machine rather than a document beside it.
+- the **BAU control plane**, where compliance is part of the machine rather than a document beside it;
+- the **work layers** that run on top of it:
+  - Jarvis missions, agents and the model router (Claude, local llama.cpp, K3 offload);
+  - MAYA memory and Project Genesis;
+  - media, music-video and public-data spatial tools;
+  - six business factories and the Opportunity Miner;
+  - economics, accounting and sanctions screening;
+  - a keyboard-first Mission Control dashboard.
 
 Before BAU sends an email, texts someone, publishes generated media, sells a subscription, monetizes an asset or moves money, it:
 1. determines which rules apply on that date, in that jurisdiction;
@@ -19,8 +26,14 @@ bau init                                   # BAU_HOME (default ~/.bau, or /var/l
 bau reg validate                           # 46 regulations, 59 policies, all cross-references resolve
 bau status --brief                         # honest production-readiness dashboard
 bau email preflight --message m.json --recipients r.json --sender s.json --evidence
+bau mission plan launch_subscription "Launch planner subscription" --facts facts.yaml
+bau genesis import ~/exports/conversations.json && bau genesis extract --to-memory
+bau factory list                           # six factories, all inactive until you approve
+bau ui                                     # Mission Control on http://127.0.0.1:8765
 python3 -m pytest -q                       # full test suite
 ```
+
+To use Claude models: `pip install 'bau[claude]'`, sign in (`ant auth login` or `ANTHROPIC_API_KEY`), then approve the model yourself: `bau set-status model claude-opus-5-5 APPROVED`. For the offline laptop install, use `installer/make-payload.sh --with-claude`.
 
 ## Install on the laptop (two USB sticks)
 
@@ -47,26 +60,31 @@ Then follow **[docs/INSTALL.md](docs/INSTALL.md)** in order: audit, backup and v
 
 ```
 src/bau/
-  decision.py  policy.py  regulations.py  jurisdiction.py   # compliance engine
-  audit.py  evidence.py  status.py  jobs.py  registry.py    # trust plane, recovery, dashboard
-  comms/        email, SMS, consent ledger, suppression, DNS auth
-  commerce/     subscriptions + cancellation, IP + royalties, tax nexus
-  privacy/      data-subject rights with deletion propagation
-  security/     permissions + approvals, secret scanner, Sentinel repo intake
-  disclosure.py claims.py hardware.py backup.py wipe_gate.py cli.py
-  data/regulations/*.yaml  data/policies/*.yaml  data/build_state.yaml
-installer/      build-usb-image.sh  write-usb.sh  make-payload.sh  hw-audit*.{sh,ps1}
-                preseed/  firstboot/  payload/{install.sh, systemd/, hardening/}
-tests/          engine, email/SMS, commerce/disclosure, trust plane, CLI
+  decision.py policy.py regulations.py jurisdiction.py    compliance engine
+  gateway.py blast.py network.py datagov.py               Universal Gateway + its checks
+  jarvis.py agents.py legal_queue.py mcp.py               orchestration, agents, MCP router
+  models/       providers (Claude SDK, llama.cpp/K3, scripted), router, Heretic lineage
+  memory.py genesis.py capgraph.py                        MAYA memory, Project Genesis, impact graph
+  media/ spatial.py                                       media gateway, music timing, God's Eye
+  factories.py opportunity.py economics.py accounting.py sanctions.py
+  incidents.py legal_pages.py platforms.py sandbox.py accessibility.py baseline.py
+  comms/ commerce/ privacy/ security/                     email/SMS, subscriptions/IP/tax, DSR, trust
+  audit.py evidence.py status.py jobs.py registry.py runtime.py ui/ cli.py cli_ext.py
+  data/  regulations, policies, missions, factories, registry defaults, build state
+installer/  build-usb-image.sh write-usb.sh make-payload.sh hw-audit*.{sh,ps1}
+            preseed/ firstboot/ payload/{install.sh, systemd/, hardening/}
+tests/      engine, email/SMS, commerce, trust plane, orchestration, knowledge/media, business/ops
 ```
 
 ## Status
 
-Foundation complete and tested.
+Every layer of spec §2 has working, tested code. `bau status` shows what only you can finish, and keeps reporting **not production-ready** until each item is done:
+- counsel signs off each regulation;
+- your sending domain's DNS records and the FCC wireless list are in place;
+- a CPA fills in the tax rules;
+- you approve the models and agents;
+- the real storefront exists;
+- the boot and restore drill passes on the laptop;
+- the first real revenue mission completes.
 
-Not yet built:
-- Jarvis orchestration, the model router and Project Genesis;
-- MAYA memory;
-- the media and spatial adapters, and the business factories.
-
-Each depends on third-party repositories that must pass Sentinel first. `bau status` tracks the full acceptance suite (spec §106).
+Third-party projects named in the spec plug in through adapters only after Sentinel review.

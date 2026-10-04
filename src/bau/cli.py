@@ -71,6 +71,8 @@ def _key(env: str, default: str) -> bytes:
 
 def cmd_init(a: argparse.Namespace) -> int:
     home = init_home(Path(a.home) if a.home else None, overwrite_data=a.refresh_data)
+    from .runtime import seed_registry
+    seed_registry(home)
     log = AuditLog(home / "audit" / "chain.jsonl")
     if not any(True for _ in log.records()):
         log.append("system.genesis", _actor(), {"version": __version__})
@@ -425,6 +427,9 @@ def cmd_recover(a: argparse.Namespace) -> int:
         steps["regulations"] = {"ok": True, "count": len(reg.regs)}
     except ValueError as e:
         steps["regulations"] = {"ok": False, "detail": str(e)}
+    from .memory import MemoryLane
+    mem_ok, mem_msg = MemoryLane().verify()
+    steps["memory"] = {"ok": mem_ok, "detail": mem_msg}
     steps["capability_registry"] = {"problems": CapabilityRegistry().problems()}
     steps["credentials"] = {k: Path(v).exists() for k, v in {
         "audit_key": "/etc/bau/audit.key", "allowed_signers": "/etc/bau/allowed_signers",
@@ -433,7 +438,7 @@ def cmd_recover(a: argparse.Namespace) -> int:
     AuditLog().append("system.recovered", "system:bau-recover",
                       {"audit_ok": ok, "jobs": len(steps["jobs"])})
     _out(steps)
-    return EXIT_OK if ok and steps["regulations"]["ok"] else EXIT_BLOCKED
+    return EXIT_OK if ok and mem_ok and steps["regulations"]["ok"] else EXIT_BLOCKED
 
 
 def cmd_hw(a: argparse.Namespace) -> int:
@@ -490,7 +495,9 @@ def cmd_selftest(a: argparse.Namespace) -> int:
     except ValueError as e:
         results["registry_and_policies"] = f"FAIL: {e}"
     results["audit_chain"] = "ok" if AuditLog().verify()[0] else "FAIL"
-    for tool in ("podman", "nft", "aa-status", "chronyc", "ssh-keygen"):
+    from .memory import MemoryLane
+    results["memory_chain"] = "ok" if MemoryLane().verify()[0] else "FAIL"
+    for tool in ("podman", "nft", "aa-status", "chronyc", "ssh-keygen", "ffmpeg"):
         results[f"tool:{tool}"] = "ok" if shutil.which(tool) else "missing"
     for key in ("audit.key", "unsubscribe.key"):
         p = Path("/etc/bau") / key
@@ -710,6 +717,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--lab-only", action="store_true",
                    help="non-commercial lab install (permits noncommercial OS licences)")
     s.set_defaults(fn=cmd_wipe_gate)
+
+    from .cli_ext import register
+    register(sub)
     return p
 
 
@@ -718,6 +728,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return int(args.fn(args))
+    except PermissionError as e:
+        print(f"denied: {e}", file=sys.stderr)
+        return EXIT_BLOCKED
     except (FileNotFoundError, json.JSONDecodeError, yaml.YAMLError, ValueError, KeyError,
             TypeError) as e:
         print(f"error: {e}", file=sys.stderr)

@@ -52,7 +52,7 @@ if [[ "${ID}" != debian || "${VERSION_ID%%.*}" -lt 13 ]] && ((ALLOW_OS == 0)); t
   die "expected Debian 13+, found ${PRETTY_NAME} (use --allow-other-os at your own risk)"
 fi
 pkgs=(python3 python3-venv python3-yaml nftables podman uidmap apparmor apparmor-utils chrony
-      auditd unattended-upgrades dnsutils openssh-client)
+      auditd unattended-upgrades dnsutils openssh-client ffmpeg)
 missing=()
 for p in "${pkgs[@]}"; do dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p"); done
 if ((${#missing[@]})); then
@@ -107,6 +107,11 @@ wheel="${wheels[-1]}"
 [[ -f "${wheel}" ]] || die "no wheel in payload"
 [[ -x /opt/bau/venv/bin/python ]] || python3 -m venv --system-site-packages /opt/bau/venv
 /opt/bau/venv/bin/pip install --quiet --no-index --no-deps --force-reinstall "${wheel}"
+# Optional: Claude SDK, bundled by `make-payload.sh --with-claude` for offline install.
+if compgen -G "${HERE}/wheels/anthropic-*.whl" >/dev/null; then
+  /opt/bau/venv/bin/pip install --quiet --no-index --find-links "${HERE}/wheels" anthropic
+  log "Claude SDK installed (cloud models still need approval: bau set-status model ...)"
+fi
 ln -sf /opt/bau/venv/bin/bau /usr/local/bin/bau
 cat > /etc/profile.d/bau.sh <<'EOF'
 export BAU_HOME=/var/lib/bau
@@ -136,8 +141,8 @@ aa-enabled -q 2>/dev/null || log "WARNING: AppArmor is not enabled"
 # ---------------------------------------------------------------- 7. services
 install -m 0644 "${HERE}"/systemd/*.service "${HERE}"/systemd/*.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable bau-recover.service bau-regwatch.timer >/dev/null
-systemctl start bau-regwatch.timer
+systemctl enable bau-recover.service bau-regwatch.timer bau-ui.service >/dev/null
+systemctl start bau-regwatch.timer bau-ui.service
 
 # ---------------------------------------------------------------- 8. wipe-gate evidence
 audit() { runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \

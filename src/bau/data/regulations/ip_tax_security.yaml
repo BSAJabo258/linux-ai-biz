@@ -43,14 +43,16 @@
   effective_date: 1954-08-16
   obligations:
     - Keep records that substantiate income, deductions and credits (generally 3 years; 6-7 in some cases; employment 4 years)
-    - Report royalties of $10 or more on Form 1099-MISC; collect W-9/W-8 before paying
-    - Backup withholding when a payee fails to provide a TIN
+    - Collect W-9/W-8 before paying; 1099-NEC/1099-MISC thresholds rose from $600 to $2,000 for payments made from 2026 (One Big Beautiful Bill Act, indexed after 2026)
+    - Royalties keep a separate $10 reporting line on Form 1099-MISC (confirm with a CPA)
+    - Backup withholding (24%) when a payee fails to provide a TIN
   penalties: Accuracy-related and information-return penalties
   source_url: https://www.irs.gov/businesses/small-businesses-self-employed/recordkeeping
   source_type: official_guidance
   last_verified: 2026-10-04
   next_review: 2027-01-04
   legal_review_required: true
+  verification_note: 2026 threshold change from secondary sources (OBBBA, July 2025) - confirm against current IRS form instructions.
 
 - reg_id: pci-dss-4
   jurisdiction: ANY
@@ -97,6 +99,7 @@
   obligations:
     - Do not sell to, pay, or contract with sanctioned persons or comprehensively sanctioned regions
     - Screen payees and high-value customers; payment processors screen but do not remove your liability
+    - Comprehensive embargoes - Cuba, Iran, North Korea, Crimea and the so-called DNR/LNR regions; Syria's program ended 2025-07-01 (regulations removed 2025-08-26) but Syria-related SDN listings remain
   penalties: Strict liability civil penalties; criminal for willful violations
   source_url: https://ofac.treasury.gov/
   source_type: official_guidance

@@ -59,37 +59,66 @@ When findings are combined, the worst state wins. An empty evaluation is UNKNOWN
 
 | Spec | Implementation |
 |---|---|
-| §1.4 secrets | `security/secrets_scan.py`, CI secret scan, keys generated on-machine in `/etc/bau` |
+| §1.2, §99 untrusted content / prompt injection | `agents.py` (`untrusted()` wrapping, injection flagging, constitution), memory and Genesis prompts |
+| §1.4 secrets | `security/secrets_scan.py`, CI secret scan, keys generated on-machine; sandbox and MCP refuse secrets in config |
 | §1.5, §96-97 evidence + audit | `audit.py` (hash chain, HMAC, PII refusal, anchor), `evidence.py` |
+| §3, §90, §104-105 OS, golden baseline, updates | `installer/` (Debian, LUKS, preseed, hardening), `baseline.py` (freeze, verify drift, TEST→CANARY→VALIDATE→PROMOTE) |
 | §4 hardware gate | `hardware.py`, `installer/hw-audit.sh`, `hw-audit-windows.ps1` |
-| §4.1, §104-105 backup | `backup.py` (manifest + read-back verify) |
-| §5 wipe gate | `wipe_gate.py`, `bau wipe-gate`, `write-usb.sh` record, `install.sh` import |
-| §3, §90 OS + golden baseline | `installer/` (Debian, LUKS, preseed, hardening); golden image = OPEN |
-| §9-12, §74-75, §113-118 compliance engine | `regulations.py`, `policy.py`, `decision.py`, `jurisdiction.py` |
-| §13-16, §77, §80-81 AI disclosure + likeness | `disclosure.py`, `policies/ai_disclosure.yaml` |
-| §17-20 data governance + rights | `privacy/dsr.py` (deadlines, per-store deletion outcomes) |
-| §21 consent | `comms/consent.py` (ledger with evidence, CASL expiry, global withdrawal) |
+| §4.1 backup | `backup.py` (manifest + read-back verify) |
+| §5 wipe gate | `wipe_gate.py`, `write-usb.sh` record, `install.sh` import |
+| §6 K3 | registered as OFFLOAD in `data/registry_defaults.yaml`; reached through `models/providers.LocalHTTPProvider` |
+| §7-8, §113, §122, §125 Jarvis + missions | `jarvis.py`, `data/missions.yaml` (compliance dependencies per mission type) |
+| §9-12, §74-75, §114-118 compliance engine | `regulations.py`, `policy.py`, `decision.py`, `jurisdiction.py` |
+| §13-16, §77, §80-81 AI disclosure + likeness | `disclosure.py`, `policies/ai_disclosure.yaml`, media gateway provenance |
+| §17-18, §26, §82-83, §101 data governance | `datagov.py` (data objects, use rights, provider boundary, tracking registry) |
+| §19-20 data rights | `privacy/dsr.py` (deadlines, per-store deletion outcomes) |
+| §21 consent | `comms/consent.py` |
 | §22-23, §79 subscriptions + cancellation | `commerce/subscriptions.py`, `policies/commerce.yaml` |
 | §24-25 claims | `claims.py` |
+| §33, §120 high-impact actions, legal review queue | `data/missions.yaml` (`high_impact`, `legal_review`), `legal_queue.py` |
+| §34 NIST AI RMF | registry record `nist-ai-rmf`; GOVERN = policies/approvals, MAP = mission planning, MEASURE = evidence/metrics, MANAGE = incidents/revocation |
+| §35 incidents | `incidents.py` (stage order, notification clocks, evidence anchoring) |
 | §36-37, §111 Sentinel | `security/sentinel.py` (static only, canonical state machine) |
-| §43-51 registries | `registry.py` |
-| §49, §55, §73 permissions / revocation / money | `security/permissions.py` (SSH-signed human approvals, `bau approve`) |
-| §66-67 IP + royalties | `commerce/ip.py` (exact decimal splits, refuses unresolved ownership) |
-| §68-71 tax nexus | `commerce/tax.py` (rules as dated, verified data; unverified = UNKNOWN) |
-| §86-89 jobs, checkpoints, recovery | `jobs.py`, `bau recover`, `bau-recover.service` |
-| §92-93 regulation watcher | `regulations.watch`, `bau reg watch`, `bau-regwatch.timer`; lifecycle via `bau reg promote` |
-| §95, §106-107 dashboard | `status.py`, `data/build_state.yaml` |
+| §38-41 Project Genesis | `genesis.py` (ChatGPT/Claude/Markdown importers, dedupe, extraction, status tags, contradictions, 22 canonical drafts) |
+| §42 MAYA Memory Lane | `memory.py` (hash-linked Markdown records, BM25 search, resume phrases, deterministic export) |
+| §43, §94 capability graph + legal-change impact | `capgraph.py` (`bau graph impact <reg_id>`) |
+| §44-47 models, router, trust, Heretic | `registry.py`, `models/providers.py` (Claude via official SDK with refusal fallbacks; llama.cpp/Ollama; scripted), `models/router.py`, `models/heretic.py` |
+| §48, §102 agents + budgets | `agents.py`, `economics.Budgets` |
+| §49, §55, §73 permissions / revocation / money | `security/permissions.py` (SSH-signed human approvals, `bau approve`), `accounting.prepare_payout` |
+| §50 Universal Gateway | `gateway.py` (one ordered check path, audit on allow and deny) |
+| §51 MCP router | `mcp.py` (stdio JSON-RPC client; each approved tool becomes its own gated capability) |
+| §52-53 network + endpoint trust | `network.py` |
+| §54 blast radius | `blast.py` (escalates approval requirements in the gateway) |
+| §56-58 media + music video | `media/gateway.py` (FFmpeg + HTTP adapters, provenance sidecars, C2PA when available), `media/music.py` (beat grid, sections, drops, edit decision list) |
+| §59 God's Eye | `spatial.py` (USGS, OpenSky, CelesTrak; person-targeting refused) |
+| §60-65 business factories | `factories.py`, `data/factories.yaml` (six factories, inactive by default), `bau factory-run` |
+| §61 Opportunity Miner | `opportunity.py` |
+| §66-67 IP + royalties | `commerce/ip.py` |
+| §68-72 tax, accounting evidence, 1099s | `commerce/tax.py`, `accounting.py` |
+| OFAC (gap G-06) | `sanctions.py` |
+| §76, §78 legal pages + terms versioning | `legal_pages.py` (drafts from live data, material-change detection, counsel approval) |
+| §80 platform policies | `platforms.py` (policy registry, file-drop connector) |
+| §84-85 economics + usage dashboard | `economics.py` |
+| §86-89 jobs, checkpoints, recovery, offline | `jobs.py`, `bau recover` (audit + memory + registries), WAITING_FOR_NETWORK in gateway |
+| §92-93 regulation watcher | `regulations.watch`, `bau-regwatch.timer`, `bau reg promote` |
+| §95 Mission Control | `ui/` (localhost, read-only, keyboard-first, command palette), `status.py` |
+| §100 sandbox | `sandbox.py` (rootless podman, no network, read-only, caps dropped) |
+| §28-30 accessibility | `accessibility.py` (WCAG lint, shortcut registry); CLI and Mission Control are keyboard-only |
 | Outbound comms (gap G-01) | `comms/email.py`, `comms/sms.py`, `comms/dns_auth.py` |
 
-Not yet built (each enters through Sentinel first):
-- Jarvis (§7)
-- model router (§45)
-- MCP router (§50-51 runtime)
-- Project Genesis (§38-41)
-- MAYA Memory Lane (§42)
-- media/spatial adapters (§56-59)
-- business factories (§60-65)
-- the GUI (§28-30)
+### What "complete" means here
+
+Every layer in spec §2 has working, tested code. What cannot be finished from a repository is
+listed in `bau status`:
+- counsel sign-off on regulations;
+- your domain's DNS records and the FCC wireless list;
+- a CPA's tax rules;
+- approving models and agents;
+- the real storefront;
+- the on-hardware boot and restore drill;
+- the first real revenue mission.
+
+Third-party projects named in the spec (aiOS, open-context, Open-Generative-AI, God's Eye UI, Heretic, MAYA repos) plug in through the adapters above only after Sentinel review.
 
 ## Runtime layout
 
@@ -98,6 +127,7 @@ Not yet built (each enters through Sentinel first):
 | `/opt/bau/venv` | root | the installed package |
 | `/var/lib/bau` (`BAU_HOME`) | `bau:bau` 2770 | regulations, policies, audit, evidence, consent, suppression, dsr, jobs, reports... (spec §91 `.bau/` layout) |
 | `/etc/bau/audit.key`, `unsubscribe.key` | `root:bau` 0640 | machine-generated |
+| `bau-ui.service` | runs as `bau`, localhost only | Mission Control on http://127.0.0.1:8765 |
 | `/etc/bau/allowed_signers` | `root:bau` 0644 | public keys of the humans who may approve; only root can add one |
 | `~bauadmin/.ssh/bau_approval_ed25519` | the admin, passphrase-protected | the admin's personal approval signing key |
 

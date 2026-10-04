@@ -16,13 +16,15 @@ OUT_DIR="${ROOT}/dist"
 SIGN_KEY=""
 TO=""
 SKIP_TESTS=0
+WITH_CLAUDE=0
 while (($#)); do
   case $1 in
     --out) OUT_DIR=$2; shift 2 ;;
     --sign) SIGN_KEY=$2; shift 2 ;;
     --to) TO=$2; shift 2 ;;          # mounted USB stick to copy onto
     --skip-tests) SKIP_TESTS=1; shift ;;
-    -h|--help) echo "usage: $0 [--out DIR] [--sign GPG_KEYID] [--to /media/usb] [--skip-tests]"; exit 0 ;;
+    --with-claude) WITH_CLAUDE=1; shift ;;   # bundle the anthropic SDK for offline install
+    -h|--help) echo "usage: $0 [--out DIR] [--sign GPG_KEYID] [--to /media/usb] [--skip-tests] [--with-claude]"; exit 0 ;;
     *) die "unknown argument $1" ;;
   esac
 done
@@ -49,6 +51,14 @@ if ! python3 -m pip wheel --quiet --no-deps --no-build-isolation -w "${P}/wheels
      >/dev/null 2>&1; then
   warn "offline wheel build failed; retrying with build isolation"
   python3 -m pip wheel --quiet --no-deps -w "${P}/wheels" "${ROOT}" || die "wheel build failed"
+fi
+
+if ((WITH_CLAUDE)); then
+  log "downloading the anthropic SDK and its dependencies for Debian 13 (Python 3.13, x86_64)"
+  python3 -m pip download --quiet --dest "${P}/wheels" --only-binary=:all: \
+    --python-version 3.13 --platform manylinux2014_x86_64 --platform manylinux_2_17_x86_64 \
+    --platform manylinux_2_28_x86_64 --implementation cp anthropic \
+    || die "could not download the anthropic SDK wheels"
 fi
 
 cp "${HERE}/payload/install.sh" "${P}/install.sh"

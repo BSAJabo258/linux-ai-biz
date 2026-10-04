@@ -127,4 +127,25 @@ bau approve --capability email.send.commercial --request-id <campaign_id> \
 bau email preflight ... --approval approval.json
 ```
 
+## Phase 7: Bring the work layers online
+
+```bash
+bau ui                                         # or open http://127.0.0.1:8765 (bau-ui.service)
+bau set-status model claude-opus-5-5 APPROVED  # after reviewing terms; repeat for local models
+bau models route reasoning --data PERSONAL     # see which model the router would use, and why
+bau genesis import ~/exports/chatgpt/conversations.json
+bau genesis import ~/exports/claude/conversations.json
+bau genesis extract --to-memory                # drafts in /var/lib/bau/history/canonical/
+bau opportunity opportunities.yaml             # rank ideas on evidence
+bau factory activate digital_assets --approval-ref <your note>
+bau factory-run start digital_assets "Bakery planner pack"
+bau factory-run confirm <run> asset_built      # checklist items are confirmed by you
+bau factory-run facts <run> monetize facts.json
+bau approve --capability publish.text --request-id <run> --requester agent:writer \
+    --bind /var/lib/bau/jobs/factory_runs/<run>.json --out approval.json
+bau factory-run approval <run> publish.text approval.json
+```
+
+Publishing produces a reviewed export package in `/var/lib/bau/artifacts/exports/` with an upload checklist. Nothing is posted to a platform until you upload it, or until a platform API connector has been built, reviewed and approved.
+
 The machine reports **not production-ready** until every spec §107 critical item is closed. That is by design.

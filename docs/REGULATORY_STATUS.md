@@ -25,6 +25,8 @@ This is the human-readable companion to the machine-readable registry in `src/ba
 | Gmail / Yahoo / Microsoft bulk-sender rules | Rejection enforcement since Nov 2025 | `email.auth.*`, `email.unsubscribe.one_click`, `email.reputation.*` |
 | COPPA 2025 amendments | Compliance date 2026-04-22 | Recorded |
 | FTC civil penalty maximum | $53,088 (2025 level, unchanged in 2026) | Recorded on each FTC rule |
+| 1099-NEC / 1099-MISC threshold | $600 -> **$2,000** for payments from 2026 (One Big Beautiful Bill Act) | `accounting.THRESHOLDS`; royalties keep the $10 line (confirm with CPA) |
+| OFAC Syria program | Comprehensive sanctions ended 2025-07-01; regulations removed 2025-08-26 | Embargo list: Cuba, Iran, North Korea, Crimea, so-called DNR/LNR; SDN screening still applies |
 
 ## Sources consulted (2026-10-04)
 
@@ -40,6 +42,7 @@ This is the human-readable companion to the machine-readable registry in `src/ba
 - UK DUAA / PECR: Weightmans, Hill Dickinson, Freeths
 - TCPA / Texas SB 140: Kelley Drye, Thompson Hine, Commlaw Group
 - FTC penalty adjustment: FTC Rule 1.98 reporting (2025 adjustment; 2026 unchanged)
+- 1099 threshold: Beancount OBBBA guides (2026); OFAC Syria: Hunton, OFAC FAQs (2025-06-30), Simpson Thacher
 
 ## Re-verification schedule
 
