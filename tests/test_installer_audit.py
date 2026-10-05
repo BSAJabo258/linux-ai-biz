@@ -59,3 +59,16 @@ def test_install_sh_packages_are_all_preinstalled_by_usb1():
     assert not missing, f"install.sh needs packages USB #1 does not install: {missing}"
     virtual_in_debian13 = {"dnsutils"}
     assert not (set(required) | preinstalled) & virtual_in_debian13
+
+
+def test_upgrade_restarts_long_running_services():
+    """Regression (VM run): re-running install.sh left Mission Control serving the old
+    code until reboot because the long-running service was only `start`ed."""
+    sh = INSTALL.read_text()
+    long_running = [p.name for p in (ROOT / "installer" / "payload" / "systemd").glob(
+        "*.service") if "Type=oneshot" not in p.read_text()
+        and f"{p.name}" in sh.split("# ---------------------------------------------------"
+                                    "------------- 7. services")[1]]
+    assert long_running, "expected at least one long-running service"
+    for svc in long_running:
+        assert re.search(rf"systemctl (try-)?restart [^\n]*{re.escape(svc)}", sh), svc
