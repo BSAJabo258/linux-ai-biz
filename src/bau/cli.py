@@ -497,17 +497,20 @@ def cmd_selftest(a: argparse.Namespace) -> int:
     results["audit_chain"] = "ok" if AuditLog().verify()[0] else "FAIL"
     from .memory import MemoryLane
     results["memory_chain"] = "ok" if MemoryLane().verify()[0] else "FAIL"
-    for tool in ("podman", "nft", "aa-status", "chronyc", "ssh-keygen", "ffmpeg"):
-        results[f"tool:{tool}"] = "ok" if shutil.which(tool) else "missing"
-    for key in ("audit.key", "unsubscribe.key"):
-        p = Path("/etc/bau") / key
+    container = os.environ.get("BAU_IN_CONTAINER") == "1"
+    host_only = ("podman", "nft", "aa-status", "chronyc")   # the laptop's hardening layer
+    for tool in (*host_only, "ssh-keygen", "ffmpeg"):
+        results[f"tool:{tool}"] = "ok" if shutil.which(tool) else \
+            "laptop only (not in the container)" if container and tool in host_only else "missing"
+    for key, env in (("audit.key", "BAU_AUDIT_KEY"), ("unsubscribe.key", "BAU_UNSUB_KEY")):
+        p = Path(os.environ.get(env) or Path("/etc/bau") / key)
         results[f"key:{key}"] = "ok" if p.exists() and (p.stat().st_mode & 0o007) == 0 \
             else "missing or world-readable"
     signers = _allowed_signers()
     results["approvers"] = "ok" if signers.exists() and signers.read_text().strip() \
-        else "no human approver registered (/etc/bau/allowed_signers)"
+        else f"no human approver registered ({signers})"
     _out(results)
-    bad = [k for k, v in results.items() if v != "ok"]
+    bad = [k for k, v in results.items() if v != "ok" and not v.startswith("laptop only")]
     return EXIT_OK if not bad else EXIT_REVIEW
 
 

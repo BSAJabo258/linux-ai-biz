@@ -85,7 +85,7 @@ When findings are combined, the worst state wins. An empty evaluation is UNKNOWN
 | §38-41 Project Genesis | `genesis.py` (ChatGPT/Claude/Markdown importers, dedupe, extraction, status tags, contradictions, 22 canonical drafts) |
 | §42 MAYA Memory Lane | `memory.py` (hash-linked Markdown records, BM25 search, resume phrases, deterministic export) |
 | §43, §94 capability graph + legal-change impact | `capgraph.py` (`bau graph impact <reg_id>`) |
-| §44-47 models, router, trust, Heretic | `registry.py`, `models/providers.py` (Claude via official SDK with refusal fallbacks; llama.cpp/Ollama; scripted), `models/router.py`, `models/heretic.py` |
+| §44-47 models, router, trust, Heretic | `registry.py`, `models/providers.py` (Claude via official SDK with refusal fallbacks; llama.cpp/Ollama; scripted), `models/router.py`, `models/heretic.py`, `models/bench.py` (a local model is approvable only after `bau models bench` shows it answered and can call tools on this machine). Free local fallback: GLM-4.7-Flash (MIT, 30B MoE with 3B active, Q4 GGUF via llama.cpp, thinking off for Jarvis) |
 | Content lane (owner decision, amends §46-47) | an ABLITERATED local model may be approved with `lane: content_only` + `use_for` (creative_writing, script, lyrics, comedy, ad_copy, image_prompt, storyboard). The router uses it only for those jobs, never with tools or data beyond PUBLIC/INTERNAL, and prefers it there; agents refuse to give it tools; every use is audited (`model.content_lane`); it can never be the Governor's validator. Example: `examples/content-lane-model.yaml` |
 | §48, §102 agents + budgets | `agents.py`, `economics.Budgets` |
 | §49, §55, §73 permissions / revocation / money | `security/permissions.py` (SSH-signed human approvals, `bau approve`), `accounting.prepare_payout` |
@@ -234,6 +234,8 @@ unattended.
 | `/etc/bau/audit.key`, `unsubscribe.key` | `root:bau` 0640 | machine-generated |
 | `bau-ui.service` | runs as `bau`, localhost only | Mission Control on http://127.0.0.1:8765 |
 | `bau jarvis` | runs as the owner, localhost only | Jarvis HUD on http://127.0.0.1:8766 (private per-launch link) |
+| `Dockerfile` / `docker-compose.yml` | test drive only | Mission Control, Governor, Jarvis and an optional llama.cpp model server in containers. Servers bind the container interface (`BAU_IN_CONTAINER=1`) and Docker publishes them on the host's 127.0.0.1 only. Keys live in the `bau-home` volume. No disk encryption, firewall or AppArmor: the laptop install stays the production path |
+| `vm/create-vm.*` | rehearsal | VirtualBox VM (UEFI, 8 GB RAM, 60 GB) with the USB #1 and USB #2 images attached as discs |
 | `bau-governor.timer` | runs as `bau`, every 10 min | Governor tick; state in `BAU_HOME/governor/` |
 | `/etc/bau/models.env` (optional) | `root:bau` 0640 | API keys for the Governor's resume runs, validator model and Jarvis (incl. `ELEVENLABS_API_KEY`) |
 | `/etc/bau/allowed_signers` | `root:bau` 0644 | public keys of the humans who may approve; only root can add one |

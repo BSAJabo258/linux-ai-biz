@@ -442,6 +442,8 @@ class Assistant:
                   "offer. Four sentences at most.\n\n"
                   + untrusted("bau_facts", json.dumps(f, default=str)[:12000])[0])
         reply = self._turn(prompt)
+        if reply.text == "Done.":            # the model said nothing usable: speak the facts
+            reply.text = self.plain_briefing(f)
         reply.cards = cards + reply.cards
         return reply
 
@@ -512,6 +514,9 @@ class Assistant:
         else:
             final = final or "That took more steps than I allow myself. Ask me again more narrowly?"
         self._trim()
+        # Never read data blocks aloud, even if a weak model echoes them back.
+        final = re.sub(r"<untrusted_data[^>]*>.*?(</untrusted_data>|$)", "", final,
+                       flags=re.S | re.I)
         final = re.sub(r"[*#`_]{1,3}", "", final).strip() or "Done."
         self._log("jarvis", final)
         pend = [self.pending[p].public() for p in staged if p in self.pending]
@@ -703,11 +708,12 @@ class Voice:
 
 def build_assistant(home: Path | None = None, owner: str = "human:owner") -> Assistant:
     """Pick the model from config/jarvis.yaml (default Claude Opus), falling back to the
-    local model, then to plain mode. Only APPROVED models are used."""
+    free local GLM-4.7-Flash, then any other local model, then plain mode. Only APPROVED
+    models are used."""
     from .runtime import provider_for
     home = home or bau_home()
     cfg = YamlStore(home / "config" / "jarvis.yaml").load() or {}
-    for mid in [cfg.get("model"), "claude-opus-5-5", "local-llm"]:
+    for mid in [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "local-llm"]:
         if not mid:
             continue
         try:

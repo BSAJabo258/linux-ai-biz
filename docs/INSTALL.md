@@ -9,6 +9,10 @@ Two sticks, used in this order:
 
 Build both on any Linux machine with `python3`, `xorriso`, `gpg`, `curl`. Stick sizes: USB #1 at least 2 GB; USB #2 at least 1 GB. A separate **backup drive** is also required (Phase 2).
 
+**Try it before the laptop.** Two safe rehearsals, nothing gets wiped:
+- [Docker test drive](../docker/README.md): run BAU, Jarvis and an optional free local model on your own computer in minutes.
+- [Virtual machine rehearsal](../vm/README.md): run the real two-stick install inside a VirtualBox "test laptop".
+
 > Nothing here can undo a wipe. Follow the phases in order. Every destructive step asks you to type something that proves you are looking at the right disk.
 
 ---
@@ -255,8 +259,13 @@ bau jarvis --text                # same conversation in the terminal; confirms a
 bau jarvis config --call-me "boss" --model claude-opus-5-5 --voice-id <ElevenLabs voice>
 ```
 
-* **Brains:** an approved Claude model (`ANTHROPIC_API_KEY` in `/etc/bau/models.env`)
-  or your approved local model. Content-lane models never run Jarvis. With no model it
+* **Brains:** an approved Claude model (`ANTHROPIC_API_KEY` in `/etc/bau/models.env`),
+  otherwise the free **GLM-4.7-Flash** running on the laptop itself, otherwise any other
+  approved local model. Content-lane models never run Jarvis. To use GLM on the laptop:
+  run llama.cpp's `llama-server -hf unsloth/GLM-4.7-Flash-GGUF:Q4_K_M --jinja --port 8080`
+  (needs about 24 GB RAM), then `bau models bench glm-4.7-flash` and
+  `bau set-status model glm-4.7-flash APPROVED`. BAU refuses to approve a local model that
+  has not answered a benchmark on this machine. With no model it
   still works in *plain mode*: briefing, status, night report, queue, deadlines, money,
   missions, brain gaps, "add: ..." to the brain, hold and release.
 * **Voice:** put `ELEVENLABS_API_KEY=...` in `/etc/bau/models.env` for the ElevenLabs

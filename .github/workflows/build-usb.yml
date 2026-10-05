@@ -4,6 +4,7 @@ name: build-usb
 # (publication of this software project - within GitHub's Actions terms).
 #   USB #1  bau-debian-<ver>-amd64-netinst.iso  (official Debian ISO, signature-verified, remastered)
 #   USB #2  BAU-PAYLOAD-<ver>.tar.gz            (unpack onto any USB stick)
+#           BAU-PAYLOAD-<ver>.iso               (the same payload as a disc image, for a VM)
 # Run it from Actions > build-usb > "Run workflow", or by pushing a tag v*.
 
 on:
@@ -36,11 +37,15 @@ jobs:
         run: installer/make-payload.sh --with-claude --out dist
       - name: "USB #1: Debian image (official signature + checksum verified before remastering)"
         run: installer/build-usb-image.sh --out dist
+      - name: "USB #2 as a disc image for virtual machines (vm/create-vm.*)"
+        run: |
+          ver="$(python -c 'import sys; sys.path.insert(0, "src"); import bau; print(bau.__version__)')"
+          xorriso -as mkisofs -quiet -V BAU-PAYLOAD -J -R -o "dist/BAU-PAYLOAD-${ver}.iso" dist/BAU-PAYLOAD
       - name: checksums and notes
         id: meta
         run: |
           cd dist
-          sha256sum bau-debian-*.iso BAU-PAYLOAD-*.tar.gz > SHA256SUMS.txt
+          sha256sum bau-debian-*.iso BAU-PAYLOAD-*.tar.gz BAU-PAYLOAD-*.iso > SHA256SUMS.txt
           cat SHA256SUMS.txt
           ver="$(python -c 'import sys; sys.path.insert(0, "../src"); import bau; print(bau.__version__)')"
           tag="usb-v${ver}-${GITHUB_SHA::7}"
@@ -54,6 +59,7 @@ jobs:
             echo
             echo "## USB #2 - BAU"
             echo "\`$(ls BAU-PAYLOAD-*.tar.gz)\`: unpack onto any USB stick; on the new system run \`sudo bash BAU-PAYLOAD/install.sh\` (works offline)."
+            echo "\`$(ls BAU-PAYLOAD-*.iso)\`: the same payload as a disc image, for a test run in a virtual machine first (see vm/README.md)."
             echo "This payload is **unsigned** (CI never holds your GPG key). For production, rebuild with \`installer/make-payload.sh --sign <your key>\` and install with \`--expect-fpr\`."
             echo
             echo "## Verify before use"
@@ -67,6 +73,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.meta.outputs.tag }}" \
-            dist/bau-debian-*.iso dist/BAU-PAYLOAD-*.tar.gz dist/SHA256SUMS.txt \
+            dist/bau-debian-*.iso dist/BAU-PAYLOAD-*.tar.gz dist/BAU-PAYLOAD-*.iso dist/SHA256SUMS.txt \
             --title "BAU USB images (${{ steps.meta.outputs.tag }})" \
             --notes-file dist/NOTES.md --target "${GITHUB_SHA}"
