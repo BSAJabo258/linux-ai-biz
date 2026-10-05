@@ -705,6 +705,76 @@ def cmd_brain(a):
     return EXIT_OK
 
 
+def _previewer():
+    import shutil
+    import subprocess
+    opener = shutil.which("xdg-open")
+    return (lambda v: subprocess.Popen([opener, str(v)])) if opener and \
+        os.environ.get("DISPLAY") else None
+
+
+def cmd_youtube(a):
+    from . import youtube
+    q = youtube.YouTubeQueue()
+    if a.yt_cmd == "login":
+        _human()
+        client = youtube.YouTubeClient()
+        youtube.login(client, port=a.port)
+        ch = client.channel()
+        AuditLog().append("youtube.connected", _human(), {})
+        _out({"connected": ch["title"], "handle": ch.get("handle")})
+    elif a.yt_cmd == "logout":
+        youtube.TokenStore().clear()
+        _out({"connected": None})
+    elif a.yt_cmd == "add":
+        desc = Path(a.description_file).read_text() if a.description_file else a.description
+        item = q.add(Path(a.video), a.title, f"human:{getpass.getuser()}", desc or "",
+                     [t for t in (a.tags or "").split(",") if t.strip()], kids=a.kids,
+                     licensed=a.licensed, paid_promotion=a.paid_promotion,
+                     category_id=a.category, is_aigc=False if a.not_ai else None,
+                     engine=_engine())
+        _out(asdict(item))
+        return EXIT_OK if item.checks["ok"] else EXIT_BLOCKED
+    elif a.yt_cmd == "queue":
+        _out([{"item_id": i.item_id, "title": i.title, "kids": i.kids, "status": i.status,
+               "ok": i.checks.get("ok"), "problems": i.checks.get("problems"),
+               "warnings": i.checks.get("warnings")}
+              for i in (q.items() if a.all else q.pending())])
+    elif a.yt_cmd == "review":
+        done = youtube.review(q, youtube.YouTubeClient(), _human(), preview=_previewer())
+        _out([{"item_id": i.item_id, "status": i.status, "result": i.result} for i in done])
+    elif a.yt_cmd == "status":
+        client = youtube.YouTubeClient()
+        out = []
+        for i in q.items():
+            if i.video_id:
+                i.result = {**i.result, **client.status(i.video_id)}
+                q.save(i)
+            out.append({"item_id": i.item_id, "status": i.status, "youtube": i.result})
+        _out(out)
+    return EXIT_OK
+
+
+def cmd_publish(a):
+    from .publishing import ADAPTERS, Hub
+    hub = Hub()
+    if a.pub_cmd == "platforms":
+        _out([{"platform": k, "label": v.label, "kids": v.allows_kids,
+               "note": v.kids_note or None} for k, v in ADAPTERS.items()])
+    elif a.pub_cmd == "queue":
+        _out(hub.pending())
+    elif a.pub_cmd == "add":
+        desc = Path(a.description_file).read_text() if a.description_file else a.description
+        out = hub.queue(Path(a.video), [p.strip() for p in a.to.split(",") if p.strip()],
+                        f"human:{getpass.getuser()}", title=a.title, description=desc or "",
+                        tags=[t for t in (a.tags or "").split(",") if t.strip()], kids=a.kids,
+                        licensed=a.licensed, paid_promotion=a.paid_promotion,
+                        is_aigc=False if a.not_ai else None, engine=_engine())
+        _out(out)
+        return EXIT_OK if all(r.get("ok", True) for r in out) else EXIT_BLOCKED
+    return EXIT_OK
+
+
 def cmd_tiktok(a):
     from . import tiktok
     q = tiktok.TikTokQueue()
@@ -729,13 +799,8 @@ def cmd_tiktok(a):
                "ok": i.checks.get("ok"), "problems": i.checks.get("problems")}
               for i in (q.items() if a.all else q.pending())])
     elif a.tt_cmd == "review":
-        import shutil
-        import subprocess
-        opener = shutil.which("xdg-open")
-        preview = (lambda v: subprocess.Popen([opener, str(v)])) if opener and \
-            os.environ.get("DISPLAY") else None
         done = tiktok.review(q, tiktok.TikTokClient(), _human(), draft=a.draft,
-                             preview=preview)
+                             preview=_previewer())
         _out([{"item_id": i.item_id, "status": i.status, "result": i.result} for i in done])
     elif a.tt_cmd == "status":
         client = tiktok.TikTokClient()
@@ -1090,6 +1155,43 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = bs.add_parser("graph")
     x.add_argument("--out")
     s.set_defaults(fn=cmd_brain)
+
+    s = sub.add_parser("youtube", help="review-and-upload to YouTube, made-for-kids built in")
+    yt = s.add_subparsers(dest="yt_cmd", required=True)
+    x = yt.add_parser("login", help="connect your YouTube channel (opens Google sign-in)")
+    x.add_argument("--port", type=int, default=3456)
+    yt.add_parser("logout")
+
+    def video_args(x, many=False):
+        x.add_argument("video")
+        x.add_argument("--title", required=True)
+        x.add_argument("--description", default="")
+        x.add_argument("--description-file")
+        x.add_argument("--tags", help="comma-separated")
+        x.add_argument("--kids", action="store_true",
+                       help="made for kids: runs the kids checks and sets the audience")
+        x.add_argument("--licensed", action="store_true",
+                       help="you hold a licence for any third-party characters used")
+        x.add_argument("--paid-promotion", action="store_true")
+        x.add_argument("--not-ai", action="store_true", help="only for human-made videos")
+    x = yt.add_parser("add", help="queue a finished video for review")
+    video_args(x)
+    x.add_argument("--category", help="1 Film & Animation, 10 Music, 24 Entertainment, "
+                   "27 Education")
+    x = yt.add_parser("queue")
+    x.add_argument("--all", action="store_true")
+    yt.add_parser("review", help="review queued videos; your 'y' uploads")
+    yt.add_parser("status", help="refresh processing status of uploaded videos")
+    s.set_defaults(fn=cmd_youtube)
+
+    s = sub.add_parser("publish", help="one video to several platforms (YouTube, TikTok...)")
+    ps = s.add_subparsers(dest="pub_cmd", required=True)
+    ps.add_parser("platforms", help="platforms BAU can publish to")
+    ps.add_parser("queue", help="everything waiting for review, all platforms")
+    x = ps.add_parser("add", help="queue one video to several platforms")
+    video_args(x)
+    x.add_argument("--to", required=True, help="comma-separated, e.g. youtube,tiktok")
+    s.set_defaults(fn=cmd_publish)
 
     s = sub.add_parser("tiktok", help="review-and-post to TikTok (your click posts it)")
     tt = s.add_subparsers(dest="tt_cmd", required=True)

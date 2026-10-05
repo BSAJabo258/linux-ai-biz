@@ -168,6 +168,28 @@ facts, a natural conversation with memory (`BAU_HOME/jarvis/history.jsonl`), and
   configured; otherwise the browser's speech. Plain mode (no model) keeps the briefing and
   core commands working offline.
 
+## Publishing hub and kids content (`publishing.py`, `youtube.py`, `kids.py`)
+
+Every platform is an adapter in `publishing.ADAPTERS` with the same four abilities: list
+what is waiting, build the confirm card (summary, owner-only choices, preview), post after
+a human confirms, and say whether it accepts child-directed content. Jarvis (`publish_queue`,
+`post_video`), the CLI (`bau publish`) and the queues all go through the hub. Adding
+Instagram or Facebook means one adapter plus its policy record in the platform registry.
+
+| Platform | Adapter | Owner chooses at confirm | Kids |
+|---|---|---|---|
+| TikTok | `tiktok.py` (Content Posting API) | privacy, commercial disclosure | never (13+) |
+| YouTube | `youtube.py` (Data API v3, resumable upload) | audience (made for kids or not), privacy, full-watch confirmation for kids | yes, made for kids |
+
+Kids rules live in the `publish` policy domain (`data/policies/kids_content.yaml`) and only
+apply when a video is child-directed. `kids.scan` turns the title, description and tags into
+facts: personal-info requests, links, engagement bait, purchase pressure, unsuitable themes,
+sensational titles, third-party characters, and near-duplicate episodes. The rules cite
+`us-coppa`, `industry-youtube-made-for-kids`, `us-ftc-act-s5`, `us-ftc-endorsement-guides`,
+`us-lanham-act` and `industry-youtube-inauthentic-content` (near-copies are a review
+warning, not a block). Uploads set `selfDeclaredMadeForKids` and `containsSyntheticMedia`;
+paid promotion uploads go up private, because the API cannot tick the box.
+
 ## Two tiers: operator and Governor
 
 BAU is run by two AIs with different jobs:

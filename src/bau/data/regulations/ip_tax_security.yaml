@@ -122,3 +122,20 @@
   last_verified: 2026-10-04
   next_review: 2027-10-04
   legal_review_required: false
+
+- reg_id: us-lanham-act
+  jurisdiction: US
+  authority: US federal courts / USPTO
+  law: Lanham Act (15 U.S.C. 1114, 1125) - trademark infringement and false endorsement; character copyright under 17 U.S.C.
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 1947-07-05
+  obligations:
+    - Do not use characters, names or logos others own in a way that suggests their endorsement without a licence
+    - Keep licences on file for any third-party characters used
+  penalties: Injunctions, damages, platform takedowns and channel strikes
+  source_url: https://www.law.cornell.edu/uscode/text/15/1125
+  source_type: statute
+  last_verified: 2026-10-05
+  next_review: 2027-04-05
+  legal_review_required: true

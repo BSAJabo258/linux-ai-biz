@@ -35,7 +35,7 @@ ROUTABLE = {"APPROVED", "ACTIVE"}
 # creative work where a stock model's refusals get in the way of legitimate content.
 # It drafts text; it never gets tools, personal data, or any say in a decision.
 CONTENT_KINDS = {"creative_writing", "script", "lyrics", "comedy", "ad_copy",
-                 "image_prompt", "storyboard"}
+                 "image_prompt", "storyboard", "video_prompt"}
 CONTENT_LANE = "content_only"
 
 

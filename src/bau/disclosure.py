@@ -98,6 +98,15 @@ def publish_facts(p: Provenance, ctx: dict[str, Any]) -> dict[str, Any]:
             "is_review_or_testimonial": ctx.get("is_review_or_testimonial", False),
             "platform_requires_ai_label": ctx.get("platform_requires_ai_label"),
             "platform_label_set": ctx.get("platform_label_set"),
+            # child-directed content (bau.kids): rules skip unless child_directed
+            "child_directed": ctx.get("child_directed", False),
+            "made_for_kids_set": ctx.get("made_for_kids_set"),
+            "collects_child_data": ctx.get("collects_child_data"),
+            "commercial_pressure": ctx.get("commercial_pressure"),
+            "paid_promotion": ctx.get("paid_promotion", False),
+            "unsuitable_for_kids": ctx.get("unsuitable_for_kids"),
+            "unlicensed_characters": ctx.get("unlicensed_characters"),
+            "near_duplicate": ctx.get("near_duplicate"),
         },
     }
 

@@ -74,7 +74,7 @@ def test_all_factory_definitions_are_consistent(engine):
     types = mission_types()
     domains = {p.domain for p in engine.policies}
     assert set(defs) == {"faceless_media", "digital_assets", "books", "music_entertainment",
-                         "automation_services", "gods_eye_media"}
+                         "automation_services", "gods_eye_media", "kids_channel"}
     for name, f in defs.items():
         assert f["mission_type"] in types, name
         for st in f["stages"]:

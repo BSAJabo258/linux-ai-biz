@@ -41,6 +41,7 @@ from typing import Any
 from .audit import AuditLog
 from .home import bau_home
 from .models.providers import Provider, ToolSpec
+from .publishing import ADAPTERS
 from .store import JsonlStore, YamlStore
 
 PERSONA = """You are Jarvis, the voice of BAU - the owner's AI business system. You speak
@@ -58,6 +59,8 @@ How you act:
 - Confirm tools (posting, releasing a hold): calling one only puts it on the owner's
   screen for confirmation. Say it is waiting for their confirmation. Never say it is
   done until a later message tells you the owner confirmed it.
+- Kids videos go only to YouTube, marked made for kids, after the owner has watched
+  them. Never suggest posting child-directed videos to TikTok or other 13+ platforms.
 - Money, commercial email sends, legal decisions and anything else that needs a
   signed approval are not yours to do: explain what is needed and give the exact
   command, for example "bau approve ...".
@@ -118,7 +121,7 @@ def _schema(props: dict[str, Any] | None = None, required: list[str] | None = No
 class Assistant:
     def __init__(self, home: Path | None = None, provider: Provider | None = None,
                  model: dict[str, Any] | None = None, owner: str = "human:owner",
-                 audit: AuditLog | None = None, tiktok_client: Any = None):
+                 audit: AuditLog | None = None, clients: dict[str, Any] | None = None):
         self.home = home or bau_home()
         self.dir = self.home / "jarvis"
         self.dir.mkdir(parents=True, exist_ok=True)
@@ -129,7 +132,7 @@ class Assistant:
         self.owner = owner
         self.audit = audit or AuditLog(self.home / "audit" / "chain.jsonl")
         self.history = JsonlStore(self.dir / "history.jsonl")
-        self.tiktok_client = tiktok_client
+        self.clients = clients or {}         # platform -> API client (tests inject fakes)
         self.messages: list[dict[str, Any]] = []
         self.pending: dict[str, Pending] = {}
         self.tools = {t.name: t for t in self._tools()}
@@ -145,8 +148,9 @@ class Assistant:
                          []), self.t_night),
             Tool("missions", "Missions and their status and next action.", _schema(),
                  self.t_missions),
-            Tool("tiktok_queue", "Videos waiting for review: caption, AI label, checks.",
-                 _schema(), self.t_tiktok_queue),
+            Tool("publish_queue", "Videos waiting for review on every platform (YouTube, "
+                 "TikTok...): title, made-for-kids, AI label, checks.",
+                 _schema(), self.t_publish_queue),
             Tool("deadlines", "Open legal review items, regulation reviews coming due, "
                  "and open incidents.",
                  _schema({"days": {"type": "integer", "description": "horizon, default 14"}},
@@ -177,11 +181,12 @@ class Assistant:
             Tool("release_hold", "Lift a HOLD so BAU runs normally again (owner confirms "
                  "on screen).", _schema(), self.t_release, kind="confirm",
                  stage=lambda: {"summary": "Release the HOLD and let BAU run normally again?"}),
-            Tool("post_tiktok", "Put one queued TikTok video on the owner's screen to post. "
-                 "The owner watches the preview and picks who can view it and whether it "
-                 "promotes anything on that card; you cannot choose those for them.",
-                 _schema({"item_id": {"type": "string"}}),
-                 self.t_post_tiktok, kind="confirm", stage=self._tiktok_card),
+            Tool("post_video", "Put one queued video on the owner's screen to post on its "
+                 "platform. The owner watches the preview and makes the platform's choices "
+                 "(who can see it, audience, promotion) on that card; you cannot make them.",
+                 _schema({"platform": {"type": "string", "enum": sorted(ADAPTERS)},
+                          "item_id": {"type": "string"}}),
+                 self.t_post_video, kind="confirm", stage=self._post_card),
         ]
 
     def specs(self) -> list[ToolSpec]:
@@ -215,12 +220,12 @@ class Assistant:
                  "objective": m["objective"][:120], "status": m["status"],
                  "next_action": m.get("next_action", "")} for m in latest.values()][-10:]
 
-    def t_tiktok_queue(self) -> list[dict[str, Any]]:
-        from .tiktok import TikTokQueue
-        return [{"item_id": i.item_id, "video": i.video, "caption": i.caption,
-                 "ai_label": i.is_aigc, "checks_ok": i.checks.get("ok"),
-                 "problems": i.checks.get("problems", [])}
-                for i in TikTokQueue(self.home, self.audit).pending()]
+    def t_publish_queue(self) -> list[dict[str, Any]]:
+        return self.hub().pending()
+
+    def hub(self):
+        from .publishing import Hub
+        return Hub(self.home, self.audit, self.clients)
 
     def t_deadlines(self, days: int = 14) -> dict[str, Any]:
         from .incidents import Incidents
@@ -293,67 +298,11 @@ class Assistant:
         Governor(self.home, audit=self.audit, systemctl="").release(self.owner)
         return {"hold": None}
 
-    def _tiktok_card(self, item_id: str) -> dict[str, Any]:
-        """TikTok's sharing rules: the owner sees the account, a preview, the caption and
-        AI label, and picks privacy and commercial disclosure themselves - no defaults."""
-        from .tiktok import (
-            BRANDED_CONFIRMATION,
-            MUSIC_CONFIRMATION,
-            PRIVACY_LABELS,
-            TikTokClient,
-            TikTokError,
-            TikTokQueue,
-            duration_sec,
-        )
-        q = TikTokQueue(self.home, self.audit)
-        item = next((i for i in q.pending() if i.item_id == item_id), None)
-        if item is None:
-            raise ValueError(f"{item_id} is not waiting in the TikTok queue")
-        if not item.checks.get("ok"):
-            why = item.checks.get("problems") or [f"compliance gate {item.checks.get('gate')}"]
-            raise ValueError("blocked by checks: " + "; ".join(why))
-        try:
-            creator = (self.tiktok_client or TikTokClient(self.home)).creator_info()
-        except (TikTokError, OSError) as e:
-            raise ValueError(f"TikTok is not connected ({e}); run: bau tiktok login") from e
-        video = q.path(item)
-        secs, max_s = duration_sec(video), creator.get("max_video_post_duration_sec")
-        if secs is not None and max_s and secs > float(max_s):
-            raise ValueError(f"video is longer than this account allows ({max_s}s)")
-        acct = f"{creator.get('creator_nickname', '?')} (@{creator.get('creator_username', '?')})"
-        summary = (f"Post to TikTok now?\nAccount: {acct}\nCaption: {item.caption}\n"
-                   + (f"Length: {secs:.1f}s\n" if secs is not None else "")
-                   + f"AI-generated label: {'ON' if item.is_aigc else 'off'}\n"
-                   "It can take a few minutes for TikTok to process the video after posting.")
-        form = {"fields": [
-            {"name": "privacy", "label": "Who can view this video?",
-             "options": [[o, PRIVACY_LABELS.get(o, o)]
-                         for o in creator.get("privacy_level_options") or []]},
-            {"name": "promotes", "label": "Does it promote something?",
-             "options": [["none", "No"], ["own_brand", "Yes - your own brand"],
-                         ["branded_content", "Yes - branded content for someone else"]]}],
-            "notes": {"default": MUSIC_CONFIRMATION, "branded_content": BRANDED_CONFIRMATION}}
-        return {"summary": summary, "form": form, "preview": str(video)}
+    def _post_card(self, platform: str, item_id: str) -> dict[str, Any]:
+        return self.hub().adapter(platform).card(item_id)
 
-    def t_post_tiktok(self, item_id: str, privacy: str = "", promotes: str = ""
-                      ) -> dict[str, Any]:
-        if not privacy or promotes not in ("none", "own_brand", "branded_content"):
-            return {"error": "the owner must choose who can view it and whether it promotes "
-                             "anything"}
-        if promotes == "branded_content" and privacy == "SELF_ONLY":
-            return {"error": "branded content cannot be 'Only me'"}
-        from .tiktok import TikTokClient, TikTokQueue
-        q = TikTokQueue(self.home, self.audit)
-        item = next((i for i in q.pending() if i.item_id == item_id), None)
-        if item is None:
-            return {"error": f"{item_id} is not waiting in the queue"}
-        client = self.tiktok_client or TikTokClient(self.home)
-        creator = client.creator_info()
-        options = {"brand_organic_toggle": promotes == "own_brand",
-                   "brand_content_toggle": promotes == "branded_content"}
-        done = q.post(item, client, self.owner, privacy, options, creator)
-        return {"item_id": done.item_id, "status": done.status, "tiktok": done.result,
-                "account": creator.get("creator_username")}
+    def t_post_video(self, platform: str, item_id: str, **choices: Any) -> dict[str, Any]:
+        return self.hub().adapter(platform).post(item_id, choices, self.owner)
 
     # -------------------------------------------------------------- tool execution
     def _run_tool(self, name: str, args: dict[str, Any]) -> tuple[Any, bool]:
@@ -430,7 +379,7 @@ class Assistant:
     def facts(self) -> dict[str, Any]:
         f: dict[str, Any] = {"date": dt.date.today().isoformat()}
         for key, fn in (("status", self.t_status), ("night", self.t_night),
-                        ("tiktok_queue", self.t_tiktok_queue), ("deadlines", self.t_deadlines),
+                        ("publish_queue", self.t_publish_queue), ("deadlines", self.t_deadlines),
                         ("missions", self.t_missions)):
             try:
                 f[key] = fn()
@@ -452,10 +401,15 @@ class Assistant:
                          + (f" and {needs} need{'s' * (needs == 1)} you." if needs else "."))
         else:
             parts.append("Quiet night. Nothing broke.")
-        q = f.get("tiktok_queue") or []
-        if isinstance(q, list) and q:
+        q = [i for i in (f.get("publish_queue") or []) if isinstance(i, dict) and "item_id" in i]
+        if q:
             ready = sum(1 for i in q if i.get("checks_ok"))
-            parts.append(f"{len(q)} TikTok video{'s' * (len(q) != 1)} waiting, "
+            where = {}
+            for i in q:
+                where[i["platform"]] = where.get(i["platform"], 0) + 1
+            from .publishing import ADAPTERS
+            spread = " and ".join(f"{n} on {ADAPTERS[k].label}" for k, n in where.items())
+            parts.append(f"{len(q)} video{'s' * (len(q) != 1)} waiting ({spread}), "
                          f"{ready} ready to post.")
         d = f.get("deadlines") or {}
         if d.get("legal_review_open"):
@@ -580,7 +534,7 @@ class Assistant:
         routes = [   # leading word boundary only, so plurals match ("gaps", "missions")
             (r"\b(brief|morning|catch me up|what('?s| is) up|update)", None),
             (r"\b(night|overnight|governor|while i was away)", "night_report"),
-            (r"\b(tiktok|video|queue|post)", "tiktok_queue"),
+            (r"\b(tiktok|youtube|video|queue|post|upload)", "publish_queue"),
             (r"\b(deadline|legal|regulation|law|incident)", "deadlines"),
             (r"\b(mission)", "missions"),
             (r"\b(money|revenue|cost|spend|profit|sales)", "money"),
@@ -628,9 +582,12 @@ class Assistant:
         if tool == "night_report":
             return (("On hold: " + out["hold"] + ". ") if out.get("hold") else "") + (
                 f"{len(out['fixed'])} fixed, {len(out['needs_you'])} waiting for you.")
-        if tool == "tiktok_queue":
-            return (f"{len(out)} video{'s' * (len(out) != 1)} in the queue." if out
-                    else "The TikTok queue is empty.")
+        if tool == "publish_queue":
+            out = [i for i in out if "item_id" in i]
+            kids = sum(1 for i in out if i.get("made_for_kids"))
+            return ((f"{len(out)} video{'s' * (len(out) != 1)} waiting to post"
+                     + (f", {kids} made for kids." if kids else ".")) if out
+                    else "Nothing is waiting to post.")
         if tool == "deadlines":
             return (f"{len(out['legal_review_open'])} legal review items, "
                     f"{len(out['regulation_reviews_due'])} regulation reviews due, "

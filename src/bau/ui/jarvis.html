@@ -274,7 +274,7 @@ function logLine(role, text) {
   $("log").scrollTop = $("log").scrollHeight;
 }
 const TITLES = { briefing: "System", system_status: "Status", night_report: "While you were away",
-  tiktok_queue: "TikTok queue", deadlines: "Deadlines", money: "Money", missions: "Missions",
+  publish_queue: "Publishing queue", post_video: "Posted", deadlines: "Deadlines", money: "Money", missions: "Missions",
   brain_lookup: "Second Brain", brain_gaps: "Brain gaps", brain_add: "Added to brain",
   remember: "Remembered", plan_mission: "Mission plan", hold_everything: "Hold", release_hold: "Hold" };
 function fmt(v) { if (v == null) return "—"; if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(2);
@@ -290,18 +290,18 @@ function renderCard(c) {
   const d = c.data, t = TITLES[c.tool] || c.tool;
   let p;
   if (c.tool === "briefing" && d && typeof d === "object") {
-    const st = d.status || {}, nt = d.night || {}, q = Array.isArray(d.tiktok_queue) ? d.tiktok_queue : [];
+    const st = d.status || {}, nt = d.night || {}, q = Array.isArray(d.publish_queue) ? d.publish_queue.filter(x => x && x.item_id) : [];
     const cls = st.overall === "GREEN" ? "ok" : st.overall === "RED" || st.overall === "BLACK" ? "bad" : "warn";
     p = panel("System · " + (st.overall || "?"), cls);
     kv(p, "Production ready", st.production_ready); kv(p, "Setup steps left", st.setup_steps_left);
     kv(p, "Fixed overnight", (nt.fixed || []).length); kv(p, "Needs you", (nt.needs_you || []).length);
-    kv(p, "TikTok waiting", q.length); kv(p, "Missions", Array.isArray(d.missions) ? d.missions.length : "—");
+    kv(p, "Videos waiting", q.length); kv(p, "Missions", Array.isArray(d.missions) ? d.missions.length : "—");
     list(p, st.attention);
     holdChip(nt.hold);
   } else if (d && d.error) {
     p = panel(t, "bad"); p.appendChild(el("div", null, d.error));
   } else if (Array.isArray(d)) {
-    p = panel(t + " · " + d.length); list(p, d.map(x => x.caption || x.objective || x.detail || x));
+    p = panel(t + " · " + d.length); list(p, d.map(x => x.title ? ((x.platform ? x.platform + ": " : "") + x.title + (x.made_for_kids ? " (kids)" : "")) : (x.caption || x.objective || x.detail || x)));
     if (!d.length) p.appendChild(el("div", null, "Nothing here."));
   } else if (d && typeof d === "object") {
     p = panel(t, c.tool === "hold_everything" ? "warn" : "");
