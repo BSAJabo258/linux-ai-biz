@@ -41,3 +41,21 @@ def test_manifest_summary_passes_pii_guard(tmp_path):
     data = json.loads(out)
     assert "name" not in data and data["payload_version"] == "0.3.0"
     AuditLog(tmp_path / "a.jsonl", key=b"").append("install.completed", "installer", data)
+
+
+def test_install_sh_packages_are_all_preinstalled_by_usb1():
+    """USB #2 must work offline on a fresh USB #1 install: every package install.sh
+    requires has to be in the preseed's pkgsel list (or Debian's standard set), and
+    must be a real package name - `dpkg -s` never succeeds for virtual ones.
+    Regression: Debian 13 made `dnsutils` virtual (bind9-dnsutils), so every
+    install tried to download it and --offline always failed."""
+    sh = INSTALL.read_text()
+    required = re.search(r"pkgs=\(([^)]*)\)", sh).group(1).split()
+    preseed = (ROOT / "installer" / "preseed" / "bau.preseed").read_text()
+    include = re.search(r"pkgsel/include string (.*?)\n(?!\s)", preseed, re.S).group(1)
+    preinstalled = set(include.replace("\\", " ").split())
+    standard = {"python3"}            # in Debian's standard task as well
+    missing = [p for p in required if p not in preinstalled | standard]
+    assert not missing, f"install.sh needs packages USB #1 does not install: {missing}"
+    virtual_in_debian13 = {"dnsutils"}
+    assert not (set(required) | preinstalled) & virtual_in_debian13

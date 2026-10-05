@@ -52,7 +52,7 @@ d-i pkgsel/include string sudo apparmor apparmor-utils apparmor-profiles apparmo
   nftables podman uidmap slirp4netns passt fuse-overlayfs \
   python3 python3-venv python3-pip python3-yaml \
   cryptsetup tpm2-tools mokutil chrony auditd unattended-upgrades apt-listchanges \
-  openssh-client rsync smartmontools pciutils usbutils lshw dnsutils curl gnupg git xorriso orca \
+  openssh-client rsync smartmontools pciutils usbutils lshw bind9-dnsutils curl gnupg git xorriso orca \
   ffmpeg
 d-i pkgsel/upgrade select full-upgrade
 popularity-contest popularity-contest/participate boolean false

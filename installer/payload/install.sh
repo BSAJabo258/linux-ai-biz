@@ -52,7 +52,7 @@ if [[ "${ID}" != debian || "${VERSION_ID%%.*}" -lt 13 ]] && ((ALLOW_OS == 0)); t
   die "expected Debian 13+, found ${PRETTY_NAME} (use --allow-other-os at your own risk)"
 fi
 pkgs=(python3 python3-venv python3-yaml nftables podman uidmap apparmor apparmor-utils chrony
-      auditd unattended-upgrades dnsutils openssh-client ffmpeg)
+      auditd unattended-upgrades bind9-dnsutils openssh-client ffmpeg)
 missing=()
 for p in "${pkgs[@]}"; do dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p"); done
 if ((${#missing[@]})); then
