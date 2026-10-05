@@ -172,6 +172,21 @@ print(json.dumps({"payload_version": m["version"], "git_commit": m["git_commit"]
   "${HERE}/MANIFEST.json")"
 audit install.completed "${manifest}"
 
+# Desktop launcher: Jarvis runs as the owner in a terminal (its confirmations are the
+# owner's own clicks), with the HUD opened in the browser.
+install -d /usr/share/applications
+cat > /usr/share/applications/bau-jarvis.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=BAU Jarvis
+Comment=Talk to BAU: briefing, conversation, actions you confirm
+Exec=env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key BAU_ALLOWED_SIGNERS=/etc/bau/allowed_signers bau jarvis
+Terminal=true
+Icon=utilities-terminal
+Categories=Office;Utility;
+EOF
+chmod 0644 /usr/share/applications/bau-jarvis.desktop
+
 sed -i '/BAU base OS installed/,/This notice is removed by install.sh./d' /etc/motd || true
 
 # ---------------------------------------------------------------- 9. self-test
