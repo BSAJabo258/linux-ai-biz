@@ -13,3 +13,6 @@ dist/
 *.key
 *.pem
 .bau-home/
+
+# API keys for the Docker test drive - never commit
+.env

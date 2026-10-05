@@ -23,7 +23,7 @@ Before BAU sends an email, texts someone, publishes generated media, sells a sub
 ```bash
 python3 -m pip install -e '.[dev]'
 bau init                                   # BAU_HOME (default ~/.bau, or /var/lib/bau when installed)
-bau reg validate                           # 46 regulations, 59 policies, all cross-references resolve
+bau reg validate                           # 49 regulations, 65 policies, all cross-references resolve
 bau status --brief                         # honest production-readiness dashboard
 bau email preflight --message m.json --recipients r.json --sender s.json --evidence
 bau mission plan launch_subscription "Launch planner subscription" --facts facts.yaml
