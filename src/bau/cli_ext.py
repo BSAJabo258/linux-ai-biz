@@ -60,6 +60,24 @@ def cmd_models(a):
         _out({"chosen": r.model["model_id"] if r.model else None, "reason": r.reason,
               "ranked": [m["model_id"] for m in r.candidates], "rejected": r.rejected})
         return EXIT_OK if r.model or a.kind in ("format", "validate") else EXIT_BLOCKED
+    elif a.models_cmd == "bench":
+        from .models.bench import benchmark
+        rec = reg.data["model"].get(a.model)
+        if rec is None:
+            print(f"model {a.model} not registered", file=sys.stderr)
+            return EXIT_ERROR
+        try:
+            res = benchmark(rec)
+        except Exception as e:  # unreachable server, bad reply: nothing is recorded
+            print(f"benchmark failed: {type(e).__name__}: {e}"[:300], file=sys.stderr)
+            return EXIT_BLOCKED
+        rec["benchmark"] = res
+        reg.path.write_text(yaml.safe_dump(reg.data, sort_keys=True))
+        AuditLog().append("model.benchmarked", f"human:{getpass.getuser()}",
+                          {"model": a.model, "reply_ok": res["reply_ok"],
+                           "tool_calls": res["tool_calls"]})
+        _out(res)
+        return EXIT_OK if res["reply_ok"] else EXIT_BLOCKED
     elif a.models_cmd == "health":
         from .models.providers import build
         out = {}
@@ -825,6 +843,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     ms = s.add_subparsers(dest="models_cmd", required=True)
     ms.add_parser("list")
     ms.add_parser("health")
+    x = ms.add_parser("bench", help="measure a model on this machine (required before a "
+                      "local model can be approved)")
+    x.add_argument("model")
     x = ms.add_parser("route")
     x.add_argument("kind")
     x.add_argument("--data", action="append")

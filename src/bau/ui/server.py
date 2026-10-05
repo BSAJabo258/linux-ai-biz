@@ -134,6 +134,13 @@ def make_handler(home: Path) -> type[BaseHTTPRequestHandler]:
     return H
 
 
+def bind_address() -> str:
+    """127.0.0.1 always, except inside the BAU container (BAU_IN_CONTAINER=1), where the
+    server must listen on the container's interface; Docker then publishes the port on the
+    host's 127.0.0.1 only, and the Host/Origin checks still apply."""
+    return "0.0.0.0" if os.environ.get("BAU_IN_CONTAINER") == "1" else "127.0.0.1"
+
+
 def serve(port: int = 8765, home: Path | None = None) -> ThreadingHTTPServer:
-    srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(home or bau_home()))
+    srv = ThreadingHTTPServer((bind_address(), port), make_handler(home or bau_home()))
     return srv

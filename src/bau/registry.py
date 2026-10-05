@@ -70,6 +70,11 @@ def validate(kind: str, rec: dict[str, Any]) -> list[str]:
         if rec.get("deployment") == "local" and rec.get("benchmark") is None \
                 and rec.get("status") in ROUTABLE:
             errs.append("never fake local availability: local models need a benchmark (spec §6)")
+        bench = rec.get("benchmark")
+        if isinstance(bench, dict) and bench.get("reply_ok") is False \
+                and rec.get("status") in ROUTABLE:
+            errs.append("its last benchmark produced no answer: fix the model server and "
+                        "run `bau models bench` again")
     if kind == "agent" and "root" in (rec.get("permissions") or []):
         errs.append("no agent receives root (spec §7)")
     return errs

@@ -66,6 +66,30 @@ model:
     cost_in_per_mtok: 0
     cost_out_per_mtok: 0
     status: REGISTERED
+  glm-4.7-flash:
+    model_id: glm-4.7-flash
+    name: GLM-4.7-Flash (30B MoE, 3B active) - free local fallback via llama.cpp
+    version: Q4_K_M
+    provider: local
+    source: huggingface.co/unsloth/GLM-4.7-Flash-GGUF (quantised from zai-org/GLM-4.7-Flash)
+    license: MIT
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: glm-4.7-flash
+    # Jarvis needs quick spoken answers: GLM's long thinking mode stays off.
+    chat_template_kwargs: {enable_thinking: false}
+    trust_level: QUANTIZED
+    privacy: local
+    context: 32768
+    tools: true
+    input_types: [text]
+    quality: 0.75
+    latency_ms: 6000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
   k3:
     model_id: k3
     name: K3 local intelligence reserve (spec §6)

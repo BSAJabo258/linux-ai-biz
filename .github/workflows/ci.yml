@@ -28,6 +28,6 @@ jobs:
       - name: tests
         run: python -m pytest -q
       - name: shellcheck installer
-        run: shellcheck -x installer/*.sh installer/lib/*.sh installer/payload/*.sh installer/firstboot/*.sh
+        run: shellcheck -x installer/*.sh installer/lib/*.sh installer/payload/*.sh installer/firstboot/*.sh docker/*.sh vm/*.sh
       - name: build payload
         run: installer/make-payload.sh --skip-tests

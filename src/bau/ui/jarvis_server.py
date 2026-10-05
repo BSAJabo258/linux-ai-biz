@@ -26,7 +26,7 @@ from importlib import resources
 from typing import Any
 
 from ..assistant import Assistant, Voice
-from .server import allowed_hosts_from_env
+from .server import allowed_hosts_from_env, bind_address
 
 MAX_JSON = 64 * 1024
 MAX_AUDIO = 8 * 1024 * 1024
@@ -200,5 +200,5 @@ def serve(assistant: Assistant, voice: Voice, port: int = 8766, key: str | None 
     if not assistant.owner.startswith("human:"):
         raise PermissionError("Jarvis runs for a human owner; start it from your own login")
     key = key or secrets.token_urlsafe(24)
-    srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(assistant, voice, key))
+    srv = ThreadingHTTPServer((bind_address(), port), make_handler(assistant, voice, key))
     return srv, key

@@ -1,0 +1,63 @@
+name: docker
+
+# Builds the BAU test-drive image (Dockerfile) and smoke-tests it on every change; on main
+# (or "Run workflow") it also publishes ghcr.io/<owner>/bau for amd64 and arm64.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write          # push to GitHub Container Registry; nothing else
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: build (amd64) and smoke test
+        run: |
+          docker build -t bau:ci .
+          docker run -d --name ui -p 127.0.0.1:8765:8765 bau:ci
+          for i in $(seq 30); do
+            curl -sf -H 'X-BAU: 1' http://127.0.0.1:8765/api/status >/dev/null && break; sleep 1
+          done
+          curl -sf -H 'X-BAU: 1' http://127.0.0.1:8765/api/status >/dev/null
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: evil.example' http://127.0.0.1:8765/)" = 421
+          docker exec ui bau publish platforms >/dev/null
+          docker exec ui bau selftest || test $? -eq 2     # 2 = review: no approver registered yet
+          docker logs ui
+          docker rm -f ui
+      - uses: docker/setup-qemu-action@v3
+        if: github.event_name != 'pull_request'
+      - uses: docker/setup-buildx-action@v3
+        if: github.event_name != 'pull_request'
+      - uses: docker/metadata-action@v5
+        if: github.event_name != 'pull_request'
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/bau
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        if: github.event_name != 'pull_request'
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

@@ -1,0 +1,12 @@
+.git
+.github
+.devcontainer
+build
+dist
+docs
+tests
+examples
+installer
+**/__pycache__
+**/*.pyc
+.env

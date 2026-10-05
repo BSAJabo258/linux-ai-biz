@@ -1,0 +1,57 @@
+# BAU test drive. Ports are published on this computer's localhost only.
+#   docker compose up -d --build                      Mission Control + Governor
+#   docker compose run --rm --service-ports jarvis    Jarvis (needs a terminal: it asks you)
+#   docker compose --profile glm up -d llm            GLM-4.7-Flash, free local model (~18 GB)
+# Keys (optional): put ANTHROPIC_API_KEY=... / ELEVENLABS_API_KEY=... in a .env file here.
+name: bau
+
+x-bau: &bau
+  build: .
+  image: bau:local
+  environment:
+    BAU_LLM_ENDPOINT: http://llm:8080
+  env_file:
+    - path: .env
+      required: false
+  volumes:
+    - bau-home:/var/lib/bau
+
+services:
+  ui:
+    <<: *bau
+    command: ["bau", "ui", "--port", "8765"]
+    ports: ["127.0.0.1:8765:8765"]
+    restart: unless-stopped
+
+  governor:
+    <<: *bau
+    command: ["sh", "-c", "while true; do bau governor tick || true; sleep 600; done"]
+    healthcheck: {disable: true}
+    restart: unless-stopped
+
+  jarvis:
+    <<: *bau
+    profiles: [jarvis]
+    command: ["bau", "jarvis", "--no-browser"]
+    ports: ["127.0.0.1:8766:8766"]
+    stdin_open: true
+    tty: true
+    healthcheck: {disable: true}
+
+  llm:
+    profiles: [glm]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    # Downloads the model on first start (cached in the "models" volume).
+    # Smaller computers: BAU_LLM_HF=unsloth/GLM-4.7-Flash-GGUF:UD-Q3_K_XL (~14 GB).
+    command: ["-hf", "${BAU_LLM_HF:-unsloth/GLM-4.7-Flash-GGUF:Q4_K_M}", "--jinja",
+              "-c", "32768", "--host", "0.0.0.0", "--port", "8080",
+              "--alias", "glm-4.7-flash"]
+    environment:
+      LLAMA_CACHE: /models
+    volumes:
+      - models:/models
+    restart: unless-stopped
+
+volumes:
+  bau-home:
+  models:

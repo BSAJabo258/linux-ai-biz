@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -148,9 +149,11 @@ class LocalHTTPProvider(Provider):
     provider_id = "local"
 
     def __init__(self, base_url: str = "http://127.0.0.1:8080", model: str = "local",
-                 timeout: int = 600, opener: Any = None):
+                 timeout: int = 600, opener: Any = None,
+                 template_kwargs: dict[str, Any] | None = None):
         self.base_url = base_url.rstrip("/")
         self.model = model
+        self.template_kwargs = template_kwargs or {}
         self.timeout = timeout
         self._open = opener or urllib.request.urlopen
 
@@ -164,6 +167,8 @@ class LocalHTTPProvider(Provider):
         msgs = [{"role": "system", "content": system}] + messages
         body: dict[str, Any] = {"model": self.model, "messages": msgs,
                                 "max_tokens": max_tokens}
+        if self.template_kwargs:     # e.g. {"enable_thinking": false} for GLM / Qwen3
+            body["chat_template_kwargs"] = self.template_kwargs
         if tools:
             body["tools"] = [{"type": "function", "function": {
                 "name": t.name, "description": t.description,
@@ -177,7 +182,9 @@ class LocalHTTPProvider(Provider):
             calls.append(ToolCall(tc.get("id", tc["function"]["name"]), tc["function"]["name"],
                                   json.loads(args) if isinstance(args, str) else args))
         usage = data.get("usage") or {}
-        return ModelResponse(text=msg.get("content") or "", tool_calls=calls,
+        # Reasoning models (GLM, Qwen3...) may inline their thinking; never speak it.
+        text = re.sub(r"<think>.*?</think>", "", msg.get("content") or "", flags=re.S).strip()
+        return ModelResponse(text=text, tool_calls=calls,
                              stop_reason="tool_use" if calls else "end_turn",
                              model=data.get("model", self.model),
                              tokens_in=usage.get("prompt_tokens", 0),
@@ -242,8 +249,12 @@ def build(record: dict[str, Any]) -> Provider:
         return AnthropicProvider(model=record.get("api_model", "claude-opus-5-5"),
                                  effort=record.get("effort", "high"))
     if kind == "local_http":
-        return LocalHTTPProvider(base_url=record.get("endpoint", "http://127.0.0.1:8080"),
-                                 model=record.get("api_model", record["model_id"]))
+        # Inside the BAU container the model server is another container: BAU_LLM_ENDPOINT
+        # points every on-machine model there (e.g. http://llm:8080).
+        local = record.get("deployment") == "local" and os.environ.get("BAU_LLM_ENDPOINT")
+        return LocalHTTPProvider(base_url=local or record.get("endpoint", "http://127.0.0.1:8080"),
+                                 model=record.get("api_model", record["model_id"]),
+                                 template_kwargs=record.get("chat_template_kwargs"))
     if kind == "scripted":
         return ScriptedProvider(list(record.get("script", [])))
     raise ValueError(f"unknown adapter {kind}")
