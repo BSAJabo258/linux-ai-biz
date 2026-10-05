@@ -69,6 +69,7 @@ When findings are combined, the worst state wins. An empty evaluation is UNKNOWN
 | §6 K3 | registered as OFFLOAD in `data/registry_defaults.yaml`; reached through `models/providers.LocalHTTPProvider` |
 | §7-8, §113, §122, §125 Jarvis + missions | `jarvis.py`, `data/missions.yaml` (compliance dependencies per mission type) |
 | Governor (owner-away oversight) | `governor.py`, `bau-governor.timer`, `bau governor ...` (see below) |
+| TikTok review-and-post (§80) | `tiktok.py`, `bau tiktok ...`: OAuth (PKCE) login, queue with pre-checks (claims, provenance, publish gate, platform record), interactive review that shows what TikTok's Content Sharing Guidelines require; the owner's 'y' uploads (chunked) and posts via the Content Posting API, or sends to drafts. Only a human at a terminal can post; tokens in `BAU_HOME/secrets/tiktok.json` (0600) |
 | §9-12, §74-75, §114-118 compliance engine | `regulations.py`, `policy.py`, `decision.py`, `jurisdiction.py` |
 | §13-16, §77, §80-81 AI disclosure + likeness | `disclosure.py`, `policies/ai_disclosure.yaml`, media gateway provenance |
 | §17-18, §26, §82-83, §101 data governance | `datagov.py` (data objects, use rights, provider boundary, tracking registry) |
@@ -84,6 +85,7 @@ When findings are combined, the worst state wins. An empty evaluation is UNKNOWN
 | §42 MAYA Memory Lane | `memory.py` (hash-linked Markdown records, BM25 search, resume phrases, deterministic export) |
 | §43, §94 capability graph + legal-change impact | `capgraph.py` (`bau graph impact <reg_id>`) |
 | §44-47 models, router, trust, Heretic | `registry.py`, `models/providers.py` (Claude via official SDK with refusal fallbacks; llama.cpp/Ollama; scripted), `models/router.py`, `models/heretic.py` |
+| Content lane (owner decision, amends §46-47) | an ABLITERATED local model may be approved with `lane: content_only` + `use_for` (creative_writing, script, lyrics, comedy, ad_copy, image_prompt, storyboard). The router uses it only for those jobs, never with tools or data beyond PUBLIC/INTERNAL, and prefers it there; agents refuse to give it tools; every use is audited (`model.content_lane`); it can never be the Governor's validator. Example: `examples/content-lane-model.yaml` |
 | §48, §102 agents + budgets | `agents.py`, `economics.Budgets` |
 | §49, §55, §73 permissions / revocation / money | `security/permissions.py` (SSH-signed human approvals, `bau approve`), `accounting.prepare_payout` |
 | §50 Universal Gateway | `gateway.py` (one ordered check path, audit on allow and deny) |

@@ -306,3 +306,46 @@ def test_mcp_tools_become_gated_capabilities(tmp_path, monkeypatch):
         client.close()
     with pytest.raises(PermissionError):
         mcp.McpClient([sys.executable, str(server)], env={"GITHUB_TOKEN": "x"})
+
+
+def test_content_lane_only_where_designated(tmp_path):
+    from bau.registry import CapabilityRegistry
+    lane = {"model_id": "qwen-27b-abl", "name": "Qwen 27B abliterated", "version": "1",
+            "provider": "local", "source": "hf", "license": "apache-2.0",
+            "commercial_use": True, "deployment": "local", "trust_level": "ABLITERATED",
+            "privacy": "local", "status": "APPROVED", "benchmark": {"tok_s": 9},
+            "quality": 0.7, "cost_out_per_mtok": 0, "latency_ms": 2000, "context": 32768}
+    reg = CapabilityRegistry(tmp_path / "c.yaml")
+    with pytest.raises(ValueError, match="content lane"):
+        reg.add("model", lane)                                 # no lane: still isolated
+    with pytest.raises(ValueError, match="use_for"):
+        reg.add("model", dict(lane, lane="content_only", use_for=["legal_advice"]))
+    with pytest.raises(ValueError, match="no tools"):
+        reg.add("model", dict(lane, lane="content_only", use_for=["lyrics"], tools=True))
+    lane = dict(lane, lane="content_only", use_for=["lyrics", "script"])
+    reg.add("model", lane)
+    providers = {"anthropic": {"status": "APPROVED", "data_retained": "0d",
+                               "training_on_customer_data": False, "jurisdiction": "US",
+                               "dpa_signed": True}}
+    cloud = {"model_id": "cloud", "provider": "anthropic", "status": "APPROVED",
+             "commercial_use": True, "deployment": "cloud", "tools": True, "quality": 0.95,
+             "cost_out_per_mtok": 20, "latency_ms": 8000, "context": 1000000}
+    models = [cloud, lane]
+    r = route(TaskSpec("lyrics", prefer="quality"), models, providers)
+    assert r.model["model_id"] == "qwen-27b-abl" and "content lane" in r.reason
+    assert route(TaskSpec("reasoning"), models, providers).model["model_id"] == "cloud"
+    assert route(TaskSpec("ad_copy"), models, providers).model["model_id"] == "cloud"
+    assert route(TaskSpec("lyrics", needs_tools=True), models,
+                 providers).model["model_id"] == "cloud"
+    r = route(TaskSpec("lyrics", data_classes=["PERSONAL"]), models, providers)
+    assert r.model["model_id"] != "qwen-27b-abl" and "public/internal" in \
+        r.rejected["qwen-27b-abl"]
+    g = gw(tmp_path)
+    spec = agents.AgentSpec("agent:writer", "write", ["memory.search"], lane, tool_specs={})
+    with pytest.raises(PermissionError, match="never gets tools"):
+        agents.run(spec, "x", ScriptedProvider([]), g)
+    out = agents.run(agents.AgentSpec("agent:writer", "write", [], lane), "verse 1",
+                     ScriptedProvider(["la la"]), g)
+    assert out.final_text == "la la"
+    assert any(r["event"] == "model.content_lane"
+               for r in AuditLog(tmp_path / "a.jsonl", key=b"").records())

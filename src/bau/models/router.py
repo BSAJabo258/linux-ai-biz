@@ -5,6 +5,12 @@ Hard filters first (never traded off against quality):
   fits, tools / modality supported, offline -> local only, health.
 Then score what is left on quality, cost, latency and privacy.
 Deterministic work gets no model at all (spec §45).
+
+Content lane: a model approved with ``lane: content_only`` (e.g. an abliterated
+local model) is considered ONLY for the job kinds its record lists in ``use_for``,
+only when the task needs no tools and carries no data beyond PUBLIC/INTERNAL.
+For those jobs it is preferred (the owner listed it because it does them best);
+for every other job it does not exist.
 """
 
 from __future__ import annotations
@@ -13,6 +19,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..datagov import provider_allows
+from ..registry import CONTENT_LANE
+
+LANE_DATA = {"PUBLIC", "INTERNAL"}
 
 DETERMINISTIC = {"arithmetic", "format", "validate", "hash", "lookup", "schedule", "sort",
                  "regex", "template"}
@@ -55,6 +64,16 @@ def route(task: TaskSpec, models: list[dict[str, Any]], providers: dict[str, dic
         if m.get("commercial_use") is not True:
             rejected[mid] = "licence does not allow commercial use"
             continue
+        if m.get("lane") == CONTENT_LANE:
+            if task.kind not in (m.get("use_for") or []):
+                rejected[mid] = f"content lane: not designated for {task.kind}"
+                continue
+            if task.needs_tools:
+                rejected[mid] = "content lane: no tools"
+                continue
+            if not set(task.data_classes) <= LANE_DATA:
+                rejected[mid] = "content lane: public/internal data only"
+                continue
         local = m.get("deployment") == "local"
         if task.offline and not local:
             rejected[mid] = "offline: local models only"
@@ -102,8 +121,12 @@ def route(task: TaskSpec, models: list[dict[str, Any]], providers: dict[str, dic
         p = 1.0 if m.get("deployment") == "local" else 0.0
         return weights[0] * q + weights[1] * c + weights[2] * lat + weights[3] * p
 
-    ranked = sorted(ok, key=score, reverse=True)
+    ranked = sorted(ok, key=lambda m: (m.get("lane") == CONTENT_LANE, score(m)),
+                    reverse=True)
     best = ranked[0]
+    if best.get("lane") == CONTENT_LANE:
+        return Route(best, f"content lane: owner-designated for {task.kind}", ranked,
+                     rejected)
     return Route(best, f"best {task.prefer} score among {len(ranked)} eligible", ranked,
                  rejected)
 

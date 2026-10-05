@@ -31,6 +31,12 @@ STATUSES = {"UNTRUSTED", "QUARANTINED", "REGISTERED", "APPROVED", "ACTIVE", "DEP
 TRUST_LEVELS = ["UNKNOWN", "THIRD_PARTY", "ABLITERATED", "MODIFIED", "MERGED", "QUANTIZED",
                 "VERIFIED", "OFFICIAL"]
 ROUTABLE = {"APPROVED", "ACTIVE"}
+# Content lane: an ABLITERATED model may be approved for these jobs ONLY - the
+# creative work where a stock model's refusals get in the way of legitimate content.
+# It drafts text; it never gets tools, personal data, or any say in a decision.
+CONTENT_KINDS = {"creative_writing", "script", "lyrics", "comedy", "ad_copy",
+                 "image_prompt", "storyboard"}
+CONTENT_LANE = "content_only"
 
 
 def validate(kind: str, rec: dict[str, Any]) -> list[str]:
@@ -42,9 +48,23 @@ def validate(kind: str, rec: dict[str, Any]) -> list[str]:
     if kind == "model":
         if rec.get("trust_level") not in TRUST_LEVELS:
             errs.append(f"trust_level must be one of {TRUST_LEVELS}")
-        if rec.get("status") in ROUTABLE and rec.get("trust_level") in ("UNKNOWN", "ABLITERATED",
+        lane = rec.get("lane") == CONTENT_LANE
+        use_for = rec.get("use_for") or []
+        if rec.get("status") in ROUTABLE and rec.get("trust_level") in ("UNKNOWN",
                                                                          "THIRD_PARTY"):
-            errs.append("unverified/abliterated models stay isolated (spec §46-47)")
+            errs.append("unverified models stay isolated (spec §46-47)")
+        if rec.get("status") in ROUTABLE and rec.get("trust_level") == "ABLITERATED" \
+                and not lane:
+            errs.append("abliterated models stay isolated except in the content lane "
+                        f"(lane: {CONTENT_LANE}, use_for: some of {sorted(CONTENT_KINDS)})")
+        if lane:
+            if not use_for or not set(use_for) <= CONTENT_KINDS:
+                errs.append(f"content lane use_for must be a non-empty subset of "
+                            f"{sorted(CONTENT_KINDS)}")
+            if rec.get("deployment") != "local":
+                errs.append("content lane models run locally only")
+            if rec.get("tools"):
+                errs.append("content lane models get no tools")
         if rec.get("status") in ROUTABLE and rec.get("commercial_use") is not True:
             errs.append("commercial routing requires commercial_use: true")
         if rec.get("deployment") == "local" and rec.get("benchmark") is None \

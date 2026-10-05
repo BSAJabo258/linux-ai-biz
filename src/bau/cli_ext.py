@@ -6,6 +6,7 @@ import argparse
 import datetime as dt
 import getpass
 import json
+import os
 import sys
 from dataclasses import asdict
 from decimal import Decimal
@@ -578,7 +579,11 @@ def cmd_governor(a):
         if g.cfg.get("reviewer_model"):
             from .runtime import provider_for
             try:
-                reviewer, _ = provider_for(g.cfg["reviewer_model"])
+                reviewer, rec = provider_for(g.cfg["reviewer_model"])
+                if rec.get("lane") == "content_only" or rec.get("trust_level") == "ABLITERATED":
+                    reviewer = None
+                    raise PermissionError("a content-lane / abliterated model cannot be "
+                                          "the Governor's validator")
             except (KeyError, PermissionError) as e:
                 print(f"validator model unavailable: {e}", file=sys.stderr)
         g.reviewer = reviewer
@@ -600,6 +605,54 @@ def cmd_governor(a):
     elif a.gov_cmd == "close":
         g.close(a.finding_id, _human(), a.note or "")
         _out({"closed": a.finding_id})
+    return EXIT_OK
+
+
+def cmd_tiktok(a):
+    from . import tiktok
+    q = tiktok.TikTokQueue()
+    if a.tt_cmd == "login":
+        _human()
+        client = tiktok.TikTokClient()
+        tiktok.login(client, port=a.port)
+        info = client.creator_info()
+        AuditLog().append("tiktok.connected", _human(), {})
+        _out({"connected": info.get("creator_nickname"),
+              "privacy_options": info.get("privacy_level_options")})
+    elif a.tt_cmd == "logout":
+        tiktok.TokenStore().clear()
+        _out({"connected": None})
+    elif a.tt_cmd == "add":
+        item = q.add(Path(a.video), a.caption, f"human:{getpass.getuser()}",
+                     is_aigc=False if a.not_ai else None, engine=_engine())
+        _out(asdict(item))
+        return EXIT_OK if item.checks["ok"] else EXIT_BLOCKED
+    elif a.tt_cmd == "queue":
+        _out([{"item_id": i.item_id, "video": i.video, "status": i.status,
+               "ok": i.checks.get("ok"), "problems": i.checks.get("problems")}
+              for i in (q.items() if a.all else q.pending())])
+    elif a.tt_cmd == "review":
+        import shutil
+        import subprocess
+        opener = shutil.which("xdg-open")
+        preview = (lambda v: subprocess.Popen([opener, str(v)])) if opener and \
+            os.environ.get("DISPLAY") else None
+        done = tiktok.review(q, tiktok.TikTokClient(), _human(), draft=a.draft,
+                             preview=preview)
+        _out([{"item_id": i.item_id, "status": i.status, "result": i.result} for i in done])
+    elif a.tt_cmd == "status":
+        client = tiktok.TikTokClient()
+        out = []
+        for i in q.items():
+            if i.publish_id and i.result.get("status") not in ("PUBLISH_COMPLETE", "FAILED"):
+                st = client.status(i.publish_id)
+                i.result = {k: st.get(k) for k in ("status", "fail_reason",
+                                                   "publicaly_available_post_id")}
+                if st.get("status") == "FAILED":
+                    i.status = "FAILED"
+                q.save(i)
+            out.append({"item_id": i.item_id, "status": i.status, "tiktok": i.result})
+        _out(out)
     return EXIT_OK
 
 
@@ -919,6 +972,22 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("finding_id")
     x.add_argument("--note")
     s.set_defaults(fn=cmd_governor)
+
+    s = sub.add_parser("tiktok", help="review-and-post to TikTok (your click posts it)")
+    tt = s.add_subparsers(dest="tt_cmd", required=True)
+    x = tt.add_parser("login", help="connect your TikTok account (opens TikTok login)")
+    x.add_argument("--port", type=int, default=3455)
+    tt.add_parser("logout")
+    x = tt.add_parser("add", help="queue a finished video for review")
+    x.add_argument("video")
+    x.add_argument("--caption", required=True)
+    x.add_argument("--not-ai", action="store_true", help="only for human-made videos")
+    x = tt.add_parser("queue")
+    x.add_argument("--all", action="store_true")
+    x = tt.add_parser("review", help="review queued videos; 'y' posts immediately")
+    x.add_argument("--draft", action="store_true", help="send to TikTok drafts instead")
+    tt.add_parser("status", help="refresh processing status of posted videos")
+    s.set_defaults(fn=cmd_tiktok)
 
     s = sub.add_parser("gateway", help="list gateway capabilities")
     s.set_defaults(fn=cmd_gateway)

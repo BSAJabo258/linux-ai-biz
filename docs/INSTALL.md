@@ -136,6 +136,7 @@ bau governor digest --hours 72                 # after time away: what broke, wh
 bau governor hold "going offline"              # stop everything except read-only; `release` lifts it
 bau set-status model claude-opus-5-5 APPROVED  # after reviewing terms; repeat for local models
 bau models route reasoning --data PERSONAL     # see which model the router would use, and why
+bau registry add model examples/content-lane-model.yaml  # optional: abliterated model, content jobs only (fill it in first)
 bau genesis import ~/exports/chatgpt/conversations.json
 bau genesis import ~/exports/claude/conversations.json
 bau genesis extract --to-memory                # drafts in /var/lib/bau/history/canonical/
@@ -152,3 +153,31 @@ bau factory-run approval <run> publish.text approval.json
 Publishing produces a reviewed export package in `/var/lib/bau/artifacts/exports/` with an upload checklist. Nothing is posted to a platform until you upload it, or until a platform API connector has been built, reviewed and approved.
 
 The machine reports **not production-ready** until every spec §107 critical item is closed. That is by design.
+
+
+## Phase 8: TikTok (review, then your "y" posts it)
+
+One-time setup:
+1. At developers.tiktok.com create an app, add **Login Kit** and the **Content Posting API**
+   (Direct Post), and register the redirect URI `http://127.0.0.1:3455/callback/`.
+2. Put the app keys on the laptop (root-owned, never in the repo):
+   ```bash
+   sudo install -m 0640 -o root -g bau /dev/null /etc/bau/platforms.env
+   sudoedit /etc/bau/platforms.env   # TIKTOK_CLIENT_KEY=...  TIKTOK_CLIENT_SECRET=...
+   ```
+3. `bau platform add examples/platform-tiktok.yaml` (re-verify it every 90 days).
+4. `bau tiktok login` - opens TikTok, you approve, done (refreshes itself for a year).
+5. Submit the app for TikTok's audit. Until it passes, TikTok makes every post
+   "Only me" - fine for testing the whole flow.
+
+Every day:
+```bash
+bau tiktok add artifacts/videos/clip.mp4 --caption "..."   # factories/agents queue videos too
+bau tiktok review            # per video: account, preview, caption, checks -> choose
+                             # privacy -> promo yes/no -> 'y' uploads and posts immediately
+bau tiktok review --draft    # or send them to your TikTok drafts instead
+bau tiktok status            # processing -> PUBLISH_COMPLETE
+```
+Blocked videos (unproven claims in the caption, missing AI provenance, stale policy
+record, too long for the account) are shown with the reason and cannot be posted.
+AI-generated videos always carry TikTok's AI label (`is_aigc`).
