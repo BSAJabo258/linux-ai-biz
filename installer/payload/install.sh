@@ -158,7 +158,12 @@ else
   audit install.ungated '{"note": "no wipe-gate record supplied"}'
   log "WARNING: no wipe-gate record - install is marked UNGATED in the audit chain"
 fi
-audit install.completed "{\"payload\": $(cat "${HERE}/MANIFEST.json")}"
+# Only non-personal manifest fields: the audit chain refuses keys like "name".
+manifest="$(python3 -c 'import json,sys; m=json.load(open(sys.argv[1]));
+print(json.dumps({"payload_version": m["version"], "git_commit": m["git_commit"],
+                  "git_dirty": m["git_dirty"], "built_at": m["built_at"]}))' \
+  "${HERE}/MANIFEST.json")"
+audit install.completed "${manifest}"
 
 sed -i '/BAU base OS installed/,/This notice is removed by install.sh./d' /etc/motd || true
 
