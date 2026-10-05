@@ -13,6 +13,19 @@ Build both on any Linux machine with `python3`, `xorriso`, `gpg`, `curl`. Stick 
 
 ---
 
+## No Linux computer? Use GitHub
+
+* **Ready-made images:** the repository's *Actions > build-usb > Run workflow* builds both
+  sticks on GitHub's machines and publishes them on the *Releases* page
+  (`bau-debian-*.iso` for USB #1, `BAU-PAYLOAD-*.tar.gz` for USB #2, `SHA256SUMS.txt`).
+  Check the checksums, write the ISO with balenaEtcher or Rufus (DD mode), unpack the payload
+  onto the second stick. That payload is unsigned; for production build your own with
+  `--sign` (Phase 0).
+* **Test drive in the browser:** *Code > Codespaces > Create codespace* installs BAU in a
+  private cloud machine and opens Mission Control. It is for trying and testing only:
+  GitHub's terms forbid hosting production-facing applications in Codespaces, so the
+  business itself runs on the laptop.
+
 ## Phase 0: Build the sticks (on your build machine)
 
 ```bash

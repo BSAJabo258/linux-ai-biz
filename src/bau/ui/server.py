@@ -9,6 +9,7 @@ custom header (blocks simple cross-site reads) and refuse non-local Host headers
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
@@ -69,8 +70,19 @@ def _api(path: str, home: Path) -> Any:
     raise KeyError(path)
 
 
+def allowed_hosts_from_env() -> frozenset[str]:
+    """Host names the dashboard answers to. Always localhost; plus exact names from
+    BAU_UI_ALLOWED_HOSTS (comma-separated) - used only for a private, authenticated
+    port-forward such as a GitHub Codespace. Exact names only: no wildcards, so DNS
+    rebinding protection stays intact."""
+    extra = {h.strip().lower() for h in os.environ.get("BAU_UI_ALLOWED_HOSTS", "").split(",")
+             if h.strip() and "*" not in h and "/" not in h}
+    return frozenset({"127.0.0.1", "localhost"} | extra)
+
+
 def make_handler(home: Path) -> type[BaseHTTPRequestHandler]:
     page = (resources.files("bau.ui") / "page.html").read_bytes()
+    allowed_hosts = allowed_hosts_from_env()
 
     class H(BaseHTTPRequestHandler):
         server_version = "BAU-MissionControl"
@@ -91,8 +103,8 @@ def make_handler(home: Path) -> type[BaseHTTPRequestHandler]:
             self.wfile.write(body)
 
         def do_GET(self) -> None:  # noqa: N802
-            host = (self.headers.get("Host") or "").split(":")[0]
-            if host not in ("127.0.0.1", "localhost"):
+            host = (self.headers.get("Host") or "").split(":")[0].lower()
+            if host not in allowed_hosts:
                 self._send(421, b"local access only", "text/plain")
                 return
             if self.path in ("/", "/index.html"):
