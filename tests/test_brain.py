@@ -121,3 +121,14 @@ def test_mission_control_brain_view(tmp_path):
     d = _api("/api/brain", tmp_path)
     assert len(d["nodes"]) == 3 and d["workflows"][0]["workflow"] == "slack-questions"
     assert any(i["issue"] == "workflow_incomplete" for i in d["lint"])     # no outputs yet
+
+
+def test_dashboard_host_allow_list(monkeypatch):
+    from bau.ui.server import allowed_hosts_from_env
+    monkeypatch.delenv("BAU_UI_ALLOWED_HOSTS", raising=False)
+    assert allowed_hosts_from_env() == {"127.0.0.1", "localhost"}
+    monkeypatch.setenv("BAU_UI_ALLOWED_HOSTS",
+                       "my-space-8765.app.github.dev, *.evil.example, a/b")
+    hosts = allowed_hosts_from_env()
+    assert "my-space-8765.app.github.dev" in hosts
+    assert not any("*" in h or "/" in h for h in hosts)      # no wildcards, no junk

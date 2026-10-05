@@ -1,0 +1,23 @@
+{
+  // GitHub Codespaces: try BAU in the browser (development and testing only -
+  // GitHub's terms forbid hosting production-facing applications in Codespaces).
+  // The real business runs on the laptop installed from the two USB sticks.
+  "name": "BAU test drive",
+  "image": "mcr.microsoft.com/devcontainers/python:3.13",
+  "hostRequirements": { "cpus": 2 },
+  "containerEnv": {
+    "BAU_HOME": "/workspaces/.bau-home"
+  },
+  "remoteEnv": {
+    "BAU_UI_ALLOWED_HOSTS": "${containerEnv:CODESPACE_NAME}-8765.${containerEnv:GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "nohup bau ui --port 8765 > /tmp/bau-ui.log 2>&1 &",
+  "forwardPorts": [8765],
+  "portsAttributes": {
+    "8765": { "label": "Mission Control", "onAutoForward": "openBrowser" }
+  },
+  "customizations": {
+    "codespaces": { "openFiles": [".devcontainer/README.md"] }
+  }
+}
