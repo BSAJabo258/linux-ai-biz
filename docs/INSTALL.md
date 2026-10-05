@@ -131,6 +131,10 @@ bau email preflight ... --approval approval.json
 
 ```bash
 bau ui                                         # or open http://127.0.0.1:8765 (bau-ui.service)
+bau brain import                               # Second Brain: seed from agents, factories, missions
+bau brain say "Content team runs TikTok publishing which consumes scripts, music and produces videos"
+bau brain lint                                 # what is not automatable yet
+# open /var/lib/bau/brain in Obsidian for the graph view, or Mission Control > Second Brain
 bau governor status                            # the watchdog (bau-governor.timer, every 10 min)
 bau governor digest --hours 72                 # after time away: what broke, what it fixed, what needs you
 bau governor hold "going offline"              # stop everything except read-only; `release` lifts it

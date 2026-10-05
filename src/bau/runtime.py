@@ -50,6 +50,11 @@ TOOL_SPECS: dict[str, ToolSpec] = {
                                                    "enum": ["earthquakes", "satellites"]},
                                         "purpose": {"type": "string"}},
                                      "required": ["source", "purpose"]}),
+    "memory.brain": ToolSpec("memory.brain", "Look up the business's Second Brain: the "
+                             "teams, workflows, tools and rules related to a topic, with how "
+                             "they connect. Context, not authority.",
+                             {"type": "object", "properties": {"query": {"type": "string"}},
+                              "required": ["query"]}),
     "media.analyze_audio": ToolSpec("media.analyze_audio", "Analyse a song in the media "
                                     "inbox: tempo, beats, sections, drops.",
                                     {"type": "object", "properties": {
@@ -127,6 +132,13 @@ def build_gateway(home: Path | None = None, trust=None) -> Gateway:
 
     gw.register("memory.search", Handler(mem_search, "READ_ONLY",
                                          description=TOOL_SPECS["memory.search"].description))
+    def brain_context(query: str) -> dict[str, Any]:
+        from .brain import Brain
+        ctx = Brain(home).context(query)            # PUBLIC/INTERNAL notes only
+        return {"nodes": ctx["nodes"], "context": ctx["markdown"][:12000]}
+
+    gw.register("memory.brain", Handler(brain_context, "READ_ONLY",
+                                        description=TOOL_SPECS["memory.brain"].description))
     gw.register("search.regulations", Handler(reg_search, "READ_ONLY",
                                               description="regulation registry search"))
     gw.register("artifact.write_draft", Handler(write_draft, "LOW_RISK",

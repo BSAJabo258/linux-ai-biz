@@ -52,7 +52,7 @@ if [[ "${ID}" != debian || "${VERSION_ID%%.*}" -lt 13 ]] && ((ALLOW_OS == 0)); t
   die "expected Debian 13+, found ${PRETTY_NAME} (use --allow-other-os at your own risk)"
 fi
 pkgs=(python3 python3-venv python3-yaml nftables podman uidmap apparmor apparmor-utils chrony
-      auditd unattended-upgrades dnsutils openssh-client ffmpeg)
+      auditd unattended-upgrades bind9-dnsutils openssh-client ffmpeg)
 missing=()
 for p in "${pkgs[@]}"; do dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p"); done
 if ((${#missing[@]})); then
@@ -121,6 +121,10 @@ EOF
 export BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key
 runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
   /usr/local/bin/bau init >/dev/null
+# Seed the Second Brain from the shipped agents, factories and missions (idempotent;
+# the owner's own notes are never overwritten).
+runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
+  /usr/local/bin/bau brain import >/dev/null
 log "BAU $(/usr/local/bin/bau --version) installed"
 
 # ---------------------------------------------------------------- 6. host hardening
@@ -142,7 +146,10 @@ aa-enabled -q 2>/dev/null || log "WARNING: AppArmor is not enabled"
 install -m 0644 "${HERE}"/systemd/*.service "${HERE}"/systemd/*.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable bau-recover.service bau-regwatch.timer bau-governor.timer bau-ui.service >/dev/null
-systemctl start bau-regwatch.timer bau-governor.timer bau-ui.service
+systemctl start bau-regwatch.timer bau-governor.timer
+# restart, not start: on an upgrade the dashboard must load the new code now,
+# not at the next reboot (timer jobs pick up new code on their next run).
+systemctl restart bau-ui.service
 
 # ---------------------------------------------------------------- 8. wipe-gate evidence
 audit() { runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
@@ -158,7 +165,12 @@ else
   audit install.ungated '{"note": "no wipe-gate record supplied"}'
   log "WARNING: no wipe-gate record - install is marked UNGATED in the audit chain"
 fi
-audit install.completed "{\"payload\": $(cat "${HERE}/MANIFEST.json")}"
+# Only non-personal manifest fields: the audit chain refuses keys like "name".
+manifest="$(python3 -c 'import json,sys; m=json.load(open(sys.argv[1]));
+print(json.dumps({"payload_version": m["version"], "git_commit": m["git_commit"],
+                  "git_dirty": m["git_dirty"], "built_at": m["built_at"]}))' \
+  "${HERE}/MANIFEST.json")"
+audit install.completed "${manifest}"
 
 sed -i '/BAU base OS installed/,/This notice is removed by install.sh./d' /etc/motd || true
 
