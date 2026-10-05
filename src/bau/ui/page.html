@@ -35,6 +35,9 @@ dialog input { width:100%; font:inherit; padding:8px; background:var(--bg); colo
 dialog ul { list-style:none; padding:0; max-height:50vh; overflow:auto; }
 dialog li[aria-selected="true"] { background:var(--line); }
 kbd { border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+svg.brain { width:100%; height:auto; background:var(--bg); border:1px solid var(--line); border-radius:8px; }
+svg.brain line { stroke:var(--line); stroke-width:1; }
+svg.brain text { fill:var(--muted); font-size:10px; }
 </style>
 </head>
 <body>
@@ -42,7 +45,7 @@ kbd { border:1px solid var(--line); border-radius:4px; padding:0 4px; }
 <header>
   <h1>BAU Mission Control</h1>
   <p class="muted">Read-only view. Changes and approvals are made with the <code>bau</code> command at a terminal.
-  Press <kbd>Ctrl</kbd>+<kbd>K</kbd> for the command palette, <kbd>1</kbd>-<kbd>7</kbd> to switch views.</p>
+  Press <kbd>Ctrl</kbd>+<kbd>K</kbd> for the command palette, <kbd>1</kbd>-<kbd>9</kbd> to switch views.</p>
   <nav aria-label="Views"><ul id="tabs"></ul></nav>
 </header>
 <main id="content" tabindex="-1">
@@ -63,7 +66,7 @@ const VIEWS = [
   ["status", "Status", "/api/status"], ["missions", "Missions", "/api/missions"],
   ["legal", "Legal review", "/api/legal-queue"], ["regulations", "Regulations", "/api/regulations"],
   ["jobs", "Jobs", "/api/jobs"], ["economics", "Economics", "/api/economics"],
-  ["incidents", "Incidents", "/api/incidents"], ["governor", "Governor", "/api/governor"]];
+  ["incidents", "Incidents", "/api/incidents"], ["governor", "Governor", "/api/governor"], ["brain", "Second Brain", "/api/brain"]];
 const COMMANDS = ["bau status", "bau reg due", "bau audit verify", "bau mission list",
   "bau email preflight --message m.json --recipients r.json --sender s.json --evidence",
   "bau approve --capability CAP --request-id ID --requester AGENT --bind FILE --out approval.json",
@@ -85,6 +88,52 @@ function table(rows, cols) {
     tr.append(td); }); body.append(tr); });
   t.append(body); return t;
 }
+const TYPE_COLOR = { workflow: "var(--green)", team: "var(--focus)", role: "var(--focus)",
+  agent: "var(--yellow)", model: "var(--orange)", governance: "var(--red)", regulation: "var(--red)",
+  factory: "var(--green)", mission_type: "var(--yellow)", capability: "var(--muted)" };
+function brainGraph(g) {
+  // Static force layout (computed once, no animation): spring edges, repelling nodes.
+  const W = 1000, H = 640, NS = "http://www.w3.org/2000/svg";
+  const idx = new Map(g.nodes.map((n, i) => [n.id, i]));
+  const P = g.nodes.map((n, i) => ({ x: W / 2 + 280 * Math.cos(i * 2.4) * Math.sqrt((i + 1) / g.nodes.length),
+                                     y: H / 2 + 240 * Math.sin(i * 2.4) * Math.sqrt((i + 1) / g.nodes.length), dx: 0, dy: 0 }));
+  const E = g.edges.filter(e => idx.has(e.source) && idx.has(e.target)).map(e => [idx.get(e.source), idx.get(e.target)]);
+  const deg = P.map(() => 0); E.forEach(([a, b]) => { deg[a]++; deg[b]++; });
+  // Fruchterman-Reingold with gravity: even spacing, nothing pinned to the border.
+  const n = Math.max(P.length, 1), k = Math.sqrt((W * H) / n) * 0.75;
+  let temp = W / 8;
+  for (let it = 0; it < 400; it++) {
+    P.forEach(p => { p.dx = 0; p.dy = 0; });
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      let dx = P[i].x - P[j].x, dy = P[i].y - P[j].y;
+      const d = Math.max(Math.hypot(dx, dy), 0.5), f = (k * k) / d;
+      dx /= d; dy /= d;
+      P[i].dx += dx * f; P[i].dy += dy * f; P[j].dx -= dx * f; P[j].dy -= dy * f; }
+    E.forEach(([a, b]) => { let dx = P[b].x - P[a].x, dy = P[b].y - P[a].y;
+      const d = Math.max(Math.hypot(dx, dy), 0.5), f = (d * d) / k;
+      dx /= d; dy /= d;
+      P[a].dx += dx * f; P[a].dy += dy * f; P[b].dx -= dx * f; P[b].dy -= dy * f; });
+    P.forEach(p => { p.dx += (W / 2 - p.x) * 0.9; p.dy += (H / 2 - p.y) * 0.9;
+      const d = Math.max(Math.hypot(p.dx, p.dy), 0.5), step = Math.min(d, temp);
+      p.x = Math.min(W - 40, Math.max(40, p.x + (p.dx / d) * step));
+      p.y = Math.min(H - 30, Math.max(30, p.y + (p.dy / d) * step)); });
+    temp = Math.max(1, temp * 0.985);
+  }
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("class", "brain");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `Graph of ${g.nodes.length} notes; the same links are listed in the table below.`);
+  const mk = (t, a) => { const e = document.createElementNS(NS, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e; };
+  E.forEach(([a, b]) => svg.append(mk("line", { x1: P[a].x, y1: P[a].y, x2: P[b].x, y2: P[b].y })));
+  g.nodes.forEach((n, i) => {
+    const c = mk("circle", { cx: P[i].x, cy: P[i].y, r: 4 + Math.min(10, deg[i] * 1.5),
+                             fill: TYPE_COLOR[n.type] || "var(--fg)" });
+    const tip = document.createElementNS(NS, "title"); tip.textContent = `${n.title} (${n.type})`; c.append(tip);
+    svg.append(c);
+    if (deg[i] >= 3 || n.type === "workflow") { const tx = mk("text", { x: P[i].x + 8, y: P[i].y + 3 }); tx.textContent = n.title; svg.append(tx); }
+  });
+  return svg;
+}
 function render(key, data) {
   const v = document.getElementById("view"); v.replaceChildren();
   if (key === "status") {
@@ -102,6 +151,13 @@ function render(key, data) {
       table(Object.entries(data.counts).map(([severity, n]) => ({ severity, n })), ["severity", "n"])));
     v.append(el("section", {}, el("h3", {}, "Needs you"), table(data.needs_you, ["severity", "check", "subject", "detail", "at"])));
     v.append(el("section", {}, el("h3", {}, "Fixed by the Governor (72h)"), table(data.fixed, ["check", "subject", "detail", "remedy", "at"])));
+  } else if (key === "brain") {
+    v.append(el("section", {}, el("h3", {}, `${data.nodes.length} notes, ${data.edges.length} links`),
+      el("p", { class: "muted" }, "Your notes in BAU_HOME/brain (open the folder in Obsidian for the same graph). Add knowledge with: bau brain say \"Team runs Workflow which consumes X and produces Y\""),
+      brainGraph(data)));
+    v.append(el("section", {}, el("h3", {}, "Workflows"), table(data.workflows, ["workflow", "run_by", "consumes", "produces", "uses", "governed_by"])));
+    v.append(el("section", {}, el("h3", {}, "Gaps (what is not automatable yet)"), table(data.lint, ["node", "issue", "detail"])));
+    v.append(el("section", {}, el("h3", {}, "All links (noun verb noun)"), table(data.edges, ["source", "verb", "target"])));
   } else if (key === "incidents") v.append(table(data, ["id", "class", "severity", "stage", "title"]));
 }
 async function show(i) {

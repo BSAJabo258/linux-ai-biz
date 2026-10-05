@@ -69,6 +69,7 @@ When findings are combined, the worst state wins. An empty evaluation is UNKNOWN
 | §6 K3 | registered as OFFLOAD in `data/registry_defaults.yaml`; reached through `models/providers.LocalHTTPProvider` |
 | §7-8, §113, §122, §125 Jarvis + missions | `jarvis.py`, `data/missions.yaml` (compliance dependencies per mission type) |
 | Governor (owner-away oversight) | `governor.py`, `bau-governor.timer`, `bau governor ...` (see below) |
+| Second Brain (memory you own, model-agnostic) | `brain.py`, `bau brain ...`, Mission Control *Second Brain* view, agent tool `memory.brain`: one Markdown note per noun in `BAU_HOME/brain/` (Obsidian-compatible), typed verb edges, sentences compiled to workflows, system import, gap lint, data-class-filtered context for any model |
 | TikTok review-and-post (§80) | `tiktok.py`, `bau tiktok ...`: OAuth (PKCE) login, queue with pre-checks (claims, provenance, publish gate, platform record), interactive review that shows what TikTok's Content Sharing Guidelines require; the owner's 'y' uploads (chunked) and posts via the Content Posting API, or sends to drafts. Only a human at a terminal can post; tokens in `BAU_HOME/secrets/tiktok.json` (0600) |
 | §9-12, §74-75, §114-118 compliance engine | `regulations.py`, `policy.py`, `decision.py`, `jurisdiction.py` |
 | §13-16, §77, §80-81 AI disclosure + likeness | `disclosure.py`, `policies/ai_disclosure.yaml`, media gateway provenance |
@@ -122,6 +123,27 @@ listed in `bau status`:
 - the first real revenue mission.
 
 Third-party projects named in the spec (aiOS, open-context, Open-Generative-AI, God's Eye UI, Heretic, MAYA repos) plug in through the adapters above only after Sentinel review.
+
+## Second Brain
+
+The model is not the memory. `BAU_HOME/brain/` holds one Markdown note per *noun* - team,
+role, workflow, artifact, tool, agent, model, capability, governance, factory, mission type -
+with YAML frontmatter (`type`, `data_class`, `status`, `relations`) and `[[wikilinks]]`, so the
+folder opens in Obsidian with the same graph view. *Verbs* are typed edges: runs, consumes,
+produces, uses, owns, governs, requires, feeds, approves, monitors, blocks, publishes, sells,
+serves.
+
+* `bau brain say "Product team runs Slack questions which consumes tickets and produces
+  answers"` compiles the sentence into nodes and edges (a verb after "which/that" applies to the
+  previous object; after "and" to the current subject; objects split on commas and "and").
+* `bau brain import` mirrors agents, models, tools, factories, mission types and their
+  compliance gates into the brain; the owner's own notes are never overwritten.
+* `bau brain lint` lists what is not yet automatable: workflows without an owner, inputs or
+  outputs; broken links; untyped notes; e-mail addresses or phone numbers in notes not marked
+  PERSONAL.
+* Any model gets the same context (`memory.brain` agent tool, `bau brain context`, and the
+  `brain` step of every Jarvis plan): the matching notes plus their neighbours, as plain
+  Markdown, **only PUBLIC/INTERNAL notes** unless the caller explicitly allows more.
 
 ## Two tiers: operator and Governor
 

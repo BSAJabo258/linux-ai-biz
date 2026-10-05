@@ -608,6 +608,39 @@ def cmd_governor(a):
     return EXIT_OK
 
 
+def cmd_brain(a):
+    from .brain import Brain
+    b = Brain()
+    if a.brain_cmd == "say":
+        edges = b.say(a.sentence)
+        AuditLog().append("brain.edges_added", f"human:{getpass.getuser()}",
+                          {"count": len(edges)})
+        _out([{"source": s_, "verb": v, "target": t} for s_, v, t in edges])
+    elif a.brain_cmd == "note":
+        n = b.upsert(a.title, a.type, data_class=a.data_class, body=a.body)
+        _out({"note": str(b.path(n.id)), "type": n.type, "data_class": n.data_class})
+    elif a.brain_cmd == "import":
+        _out(b.import_system())
+    elif a.brain_cmd == "lint":
+        issues = b.lint()
+        _out(issues)
+        return EXIT_REVIEW if issues else EXIT_OK
+    elif a.brain_cmd == "workflows":
+        _out(b.workflows())
+    elif a.brain_cmd == "context":
+        ctx = b.context(a.query, hops=a.hops)
+        print(ctx["markdown"] or "(nothing related yet)")
+        if ctx["withheld_by_data_class"]:
+            print(f"\n[{ctx['withheld_by_data_class']} note(s) withheld: data class not "
+                  "safe to send to a model]", file=sys.stderr)
+    elif a.brain_cmd == "graph":
+        if a.out:
+            _out({"written": str(b.export(Path(a.out)))})
+        else:
+            _out(b.graph())
+    return EXIT_OK
+
+
 def cmd_tiktok(a):
     from . import tiktok
     q = tiktok.TikTokQueue()
@@ -972,6 +1005,27 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("finding_id")
     x.add_argument("--note")
     s.set_defaults(fn=cmd_governor)
+
+    s = sub.add_parser("brain", help="Second Brain: your business as linked notes")
+    bs = s.add_subparsers(dest="brain_cmd", required=True)
+    x = bs.add_parser("say", help='e.g. "Product team runs Slack questions which consumes '
+                                  'tickets and produces answers"')
+    x.add_argument("sentence")
+    x = bs.add_parser("note", help="create/update a note")
+    x.add_argument("title")
+    x.add_argument("--type")
+    x.add_argument("--data-class", choices=["PUBLIC", "INTERNAL", "CONFIDENTIAL", "PERSONAL",
+                                            "SENSITIVE_PERSONAL"])
+    x.add_argument("--body")
+    bs.add_parser("import", help="seed from agents, models, factories, missions")
+    bs.add_parser("lint", help="gaps: incomplete workflows, broken links, personal data")
+    bs.add_parser("workflows")
+    x = bs.add_parser("context", help="what a model would be given for a question")
+    x.add_argument("query")
+    x.add_argument("--hops", type=int, default=1)
+    x = bs.add_parser("graph")
+    x.add_argument("--out")
+    s.set_defaults(fn=cmd_brain)
 
     s = sub.add_parser("tiktok", help="review-and-post to TikTok (your click posts it)")
     tt = s.add_subparsers(dest="tt_cmd", required=True)

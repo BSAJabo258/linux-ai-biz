@@ -50,6 +50,12 @@ def _api(path: str, home: Path) -> Any:
         from ..economics import Ledger, metrics, usage_dashboard
         led = Ledger(home)
         return {"metrics": metrics(led), "usage": usage_dashboard(led, home)}
+    if path == "/api/brain":
+        from ..brain import Brain
+        b = Brain(home)
+        g = b.graph()
+        return {"nodes": g["nodes"], "edges": g["edges"], "lint": b.lint()[:200],
+                "workflows": b.workflows()}
     if path == "/api/governor":
         from ..audit import AuditLog
         from ..governor import Governor

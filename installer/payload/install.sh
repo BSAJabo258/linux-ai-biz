@@ -121,6 +121,10 @@ EOF
 export BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key
 runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
   /usr/local/bin/bau init >/dev/null
+# Seed the Second Brain from the shipped agents, factories and missions (idempotent;
+# the owner's own notes are never overwritten).
+runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
+  /usr/local/bin/bau brain import >/dev/null
 log "BAU $(/usr/local/bin/bau --version) installed"
 
 # ---------------------------------------------------------------- 6. host hardening

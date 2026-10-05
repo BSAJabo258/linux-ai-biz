@@ -99,7 +99,7 @@ agent:
     permissions: [READ_ONLY]
     budget_usd_per_day: 5
     network_scope: allowlisted research sources
-    tools: [memory.search, search.regulations, spatial.public_data]
+    tools: [memory.search, memory.brain, search.regulations, spatial.public_data]
     approval_policy: none (read-only)
     risk_level: LOW
     status: APPROVED
@@ -111,7 +111,7 @@ agent:
     permissions: [READ_ONLY, LOW_RISK]
     budget_usd_per_day: 5
     network_scope: none
-    tools: [memory.search, artifact.write_draft]
+    tools: [memory.search, memory.brain, artifact.write_draft]
     approval_policy: drafts only; publication is a separate approved step
     risk_level: LOW
     status: APPROVED
@@ -123,7 +123,7 @@ agent:
     permissions: [READ_ONLY]
     budget_usd_per_day: 3
     network_scope: none
-    tools: [memory.search, search.regulations]
+    tools: [memory.search, memory.brain, search.regulations]
     approval_policy: none (read-only)
     risk_level: LOW
     status: APPROVED
@@ -135,7 +135,7 @@ agent:
     permissions: [READ_ONLY, LOW_RISK]
     budget_usd_per_day: 5
     network_scope: none
-    tools: [memory.search, media.analyze_audio, artifact.write_draft]
+    tools: [memory.search, memory.brain, media.analyze_audio, artifact.write_draft]
     approval_policy: drafts only
     risk_level: LOW
     status: APPROVED

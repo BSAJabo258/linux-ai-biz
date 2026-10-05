@@ -104,6 +104,8 @@ class Jarvis:
         hits = self.memory.search(objective, k=5, include_status={"CURRENT", "PLANNED"})
         m.steps["context"] = [{"id": r.id, "title": r.title, "status": r.status}
                               for _, r in hits]
+        from .brain import Brain
+        m.steps["brain"] = Brain(self.home).context(objective, hops=1, max_nodes=12)["nodes"]
         juris: list[str] = []
         for f in facts.values():
             for j in f.get("jurisdictions") or []:
