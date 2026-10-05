@@ -198,3 +198,32 @@ bau tiktok status            # processing -> PUBLISH_COMPLETE
 Blocked videos (unproven claims in the caption, missing AI provenance, stale policy
 record, too long for the account) are shown with the reason and cannot be posted.
 AI-generated videos always carry TikTok's AI label (`is_aigc`).
+
+## Phase 9: Talk to Jarvis
+
+Double-click **BAU Jarvis** in the app menu, or run `bau jarvis` from your own login.
+Jarvis opens a full-screen HUD in the browser; tap (or press any key) to wake it, and it
+gives you a spoken briefing: holds, what the Governor fixed overnight, what needs you,
+videos waiting, deadlines. Then just talk: hold **Space** (or the mic button) and speak,
+or type.
+
+```bash
+bau jarvis                       # HUD in the browser (http://127.0.0.1:8766, private link)
+bau jarvis --text                # same conversation in the terminal; confirms are y/N
+bau jarvis config --call-me "boss" --model claude-opus-5-5 --voice-id <ElevenLabs voice>
+```
+
+* **Brains:** an approved Claude model (`ANTHROPIC_API_KEY` in `/etc/bau/models.env`)
+  or your approved local model. Content-lane models never run Jarvis. With no model it
+  still works in *plain mode*: briefing, status, night report, queue, deadlines, money,
+  missions, brain gaps, "add: ..." to the brain, hold and release.
+* **Voice:** put `ELEVENLABS_API_KEY=...` in `/etc/bau/models.env` for the ElevenLabs
+  voice and for push-to-talk transcription. Your voice clips then go to ElevenLabs; use
+  `bau jarvis config --listen browser` to keep them on the browser's own recognition
+  instead. Without a key Jarvis uses the browser's voice, and typing always works.
+* **What it may do:** look anything up; add to the Second Brain, save notes, plan
+  missions and put BAU on HOLD when you ask. Posting to TikTok and releasing a hold only
+  appear on screen as a confirmation card - for TikTok with the video preview, and *you*
+  pick who can view it and whether it promotes anything. Nothing happens until you press
+  Confirm. Money, commercial email and legal decisions stay with `bau approve`.
+

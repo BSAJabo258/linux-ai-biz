@@ -537,6 +537,70 @@ def cmd_graph(a):
     return EXIT_OK
 
 
+def cmd_jarvis(a):
+    from .assistant import Voice, build_assistant, load_env_file, save_config
+    if a.jv_cmd == "config":
+        values = {"call_me": a.call_me, "model": a.model, "elevenlabs_voice_id": a.voice_id,
+                  "listen": a.listen}
+        if any(v is not None for v in values.values()):
+            save_config(bau_home(), **values)
+        _out(yaml.safe_load((bau_home() / "config" / "jarvis.yaml").read_text())
+             if (bau_home() / "config" / "jarvis.yaml").exists() else {})
+        return EXIT_OK
+    owner = _human()
+    load_env_file()
+    jv = build_assistant(owner=owner)
+    if a.text:
+        return _jarvis_terminal(jv)
+    from .ui.jarvis_server import serve
+    srv, key = serve(jv, Voice(), a.port)
+    url = f"http://127.0.0.1:{a.port}/?k={key}"
+    mode = f"model {jv.model.get('id')}" if jv.provider else "plain mode (no model connected)"
+    print(f"Jarvis is up ({mode}). Open: {url}\nCtrl+C to stop.", file=sys.stderr)
+    if not a.no_browser:
+        import webbrowser
+        webbrowser.open(url)
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    return EXIT_OK
+
+
+def _jarvis_terminal(jv) -> int:
+    def show(r) -> None:
+        print(f"\nJarvis: {r.text}\n")
+        for p in r.pending:
+            print("-" * 60 + f"\n{p['summary']}\n" + "-" * 60)
+            choices = {}
+            for f in (p.get("form") or {}).get("fields", []):
+                for i, (_, label) in enumerate(f["options"], 1):
+                    print(f"  {i}. {label}")
+                while (n := input(f"{f['label']} (number, no default): ").strip()) not in [
+                        str(i) for i in range(1, len(f["options"]) + 1)]:
+                    pass
+                choices[f["name"]] = f["options"][int(n) - 1][0]
+            notes = (p.get("form") or {}).get("notes")
+            if notes:
+                print(notes.get(choices.get("promotes"), notes["default"]))
+            if p.get("preview"):
+                print(f"Preview the video first: {jv.pending[p['id']].preview}")
+            yes = input("Confirm? [y/N] ").strip().lower() == "y"
+            out = jv.confirm(p["id"], yes, jv.owner, choices)
+            print("Done." if out.get("done") else
+                  "Not done." if not yes else f"That didn't go through: {out.get('result')}")
+    show(jv.briefing())
+    while True:
+        try:
+            text = input("you> ")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return EXIT_OK
+        if text.strip().lower() in ("exit", "quit", "bye"):
+            return EXIT_OK
+        show(jv.ask(text))
+
+
 def cmd_ui(a):
     from .ui.server import serve
     srv = serve(a.port)
@@ -1045,6 +1109,20 @@ def register(sub: argparse._SubParsersAction) -> None:
 
     s = sub.add_parser("gateway", help="list gateway capabilities")
     s.set_defaults(fn=cmd_gateway)
+
+    s = sub.add_parser("jarvis", help="talk to Jarvis: spoken briefing, conversation, "
+                       "actions you confirm")
+    s.add_argument("--port", type=int, default=8766)
+    s.add_argument("--text", action="store_true", help="talk in this terminal instead")
+    s.add_argument("--no-browser", action="store_true")
+    jv = s.add_subparsers(dest="jv_cmd")
+    x = jv.add_parser("config", help="how Jarvis addresses you, which model, which voice")
+    x.add_argument("--call-me")
+    x.add_argument("--model", help="registered, approved model id (default claude-opus-5-5)")
+    x.add_argument("--voice-id", help="ElevenLabs voice id")
+    x.add_argument("--listen", choices=["elevenlabs", "browser"],
+                   help="where push-to-talk audio is transcribed")
+    s.set_defaults(fn=cmd_jarvis)
 
     s = sub.add_parser("ui", help="Mission Control web dashboard (localhost, read-only)")
     s.add_argument("--port", type=int, default=8765)

@@ -145,6 +145,29 @@ serves.
   `brain` step of every Jarvis plan): the matching notes plus their neighbours, as plain
   Markdown, **only PUBLIC/INTERNAL notes** unless the caller explicitly allows more.
 
+## Jarvis, the conversational front door (`assistant.py`, `ui/jarvis_server.py`)
+
+`jarvis.py` plans missions; `assistant.py` is the presence on top: a briefing built from live
+facts, a natural conversation with memory (`BAU_HOME/jarvis/history.jsonl`), and tools.
+
+| Tool kind | Examples | Rule |
+|---|---|---|
+| read | status, night report, missions, TikTok queue, deadlines, money, brain lookup/gaps | runs freely |
+| act | brain add, remember, plan mission, hold everything | low-risk, runs when asked, audited `jarvis.tool` |
+| confirm | post to TikTok, release a hold | **staged only** (`jarvis.staged`); runs when the owner presses Confirm (`jarvis.confirmed`, actor `human:<login>`) |
+
+* Tool results reach the model wrapped as untrusted data; only arguments declared in a
+  tool's schema get through, so a model (or injected text) cannot pre-fill owner-only
+  choices. TikTok privacy and commercial disclosure come only from the confirmation card,
+  with no default, next to the video preview - as TikTok's sharing rules require.
+* Signed approvals are never tools. Jarvis explains them and gives the `bau approve` command.
+* The HUD server runs as the owner (`bau jarvis` needs a TTY), binds 127.0.0.1:8766, and
+  requires a per-launch key (in the link it opens; sent as `X-Jarvis-Key`), a local Host,
+  a same-origin `Origin`, and size-limited bodies. Mission Control stays read-only.
+* Voice: ElevenLabs text-to-speech (cached by text) and speech-to-text when a key is
+  configured; otherwise the browser's speech. Plain mode (no model) keeps the briefing and
+  core commands working offline.
+
 ## Two tiers: operator and Governor
 
 BAU is run by two AIs with different jobs:
@@ -188,8 +211,9 @@ unattended.
 | `/var/lib/bau` (`BAU_HOME`) | `bau:bau` 2770 | regulations, policies, audit, evidence, consent, suppression, dsr, jobs, reports... (spec §91 `.bau/` layout) |
 | `/etc/bau/audit.key`, `unsubscribe.key` | `root:bau` 0640 | machine-generated |
 | `bau-ui.service` | runs as `bau`, localhost only | Mission Control on http://127.0.0.1:8765 |
+| `bau jarvis` | runs as the owner, localhost only | Jarvis HUD on http://127.0.0.1:8766 (private per-launch link) |
 | `bau-governor.timer` | runs as `bau`, every 10 min | Governor tick; state in `BAU_HOME/governor/` |
-| `/etc/bau/models.env` (optional) | `root:bau` 0640 | API keys for the Governor's resume runs and validator model |
+| `/etc/bau/models.env` (optional) | `root:bau` 0640 | API keys for the Governor's resume runs, validator model and Jarvis (incl. `ELEVENLABS_API_KEY`) |
 | `/etc/bau/allowed_signers` | `root:bau` 0644 | public keys of the humans who may approve; only root can add one |
 | `~bauadmin/.ssh/bau_approval_ed25519` | the admin, passphrase-protected | the admin's personal approval signing key |
 
