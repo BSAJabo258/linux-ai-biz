@@ -1,0 +1,77 @@
+# Child-directed content (made for kids). These rules only apply when a video is
+# marked child_directed; everything else skips them. Facts come from bau.kids.
+
+policies:
+- id: kids.audience_declared
+  domain: publish
+  scope: artifact
+  stage: 100
+  title: Child-directed video is marked "made for kids" on the platform
+  regs: [us-coppa, industry-youtube-made-for-kids]
+  jurisdictions: [ANY]
+  when: {fact: context.child_directed, eq: true}
+  require:
+    - {fact: context.made_for_kids_set, eq: true}
+  remediation: Set the platform's made-for-kids / audience setting. The creator is legally responsible for it.
+
+- id: kids.no_child_data
+  domain: publish
+  scope: artifact
+  stage: 101
+  title: No request for children's personal information, no off-platform links, no comment or notification prompts
+  regs: [us-coppa]
+  jurisdictions: [ANY]
+  when: {fact: context.child_directed, eq: true}
+  require:
+    - {fact: context.collects_child_data, eq: false}
+  remediation: Remove the question, link or call to action from the title, description and tags.
+
+- id: kids.no_commercial_pressure
+  domain: publish
+  scope: artifact
+  stage: 102
+  title: No purchase pressure and no paid promotion aimed at children
+  regs: [us-ftc-act-s5, us-ftc-endorsement-guides]
+  jurisdictions: [ANY]
+  when: {fact: context.child_directed, eq: true}
+  require:
+    - {fact: context.commercial_pressure, eq: false}
+    - {fact: context.paid_promotion, eq: false}
+  remediation: Children cannot reliably tell ads from content. BAU does not run paid promotions or buy-now pushes in kids videos.
+
+- id: kids.suitable
+  domain: publish
+  scope: artifact
+  stage: 103
+  title: Theme and title suitable for young children (no violence, scares, pranks or sensational titles)
+  regs: [industry-youtube-made-for-kids]
+  jurisdictions: [ANY]
+  when: {fact: context.child_directed, eq: true}
+  require:
+    - {fact: context.unsuitable_for_kids, eq: false}
+  remediation: Rewrite the title and description in calm, age-appropriate language.
+
+- id: kids.licensed_characters
+  domain: publish
+  scope: artifact
+  stage: 104
+  title: No characters or brands someone else owns, unless licensed
+  regs: [us-lanham-act]
+  jurisdictions: [ANY]
+  when: {fact: context.child_directed, eq: true}
+  require:
+    - {fact: context.unlicensed_characters, eq: false}
+  remediation: Use your own characters, or record the licence and queue with --licensed.
+
+- id: kids.not_mass_produced
+  domain: publish
+  scope: artifact
+  stage: 105
+  title: Not a near-copy of an earlier episode (YouTube inauthentic / mass-produced content)
+  regs: [industry-youtube-inauthentic-content]
+  jurisdictions: [ANY]
+  when: {fact: context.child_directed, eq: true}
+  on_fail: PASS_WITH_REVIEW
+  require:
+    - {fact: context.near_duplicate, eq: false}
+  remediation: Give each episode its own story, lesson or song. Template copies get demonetised.

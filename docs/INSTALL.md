@@ -199,6 +199,48 @@ Blocked videos (unproven claims in the caption, missing AI provenance, stale pol
 record, too long for the account) are shown with the reason and cannot be posted.
 AI-generated videos always carry TikTok's AI label (`is_aigc`).
 
+## Phase 8b: YouTube, including kids channels (review, then your "y" uploads)
+
+One-time setup:
+1. In Google Cloud Console create a project, enable **YouTube Data API v3**, set up the
+   OAuth consent screen, and create an OAuth client of type **Desktop app**.
+2. Add the client to the laptop's platform keys:
+   ```bash
+   sudoedit /etc/bau/platforms.env   # YOUTUBE_CLIENT_ID=...  YOUTUBE_CLIENT_SECRET=...
+   ```
+3. `bau platform add examples/platform-youtube.yaml` (re-verify it every 90 days).
+4. `bau youtube login` - Google sign-in opens, you pick the channel, done.
+5. Apply for Google's API audit. Until it passes, YouTube keeps every API upload
+   private; you can make videos public yourself in YouTube Studio.
+
+Every day:
+```bash
+bau youtube add artifacts/videos/ep12.mp4 --title "Benny the Bear Learns to Count" \
+    --description "A gentle counting song." --tags counting,preschool --kids --category 27
+bau publish add artifacts/videos/clip.mp4 --to youtube,tiktok --title "..."   # one video, many platforms
+bau publish queue            # everything waiting, every platform
+bau youtube review           # channel, video, title, AI label -> audience -> privacy -> 'y' uploads
+bau youtube status           # processing -> processed
+```
+Or ask Jarvis: "what's waiting to post?" and "post the kids episode". The confirm card
+shows the preview, and you make the choices.
+
+**Kids videos (`--kids`)** are uploaded marked *made for kids*, as COPPA and YouTube
+require. BAU blocks a kids video whose title, description or tags:
+- ask children for personal details, link off YouTube, or tell them to comment, like or
+  turn on notifications;
+- push purchases or carry paid promotion;
+- use scary, violent or prank themes or a sensational title;
+- use characters or brands someone else owns (unless you hold a licence: `--licensed`).
+
+It warns when an episode is a near-copy of an earlier one, because YouTube demonetises
+mass-produced content. You must confirm you watched the whole video before it uploads.
+Kids videos never go to TikTok (13+). Uploads are capped at 3 a day by default
+(`config/youtube.yaml`: `max_uploads_per_day`). The `kids_channel` factory runs a whole episode from
+series bible to upload, once you activate it with a signed approval:
+`bau factory activate kids_channel --approval-ref <ref>`, then
+`bau factory-run start kids_channel "Episode 12: Benny counts to ten"`.
+
 ## Phase 9: Talk to Jarvis
 
 Double-click **BAU Jarvis** in the app menu, or run `bau jarvis` from your own login.

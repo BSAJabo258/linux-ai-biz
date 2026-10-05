@@ -174,3 +174,39 @@
   last_verified: 2026-10-04
   next_review: 2027-10-04
   legal_review_required: false
+
+- reg_id: industry-youtube-made-for-kids
+  jurisdiction: ANY
+  authority: YouTube (audience setting required since the 2019 FTC / New York AG COPPA settlement)
+  law: YouTube "made for kids" audience setting and kids content quality principles
+  legal_status: industry_requirement
+  bau_status: IMPLEMENTED
+  effective_date: 2020-01-06
+  obligations:
+    - Mark every video made for kids or not; child-directed videos must be marked made for kids
+    - Made-for-kids videos lose comments, personalised ads, notifications, end screens, memberships and similar features
+    - Mis-setting the audience can bring YouTube penalties and legal consequences under COPPA
+  penalties: Platform action plus COPPA civil penalties for the creator
+  source_url: https://support.google.com/youtube/answer/9528076
+  source_type: industry_policy
+  last_verified: 2026-10-05
+  next_review: 2027-01-05
+  legal_review_required: true
+
+- reg_id: industry-youtube-inauthentic-content
+  jurisdiction: ANY
+  authority: YouTube Partner Program
+  law: YouTube monetization policy - inauthentic (mass-produced or repetitive) content
+  legal_status: industry_requirement
+  bau_status: IMPLEMENTED
+  effective_date: 2025-07-15
+  obligations:
+    - Monetised content must be original and not mass-produced, generic or repetitive
+    - AI content made from generic templates without the creator's own insight is ineligible
+    - Series with recurring characters are fine when each episode has a distinct story or concept
+  penalties: Channel demonetised or removed from the YouTube Partner Program
+  source_url: https://support.google.com/youtube/answer/1311392
+  source_type: industry_policy
+  last_verified: 2026-10-05
+  next_review: 2027-01-05
+  legal_review_required: false

@@ -25,6 +25,24 @@ faceless_media:
     - {id: final_qa, type: checklist, items: [watched_end_to_end, links_checked]}
     - {id: approval, type: approval, capability: publish.video}
     - {id: publish, type: tool, capability: publish.video}
+kids_channel:
+  description: Faceless kids channel on YouTube (made for kids) - original series, one distinct story per episode
+  mission_type: publish_video
+  stages:
+    - {id: audience, type: agent, agent: research, prompt: "Pick one age band (2-4, 4-6 or 6-8) and what children that age enjoy and learn; cite sources."}
+    - {id: series_bible, type: agent, agent: writer, prompt: "Create original characters and a series bible. No characters, names or styles other people own."}
+    - {id: episode, type: agent, agent: writer, prompt: "Pitch one episode with its own story and one learning goal, different from every earlier episode."}
+    - {id: script, type: agent, agent: writer, prompt: "Write a calm, age-appropriate script: no scares, violence, pranks, buying pressure, links or requests for comments or personal details."}
+    - {id: kids_qa, type: checklist, items: [age_appropriate, no_scary_or_violent_moments, no_purchase_pressure, no_calls_to_comment_or_share, original_characters_only, distinct_from_earlier_episodes]}
+    - {id: storyboard, type: agent, agent: media, prompt: "Storyboard the script scene by scene."}
+    - {id: video_prompts, type: agent, agent: media, prompt: "Write one video-generator prompt per scene, keeping characters consistent; gentle colours and pacing."}
+    - {id: production, type: checklist, items: [scenes_generated, voice_produced, music_licensed, edit_done, captions_done, thumbnail_done]}
+    - {id: metadata, type: agent, agent: writer, prompt: "Write a plain, non-sensational title (no caps, no !!!), a description with no links or calls to action, and tags."}
+    - {id: ai_disclosure, type: gate, domain: publish}
+    - {id: rights_check, type: gate, domain: monetize}
+    - {id: final_qa, type: checklist, items: [watched_end_to_end, made_for_kids_set]}
+    - {id: approval, type: approval, capability: publish.video}
+    - {id: publish, type: tool, capability: publish.video}
 digital_assets:
   description: Templates, planners, kits, packs (spec §64)
   mission_type: sell_digital_asset

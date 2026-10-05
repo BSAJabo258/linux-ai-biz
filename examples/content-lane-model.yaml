@@ -19,7 +19,7 @@ trust_level: ABLITERATED
 privacy: local
 lane: content_only
 use_for: [creative_writing, script, lyrics]      # pick from: creative_writing, script, lyrics,
-                                                 # comedy, ad_copy, image_prompt, storyboard
+                                                 # comedy, ad_copy, image_prompt, storyboard, video_prompt
 tools: false
 context: 32768
 input_types: [text]

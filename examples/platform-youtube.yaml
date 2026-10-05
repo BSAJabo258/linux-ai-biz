@@ -1,0 +1,36 @@
+# YouTube platform policy record (bau platform add examples/platform-youtube.yaml).
+# Facts below were checked on 2026-10-05 against developers.google.com/youtube/v3 and
+# support.google.com/youtube. Re-verify and bump last_verified at least every 90 days;
+# uploading is blocked once it goes stale.
+platform: youtube
+policy_version: "YouTube Data API v3 videos.insert / made-for-kids / YPP inauthentic content (checked 2026-10-05)"
+ai_content_policy: >-
+  Realistic altered or synthetic content must be disclosed (status.containsSyntheticMedia).
+  BAU sets it for every AI-generated video, realistic or animated.
+copyright_policy: >-
+  Only upload material BAU holds rights to. Characters and brands other people own
+  (Peppa Pig, Paw Patrol, Disney, Pokemon...) need a licence on file (--licensed).
+music_policy: Licensed or royalty-free music only; YouTube Content ID claims follow the rights holder.
+advertising_policy: >-
+  Paid product placements, endorsements and sponsorships must be declared with YouTube's
+  "includes paid promotion" setting, which the API does not expose: BAU uploads those as
+  private for the owner to tick the box in YouTube Studio. BAU never runs paid promotions
+  in made-for-kids videos.
+commercial_content_policy: >-
+  Made-for-kids videos have no personalised ads, comments, notifications, end screens,
+  cards, memberships, merchandise or Super Chat. Kids videos must not push purchases.
+api_policy: >-
+  OAuth installed-app flow with PKCE (youtube.upload, youtube.readonly). videos.insert
+  costs 1 unit of the Video Uploads quota bucket (100 per day). Uploads from unverified
+  API projects created after 2020-07-28 are forced private until Google's audit passes.
+automation_policy: >-
+  BAU uploads only after the owner reviews each video, chooses the audience (made for kids
+  or not, no default) and privacy (no default), and confirms; kids videos also need the
+  owner to confirm a full watch. Daily upload cap in config/youtube.yaml (default 3).
+  YouTube Partner Program: mass-produced, repetitive or template AI content is not
+  monetisable ("inauthentic content", 2025-07-15); each episode needs its own story.
+account_limits: Title 100 characters, description 5000 bytes, tags 500 characters, file up to 256 GB.
+appeal_process: YouTube Studio > Content > appeal; Partner Program appeals in Studio > Earn.
+requires_ai_label: true
+source_url: https://developers.google.com/youtube/v3/docs/videos/insert
+last_verified: 2026-10-05
