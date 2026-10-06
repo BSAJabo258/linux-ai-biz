@@ -3,7 +3,7 @@ Build a VirtualBox "test laptop" with both BAU sticks plugged in, so the whole t
 install can be rehearsed on this Windows computer before touching the real laptop.
 
   powershell -ExecutionPolicy Bypass -File vm\create-vm.ps1 [-Usb1 FILE.iso] [-Payload FILE.iso]
-                                                     [-Name BAU-Test] [-MemoryMB 8192] [-Cpus 4] [-DiskGB 60]
+                                                     [-Name BAU-Test] [-MemoryMB N] [-Cpus N] [-DiskGB 60]
 
 Without -Usb1/-Payload it looks for bau-debian-*.iso and BAU-PAYLOAD-*.iso (from the GitHub
 release) in the current folder and your Downloads folder, and checks them against
@@ -14,13 +14,24 @@ param(
   [string]$Usb1 = "",
   [string]$Payload = "",
   [string]$Name = "BAU-Test",
-  [int]$MemoryMB = 8192,
-  [int]$Cpus = 4,
+  [int]$MemoryMB = 0,      # 0 = half of this computer's RAM, 4-8 GB
+  [int]$Cpus = 0,          # 0 = half of this computer's cores, at most 4
   [int]$DiskGB = 60
 )
 $ErrorActionPreference = "Stop"
 
 function Die($msg) { Write-Host "create-vm: $msg" -ForegroundColor Red; exit 1 }
+
+# Size the VM from this computer so Windows keeps enough memory: a VM that takes too
+# much RAM makes the whole PC swap and freeze.
+$hostMB = [int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1MB)
+# At most 60% of RAM and at least 4 GB left for Windows (8 GB on a 12 GB PC froze it).
+$maxMB = [Math]::Max(2048, [int]([Math]::Floor([Math]::Min($hostMB * 0.6, $hostMB - 4096) / 1024) * 1024))
+if ($MemoryMB -le 0) { $MemoryMB = [Math]::Max(2048, [Math]::Min([Math]::Min(8192, $maxMB), [int]([Math]::Floor($hostMB / 2048) * 1024))) }
+if ($Cpus -le 0) { $Cpus = [Math]::Max(1, [Math]::Min(4, [int][Math]::Floor([Environment]::ProcessorCount / 2))) }
+if ($MemoryMB -gt $maxMB) {
+  Die "$MemoryMB MB for the VM is too much for this PC's $hostMB MB (Windows would freeze) - use -MemoryMB $maxMB or less"
+}
 
 $vbox = (Get-Command VBoxManage -ErrorAction SilentlyContinue).Source
 if (-not $vbox) {
@@ -66,7 +77,7 @@ $disk = Join-Path (Join-Path $base $Name) "$Name.vdi"
 
 VBox createvm --name $Name --ostype Debian_64 --register
 VBox modifyvm $Name --memory $MemoryMB --cpus $Cpus --firmware efi64 --graphicscontroller vmsvga `
-  --vram 128 --nic1 nat --boot1 dvd --boot2 disk --boot3 none --boot4 none
+  --vram 128 --nic1 nat --boot1 disk --boot2 dvd --boot3 none --boot4 none
 VBox createmedium disk --filename $disk --size ($DiskGB * 1024) --format VDI
 VBox storagectl $Name --name SATA --add sata --controller IntelAhci --portcount 3
 VBox storageattach $Name --storagectl SATA --port 0 --device 0 --type hdd --medium $disk

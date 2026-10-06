@@ -3,7 +3,7 @@
 # install can be rehearsed on this computer before touching the real laptop.
 #
 #   bash vm/create-vm.sh [--usb1 FILE.iso] [--payload FILE.iso] [--name BAU-Test]
-#                        [--memory-mb 8192] [--cpus 4] [--disk-gb 60]
+#                        [--memory-mb N] [--cpus N] [--disk-gb 60]
 #
 # Without --usb1/--payload it looks for bau-debian-*.iso and BAU-PAYLOAD-*.iso (from the
 # GitHub release) in the current folder and ~/Downloads, and checks them against
@@ -12,8 +12,8 @@
 set -euo pipefail
 
 NAME=BAU-Test
-MEM=8192
-CPUS=4
+MEM=0      # 0 = half of this computer's RAM, 4-8 GB
+CPUS=0     # 0 = half of this computer's cores, at most 4
 DISK_GB=60
 USB1=""
 PAYLOAD=""
@@ -31,6 +31,22 @@ while (($#)); do
 done
 
 die() { echo "create-vm: $*" >&2; exit 1; }
+# Size the VM from this computer so the host keeps enough memory: a VM that takes too
+# much RAM makes the whole computer swap and freeze.
+if [[ -r /proc/meminfo ]]; then host_mb=$(( $(awk '/^MemTotal:/ {print $2}' /proc/meminfo) / 1024 ))
+else host_mb=$(( $(sysctl -n hw.memsize) / 1048576 )); fi
+cores="$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+# At most 60% of RAM and at least 4 GB left for the computer itself.
+max_mb=$(( host_mb * 6 / 10 )); ((max_mb > host_mb - 4096)) && max_mb=$(( host_mb - 4096 ))
+max_mb=$(( max_mb - max_mb % 1024 )); ((max_mb < 2048)) && max_mb=2048
+if ((MEM <= 0)); then
+  MEM=$(( host_mb / 2 - (host_mb / 2) % 1024 )); ((MEM > 8192)) && MEM=8192
+  ((MEM > max_mb)) && MEM=$max_mb; ((MEM < 2048)) && MEM=2048
+fi
+if ((CPUS <= 0)); then CPUS=$(( cores / 2 )); ((CPUS < 1)) && CPUS=1; ((CPUS > 4)) && CPUS=4; fi
+if ((MEM > max_mb)); then
+  echo "create-vm: ${MEM} MB for the VM is too much for this computer's ${host_mb} MB (it would freeze) - use --memory-mb ${max_mb} or less" >&2; exit 1
+fi
 command -v VBoxManage >/dev/null || die "VirtualBox not found - install it from virtualbox.org"
 
 find_one() {  # newest file matching the pattern $1 in . or ~/Downloads
@@ -69,7 +85,7 @@ disk="$base/$NAME/$NAME.vdi"
 VBoxManage createvm --name "$NAME" --ostype Debian_64 --register
 VBoxManage modifyvm "$NAME" --memory "$MEM" --cpus "$CPUS" --firmware efi64 \
   --graphicscontroller vmsvga --vram 128 --nic1 nat \
-  --boot1 dvd --boot2 disk --boot3 none --boot4 none
+  --boot1 disk --boot2 dvd --boot3 none --boot4 none
 VBoxManage createmedium disk --filename "$disk" --size $((DISK_GB * 1024)) --format VDI
 VBoxManage storagectl "$NAME" --name SATA --add sata --controller IntelAhci --portcount 3
 VBoxManage storageattach "$NAME" --storagectl SATA --port 0 --device 0 --type hdd --medium "$disk"

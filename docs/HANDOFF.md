@@ -53,6 +53,9 @@ Then:
 - `powershell -ExecutionPolicy Bypass -File vm\create-vm.ps1` (Windows), or `bash vm/create-vm.sh`;
 - follow `vm/README.md`.
 
+The scripts size the VM from the host: half its RAM (2-8 GB), never more than 60% or leaving
+less than 4 GB, and half its cores (at most 4). A fixed 8 GB froze the owner's 12 GB PC.
+
 This is the **first real VirtualBox run**. Watch for these and fix anything that breaks in `vm/create-vm.*`:
 - `--firmware efi64`;
 - the SATA DVD attachments;
