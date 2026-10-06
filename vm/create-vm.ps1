@@ -27,7 +27,14 @@ function Die($msg) { Write-Host "create-vm: $msg" -ForegroundColor Red; exit 1 }
 
 # Size the VM from this computer so Windows keeps enough memory: a VM that takes too
 # much RAM makes the whole PC swap and freeze.
-$hostMB = [int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1MB)
+$computer = Get-CimInstance Win32_ComputerSystem
+$hostMB = [int]($computer.TotalPhysicalMemory / 1MB)
+# VirtualBox needs the CPU's virtualisation switched on in the BIOS/UEFI. With Hyper-V or
+# Memory integrity on, Windows owns it and reports HypervisorPresent instead.
+$cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+if (-not $cpu.VirtualizationFirmwareEnabled -and -not $computer.HypervisorPresent) {
+  Die "virtualisation is switched off in this PC's BIOS/UEFI. Turn on Intel VT-x (or AMD SVM), then run this again - see vm\README.md, 'Turn on virtualisation'"
+}
 # At most 60% of RAM and at least 4 GB left for Windows (8 GB on a 12 GB PC froze it).
 $maxMB = [Math]::Max(2048, [int]([Math]::Floor([Math]::Min($hostMB * 0.6, $hostMB - 4096) / 1024) * 1024))
 if ($MemoryMB -le 0) { $MemoryMB = [Math]::Max(2048, [Math]::Min([Math]::Min(8192, $maxMB), [int]([Math]::Floor($hostMB / 2048) * 1024))) }
