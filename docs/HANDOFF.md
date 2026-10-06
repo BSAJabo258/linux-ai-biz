@@ -55,6 +55,8 @@ Then:
 
 The scripts size the VM from the host: half its RAM (2-8 GB), never more than 60% or leaving
 less than 4 GB, and half its cores (at most 4). A fixed 8 GB froze the owner's 12 GB PC.
+Run on an existing VM, they resize it instead (asking before powering it off). VS Code task:
+*BAU: create or fix the test VM* (`.vscode/tasks.json`).
 
 This is the **first real VirtualBox run**. Watch for these and fix anything that breaks in `vm/create-vm.*`:
 - `--firmware efi64`;
