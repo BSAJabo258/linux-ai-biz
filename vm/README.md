@@ -4,7 +4,8 @@ A virtual machine (VM) is a pretend laptop inside your computer. Here you run th
 two-stick install in it, exactly as on the laptop, without wiping anything real.
 
 You need **VirtualBox 7** (free, virtualbox.org) on Windows, Linux or an Intel Mac, about
-**70 GB free disk** and **16 GB RAM** (the VM takes 8). On an Apple-silicon Mac (M1-M4),
+**70 GB free disk** and at least **8 GB RAM** (the VM takes half your RAM, up to 8 GB, so your
+computer keeps enough for itself). On an Apple-silicon Mac (M1-M4),
 use the Docker test drive instead (`docker/README.md`): VirtualBox can't run this kind of VM
 there.
 
@@ -32,7 +33,9 @@ bash vm/create-vm.sh
 ```
 
 The script finds both images, verifies their checksums, and creates a VM called
-**BAU-Test** (8 GB RAM, 4 CPUs, 60 GB disk, UEFI) with both "sticks" inserted. Options:
+**BAU-Test** (half your RAM up to 8 GB, half your CPU cores up to 4, 60 GB disk, UEFI)
+with both "sticks" inserted. It boots from its own disk first, so the installer stick only
+runs while that disk is empty. Options:
 `-MemoryMB`, `-Cpus`, `-DiskGB`, `-Name` (Windows) or `--memory-mb`, `--cpus`, `--disk-gb`,
 `--name` (Linux/Mac).
 
@@ -57,6 +60,24 @@ The script finds both images, verifies their checksums, and creates a VM called
 
 If all of that works in the VM, the real laptop will behave the same way. Afterwards the
 sticks can be put away: everything lives on the (virtual) disk.
+
+## If it seems frozen
+
+- **Black screen after boot:** it's waiting for the disk passphrase behind the logo. Click
+  the VM window, type the passphrase, press Enter (Esc shows the prompt).
+- **Very slow, green turtle icon in the VM's status bar (Windows):** Hyper-V is in the way.
+  Turn off Windows Security > Device security > Core isolation > **Memory integrity**,
+  restart the PC, try again.
+- **Whole PC freezes:** the VM has too much memory. Power it off, then BAU-Test >
+  Settings > System > Base Memory: at most half your PC's RAM (4096 MB on 8-12 GB PCs).
+- **Mouse or keyboard stuck in the VM:** press the **right Ctrl** key to release them.
+- **Grey or black screen after login:** Settings > Display > Graphics Controller
+  **VBoxSVGA** and tick **Enable 3D Acceleration**.
+- **Stuck at "Retrieving" / "Installing software":** the installer downloads packages;
+  20-40 minutes is normal. Check the PC is online.
+
+To stop a stuck VM without restarting the PC: close its window > **Power off the machine**
+(or end **VirtualBoxVM** in Task Manager).
 
 ## Start over
 
