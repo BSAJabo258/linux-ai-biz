@@ -9,6 +9,23 @@ computer keeps enough for itself). On an Apple-silicon Mac (M1-M4),
 use the Docker test drive instead (`docker/README.md`): VirtualBox can't run this kind of VM
 there.
 
+## 0. Turn on virtualisation (once)
+
+VirtualBox needs your processor's virtualisation switched on. Check: open **Task Manager >
+Performance > CPU** and look for **Virtualization: Enabled**. If it says **Disabled**:
+
+1. Save your work. In Windows: **Settings > System > Recovery > Advanced startup > Restart
+   now**, then **Troubleshoot > Advanced options > UEFI Firmware Settings > Restart**.
+   (Or press the setup key while the PC starts: usually **F2** or **Del**; **F10** on HP,
+   **F1** on Lenovo ThinkPad.)
+2. Find the setting, usually under **Advanced**, **CPU Configuration** or **Security**:
+   - Intel: **Intel Virtualization Technology** (VT-x or Intel VT)
+   - AMD: **SVM Mode** (or AMD-V)
+3. Set it to **Enabled**, then **Save & Exit** (usually **F10**). Windows starts as normal.
+
+Check Task Manager again: it should now say **Enabled**. The create-vm script also checks
+this and stops with this hint if it is still off. Leave the other firmware settings alone.
+
 ## 1. Download the two sticks
 
 From the repository's GitHub **Releases** page (or run *Actions > build-usb > Run
