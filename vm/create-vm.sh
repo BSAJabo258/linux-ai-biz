@@ -5,6 +5,9 @@
 #   bash vm/create-vm.sh [--usb1 FILE.iso] [--payload FILE.iso] [--name BAU-Test]
 #                        [--memory-mb N] [--cpus N] [--disk-gb 60]
 #
+# If the VM already exists, it is resized instead: safe memory and CPUs for this computer,
+# disk first in the boot order. Its disk and anything installed on it are kept.
+#
 # Without --usb1/--payload it looks for bau-debian-*.iso and BAU-PAYLOAD-*.iso (from the
 # GitHub release) in the current folder and ~/Downloads, and checks them against
 # SHA256SUMS.txt when that file sits next to them. Needs VirtualBox 7 on Linux or an
@@ -25,7 +28,7 @@ while (($#)); do
     --memory-mb) MEM=$2; shift 2 ;;
     --cpus) CPUS=$2; shift 2 ;;
     --disk-gb) DISK_GB=$2; shift 2 ;;
-    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) echo "unknown argument $1" >&2; exit 2 ;;
   esac
 done
@@ -48,6 +51,34 @@ if ((MEM > max_mb)); then
   echo "create-vm: ${MEM} MB for the VM is too much for this computer's ${host_mb} MB (it would freeze) - use --memory-mb ${max_mb} or less" >&2; exit 1
 fi
 command -v VBoxManage >/dev/null || die "VirtualBox not found - install it from virtualbox.org"
+ask() { local a; read -r -p "$1 (y/N) " a; [[ $a =~ ^[Yy]([Ee][Ss])?$ ]]; }
+
+if VBoxManage showvminfo "$NAME" >/dev/null 2>&1; then
+  # Fix the existing VM instead of building a new one; its disk is left alone.
+  state="$(VBoxManage showvminfo "$NAME" --machinereadable | sed -n 's/^VMState="\(.*\)"$/\1/p')"
+  case $state in
+    running|paused|stuck)
+      ask "$NAME is running. Power it off now to fix its memory? Unsaved work inside it is lost" ||
+        die "left $NAME as it is - shut it down, then run this again"
+      VBoxManage controlvm "$NAME" poweroff ||
+        die "could not power off $NAME - close its window, choose Power off, then run this again" ;;
+    saved)
+      ask "$NAME was saved while running. Discard that saved moment so its memory can be fixed? (like pulling the plug)" ||
+        die "left $NAME as it is - start it, shut it down from inside, then run this again"
+      VBoxManage discardstate "$NAME" ;;
+  esac
+  # Right after a power-off VirtualBox keeps the VM locked for a few seconds.
+  for ((i = 0; i < 15; i++)); do
+    VBoxManage modifyvm "$NAME" --memory "$MEM" --cpus "$CPUS" \
+      --boot1 disk --boot2 dvd --boot3 none --boot4 none && break
+    sleep 2
+  done
+  ((i < 15)) || die "could not change $NAME - close VirtualBox completely, then run this again"
+  echo
+  echo "VM \"$NAME\" fixed: ${MEM} MB RAM, ${CPUS} CPUs (safe for this computer's ${host_mb} MB). Its disk and everything installed are kept."
+  echo "Start it:   VBoxManage startvm \"$NAME\" --type gui     (or double-click it in VirtualBox)"
+  exit 0
+fi
 
 find_one() {  # newest file matching the pattern $1 in . or ~/Downloads
   local f="" c
@@ -76,9 +107,6 @@ for img in "$USB1" "$PAYLOAD"; do
   fi
 done
 
-if VBoxManage showvminfo "$NAME" >/dev/null 2>&1; then
-  die "a VM called $NAME already exists (delete it in VirtualBox or use --name)"
-fi
 base="$(VBoxManage list systemproperties | sed -n 's/^Default machine folder: *//p')"
 disk="$base/$NAME/$NAME.vdi"
 

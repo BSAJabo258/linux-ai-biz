@@ -32,12 +32,19 @@ Linux / Intel Mac:
 bash vm/create-vm.sh
 ```
 
+Or in VS Code: *Terminal > Run Task... > BAU: create or fix the test VM*.
+
 The script finds both images, verifies their checksums, and creates a VM called
 **BAU-Test** (half your RAM up to 8 GB, half your CPU cores up to 4, 60 GB disk, UEFI)
 with both "sticks" inserted. It boots from its own disk first, so the installer stick only
 runs while that disk is empty. Options:
 `-MemoryMB`, `-Cpus`, `-DiskGB`, `-Name` (Windows) or `--memory-mb`, `--cpus`, `--disk-gb`,
 `--name` (Linux/Mac).
+
+**Already made the VM?** Run the same command (or the same VS Code task). It sees that
+**BAU-Test** exists and fixes it instead: safe memory and CPUs for this computer, disk first.
+If the VM is running it asks before powering it off. Its disk and everything you installed
+are kept.
 
 ## 3. Install, exactly as on the laptop
 
@@ -68,8 +75,8 @@ sticks can be put away: everything lives on the (virtual) disk.
 - **Very slow, green turtle icon in the VM's status bar (Windows):** Hyper-V is in the way.
   Turn off Windows Security > Device security > Core isolation > **Memory integrity**,
   restart the PC, try again.
-- **Whole PC freezes:** the VM has too much memory. Power it off, then BAU-Test >
-  Settings > System > Base Memory: at most half your PC's RAM (4096 MB on 8-12 GB PCs).
+- **Whole PC freezes:** the VM has too much memory. Restart the PC if you have to, then run
+  the create-vm command (or VS Code task) again: it resizes BAU-Test to fit your PC.
 - **Mouse or keyboard stuck in the VM:** press the **right Ctrl** key to release them.
 - **Grey or black screen after login:** Settings > Display > Graphics Controller
   **VBoxSVGA** and tick **Enable 3D Acceleration**.

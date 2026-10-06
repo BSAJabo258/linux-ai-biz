@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "BAU: create or fix the test VM",
+      "detail": "Builds BAU-Test in VirtualBox, or resizes an existing one so this computer can't freeze",
+      "type": "shell",
+      "command": "bash vm/create-vm.sh",
+      "windows": {
+        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File vm\\create-vm.ps1"
+      },
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "focus": true, "panel": "dedicated" },
+      "problemMatcher": []
+    }
+  ]
+}

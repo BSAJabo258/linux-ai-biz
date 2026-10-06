@@ -5,6 +5,9 @@ install can be rehearsed on this Windows computer before touching the real lapto
   powershell -ExecutionPolicy Bypass -File vm\create-vm.ps1 [-Usb1 FILE.iso] [-Payload FILE.iso]
                                                      [-Name BAU-Test] [-MemoryMB N] [-Cpus N] [-DiskGB 60]
 
+If the VM already exists, it is resized instead: safe memory and CPUs for this PC, disk first
+in the boot order. Its disk and anything installed on it are kept.
+
 Without -Usb1/-Payload it looks for bau-debian-*.iso and BAU-PAYLOAD-*.iso (from the GitHub
 release) in the current folder and your Downloads folder, and checks them against
 SHA256SUMS.txt when that file sits next to them. Needs VirtualBox 7 (virtualbox.org) and
@@ -39,6 +42,41 @@ if (-not $vbox) {
   if (Test-Path $guess) { $vbox = $guess } else { Die "VirtualBox not found - install it from virtualbox.org" }
 }
 function VBox { & $vbox @args; if ($LASTEXITCODE -ne 0) { Die "VBoxManage $($args -join ' ') failed" } }
+# Windows PowerShell 5.1 turns a native command's error output into a terminating error
+# under "Stop", so probes and retries run with "Continue".
+function VBoxTry { $ErrorActionPreference = "Continue"; & $vbox @args | Out-Host; return $LASTEXITCODE }
+function Ask($question) { return (Read-Host "$question (y/N)") -match '^(y|yes)$' }
+
+$ErrorActionPreference = "Continue"
+$exists = (& $vbox list vms) -match ('^"' + [regex]::Escape($Name) + '" ')
+$ErrorActionPreference = "Stop"
+if ($exists) {
+  # Fix the existing VM instead of building a new one; its disk is left alone.
+  $ErrorActionPreference = "Continue"
+  $state = [string](& $vbox showvminfo $Name --machinereadable | Select-String '^VMState=').Line -replace '^VMState="?([^"]*)"?$', '$1'
+  $ErrorActionPreference = "Stop"
+  if ($state -in @("running", "paused", "stuck")) {
+    if (-not (Ask "$Name is running. Power it off now to fix its memory? Unsaved work inside it is lost")) {
+      Die "left $Name as it is - shut it down, then run this again"
+    }
+    if ((VBoxTry controlvm $Name poweroff) -ne 0) { Die "could not power off $Name - close its window, choose Power off, then run this again" }
+  } elseif ($state -eq "saved") {
+    if (-not (Ask "$Name was saved while running. Discard that saved moment so its memory can be fixed? (like pulling the plug)")) {
+      Die "left $Name as it is - start it, shut it down from inside, then run this again"
+    }
+    VBox discardstate $Name
+  }
+  # Right after a power-off VirtualBox keeps the VM locked for a few seconds.
+  for ($i = 0; $i -lt 15; $i++) {
+    if ((VBoxTry modifyvm $Name --memory $MemoryMB --cpus $Cpus --boot1 disk --boot2 dvd --boot3 none --boot4 none) -eq 0) { break }
+    Start-Sleep -Seconds 2
+  }
+  if ($i -eq 15) { Die "could not change $Name - close VirtualBox completely, then run this again" }
+  Write-Host ""
+  Write-Host "VM `"$Name`" fixed: $MemoryMB MB RAM, $Cpus CPUs (safe for this PC's $hostMB MB). Its disk and everything installed are kept." -ForegroundColor Green
+  Write-Host "Start it: double-click $Name in VirtualBox (or: VBoxManage startvm $Name --type gui)"
+  exit 0
+}
 
 function Find-One($pattern) {
   $places = @((Get-Location).Path, (Join-Path $env:USERPROFILE "Downloads"))
@@ -66,12 +104,6 @@ foreach ($img in @($Usb1, $Payload)) {
   }
 }
 
-# Windows PowerShell 5.1 turns a native command's error output into a terminating error
-# under "Stop", so this probe runs with "Continue".
-$ErrorActionPreference = "Continue"
-$exists = (& $vbox list vms) -match ('^"' + [regex]::Escape($Name) + '" ')
-$ErrorActionPreference = "Stop"
-if ($exists) { Die "a VM called $Name already exists (delete it in VirtualBox or use -Name)" }
 $base = ((& $vbox list systemproperties) | Select-String "^Default machine folder:").Line -replace "^Default machine folder:\s*", ""
 $disk = Join-Path (Join-Path $base $Name) "$Name.vdi"
 
