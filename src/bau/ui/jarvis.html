@@ -25,9 +25,9 @@ header .r{display:flex;gap:14px;align-items:center}
 .chip.warn{color:var(--amber);border-color:rgba(255,179,64,.5)}
 .chip.bad{color:var(--red);border-color:rgba(255,77,94,.5)}
 button.chip{background:none;color:inherit;font:inherit;cursor:pointer;letter-spacing:inherit;text-transform:inherit}
-#statelabel{position:fixed;left:50%;top:calc(50% + min(26vh,210px));transform:translateX(-50%);
+#statelabel{pointer-events:none;position:fixed;left:50%;top:calc(50% + min(26vh,210px));transform:translateX(-50%);
   font-size:12px;letter-spacing:.42em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
-#caption{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);width:min(760px,calc(100% - 32px));
+#caption{pointer-events:none;position:fixed;left:50%;bottom:118px;transform:translateX(-50%);width:min(760px,calc(100% - 32px));
   text-align:center;font-size:20px;line-height:1.4;color:#e8f8ff;text-shadow:0 0 18px rgba(63,214,255,.35);
   min-height:2.8em}
 #caption .you{color:var(--dim);font-size:15px;display:block;margin-bottom:6px}
@@ -76,8 +76,43 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:cente
 #cform label{display:block;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin:0 0 4px}
 #cform select{width:100%;margin:0 0 12px;background:#03101b;color:var(--ink);border:1px solid var(--line);padding:8px;font:inherit}
 #cnote{font-size:12px;color:var(--dim);margin:0 0 14px}#no{border:1px solid var(--dim);color:var(--ink)}
-@media (max-width:1100px){aside.r{display:none}}
-@media (max-width:760px){aside.l{display:none}.hint{display:none}header{padding:12px 16px;letter-spacing:.14em}header .r{gap:8px}#caption{font-size:17px;bottom:104px}#statelabel{top:calc(50% + 24vw)}}
+aside.r{display:none}body.showlog aside.r{display:block}
+#nodes{position:fixed;inset:0;pointer-events:none}
+.node{position:absolute;transform:translate(-50%,-50%);transition:left .4s,top .4s;pointer-events:auto;background:none;border:0;
+  color:var(--ink);font:inherit;font-size:14px;letter-spacing:.06em;cursor:pointer;display:flex;
+  align-items:center;gap:8px;padding:6px;white-space:nowrap}
+.node .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--cyan);flex:none;
+  box-shadow:0 0 10px rgba(63,214,255,.5);background:rgba(2,10,18,.8)}
+.node.left{flex-direction:row-reverse}
+.node.ok .dot{border-color:var(--green);box-shadow:0 0 10px rgba(70,242,164,.55)}
+.node.warn .dot{border-color:var(--amber);box-shadow:0 0 14px rgba(255,179,64,.7);animation:pulse 1.6s infinite}
+.node.bad .dot{border-color:var(--red);box-shadow:0 0 14px rgba(255,77,94,.7);animation:pulse 1s infinite}
+.node.idle .dot{border-color:var(--cyan);opacity:.75}
+.node.off{color:#3d6175}.node.off .dot{border:1px dashed #3d6175;box-shadow:none;width:12px;height:12px}
+.node.connector{font-size:12px}
+.node:hover .dot,.node.sel .dot{transform:scale(1.25)}.node.sel{color:#fff}
+@keyframes pulse{50%{box-shadow:0 0 2px rgba(255,179,64,.2)}}
+aside.l{display:none}aside.l.open{display:block}
+.panel .x{float:right;background:none;border:0;color:var(--dim);cursor:pointer;font:inherit;font-size:16px;line-height:1}
+.act{background:none;border:1px solid var(--cyan);color:var(--cyan);font:inherit;font-size:11px;
+  letter-spacing:.16em;text-transform:uppercase;padding:6px 10px;margin:6px 6px 0 0;cursor:pointer}
+.act.owner{border-color:var(--amber);color:var(--amber)}
+.act[disabled]{opacity:.35;cursor:wait}
+.ep{border-top:1px dashed rgba(80,200,255,.18);padding:8px 0 4px;margin-top:6px}
+.ep b{font-weight:600;font-size:13px}
+.st{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:1px 0}
+.st .s-checked{color:var(--green)}.st .s-drafted{color:var(--amber)}.st .s-waiting{color:#3d6175}
+.issue{color:var(--red);font-size:12px}
+code.cmd{display:block;background:#03101b;border:1px solid var(--line);padding:6px 8px;margin:4px 0;
+  font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);word-break:break-all;cursor:copy}
+@media (max-width:760px){
+  #nodes{position:fixed;inset:auto 0 auto 0;top:46px;height:auto;display:flex;gap:4px;overflow-x:auto;
+    padding:4px 10px;pointer-events:auto;scrollbar-width:none}
+  .node{position:static;transform:none;flex:none;font-size:12px;border:1px solid var(--line);
+    border-radius:14px;padding:4px 10px}.node.left{flex-direction:row}
+  .node .dot{width:10px;height:10px}
+  aside.l.open{left:8px;right:8px;width:auto;top:auto;bottom:96px;max-height:55vh;z-index:5}
+  .hint{display:none}header>div:first-child{white-space:nowrap}header .chip{padding:2px 6px;font-size:10px;letter-spacing:.08em}header{padding:12px 16px;letter-spacing:.14em}header .r{gap:8px}#caption{font-size:17px;bottom:104px}#statelabel{top:calc(50% + 24vw)}}
 </style>
 </head>
 <body>
@@ -88,9 +123,11 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:cente
   <div class="r">
     <span class="chip" id="c-mode">—</span>
     <span class="chip" id="c-hold" hidden>HOLD</span>
+    <button class="chip" id="c-log" title="Show the conversation log (L)">LOG</button>
     <button class="chip" id="c-mute" title="Mute voice (M)">VOICE ON</button>
   </div>
 </header>
+<div id="nodes"></div>
 <aside class="l" id="cards"></aside>
 <aside class="r" id="log"></aside>
 <div id="statelabel">STANDBY</div>
@@ -166,8 +203,10 @@ function frame(now) {
     const want = HUE[STATE]; for (let i = 0; i < 3; i++) col[i] += (want[i] - col[i]) * 0.08;
 
     cx.clearRect(0, 0, W, H);
-    const R = Math.min(W, H) * (W < 760 ? 0.2 : 0.16), X = W / 2, Y = H / 2 - (W < 760 ? 30 : 10);
+    offX += (offTarget - offX) * 0.12;
+    const { X, Y, R } = centre();
     const spin = STATE === "thinking" ? 3.2 : STATE === "listening" ? 1.6 : 1;
+    drawLinks(X, Y, R, now);
     // glow core
     const g = cx.createRadialGradient(X, Y, 0, X, Y, R * (0.95 + level * 0.5));
     g.addColorStop(0, rgba([235, 252, 255], 0.95)); g.addColorStop(0.18, rgba(col, 0.85));
@@ -281,7 +320,10 @@ function fmt(v) { if (v == null) return "—"; if (typeof v === "number") return
   if (typeof v === "boolean") return v ? "yes" : "no"; if (Array.isArray(v)) return v.map(fmt).join(", ");
   if (typeof v === "object") return Object.entries(v).filter(([, x]) => x).map(([k, x]) => k.toLowerCase() + " " + fmt(x)).join(" · ") || "none";
   return String(v); }
-function panel(title, cls) { const p = el("div", "panel " + (cls || "")); p.appendChild(el("h3", null, title)); return p; }
+function panel(title, cls) { const p = el("div", "panel " + (cls || "")), h = el("h3", null, title);
+  const x = el("button", "x", "×"); x.title = "Close";
+  x.onclick = () => { p.remove(); if (!$("cards").children.length) { $("cards").classList.remove("open"); drawerChanged(); } };
+  h.appendChild(x); p.appendChild(h); return p; }
 function kv(p, k, v) { const r = el("div", "kv"); r.appendChild(el("span", null, k)); r.appendChild(el("span", null, fmt(v))); p.appendChild(r); }
 function list(p, items) { if (!items || !items.length) return; const ul = el("ul");
   items.slice(0, 8).forEach(i => ul.appendChild(el("li", null, typeof i === "object" ? Object.values(i).map(fmt).join(" · ") : i)));
@@ -312,7 +354,9 @@ function renderCard(c) {
     }
     if ("hold" in d) holdChip(d.hold);
   } else { p = panel(t); p.appendChild(el("div", null, fmt(d))); }
-  const box = $("cards"); box.prepend(p);
+  const box = $("cards"); const d0 = $("detail");
+  if (d0) d0.after(p); else box.prepend(p);
+  box.classList.add("open"); drawerChanged();
   while (box.children.length > 6) box.lastChild.remove();
 }
 function holdChip(h) { const c = $("c-hold"); c.hidden = !h; c.className = "chip bad"; if (h) c.title = h; }
@@ -365,6 +409,7 @@ async function answer(approve) {
     const msg = !approve ? "Understood. I won't." : r.done ? "Done." : "That didn't go through: " + fmt((r.result || r).error || "unknown error");
     logLine("sys", (approve ? "Confirmed: " : "Declined: ") + item.tool);
     if (r.result) renderCard({ tool: item.tool, data: r.result });
+    loadNodes();
     caption(msg); logLine("jarvis", msg); setState("idle"); speak(msg);
   } catch (e) { caption(e.message); setState("idle"); }
   nextConfirm();
@@ -378,7 +423,7 @@ function handle(r, you) {
   caption(r.text, you); logLine("jarvis", r.text);
   paintState(r.state);
   if (r.pending && r.pending.length) queueConfirms(r.pending);
-  speak(r.text);
+  speak(r.text); loadNodes();
 }
 async function ask(text) {
   text = (text || "").trim(); if (!text || busy) return;
@@ -449,6 +494,125 @@ addEventListener("keydown", (e) => {
 addEventListener("keyup", (e) => { if (e.code === "Space" && document.activeElement !== $("text")) stopListening(); });
 $("c-mute").onclick = () => { muted = !muted; try { localStorage.setItem("jarvis-muted", muted ? "1" : "0"); } catch (e) {}
   paintMute(); if (muted) stopSpeaking(); };
+
+// ---------------------------------------------------------------- the constellation
+// One node per part of the business, built from what BAU really measures (/api/overview).
+let NODES = [], SEL = null, offX = 0, offTarget = 0;
+const STATE_COL = { ok: [70, 242, 164], warn: [255, 179, 64], bad: [255, 77, 94], idle: [63, 214, 255], off: [61, 97, 117] };
+function centre(target) { const R = Math.min(W, H) * (W < 760 ? 0.2 : 0.16);
+  return { X: W / 2 + (target ? offTarget : offX), Y: H / 2 - (W < 760 ? 30 : 10), R }; }
+// An open panel on the left slides the whole map right so no name hides behind it.
+function drawerChanged() { offTarget = $("cards").classList.contains("open") && W >= 1100 ? Math.min(170, W * 0.1) : 0; layoutNodes(); }
+function layoutNodes() {
+  if (W < 760) return;                    // phones: a scrolling strip under the header
+  const { X, Y, R } = centre(true);
+  const rx = Math.min(W * 0.36, R * 3.1), ry = Math.min(H * 0.34, R * 2.4);
+  const groups = { team: [], system: [], connector: [] };
+  NODES.forEach(n => (groups[n.group] || groups.team).push(n));
+  const place = (list, from, to, sx, sy, side) => list.forEach((n, i) => {
+    const a = (from + (to - from) * (list.length > 1 ? i / (list.length - 1) : 0.5)) * Math.PI / 180;
+    n.x = X + Math.cos(a) * rx * sx; n.y = Y + Math.sin(a) * ry * sy; n.side = side; });
+  place(groups.team, 232, 128, 1, 1, "left");            // the team on the left
+  place(groups.system, -34, 34, 0.8, 0.8, "right");      // BAU's own systems on the right
+  place(groups.connector, -62, 62, 1.12, 1.12, "right"); // outside connections, further out
+  for (const n of NODES) { const b = n.el; if (!b) continue;
+    b.style.left = n.x + "px"; b.style.top = n.y + "px"; b.classList.toggle("left", n.side === "left"); }
+}
+function drawLinks(X, Y, R, now) {
+  if (W < 760) return;
+  for (const n of NODES) {
+    if (n.x == null) continue;
+    const c = STATE_COL[n.state] || STATE_COL.idle, off = n.state === "off";
+    const mx = (X + n.x) / 2 + (n.y - Y) * 0.12, my = (Y + n.y) / 2 - (n.x - X) * 0.12;
+    cx.strokeStyle = rgba(c, off ? 0.12 : n === SEL ? 0.7 : 0.28); cx.lineWidth = n === SEL ? 1.6 : 1;
+    if (off) cx.setLineDash([3, 6]);
+    cx.beginPath(); cx.moveTo(X, Y); cx.quadraticCurveTo(mx, my, n.x, n.y); cx.stroke(); cx.setLineDash([]);
+    if (off) continue;
+    const t = ((now / (n.state === "warn" || n.state === "bad" ? 1400 : 2600)) + n.phase) % 1, u = 1 - t;
+    const px = u * u * X + 2 * u * t * mx + t * t * n.x, py = u * u * Y + 2 * u * t * my + t * t * n.y;
+    cx.fillStyle = rgba(c, 0.9); cx.beginPath(); cx.arc(px, py, 2, 0, 6.283); cx.fill();
+  }
+}
+async function loadNodes() {
+  try {
+    const o = await (await api("/api/overview")).json();
+    const box = $("nodes"), old = Object.fromEntries(NODES.map(n => [n.id, n]));
+    NODES = o.nodes.map(n => ({ ...n, el: old[n.id] && old[n.id].el, phase: old[n.id] ? old[n.id].phase : Math.random() }));
+    for (const n of NODES) {
+      if (!n.el) { n.el = el("button", "node"); n.el.appendChild(el("span", "dot")); n.el.appendChild(el("span", "lbl", n.label));
+        n.el.onclick = () => openNode(n.id); box.appendChild(n.el); }
+      n.el.className = "node " + n.group + " " + n.state + (SEL && SEL.id === n.id ? " sel" : "");
+      n.el.title = n.label + ": " + n.summary;
+    }
+    holdChip(o.hold);
+    layoutNodes();
+    if (SEL) { SEL = NODES.find(n => n.id === SEL.id) || null; if (SEL) showDetail(SEL); }
+  } catch (e) { /* the screen keeps working without the map */ }
+}
+addEventListener("resize", drawerChanged);
+function openNode(id) { const n = NODES.find(x => x.id === id); if (!n) return;
+  if (SEL === n && $("detail")) { closeDetail(); return; }
+  SEL = n; NODES.forEach(x => x.el && x.el.classList.toggle("sel", x === n)); showDetail(n); }
+function closeDetail() { SEL = null; const d = $("detail"); if (d) d.remove();
+  NODES.forEach(x => x.el && x.el.classList.remove("sel"));
+  if (!$("cards").children.length) $("cards").classList.remove("open"); drawerChanged(); }
+function cmd(p, text) { const c = el("code", "cmd", text); c.title = "Click to copy";
+  c.onclick = () => { try { navigator.clipboard.writeText(text); c.textContent = "copied ✓"; setTimeout(() => c.textContent = text, 1200); } catch (e) {} };
+  p.appendChild(c); }
+function button(p, label, fn, owner) { const b = el("button", "act" + (owner ? " owner" : ""), label);
+  b.onclick = async () => { b.disabled = true; try { await fn(); } finally { b.disabled = false; } }; p.appendChild(b); return b; }
+function showDetail(n) {
+  const cls = { ok: "ok", warn: "warn", bad: "bad" }[n.state] || "";
+  const p = panel(n.label, cls); p.id = "detail";
+  p.querySelector(".x").onclick = closeDetail;
+  p.appendChild(el("div", null, n.summary));
+  const d = n.detail;
+  if (n.id === "producer" && d) renderEpisodes(p, d.episodes);
+  else if (n.id === "models" && d) renderModels(p, d);
+  else if (d && d.error) p.appendChild(el("div", "issue", d.error));
+  else if (Array.isArray(d)) list(p, d.map(i => typeof i === "object" ? (i.title || i.objective || i.detail || Object.values(i).map(fmt).join(" · ")) : i));
+  else if (d && typeof d === "object") for (const [k, v] of Object.entries(d)) {
+    if (Array.isArray(v)) { if (v.length) { p.appendChild(el("div", null, k.replace(/_/g, " "))); list(p, v); } }
+    else if (v && typeof v === "object") kv(p, k.replace(/_/g, " "), v); else kv(p, k.replace(/_/g, " "), v); }
+  if (n.ask) button(p, "Ask Jarvis", () => ask(n.ask));
+  const box = $("cards"), old = $("detail"); if (old) old.replaceWith(p); else box.prepend(p);
+  box.classList.add("open"); drawerChanged();
+}
+function renderEpisodes(p, eps) {
+  if (!eps || !eps.length) { p.appendChild(el("div", null, "Start one in the terminal:"));
+    cmd(p, "bau ws create kids-channel"); cmd(p, 'bau ws episode kids-channel "your idea"'); return; }
+  for (const e of eps) {
+    const box = el("div", "ep"); box.appendChild(el("b", null, e.workspace + " · " + e.episode));
+    for (const s of e.stages) { const r = el("div", "st"); r.appendChild(el("span", null, s.stage));
+      const word = s.state.split(":")[0]; r.appendChild(el("span", "s-" + word.split(" ")[0], s.state)); box.appendChild(r);
+      for (const i of s.issues || []) box.appendChild(el("div", "issue", "⚠ " + i)); }
+    const nx = e.next;
+    if (nx && nx.action === "draft") button(box, "Draft step " + nx.stage, async () => {
+      setState("thinking"); caption("Drafting step " + nx.stage + "…");
+      const r = await (await api("/api/draft", { workspace: e.workspace, episode: e.episode })).json();
+      setState("idle");
+      const msg = r.error ? "That didn't work: " + fmt((r.result || {}).error) : "Step " + nx.stage + " is drafted. Read it, edit it if you like, then check it.";
+      caption(msg); logLine("jarvis", msg); if (!r.error) renderCard({ tool: "draft_stage", data: r.result }); loadNodes(); });
+    if (nx && nx.action === "check") button(box, "Read & check step " + nx.stage, async () => {
+      const r = await (await api("/api/check", { workspace: e.workspace, episode: e.episode, stage: nx.stage })).json();
+      if (r.error) { caption(r.error); logLine("sys", r.error); } else queueConfirms(r.pending); }, true);
+    if (nx && nx.action === "owner") box.appendChild(el("div", null, "Step " + nx.stage + " is yours: make the video, watch it all the way through, then queue it."));
+    if (!nx) box.appendChild(el("div", null, "Every step is checked."));
+    p.appendChild(box);
+  }
+}
+function renderModels(p, d) {
+  for (const m of d.models) kv(p, m.model, m.status + (m.tested === true ? " · tested ✓" : m.tested === false ? " · test failed" : ""));
+  if (!d.active) {
+    p.appendChild(el("div", null, "Turn one on yourself in the terminal: test it, then approve it. Approving stays a typed command on purpose: it's your signature, not a button."));
+    cmd(p, "bau models bench glm-4.7-flash-zai"); cmd(p, "bau set-status model glm-4.7-flash-zai APPROVED");
+    p.appendChild(el("div", null, "Then restart Jarvis (bau jarvis)."));
+  }
+}
+$("c-log").onclick = () => document.body.classList.toggle("showlog");
+addEventListener("keydown", (e) => { if ((e.key === "l" || e.key === "L") && document.activeElement !== $("text") && !$("confirm").classList.contains("show")) $("c-log").onclick(); });
+loadNodes();
+setInterval(() => { if (!busy && !document.hidden) loadNodes(); }, 30000);
 
 // ---------------------------------------------------------------- wake + briefing
 let woke = false;

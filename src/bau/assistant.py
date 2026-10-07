@@ -138,6 +138,11 @@ class Assistant:
         self.messages: list[dict[str, Any]] = []
         self.pending: dict[str, Pending] = {}
         self.tools = {t.name: t for t in self._tools()}
+        # Started only by the owner from the screen; never offered to a model.
+        self.owner_tools = {"check_stage": Tool(
+            "check_stage", "The owner checks a stage they have read.",
+            _schema({"workspace": {"type": "string"}, "episode": {"type": "string"},
+                     "stage": {"type": "string"}}), self.t_check_stage, kind="confirm")}
 
     # -------------------------------------------------------------- tools
     def _tools(self) -> list[Tool]:
@@ -322,6 +327,40 @@ class Assistant:
                 "status": "drafted; waiting for the owner to read it and run "
                           f"bau ws check {ws.name} {ep.name} {c.stage[:2]}"}
 
+    def stage_check(self, workspace: str, episode: str, stage: str) -> dict[str, Any]:
+        """Put the owner's check of one stage on their screen, showing what they are
+        checking. Raises WorkspaceError when there is nothing that could be checked."""
+        from . import workspace as W
+        ws = W.open_ws(workspace, self.home)
+        ep = W.find_episode(ws, episode)
+        hits = [c for c in W.contracts(ep) if c.stage[:2] == stage[:2]]
+        if len(hits) != 1:
+            raise W.WorkspaceError(f"no single stage {stage!r} in {ep.name}")
+        c = hits[0]
+        texts = []
+        for o in c.outputs:
+            f = c.out_dir / o
+            if not f.exists():
+                raise W.WorkspaceError(f"{c.stage}: {o} not written yet")
+            texts.append(f.read_text()[:3000])
+        issues = [i["detail"] for i in W.run_checks(ws, ep, c)]
+        if issues:
+            raise W.WorkspaceError(f"{c.stage}: fix these first: " + "; ".join(issues))
+        pid = "cf_" + secrets.token_hex(4)
+        args = {"workspace": ws.name, "episode": ep.name, "stage": c.stage[:2]}
+        summary = (f"Check {c.stage} of {ep.name}?\n{c.human_check}\n\n"
+                   + "\n\n".join(texts))
+        self.pending[pid] = Pending(pid, "check_stage", args, summary, _now())
+        return self.pending[pid].public()
+
+    def t_check_stage(self, workspace: str, episode: str, stage: str) -> dict[str, Any]:
+        from . import workspace as W
+        ws = W.open_ws(workspace, self.home)
+        ep = W.find_episode(ws, episode)
+        c = W.check(ws, ep, stage, self.owner, self.audit)
+        nxt = W.next_stage(ep)
+        return {"checked": c.stage, "next": nxt.stage if nxt else None}
+
     def t_hold(self, reason: str) -> dict[str, Any]:
         from .governor import Governor
         Governor(self.home, audit=self.audit, systemctl="").hold(
@@ -397,7 +436,8 @@ class Assistant:
                 {"type": "text", "text": "Understood, I won't do that."}]})
             return {"done": False}
         try:
-            out = self.tools[p.tool].fn(**p.args)
+            tool = self.tools.get(p.tool) or self.owner_tools[p.tool]
+            out = tool.fn(**p.args)
             ok = not (isinstance(out, dict) and out.get("error"))
         except Exception as e:
             out, ok = {"error": f"{type(e).__name__}: {e}"[:400]}, False

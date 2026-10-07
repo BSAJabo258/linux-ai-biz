@@ -132,6 +132,10 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     shutil.copyfileobj(f, self.wfile, 1024 * 1024)
             elif path == "/api/state":
                 self._json(200, self._state())
+            elif path == "/api/overview":
+                from ..overview import overview
+                with lock:
+                    self._json(200, overview(assistant))
             elif path == "/api/briefing":
                 with lock:
                     r = assistant.briefing()
@@ -175,6 +179,24 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                                             data.get("approve") is True, assistant.owner,
                                             choices if isinstance(choices, dict) else None)
                 self._json(200, {**out, "state": self._state()})
+            elif self.path == "/api/draft":
+                # The owner pressed Draft on an episode: the same act Jarvis may do.
+                with lock:
+                    out, err = assistant._run_tool("draft_stage", {
+                        "workspace": str(data.get("workspace", "")),
+                        "episode": str(data.get("episode", ""))})
+                self._json(200, {"result": out, "error": err})
+            elif self.path == "/api/check":
+                # Checking is the owner's: this only puts it on screen; Confirm does it.
+                from ..workspace import WorkspaceError
+                try:
+                    with lock:
+                        p = assistant.stage_check(str(data.get("workspace", "")),
+                                                  str(data.get("episode", "")),
+                                                  str(data.get("stage", "")))
+                    self._json(200, {"pending": [p]})
+                except WorkspaceError as e:
+                    self._json(200, {"error": str(e)[:400]})
             elif self.path == "/api/tts":
                 audio = voice.speak(str(data.get("text", ""))[:2500])
                 if audio is None:
