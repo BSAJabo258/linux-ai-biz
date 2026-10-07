@@ -6,7 +6,12 @@ on the laptop installed from the two USB sticks (see `docs/INSTALL.md`; ready-ma
 images are on the repository's **Releases** page).
 
 Mission Control opens automatically on port 8765 (the *Ports* tab, "Mission
-Control"). The port is private to your GitHub account by default - keep it that way.
+Control"). Jarvis uses port 8766. Both ports are private to your GitHub account by
+default - keep it that way.
+
+**Full model for free:** follow `docs/CLOUD-TEST.md` - a free Z.ai key saved as the
+Codespaces secret `ZAI_API_KEY`, then `bau models bench glm-4.7-flash-zai`, approve it,
+and `bau jarvis --no-browser`. Works from a computer or an iPhone.
 
 Try:
 
@@ -20,6 +25,7 @@ bau gateway                        # every capability an agent can ask for
 ```
 
 State lives in `/workspaces/.bau-home` (outside the repository, never committed).
-Do not put real customer data, API keys or approval keys in a Codespace.
-Free accounts get 120 core-hours a month; stop the Codespace when you are done
+Do not put real customer data or approval keys in a Codespace. API keys only through
+GitHub's Codespaces secrets (never in a file in the repository).
+Free accounts get 120 core-hours a month (about 60 hours on this 2-core machine); stop the Codespace when you are done
 (it also stops itself when idle).

@@ -63,16 +63,21 @@ TOOL_SPECS: dict[str, ToolSpec] = {
 
 
 def seed_registry(home: Path | None = None) -> None:
+    """Add shipped records the registry does not have yet. Records already there (and the
+    owner's approvals in them) are never changed."""
     reg = CapabilityRegistry((home or bau_home()) / "registry" / "capabilities.yaml")
-    if any(reg.data[k] for k in reg.data):
-        return
     seed = yaml.safe_load((shipped_data() / "registry_defaults.yaml").read_text())
     from .registry import REQUIRED
+    added = False
     for kind, recs in seed.items():
         for rec in recs.values():
-            reg.data[kind][rec[REQUIRED[kind][0]]] = rec
-    reg.path.parent.mkdir(parents=True, exist_ok=True)
-    reg.path.write_text(yaml.safe_dump(reg.data, sort_keys=True))
+            key = rec[REQUIRED[kind][0]]
+            if key not in reg.data[kind]:
+                reg.data[kind][key] = rec
+                added = True
+    if added or not reg.path.exists():
+        reg.path.parent.mkdir(parents=True, exist_ok=True)
+        reg.path.write_text(yaml.safe_dump(reg.data, sort_keys=True))
 
 
 def build_gateway(home: Path | None = None, trust=None) -> Gateway:

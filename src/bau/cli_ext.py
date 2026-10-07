@@ -61,7 +61,9 @@ def cmd_models(a):
               "ranked": [m["model_id"] for m in r.candidates], "rejected": r.rejected})
         return EXIT_OK if r.model or a.kind in ("format", "validate") else EXIT_BLOCKED
     elif a.models_cmd == "bench":
+        from .assistant import load_env_file
         from .models.bench import benchmark
+        load_env_file()                       # hosted models read their key from it
         rec = reg.data["model"].get(a.model)
         if rec is None:
             print(f"model {a.model} not registered", file=sys.stderr)
@@ -596,6 +598,10 @@ def cmd_jarvis(a):
     from .ui.jarvis_server import serve
     srv, key = serve(jv, Voice(), a.port)
     url = f"http://127.0.0.1:{a.port}/?k={key}"
+    if os.environ.get("CODESPACE_NAME"):      # GitHub Codespaces: the private forwarded port
+        url = (f"https://{os.environ['CODESPACE_NAME']}-{a.port}."
+               f"{os.environ.get('GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN', 'app.github.dev')}"
+               f"/?k={key}")
     mode = f"model {jv.model.get('id')}" if jv.provider else "plain mode (no model connected)"
     print(f"Jarvis is up ({mode}). Open: {url}\nCtrl+C to stop.", file=sys.stderr)
     if not a.no_browser:

@@ -12,6 +12,20 @@ provider:
     terms_url: https://www.anthropic.com/legal/commercial-terms
     dpa_signed: false
     status: REGISTERED
+  zai:
+    # Checked 2026-10-07 at docs.z.ai: operated by JINGSHENG HENGXING TECHNOLOGY PTE. LTD.
+    # from Singapore; the API data processing terms say API content is processed in real
+    # time and not saved on their servers. Training on API content is not stated either way.
+    provider_id: zai
+    data_sent: [Jarvis prompts, your messages, BAU status summaries and tool results]
+    data_retained: "API content processed in real time and not stored (Z.ai API terms); account and billing data kept per their privacy policy"
+    training_on_customer_data: not stated for the API
+    jurisdiction: SG
+    commercial_rights: GLM-4.7-Flash weights are MIT; API use per Z.ai terms of use
+    terms_url: https://docs.z.ai/legal-agreement/terms-of-use
+    privacy_url: https://docs.z.ai/legal-agreement/privacy-policy
+    dpa_signed: false
+    status: REGISTERED
   local:
     provider_id: local
     data_sent: [nothing leaves the machine]
@@ -87,6 +101,34 @@ model:
     input_types: [text]
     quality: 0.75
     latency_ms: 6000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+  glm-4.7-flash-zai:
+    model_id: glm-4.7-flash-zai
+    name: GLM-4.7-Flash, full model hosted by Z.ai (free API) - for testing on small machines
+    version: hosted
+    provider: zai
+    # Checked 2026-10-07 at docs.z.ai: GLM-4.7-Flash is listed "Free" for input and output;
+    # chat endpoint https://api.z.ai/api/paas/v4/chat/completions with a Bearer key;
+    # "thinking": {"type": "disabled"} turns reasoning off; function calling is supported.
+    source: Z.ai API (docs.z.ai)
+    license: MIT weights; Z.ai terms of use for the API
+    commercial_use: true
+    deployment: cloud
+    adapter: openai_compat
+    endpoint: https://api.z.ai/api/paas/v4
+    chat_path: /chat/completions
+    api_model: glm-4.7-flash
+    api_key_env: ZAI_API_KEY
+    extra_body: {thinking: {type: disabled}}
+    trust_level: OFFICIAL
+    privacy: cloud
+    context: 200000
+    tools: true
+    input_types: [text]
+    quality: 0.75
+    latency_ms: 4000
     cost_in_per_mtok: 0
     cost_out_per_mtok: 0
     status: REGISTERED

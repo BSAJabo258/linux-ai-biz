@@ -148,18 +148,24 @@ class LocalHTTPProvider(Provider):
 
     provider_id = "local"
 
+    chat_path = "/v1/chat/completions"
+
     def __init__(self, base_url: str = "http://127.0.0.1:8080", model: str = "local",
                  timeout: int = 600, opener: Any = None,
                  template_kwargs: dict[str, Any] | None = None):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.template_kwargs = template_kwargs or {}
+        self.extra_body: dict[str, Any] = {}
         self.timeout = timeout
         self._open = opener or urllib.request.urlopen
 
+    def _headers(self) -> dict[str, str]:
+        return {"Content-Type": "application/json"}
+
     def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         req = urllib.request.Request(self.base_url + path, data=json.dumps(body).encode(),
-                                     headers={"Content-Type": "application/json"})
+                                     headers=self._headers())
         with self._open(req, timeout=self.timeout) as r:
             return json.loads(r.read())
 
@@ -169,11 +175,12 @@ class LocalHTTPProvider(Provider):
                                 "max_tokens": max_tokens}
         if self.template_kwargs:     # e.g. {"enable_thinking": false} for GLM / Qwen3
             body["chat_template_kwargs"] = self.template_kwargs
+        body.update(self.extra_body)
         if tools:
             body["tools"] = [{"type": "function", "function": {
                 "name": t.name, "description": t.description,
                 "parameters": t.input_schema}} for t in tools]
-        data = self._post("/v1/chat/completions", body)
+        data = self._post(self.chat_path, body)
         choice = data["choices"][0]
         msg = choice["message"]
         calls = []
@@ -205,6 +212,27 @@ class LocalHTTPProvider(Provider):
             return {"ok": True, "models": [m.get("id") for m in models]}
         except (urllib.error.URLError, OSError, ValueError) as e:
             return {"ok": False, "error": str(e)[:200]}
+
+
+class OpenAICompatProvider(LocalHTTPProvider):
+    """A hosted OpenAI-compatible chat API (e.g. Z.ai). The key is read from the environment
+    variable the registry record names (never stored in the registry or the repository)."""
+
+    provider_id = "openai_compat"
+
+    def __init__(self, base_url: str, model: str, api_key: str, chat_path: str,
+                 extra_body: dict[str, Any] | None = None, timeout: int = 120,
+                 opener: Any = None):
+        super().__init__(base_url, model, timeout, opener)
+        self.api_key = api_key
+        self.chat_path = chat_path
+        self.extra_body = dict(extra_body or {})
+
+    def _headers(self) -> dict[str, str]:
+        return {"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"}
+
+    def health(self):
+        return {"ok": None, "note": "hosted model: checked on first call (bau models bench)"}
 
 
 # ------------------------------------------------------------------ scripted
@@ -255,6 +283,16 @@ def build(record: dict[str, Any]) -> Provider:
         return LocalHTTPProvider(base_url=local or record.get("endpoint", "http://127.0.0.1:8080"),
                                  model=record.get("api_model", record["model_id"]),
                                  template_kwargs=record.get("chat_template_kwargs"))
+    if kind == "openai_compat":
+        env = record.get("api_key_env", "")
+        key = os.environ.get(env, "") if env else ""
+        if not key:
+            raise PermissionError(f"{record['model_id']} needs its API key in {env or '?'}")
+        return OpenAICompatProvider(base_url=record["endpoint"],
+                                    model=record.get("api_model", record["model_id"]),
+                                    api_key=key, chat_path=record.get("chat_path",
+                                                                      "/v1/chat/completions"),
+                                    extra_body=record.get("extra_body"))
     if kind == "scripted":
         return ScriptedProvider(list(record.get("script", [])))
     raise ValueError(f"unknown adapter {kind}")
