@@ -53,6 +53,42 @@ BOOT USB → UNLOCK (passphrase) → DESKTOP → NETWORK → JARVIS SETUP
 → ASK A QUESTION → ANSWER → REMEMBER → REBOOT → MEMORY STILL THERE
 ```
 
+## Architecture principle: structure before frameworks (ICM)
+
+Since 2026-10-07 the plan follows **Interpretable Context Methodology**: folder structure as
+agent architecture. Sources: Van Clief & McDermott, arXiv:2603.16021, MIT licence, and
+github.com/RinDig/icm-architect. The paper is a design proposal; we treat it as design
+discipline, not measured performance.
+
+The idea is that, for sequential, human-checked, repeatable work, one agent walking
+well-made folders does what a multi-agent framework would:
+
+- numbered stage folders carry the order;
+- each stage's `CONTEXT.md` names exactly which files it reads;
+- outputs are plain files the owner edits before the next stage reads them.
+
+Most of BAU's business is that kind of work: episodes, books, client deliverables.
+
+How this changes the plan:
+
+- **Factories become ICM workspaces first** (`bau ws`, `src/bau/workspace.py`). The
+  pilot is the kids channel (`data/workspaces/kids-channel/`). The owner's check on each
+  stage is recorded with a SHA-256 of the output, so editing afterwards voids it. Kids
+  rules run on the stages that list them, and every draft and check is in the audit chain.
+- **Small and free models become useful.** A stage loads about 2k-8k tokens, so a step
+  fits Qwen-1.5B's 8k context or a free hosted model. A stage that would overflow the
+  model is refused, never silently cut.
+- **Several spec "engines" are structures, not new software.** Missions become a record
+  library. The question graph and evidence become a knowledge bundle with typed
+  frontmatter. Skills become workspaces and templates.
+- **Frameworks only where ICM honestly loses:** real-time loops (God's Eye watching
+  live), many users at once (the public product), and the system branching on its own
+  mid-run. Hermes, OpenHands and LiteLLM come in for those cases, not by default.
+
+What ICM doesn't replace in BAU: the signed approvals, the tamper-evident audit chain,
+the locked core (no agent edits `_shared/`, policies or regulations), and `untrusted()`
+wrapping of anything from outside.
+
 ## Build order from here (spec §87)
 
 Each phase is one pull request with tests, and is boot-tested where it touches the image.
@@ -60,13 +96,14 @@ Each phase is one pull request with tests, and is boot-tested where it touches t
 | Phase | Content | Notes |
 |---|---|---|
 | 0-3 | Repository, base image, encrypted persistence, system tools | **Done in MVP #1** (main stays protected by PR + CI) |
-| 4 | Hermes as executive, behind an adapter (`upstream/` pinned by commit, licence recorded) | Verify Hermes' current repo, licence and install path first |
+| 4 | **ICM workspaces** (structure before frameworks): `bau ws`, kids-channel pilot; then the other factories (faceless media, books, digital assets) as workspaces | **Pilot done 2026-10-07.** Next: run real episodes with the free Z.ai model, then convert the next factory |
+| 4b | Hermes as executive, behind an adapter (`upstream/` pinned by commit, licence recorded) | Only for what workspaces can't do (live loops, concurrency). Verify Hermes' repo and licence first |
 | 5 | MCP Memory Service, provenance fields, memory firewall (trust score, then validation, then persist) | Extends the Second Brain; nothing auto-trusted |
 | 6 | LiteLLM gateway in front of the existing router | Router stays replaceable; routing decisions logged |
 | 7 | MCP servers with explicit capability profiles (default DENY) | Uses the existing `mcp` registry kind |
 | 8 | God's Eye: wider observation, event records (§21), "green means verified" | Grows from the Governor |
 | 9 | OpenHands engineering worker in a sandbox; PRs only, never push to main | GitHub-hosted or ephemeral runners, never this laptop as a public runner |
-| 10 | Question Engine, Evidence Engine, Capability Registry, Repo Scout | Discovery ≠ installation |
+| 10 | Question graph and evidence as a knowledge-bundle workspace; Capability Registry; Repo Scout | Structure first (ICM); discovery ≠ installation |
 | 11 | Self-Lab: trajectories, regression database, challenge generator, promotion gates | |
 | 12 | AMD Developer Cloud worker (ROCm + vLLM, one model, one benchmark), create-run-destroy discipline | Read credit terms from the AMD dashboard, never hard-code them |
 | 13 | Model training (LoRA/QLoRA, DPO …) | Only with enough trajectories and benchmarks |
