@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -228,11 +229,55 @@ class OpenAICompatProvider(LocalHTTPProvider):
         self.chat_path = chat_path
         self.extra_body = dict(extra_body or {})
 
+    # Free hosted tiers answer 429 "overloaded" when busy (Z.ai error 1305, seen on the
+    # first real bench 2026-10-07: four busy replies, then success). Wait and try again
+    # rather than fail the owner's conversation; give up with the service's own words.
+    BUSY = (429, 502, 503, 504)
+    waits = (5, 10, 20, 40)
+    sleep = staticmethod(time.sleep)
+
     def _headers(self) -> dict[str, str]:
         return {"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"}
 
+    def _post(self, path, body):
+        for attempt in range(len(self.waits) + 1):
+            try:
+                return super()._post(path, body)
+            except urllib.error.HTTPError as e:
+                said = _service_message(e)
+                if e.code not in self.BUSY:
+                    raise ProviderError(f"{self.base_url} refused the request "
+                                        f"(HTTP {e.code}): {said}") from None
+                if attempt == len(self.waits):
+                    raise ProviderError(f"{self.base_url} is busy (HTTP {e.code}): {said}. "
+                                        "Free services get crowded; try again in a few "
+                                        "minutes.") from None
+                self.sleep(_retry_after(e, self.waits[attempt]))
+        raise AssertionError("unreachable")
+
     def health(self):
         return {"ok": None, "note": "hosted model: checked on first call (bau models bench)"}
+
+
+class ProviderError(RuntimeError):
+    """A hosted model refused or stayed busy; the message is safe to show the owner."""
+
+
+def _service_message(e: urllib.error.HTTPError) -> str:
+    try:
+        data = json.loads(e.read() or b"{}")
+        err = data.get("error") if isinstance(data, dict) else None
+        msg = err.get("message") if isinstance(err, dict) else err
+        return str(msg or e.reason)[:200]
+    except (ValueError, OSError, AttributeError):
+        return str(e.reason)[:200]
+
+
+def _retry_after(e: urllib.error.HTTPError, default: int) -> int:
+    try:
+        return max(1, min(60, int(e.headers.get("Retry-After", default))))
+    except (TypeError, ValueError, AttributeError):
+        return default
 
 
 # ------------------------------------------------------------------ scripted
