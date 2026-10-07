@@ -63,6 +63,11 @@ BAU checks that the model really answers and can use a tool. If it shows
 bau set-status model glm-4.7-flash-zai APPROVED
 ```
 
+If it says **busy** or **overloaded**, Z.ai's free service is crowded. BAU already waits and
+tries again for about a minute and a half; if it still gives up, run the bench again in a few
+minutes. (On the first real test, 7 October 2026, it took about five minutes to get through.)
+If it says **refused (HTTP 401)**, the key is wrong: check the secret.
+
 ## 5. Talk to Jarvis
 
 In the terminal:

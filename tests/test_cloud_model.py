@@ -123,3 +123,47 @@ def test_jarvis_prints_the_private_codespace_link(monkeypatch, capsys, tmp_path)
         jv_cmd, text, port, no_browser = None, False, 8766, True
     assert cli_ext.cmd_jarvis(A()) == 0
     assert "https://fuzzy-train-8766.app.github.dev/?k=KEY" in capsys.readouterr().err
+
+
+def _busy(code, body):
+    import io
+    import urllib.error
+    return urllib.error.HTTPError("https://api.z.ai/x", code, "Too Many Requests", {},
+                                  io.BytesIO(body))
+
+
+def test_busy_free_service_is_retried_then_answers(monkeypatch):
+    monkeypatch.setenv("ZAI_API_KEY", "test-key-123")
+    prov = build(defaults()["model"]["glm-4.7-flash-zai"])
+    ok, waited = FakeAPI(), []
+    replies = [_busy(429, b'{"error":{"code":"1305","message":"overloaded"}}')] * 2
+
+    def flaky(req, timeout=0):
+        if replies:
+            raise replies.pop()
+        return ok(req, timeout)
+    prov._open, prov.sleep = flaky, waited.append
+    assert prov.complete("Be brief.", [{"role": "user", "content": "Hi"}]).text == "Hello! Teal."
+    assert waited == [5, 10]
+
+
+def test_busy_too_long_or_refused_shows_the_service_message_not_the_key(monkeypatch):
+    from bau.models.providers import ProviderError
+    monkeypatch.setenv("ZAI_API_KEY", "test-key-123")
+    prov = build(defaults()["model"]["glm-4.7-flash-zai"])
+    waited = []
+
+    def busy(req, timeout=0):
+        raise _busy(429, b'{"error":{"code":"1305","message":"The service may be '
+                         b'temporarily overloaded"}}')
+    prov._open, prov.sleep = busy, waited.append
+    with pytest.raises(ProviderError, match="busy .*temporarily overloaded.*try again") as e:
+        prov.complete("s", [{"role": "user", "content": "Hi"}])
+    assert len(waited) == 4 and "test-key-123" not in str(e.value)
+
+    def refused(req, timeout=0):
+        raise _busy(401, b'{"error":{"code":"1000","message":"Authentication failed"}}')
+    prov._open, waited[:] = refused, []
+    with pytest.raises(ProviderError, match="HTTP 401.*Authentication failed"):
+        prov.complete("s", [{"role": "user", "content": "Hi"}])
+    assert waited == []                                     # a wrong key is not retried
