@@ -14,11 +14,17 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 188 tests pass; 49 regulations / 65 policies validate.
+State: 195 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
 Phase 4 (Hermes behind an adapter).
+
+The owner's PC (12 GB, virtualisation off) can't run the full model, so testing runs in the
+cloud for free (`docs/CLOUD-TEST.md`): GitHub Codespaces runs BAU, and Z.ai's free hosted
+GLM-4.7-Flash (`glm-4.7-flash-zai`, adapter `openai_compat`, key in `ZAI_API_KEY`) is
+Jarvis's model. Tested against a stand-in server only; the first real call is the owner's
+`bau models bench glm-4.7-flash-zai`.
 
 ## What was verified, and how
 

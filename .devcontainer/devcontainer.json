@@ -9,13 +9,16 @@
     "BAU_HOME": "/workspaces/.bau-home"
   },
   "remoteEnv": {
-    "BAU_UI_ALLOWED_HOSTS": "${containerEnv:CODESPACE_NAME}-8765.${containerEnv:GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+    "BAU_UI_ALLOWED_HOSTS": "${containerEnv:CODESPACE_NAME}-8765.${containerEnv:GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN},${containerEnv:CODESPACE_NAME}-8766.${containerEnv:GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
-  "postStartCommand": "nohup bau ui --port 8765 > /tmp/bau-ui.log 2>&1 &",
-  "forwardPorts": [8765],
+  // bau init adds newly shipped registry records (your approvals are kept).
+  "postStartCommand": "bau init >/dev/null; nohup bau ui --port 8765 > /tmp/bau-ui.log 2>&1 &",
+  // Both ports stay private: only your GitHub login can open them (computer or phone).
+  "forwardPorts": [8765, 8766],
   "portsAttributes": {
-    "8765": { "label": "Mission Control", "onAutoForward": "openBrowser" }
+    "8765": { "label": "Mission Control", "onAutoForward": "openBrowser" },
+    "8766": { "label": "Jarvis", "onAutoForward": "notify" }
   },
   "customizations": {
     "codespaces": { "openFiles": [".devcontainer/README.md"] }
