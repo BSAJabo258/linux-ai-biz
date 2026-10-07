@@ -708,12 +708,13 @@ class Voice:
 
 def build_assistant(home: Path | None = None, owner: str = "human:owner") -> Assistant:
     """Pick the model from config/jarvis.yaml (default Claude Opus), falling back to the
-    free local GLM-4.7-Flash, then any other local model, then plain mode. Only APPROVED
-    models are used."""
+    free local GLM-4.7-Flash, the small Qwen2.5-1.5B (8 GB machines), then any other local
+    model, then plain mode. Only APPROVED models are used."""
     from .runtime import provider_for
     home = home or bau_home()
     cfg = YamlStore(home / "config" / "jarvis.yaml").load() or {}
-    for mid in [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "local-llm"]:
+    for mid in [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "qwen2.5-1.5b-instruct",
+                "local-llm"]:
         if not mid:
             continue
         try:

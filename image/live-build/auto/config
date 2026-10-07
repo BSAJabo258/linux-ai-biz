@@ -1,0 +1,31 @@
+#!/bin/sh
+# live-build configuration for the My Jarvis live USB (Debian 13 "trixie", amd64).
+# Run by `lb config`; image/build-live.sh does that for you.
+set -e
+
+# Boot parameters for the normal entry:
+#   persistence-encryption=lukslabel  only open a LUKS container labelled "persistence"
+#                                     (never other encrypted disks, never plain storage)
+#   username / hostname               the owner's account and the machine name
+# Bootloaders: GRUB (with the My Jarvis menu) on UEFI PCs, syslinux on old BIOS-only PCs.
+# syslinux also makes xorriso use -partition_offset 16: partition 1 is then a mountable
+# copy of the system, so live-boot mounts that partition instead of the whole stick and
+# the encrypted partition next to it can be opened (a mounted whole disk locks them all).
+lb config noauto \
+  --distribution trixie \
+  --architectures amd64 \
+  --archive-areas "main contrib non-free non-free-firmware" \
+  --binary-images iso-hybrid \
+  --bootloaders "syslinux,grub-efi" \
+  --debian-installer none \
+  --firmware-binary false \
+  --firmware-chroot false \
+  --security true \
+  --updates true \
+  --apt-recommends false \
+  --memtest none \
+  --iso-application "My Jarvis" \
+  --iso-publisher "BAUBSA" \
+  --iso-volume "MYJARVIS" \
+  --bootappend-live "boot=live components persistence persistence-encryption=lukslabel username=jarvis hostname=my-jarvis locales=en_US.UTF-8 keyboard-layouts=us quiet splash" \
+  "${@}"

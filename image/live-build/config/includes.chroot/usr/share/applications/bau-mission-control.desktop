@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Mission Control
+Comment=BAU dashboard (read-only, this computer only)
+Exec=firefox-esr http://127.0.0.1:8765/
+Terminal=false
+Icon=utilities-system-monitor
+Categories=Office;Utility;

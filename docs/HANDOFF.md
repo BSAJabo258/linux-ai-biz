@@ -1,4 +1,4 @@
-# Handoff: BAU/BSA - state on 2026-10-05
+# Handoff: BAU/BSA - state on 2026-10-07
 
 For Claude Code in VS Code on the owner's computer, picking up from the cloud session that
 built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be broken.
@@ -11,10 +11,34 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #5 | Jarvis: spoken briefing, conversation with memory, tools, owner-confirmed actions, voice HUD (`bau jarvis`) |
 | #6 | Publishing hub (`publishing.py`) with TikTok + YouTube adapters; made-for-kids rules (`kids.py`, `policies/kids_content.yaml`); `kids_channel` factory |
 | #7 | Docker test drive, VirtualBox rehearsal scripts (`vm/`), GLM-4.7-Flash free local fallback, `bau models bench` |
+| #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
+| next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 172 tests pass; 49 regulations / 65 policies validate. Main = `619fa73`.
+State: 188 tests pass; 49 regulations / 65 policies validate.
+
+The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
+spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
+Phase 4 (Hermes behind an adapter).
 
 ## What was verified, and how
+
+- **My Jarvis live USB (MVP #1), 2026-10-07:** `my-jarvis-0.1.0-amd64.iso` (910 MB) was
+  written to a 16 GB raw disk attached to QEMU as a USB stick.
+  - UEFI (OVMF) boot shows the My Jarvis GRUB menu.
+  - First boot came up in LIMITED mode, with nothing private created.
+  - `jarvis-storage setup` added a 15.1 GB LUKS2 `persistence` partition after the system.
+  - Restart: live-boot asked "Please unlock disk", then PRIVATE mode. `/etc/bau` and
+    `/var/lib/bau` came from the encrypted container, keys were made on the machine,
+    and Mission Control returned 200.
+  - `bau models fetch` verified the SHA-256.
+  - The image's llama.cpp served Qwen2.5-1.5B inside the VM, and `bau models bench`
+    gave reply_ok and tool_calls. It was then approved.
+  - Jarvis was told a fact. After a restart and unlock, asked for it, he answered
+    correctly ("Teal").
+  - Caveat: the cloud VM has no KVM, so its CPU is emulated at about 0.4 token/s. The
+    two Jarvis conversations therefore used the same llama.cpp build and model on the
+    host (`BAU_LLM_ENDPOINT`). On a real 8 GB PC the model runs in the image itself.
+  - Not yet tried on physical hardware or a real USB stick.
 
 - **Real install:** USB #1 + USB #2 in a QEMU/OVMF VM (cloud). That covered:
   - UEFI boot, LUKS unlock, `install.sh` exit 0, services up;

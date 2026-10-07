@@ -1,0 +1,16 @@
+[Unit]
+Description=My Jarvis: PRIVATE (encrypted storage unlocked) or LIMITED mode
+After=local-fs.target live-config.service
+# Before any login (console or desktop): the owner's BAU group membership must exist
+# when their session starts.
+Before=systemd-user-sessions.service display-manager.service
+Before=bau-recover.service bau-ui.service bau-llm.service
+Before=bau-governor.timer bau-regwatch.timer
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/bau-live-init
+
+[Install]
+WantedBy=multi-user.target

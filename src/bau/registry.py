@@ -8,6 +8,7 @@ capabilities may be routed to.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -75,6 +76,14 @@ def validate(kind: str, rec: dict[str, Any]) -> list[str]:
                 and rec.get("status") in ROUTABLE:
             errs.append("its last benchmark produced no answer: fix the model server and "
                         "run `bau models bench` again")
+        dl = rec.get("download")
+        if dl is not None:
+            if not str(dl.get("url", "")).startswith("https://"):
+                errs.append("download.url must be https")
+            if not re.fullmatch(r"[0-9a-f]{64}", str(dl.get("sha256", ""))):
+                errs.append("download.sha256 must be the file's 64-character SHA-256")
+            if not re.fullmatch(r"[\w.-]+", str(dl.get("file", ""))):
+                errs.append("download.file must be a plain file name")
     if kind == "agent" and "root" in (rec.get("permissions") or []):
         errs.append("no agent receives root (spec §7)")
     return errs

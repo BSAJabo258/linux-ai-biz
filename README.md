@@ -35,6 +35,14 @@ python3 -m pytest -q                       # full test suite
 
 To use Claude models: `pip install 'bau[claude]'`, sign in (`ant auth login` or `ANTHROPIC_API_KEY`), then approve the model yourself: `bau set-status model claude-opus-5-5 APPROVED`. For the offline laptop install, use `installer/make-payload.sh --with-claude`.
 
+## My Jarvis live USB (boot and run from one stick)
+
+```bash
+bash image/build-live.sh                     # Debian 13 live system + BAU + llama.cpp -> dist/my-jarvis-*.iso
+```
+
+Write the ISO to a USB stick (balenaEtcher, or Rufus in DD mode), start any 8 GB PC from it, and follow **[docs/LIVE-USB.md](docs/LIVE-USB.md)**: encrypted storage on the stick, a small local model you approve, Jarvis. How the *My Jarvis OS* spec maps onto this repository, and the build order: **[docs/MY-JARVIS.md](docs/MY-JARVIS.md)**.
+
 ## Install on the laptop (two USB sticks)
 
 ```bash
@@ -53,6 +61,8 @@ Then follow **[docs/INSTALL.md](docs/INSTALL.md)** in order: audit, backup and v
 | [docs/EMAIL_AND_MESSAGING_COMPLIANCE.md](docs/EMAIL_AND_MESSAGING_COMPLIANCE.md) | The exact order every commercial email and marketing text goes through, and what you must set up |
 | [docs/REGULATORY_STATUS.md](docs/REGULATORY_STATUS.md) | What changed in the law through 2026-10-04, with sources |
 | [docs/INSTALL.md](docs/INSTALL.md) | Phase-by-phase install runbook |
+| [docs/LIVE-USB.md](docs/LIVE-USB.md) | My Jarvis live USB: write, boot, encrypted storage, local model |
+| [docs/MY-JARVIS.md](docs/MY-JARVIS.md) | My Jarvis OS spec mapped onto this code, and the phase-by-phase build order |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the spec maps onto the code; decision model; identities |
 | [docs/spec/BAU_MASTER_SPEC.md](docs/spec/BAU_MASTER_SPEC.md) | The master specification (v1.0) |
 

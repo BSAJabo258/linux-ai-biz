@@ -90,6 +90,34 @@ model:
     cost_in_per_mtok: 0
     cost_out_per_mtok: 0
     status: REGISTERED
+  qwen2.5-1.5b-instruct:
+    model_id: qwen2.5-1.5b-instruct
+    name: Qwen2.5-1.5B-Instruct - small local model for 8 GB machines (no GPU) via llama.cpp
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-07: official GGUF from the Qwen team, Apache-2.0 (README front matter).
+    source: huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen2.5-1.5b-instruct
+    download:
+      url: https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf
+      file: qwen2.5-1.5b-instruct-q4_k_m.gguf
+      size: 1117320736
+      sha256: 6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e
+    trust_level: QUANTIZED
+    privacy: local
+    context: 8192
+    tools: true
+    input_types: [text]
+    quality: 0.5
+    latency_ms: 4000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
   k3:
     model_id: k3
     name: K3 local intelligence reserve (spec §6)

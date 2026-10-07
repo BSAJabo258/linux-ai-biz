@@ -78,6 +78,29 @@ def cmd_models(a):
                            "tool_calls": res["tool_calls"]})
         _out(res)
         return EXIT_OK if res["reply_ok"] else EXIT_BLOCKED
+    elif a.models_cmd == "fetch":
+        from .models.fetch import FetchError, fetch
+        rec = reg.data["model"].get(a.model)
+        if rec is None:
+            print(f"model {a.model} not registered", file=sys.stderr)
+            return EXIT_ERROR
+        last = [-1]
+
+        def progress(done: int, total: int) -> None:
+            pct = done * 100 // total if total else 0
+            if pct != last[0] and sys.stderr.isatty():
+                last[0] = pct
+                print(f"\r{done >> 20} MB of {total >> 20} MB ({pct}%)", end="",
+                      file=sys.stderr)
+        try:
+            path = fetch(rec, Path(a.dir) if a.dir else bau_home() / "models", progress=progress)
+        except FetchError as e:
+            print(f"\n{e}", file=sys.stderr)
+            return EXIT_BLOCKED
+        AuditLog().append("model.fetched", f"human:{getpass.getuser()}",
+                          {"model": a.model, "sha256": rec["download"]["sha256"]})
+        _out({"model": a.model, "file": str(path), "sha256": rec["download"]["sha256"],
+              "next": f"start the model server, then: bau models bench {a.model}"})
     elif a.models_cmd == "health":
         from .models.providers import build
         out = {}
@@ -846,6 +869,10 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = ms.add_parser("bench", help="measure a model on this machine (required before a "
                       "local model can be approved)")
     x.add_argument("model")
+    x = ms.add_parser("fetch", help="download a registered model file, verified against "
+                      "its pinned SHA-256 (resumes if interrupted)")
+    x.add_argument("model")
+    x.add_argument("--dir", help="where to save it (default BAU_HOME/models)")
     x = ms.add_parser("route")
     x.add_argument("kind")
     x.add_argument("--data", action="append")

@@ -16,10 +16,11 @@ stand and what is next.
 | `src/bau/brain.py` | Second Brain (Markdown vault, nouns + verbs graph) |
 | `src/bau/models/` | providers (Claude, llama.cpp), router, `bench.py` |
 | `installer/` | USB #1 image builder, USB #2 payload (`make-payload.sh`), `payload/install.sh` |
+| `image/`, `src/bau/live.py` | My Jarvis live USB: `build-live.sh` (Debian Live + BAU + llama.cpp), `live-build/` config, `jarvis-storage` (encrypted persistence); see `docs/MY-JARVIS.md` |
 | `Dockerfile`, `docker-compose.yml`, `docker/` | test drive in containers |
 | `vm/` | VirtualBox rehearsal scripts (`create-vm.ps1`, `create-vm.sh`) |
-| `docs/` | `INSTALL.md` (owner guide), `ARCHITECTURE.md`, `HANDOFF.md` |
-| `tests/` | pytest suite (172 tests) |
+| `docs/` | `INSTALL.md` (owner guide), `LIVE-USB.md`, `MY-JARVIS.md` (spec + build order), `ARCHITECTURE.md`, `HANDOFF.md` |
+| `tests/` | pytest suite |
 
 ## Commands
 
@@ -29,8 +30,9 @@ python3 -m pytest -q                      # all tests (~30 s)
 ruff check .                              # lint (line length 100)
 bau reg validate                          # regulations + policies cross-check
 bau secrets .                             # secret scan (CI runs it)
-shellcheck -x installer/*.sh installer/lib/*.sh installer/payload/*.sh installer/firstboot/*.sh docker/*.sh vm/*.sh
+shellcheck -x installer/*.sh installer/lib/*.sh installer/payload/*.sh installer/firstboot/*.sh docker/*.sh vm/*.sh image/*.sh
 bash installer/make-payload.sh --skip-tests --out /tmp/pl   # build USB #2
+bash image/build-live.sh --out /tmp/live                    # live USB image (Docker, ~15 GB disk)
 docker compose up -d --build                                # test drive: http://localhost:8765
 ```
 

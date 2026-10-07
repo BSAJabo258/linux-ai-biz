@@ -1,0 +1,57 @@
+#!/bin/bash
+# Every boot of the My Jarvis live USB: decide PRIVATE or LIMITED mode.
+#
+# PRIVATE: the encrypted storage is unlocked. BAU's keys are created here on the first
+#   private boot (on the owner's machine, inside the encrypted storage, never in the
+#   image), state is initialised once, and the BAU services may start.
+# LIMITED: no encrypted storage. Nothing private is created anywhere (there is nowhere
+#   safe to keep it); BAU services stay off and jarvis-setup offers to create the storage.
+set -euo pipefail
+
+RUN=/run/bau-live
+install -d -m 0755 "${RUN}"
+rm -f "${RUN}/private" "${RUN}/mode"
+
+if ! /usr/local/bin/jarvis-storage status >/dev/null 2>&1; then
+  echo LIMITED > "${RUN}/mode"
+  echo "bau-live-init: LIMITED mode (no encrypted storage unlocked)"
+  exit 0
+fi
+
+install -d -m 0750 -o root -g bau /etc/bau
+install -d -m 2770 -o bau -g bau /var/lib/bau
+umask 077
+for k in audit.key unsubscribe.key; do
+  if [[ ! -s /etc/bau/${k} ]]; then
+    head -c 48 /dev/urandom | base64 > "/etc/bau/${k}"
+    echo "bau-live-init: created /etc/bau/${k}"
+  fi
+  chown root:bau "/etc/bau/${k}"
+  chmod 0640 "/etc/bau/${k}"
+done
+umask 022
+touch /etc/bau/allowed_signers
+chown root:bau /etc/bau/allowed_signers
+chmod 0644 /etc/bau/allowed_signers
+
+bau_as() { runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key "$@"; }
+if [[ ! -e /var/lib/bau/.live-initialised ]]; then
+  bau_as /usr/local/bin/bau init >/dev/null
+  bau_as /usr/local/bin/bau brain import >/dev/null
+  touch /var/lib/bau/.live-initialised
+  echo "bau-live-init: BAU state initialised in the encrypted storage"
+fi
+
+# live-config recreates the owner's account at every boot: restore BAU group membership.
+owner="$(getent passwd 1000 | cut -d: -f1 || true)"
+if [[ -n "${owner}" ]]; then
+  usermod -aG bau,bau-approvers "${owner}"
+fi
+if id -nG bau | tr ' ' '\n' | grep -qx bau-approvers; then
+  echo "bau-live-init: service account 'bau' must not be an approver" >&2
+  exit 1
+fi
+
+touch "${RUN}/private"
+echo PRIVATE > "${RUN}/mode"
+echo "bau-live-init: PRIVATE mode (encrypted storage unlocked)"

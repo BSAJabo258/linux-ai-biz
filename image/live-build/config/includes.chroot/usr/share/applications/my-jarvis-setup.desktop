@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=My Jarvis Setup
+Comment=Encrypted storage, local model, approval: one step at a time
+Exec=jarvis-setup
+Terminal=true
+Icon=system-run
+Categories=System;Settings;

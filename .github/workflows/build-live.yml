@@ -1,0 +1,61 @@
+name: build-live
+
+# Builds the My Jarvis live USB image (Debian 13 live system with BAU, llama.cpp and the
+# encrypted-storage setup) and publishes it as a release. See docs/LIVE-USB.md.
+# Run it from Actions > build-live > "Run workflow", or by pushing a tag live-v*.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["live-v*"]
+
+permissions:
+  contents: write          # create the release; nothing else
+
+concurrency:
+  group: build-live
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: make room (the image build needs about 15 GB)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: tools
+        run: python -m pip install -q -e '.[dev]'
+      - name: build the image (tests and secret scan run first)
+        run: bash image/build-live.sh --out dist
+      - name: notes
+        id: meta
+        run: |
+          cd dist
+          iso="$(ls my-jarvis-*-amd64.iso)"
+          tag="live-v$(cat ../image/VERSION)-${GITHUB_SHA::7}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          {
+            echo "Built from commit ${GITHUB_SHA} on $(date -u +%Y-%m-%d)."
+            echo
+            echo "\`${iso}\`: the My Jarvis live USB. Write it to a USB stick (16 GB+) with balenaEtcher, or Rufus in **DD Image mode**, and follow docs/LIVE-USB.md."
+            echo "The \`.manifest.json\` lists what is inside (Debian packages, kernel, llama.cpp commit, BAU commit)."
+            echo
+            echo '```'
+            cat "${iso}.sha256"
+            echo '```'
+          } > NOTES.md
+      - name: publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.meta.outputs.tag }}" \
+            dist/my-jarvis-*-amd64.iso dist/my-jarvis-*-amd64.iso.sha256 \
+            dist/my-jarvis-*-amd64.manifest.json \
+            --title "My Jarvis live USB (${{ steps.meta.outputs.tag }})" \
+            --notes-file dist/NOTES.md --target "${GITHUB_SHA}"

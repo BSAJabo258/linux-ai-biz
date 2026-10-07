@@ -1,0 +1,27 @@
+[Unit]
+Description=My Jarvis local model (llama.cpp llama-server on 127.0.0.1:8080)
+ConditionPathExists=/etc/bau/llm.env
+
+[Service]
+User=bau
+Group=bau
+# BAU_LLM_MODEL (path to the .gguf) and BAU_LLM_ALIAS, written by jarvis-setup.
+EnvironmentFile=/etc/bau/llm.env
+Environment=LD_LIBRARY_PATH=/opt/llama.cpp
+ExecStart=/opt/llama.cpp/llama-server --model ${BAU_LLM_MODEL} --alias ${BAU_LLM_ALIAS} \
+  --jinja --host 127.0.0.1 --port 8080 --ctx-size 8192 --no-webui
+Restart=on-failure
+RestartSec=5
+UMask=0007
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/var/lib/bau
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

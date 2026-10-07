@@ -1,0 +1,47 @@
+#!/bin/sh
+# Install the BAU control plane into the live image (runs inside the image's chroot while
+# it is built). No keys or personal data are created here: those are made on the owner's
+# machine, inside the encrypted storage, by bau-live-init at the first private boot.
+set -eu
+
+getent group bau >/dev/null || groupadd --system bau
+getent group bau-approvers >/dev/null || groupadd --system bau-approvers
+id bau >/dev/null 2>&1 || useradd --system --gid bau --home-dir /var/lib/bau \
+  --shell /usr/sbin/nologin --comment "BAU agents (no approval rights)" bau
+
+python3 -m venv --system-site-packages /opt/bau/venv
+/opt/bau/venv/bin/pip install --quiet --no-index --no-deps /opt/bau/wheels/bau-*.whl
+rm -rf /opt/bau/wheels
+ln -sf /opt/bau/venv/bin/bau /usr/local/bin/bau
+ln -sf /opt/bau/venv/bin/jarvis-storage /usr/local/bin/jarvis-storage
+cat > /etc/profile.d/bau.sh <<'EOF'
+export BAU_HOME=/var/lib/bau
+export BAU_AUDIT_KEY=/etc/bau/audit.key
+export BAU_ALLOWED_SIGNERS=/etc/bau/allowed_signers
+EOF
+
+# Host protections from the laptop install (firewall default-deny inbound, sysctl, NTS time).
+P=/opt/bau/payload
+install -m 0644 "$P/hardening/nftables.conf" /etc/nftables.conf
+install -m 0644 "$P/hardening/99-bau-sysctl.conf" /etc/sysctl.d/99-bau.conf
+install -d /etc/chrony/conf.d
+install -m 0644 "$P/hardening/bau-nts.conf" /etc/chrony/conf.d/bau-nts.conf
+systemctl enable nftables.service apparmor.service chrony.service
+
+# BAU services: the laptop's units, started only when the encrypted storage is unlocked
+# (the drop-ins add ConditionPathExists=/run/bau-live/private).
+install -m 0644 "$P"/systemd/*.service "$P"/systemd/*.timer /etc/systemd/system/
+for u in bau-recover.service bau-ui.service bau-governor.service bau-regwatch.service \
+         bau-llm.service; do
+  install -d "/etc/systemd/system/$u.d"
+  cat > "/etc/systemd/system/$u.d/live.conf" <<'EOF'
+[Unit]
+ConditionPathExists=/run/bau-live/private
+After=bau-live-init.service
+EOF
+done
+systemctl enable bau-live-init.service bau-recover.service bau-ui.service bau-llm.service \
+  bau-governor.timer bau-regwatch.timer
+
+chmod 0755 /usr/local/sbin/bau-live-init /usr/local/bin/jarvis-setup /opt/llama.cpp/llama-server
+LD_LIBRARY_PATH=/opt/llama.cpp /opt/llama.cpp/llama-server --version
