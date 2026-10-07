@@ -18,9 +18,15 @@ testing. Don't put real customer data, passwords or approval keys into a test dr
 
 ## 1. Get your free Z.ai key (once)
 
-1. Go to **z.ai**, create an account and sign in.
-2. Open **API Keys** (in your account menu), create a key and copy it. It looks like a
-   long line of letters and numbers. Keep it private, like a password.
+Z.ai sells a monthly **GLM Coding Plan** (from about $18/month). **You don't need it: don't
+buy it.** The free part is their pay-per-use **API**, where GLM-4.7-Flash costs $0.
+
+1. Go to **z.ai**, create an account (email) and sign in.
+2. Go straight to **z.ai/manage-apikey/apikey-list** (or your picture, top right >
+   **API Keys**). Click **Create API Key** and copy it. It looks like a long line of
+   letters and numbers. Keep it private, like a password.
+3. No payment or balance is needed for GLM-4.7-Flash. If the page asks you to pay before
+   it makes a key, stop: the model is no longer free there.
 
 ## 2. Give the key to your Codespace (once)
 
