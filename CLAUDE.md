@@ -12,6 +12,7 @@ stand and what is next.
 | `src/bau/` | the package. `cli.py` + `cli_ext.py` = the `bau` command; `policy.py`/`regulations.py` = rule engine; `data/` = regulations, policies, factories, registry defaults |
 | `src/bau/assistant.py`, `ui/jarvis_server.py`, `ui/jarvis.html` | Jarvis: briefing, conversation, tools, voice HUD |
 | `src/bau/publishing.py` | publishing hub; platforms are adapters (`tiktok.py`, `youtube.py`); `kids.py` = made-for-kids rules |
+| `src/bau/workspace.py`, `data/workspaces/` | ICM workspaces (`bau ws`): numbered stage folders one agent walks, owner checks each stage; kids-channel pilot |
 | `src/bau/governor.py` | watchdog (hold / quarantine / resume, never approves) |
 | `src/bau/brain.py` | Second Brain (Markdown vault, nouns + verbs graph) |
 | `src/bau/models/` | providers (Claude, llama.cpp, hosted OpenAI-compatible e.g. Z.ai), router, `bench.py`, `fetch.py` |
@@ -19,7 +20,7 @@ stand and what is next.
 | `image/`, `src/bau/live.py` | My Jarvis live USB: `build-live.sh` (Debian Live + BAU + llama.cpp), `live-build/` config, `jarvis-storage` (encrypted persistence); see `docs/MY-JARVIS.md` |
 | `Dockerfile`, `docker-compose.yml`, `docker/` | test drive in containers |
 | `vm/` | VirtualBox rehearsal scripts (`create-vm.ps1`, `create-vm.sh`) |
-| `docs/` | `INSTALL.md` (owner guide), `LIVE-USB.md`, `CLOUD-TEST.md` (free Codespaces + Z.ai), `MY-JARVIS.md` (spec + build order), `ARCHITECTURE.md`, `HANDOFF.md` |
+| `docs/` | `INSTALL.md` (owner guide), `LIVE-USB.md`, `CLOUD-TEST.md` (free Codespaces + Z.ai), `WORKSPACES.md`, `MY-JARVIS.md` (spec + build order), `ARCHITECTURE.md`, `HANDOFF.md` |
 | `tests/` | pytest suite |
 
 ## Commands

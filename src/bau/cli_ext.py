@@ -306,6 +306,53 @@ def cmd_spatial(a):
 
 # ------------------------------------------------------------------ business
 
+def cmd_ws(a):
+    from . import workspace as W
+    try:
+        if a.ws_cmd == "templates":
+            _out(W.templates())
+        elif a.ws_cmd == "create":
+            ws = W.create(a.template, a.name)
+            _out({"workspace": str(ws), "next": f"fill in {ws / '_shared' / 'series-bible.md'} "
+                  f"(questions in setup/questionnaire.md), then: bau ws episode {ws.name} "
+                  '"your idea"'})
+        elif a.ws_cmd == "episode":
+            ws = W.open_ws(a.name)
+            ep = W.new_episode(ws, a.idea)
+            _out({"episode": ep.name, "next": f"bau ws run {ws.name} {ep.name}"})
+        elif a.ws_cmd == "status":
+            ws = W.open_ws(a.name)
+            eps = [W.find_episode(ws, a.episode)] if a.episode else W.episodes(ws)
+            _out({ep.name: W.status(ws, ep) for ep in eps})
+        elif a.ws_cmd == "run":
+            from .assistant import load_env_file, pick_model
+            ws = W.open_ws(a.name)
+            ep = W.find_episode(ws, a.episode)
+            load_env_file()
+            provider, rec = pick_model()
+            if provider is None:
+                print("no approved model: bench and approve one first (bau models bench ...)",
+                      file=sys.stderr)
+                return EXIT_BLOCKED
+            c, out = W.draft(ws, ep, provider, rec, AuditLog())
+            _out({"stage": c.stage, "draft": str(out), "model": rec["id"],
+                  "issues": [i["detail"] for i in W.run_checks(ws, ep, c)],
+                  "your_check": c.human_check,
+                  "next": f"read and edit it, then: bau ws check {ws.name} {ep.name} "
+                          f"{c.stage[:2]}"})
+        elif a.ws_cmd == "check":
+            ws = W.open_ws(a.name)
+            ep = W.find_episode(ws, a.episode)
+            c = W.check(ws, ep, a.stage, _human(), AuditLog())
+            nxt = W.next_stage(ep)
+            _out({"checked": c.stage, "next": (f"bau ws run {ws.name} {ep.name}" if nxt and
+                                               nxt.agent else nxt.stage if nxt else "done")})
+    except W.WorkspaceError as e:
+        print(f"ws: {e}", file=sys.stderr)
+        return EXIT_BLOCKED
+    return EXIT_OK
+
+
 def cmd_factory(a):
     from .factories import Activation, definitions
     if a.fac_cmd == "list":
@@ -989,6 +1036,28 @@ def register(sub: argparse._SubParsersAction) -> None:
                    metavar=("LAMIN", "LOMIN", "LAMAX", "LOMAX"))
     x.add_argument("--out")
     s.set_defaults(fn=cmd_spatial)
+
+    s = sub.add_parser("ws", help="ICM workspaces: folder pipelines one agent walks, "
+                       "the owner checks each stage")
+    w = s.add_subparsers(dest="ws_cmd", required=True)
+    w.add_parser("templates", help="workspaces BAU ships")
+    x = w.add_parser("create", help="make a workspace from a template (once)")
+    x.add_argument("template")
+    x.add_argument("--name", help="folder name (default: the template's)")
+    x = w.add_parser("episode", help="start a new run (an episode) from the template")
+    x.add_argument("name")
+    x.add_argument("idea")
+    x = w.add_parser("status", help="every stage: checked, drafted, ready, waiting")
+    x.add_argument("name")
+    x.add_argument("episode", nargs="?")
+    x = w.add_parser("run", help="draft the next stage with the approved model")
+    x.add_argument("name")
+    x.add_argument("episode")
+    x = w.add_parser("check", help="owner: I read (and edited) this stage's output")
+    x.add_argument("name")
+    x.add_argument("episode")
+    x.add_argument("stage", help="stage number or name, e.g. 02")
+    s.set_defaults(fn=cmd_ws)
 
     s = sub.add_parser("factory", help="business factories")
     fs = s.add_subparsers(dest="fac_cmd", required=True)
