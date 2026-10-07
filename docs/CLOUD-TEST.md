@@ -81,6 +81,19 @@ Jarvis prints a private link starting with `https://...-8766.app.github.dev/?k=`
 **Jarvis**, or copy the link). Tap to wake Jarvis, then talk or type. Confirmations
 appear in the terminal and in the page: they're yours to make.
 
+Around Jarvis are the parts of your business, each a dot you can click: the team on the
+left (Chief of staff, Producer, Publisher, Strategist, Researcher, Compliance, Finance,
+Watchdog), BAU's own systems on the right (Models, Memory, Audit), and outside connections
+further out (YouTube, TikTok; Email, Drive, Calendar and CRM are not connected yet). Green
+means checked and fine, amber means something waits for you, red means broken or missing,
+dashed means not connected. Every colour comes from BAU's real records; nothing is green
+just to look good.
+
+Click **Producer** to walk an episode without the terminal: **Draft step 01** has the model
+write it; **Read & check step 01** shows you the draft and waits for your **Confirm**. Only
+your click checks a step; Jarvis can't. Approving a model stays a typed command on purpose
+(the Models panel shows it, click to copy). **LOG** at the top shows the conversation.
+
 **Mission Control** is the **Ports** tab > **Mission Control** (port 8765).
 
 ## Who can open these links

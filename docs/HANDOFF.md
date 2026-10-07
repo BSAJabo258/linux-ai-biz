@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 207 tests pass; 49 regulations / 65 policies validate.
+State: 212 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -29,6 +29,12 @@ Jarvis's model. First real bench on 2026-10-07 (owner's PC, WSL): `reply_ok` and
 `tool_calls` true, about 3 s per reply, after four "429 overloaded" replies from Z.ai. The
 provider now waits and retries busy replies (5, 10, 20, 40 s) and shows the service's own
 message. The owner still has to bench and approve it in their codespace.
+
+The Jarvis screen (`ui/jarvis.html`, data from `overview.py` via `/api/overview`) shows the
+business as live nodes around the core (team, systems, connections). Producer walks
+episodes with buttons: Draft (`/api/draft`, the same act Jarvis may do) and Read & check
+(`/api/check` stages an owner-only `check_stage` card in `Assistant.owner_tools`, never
+offered to a model; Confirm runs it). Model approval stays a typed command.
 
 ## What was verified, and how
 
