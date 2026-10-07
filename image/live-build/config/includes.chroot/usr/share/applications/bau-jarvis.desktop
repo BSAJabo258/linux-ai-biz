@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=BAU Jarvis
+Comment=Talk to Jarvis: briefing, conversation, actions you confirm
+Exec=sh -c 'umask 007; . /etc/profile.d/bau.sh; exec bau jarvis'
+Terminal=true
+Icon=utilities-terminal
+Categories=Office;Utility;

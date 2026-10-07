@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=My Jarvis Setup
+Comment=Opens until encrypted storage and the local model are ready
+Exec=sh -c '[ -f /var/lib/bau/models/qwen2.5-1.5b-instruct-q4_k_m.gguf ] && grep -qx PRIVATE /run/bau-live/mode || exec xfce4-terminal --title "My Jarvis Setup" -x jarvis-setup'
+Terminal=false
+X-GNOME-Autostart-enabled=true

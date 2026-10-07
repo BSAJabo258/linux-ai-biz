@@ -28,6 +28,11 @@ jobs:
       - name: tests
         run: python -m pytest -q
       - name: shellcheck installer
-        run: shellcheck -x installer/*.sh installer/lib/*.sh installer/payload/*.sh installer/firstboot/*.sh docker/*.sh vm/*.sh
+        run: >-
+          shellcheck -x installer/*.sh installer/lib/*.sh installer/payload/*.sh
+          installer/firstboot/*.sh docker/*.sh vm/*.sh image/*.sh image/live-build/auto/config
+          image/live-build/config/hooks/live/*.chroot
+          image/live-build/config/includes.chroot/usr/local/sbin/bau-live-init
+          image/live-build/config/includes.chroot/usr/local/bin/jarvis-setup
       - name: build payload
         run: installer/make-payload.sh --skip-tests

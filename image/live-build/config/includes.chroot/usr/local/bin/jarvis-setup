@@ -1,0 +1,84 @@
+#!/bin/bash
+# My Jarvis first-time setup, one question at a time. Safe to run again at any point:
+# it only does the steps that are still missing.
+#   1. encrypted private storage (on the USB)   -> restart
+#   2. the local model (download, checked)      -> start it
+#   3. measure it on this computer               -> you approve it (or not)
+#   4. start Jarvis
+set -uo pipefail
+
+MODEL=qwen2.5-1.5b-instruct
+FILE=qwen2.5-1.5b-instruct-q4_k_m.gguf
+export BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
+  BAU_ALLOWED_SIGNERS=/etc/bau/allowed_signers
+umask 007
+
+say() { printf '\n== %s\n' "$*"; }
+ask() { local a; read -r -p "$1 [y/N] " a; [[ ${a} =~ ^[Yy] ]]; }
+pause() { read -r -p "Press Enter to close." _; }
+
+say "My Jarvis setup"
+if ! jarvis-storage status; then
+  cat <<'EOF'
+
+Nothing you do is saved yet: there is no encrypted storage. Setup creates it in the
+free space on this USB (nothing on the USB or the computer is deleted) and protects it
+with a passphrase you choose. You type that passphrase each time My Jarvis starts.
+EOF
+  if ask "Create the encrypted storage now?"; then
+    if sudo jarvis-storage setup && ask "Restart now to unlock it?"; then
+      sudo systemctl reboot
+    fi
+  fi
+  pause; exit 0
+fi
+
+if ! id -nG | tr ' ' '\n' | grep -qx bau; then
+  echo "Your account is not in the 'bau' group yet: log out and back in, then run this again."
+  pause; exit 1
+fi
+
+if [[ ! -f ${BAU_HOME}/models/${FILE} ]]; then
+  say "Local model"
+  echo "Jarvis needs a small AI model that runs on this computer (1.1 GB download,"
+  echo "Qwen2.5-1.5B-Instruct, Apache-2.0). It is checked against a pinned SHA-256."
+  ask "Download it now?" || { pause; exit 0; }
+  bau models fetch "${MODEL}" || { echo "Download failed: run jarvis-setup again to resume."; pause; exit 1; }
+fi
+
+if [[ ! -f /etc/bau/llm.env ]]; then
+  printf 'BAU_LLM_MODEL=%s\nBAU_LLM_ALIAS=%s\n' "${BAU_HOME}/models/${FILE}" "${MODEL}" \
+    | sudo tee /etc/bau/llm.env >/dev/null
+  sudo chown root:bau /etc/bau/llm.env && sudo chmod 0640 /etc/bau/llm.env
+fi
+if ! systemctl is-active --quiet bau-llm.service; then
+  echo "Starting the local model..."
+  sudo systemctl restart bau-llm.service
+fi
+for _ in $(seq 60); do
+  curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1 && break
+  sleep 2
+done
+curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1 \
+  || { echo "The model server did not start: journalctl -u bau-llm"; pause; exit 1; }
+
+status="$(bau models list | python3 -c 'import json,sys
+print(next((m["status"] for m in json.load(sys.stdin) if m["model_id"]==sys.argv[1]),""))' "${MODEL}")"
+if [[ ${status} != APPROVED ]]; then
+  say "Measure the model on this computer"
+  if ! bau models bench "${MODEL}"; then
+    echo "The model did not answer properly, so it cannot be approved."; pause; exit 1
+  fi
+  echo
+  echo "Above: how fast it is here and whether it answered and used a tool."
+  if ask "Approve ${MODEL} for Jarvis on this machine?"; then
+    bau set-status model "${MODEL}" APPROVED || { pause; exit 1; }
+  else
+    echo "Not approved: Jarvis stays in basic mode."
+  fi
+fi
+
+say "Ready"
+if ask "Talk to Jarvis now?"; then
+  exec bau jarvis
+fi

@@ -1,0 +1,64 @@
+# Live system
+live-boot
+live-config
+live-config-systemd
+cryptsetup
+cryptsetup-initramfs
+sudo
+user-setup
+
+# Desktop (light: 8 GB machines)
+xfce4
+xfce4-terminal
+lightdm
+firefox-esr
+network-manager
+network-manager-gnome
+fonts-dejavu
+dbus-x11
+
+# BAU control plane and its host protections
+python3
+python3-venv
+python3-yaml
+nftables
+apparmor
+apparmor-utils
+chrony
+openssh-client
+git
+curl
+ca-certificates
+
+# Encrypted storage setup (jarvis-storage)
+fdisk
+util-linux
+e2fsprogs
+
+# llama.cpp runtime (built from source by image/build-live.sh)
+libgomp1
+libssl3t64
+
+# Diagnostics and recovery
+pciutils
+usbutils
+lshw
+htop
+less
+nano
+
+# Firmware for common laptops: Wi-Fi, graphics, sound (explicit: the installer-style
+# firmware packages such as firmware-b43-installer download at install time and are left out)
+firmware-linux-free
+firmware-misc-nonfree
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+firmware-brcm80211
+firmware-mediatek
+firmware-amd-graphics
+firmware-intel-graphics
+firmware-intel-sound
+firmware-sof-signed
+intel-microcode
+amd64-microcode
