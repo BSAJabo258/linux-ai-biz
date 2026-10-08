@@ -81,6 +81,9 @@ def test_jarvis_uses_zai_once_approved_and_keyed(tmp_path, monkeypatch):
     monkeypatch.setenv("ZAI_API_KEY", "k")
     a = build_assistant(tmp_path)
     assert a.model["id"] == "glm-4.7-flash-zai" and isinstance(a.provider, OpenAICompatProvider)
+    from bau.assistant import CONVERSATION_WAITS
+    assert a.provider.waits == CONVERSATION_WAITS and sum(CONVERSATION_WAITS) <= 30
+    assert build(defaults()["model"]["glm-4.7-flash-zai"]).waits == (5, 10, 20, 40)  # bench
 
 
 def test_seeding_adds_new_records_and_keeps_owner_approvals(tmp_path):
@@ -167,3 +170,66 @@ def test_busy_too_long_or_refused_shows_the_service_message_not_the_key(monkeypa
     with pytest.raises(ProviderError, match="HTTP 401.*Authentication failed"):
         prov.complete("s", [{"role": "user", "content": "Hi"}])
     assert waited == []                                     # a wrong key is not retried
+
+
+def test_one_off_server_error_is_retried(monkeypatch):
+    monkeypatch.setenv("ZAI_API_KEY", "test-key-123")
+    prov = build(defaults()["model"]["glm-4.7-flash-zai"])
+    ok, waited = FakeAPI(), []
+    replies = [_busy(500, b'{"error":{"code":"500","message":"Operation failed"}}')]
+
+    def flaky(req, timeout=0):
+        if replies:
+            raise replies.pop()
+        return ok(req, timeout)
+    prov._open, prov.sleep = flaky, waited.append
+    assert prov.complete("s", [{"role": "user", "content": "Hi"}]).text == "Hello! Teal."
+    assert waited == [5]
+
+
+@pytest.mark.parametrize("module", ["jarvis_server", "server"])
+def test_a_browser_that_hangs_up_is_not_an_error(monkeypatch, tmp_path, module):
+    import importlib
+    from http.server import BaseHTTPRequestHandler
+    mod = importlib.import_module(f"bau.ui.{module}")
+    if module == "jarvis_server":
+        from bau.assistant import Assistant, Voice
+        h = mod.make_handler(Assistant(tmp_path), Voice(), "k")
+    else:
+        h = mod.make_handler(tmp_path)
+    for err in (BrokenPipeError, ConnectionResetError):
+        def gone(self, err=err):
+            raise err(32, "Broken pipe")
+        monkeypatch.setattr(BaseHTTPRequestHandler, "handle", gone)
+        h.handle(h.__new__(h))                               # no traceback, no crash
+
+
+def test_jarvis_page_reads_every_reply_through_the_safe_helper():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert "async function apiJson" in page
+    assert ".json()" not in page                 # an empty or HTML reply never hits JSON.parse raw
+
+
+def test_jarvis_answers_politely_when_the_model_fails_and_keeps_history_clean(tmp_path):
+    from bau.assistant import Assistant
+    from bau.audit import AuditLog
+    from bau.models.providers import ProviderError, ScriptedProvider
+
+    class Failing(ScriptedProvider):
+        def complete(self, *a, **kw):
+            if self.script and self.script[0] == "FAIL":
+                self.script.pop(0)
+                raise ProviderError("https://api.z.ai/api/paas/v4 refused the request "
+                                    "(HTTP 500): Operation failed")
+            return super().complete(*a, **kw)
+
+    prov = Failing(script=[{"tool": "money", "input": {}}, "FAIL", "Fine now."])
+    a = Assistant(tmp_path, prov, {}, "human:owner",
+                  AuditLog(tmp_path / "audit" / "chain.jsonl", key=b""))
+    r = a.ask("How is money?")                      # fails after a tool call, mid-turn
+    assert "couldn't reach my model" in r.text and "Operation failed" in r.text
+    assert a.messages == []                         # no half-finished exchange left behind
+    assert a.ask("How is money?").text == "Fine now."
+    assert [m["role"] for m in a.messages] == ["user", "assistant"]

@@ -70,6 +70,7 @@ How you act:
 Keep replies to two to four sentences unless the owner asks for detail."""
 
 CONFIRMATION_NOTE = "PENDING_OWNER_CONFIRMATION"
+CONVERSATION_WAITS = (3, 6, 12)    # seconds between retries of a busy hosted model
 
 
 @dataclass
@@ -550,14 +551,25 @@ class Assistant:
     def _turn(self, user_text: str, max_steps: int = 8) -> Reply:
         from .agents import untrusted
         from .economics import Ledger
+        from .models.providers import ProviderError
         from .models.router import estimate_usd
+        start = len(self.messages)
         self.messages.append({"role": "user", "content": user_text})
         cards: list[dict[str, Any]] = []
         staged: list[str] = []
         final = ""
         for _ in range(max_steps):
-            resp = self.provider.complete(self.system_prompt(), self.messages, self.specs(),
-                                          max_tokens=2000)
+            try:
+                resp = self.provider.complete(self.system_prompt(), self.messages,
+                                              self.specs(), max_tokens=2000)
+            except (ProviderError, OSError) as e:
+                # A hosted model that fails mid-turn must not break the page or leave a
+                # half-finished exchange that makes the next question fail too.
+                del self.messages[start:]
+                said = str(e) if isinstance(e, ProviderError) else "the connection failed"
+                final = f"I couldn't reach my model just now: {said}. Ask me again in a minute."
+                self._log("jarvis", final)
+                return Reply(final, cards)
             usd = estimate_usd(self.model, resp.tokens_in, resp.tokens_out)
             if usd:
                 Ledger(self.home).cost("model", usd, agent="jarvis", provider=self.model.get(
@@ -808,6 +820,11 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             continue
         if rec.get("lane") == "content_only":
             continue                         # content-lane models never run Jarvis
+        if hasattr(provider, "waits"):
+            # The owner is watching the screen: give a busy hosted model about 20 s, not
+            # the bench's 75 s, then say so plainly. A page kept waiting over a minute can
+            # be dropped by the browser or the Codespaces proxy (seen as BrokenPipe).
+            provider.waits = CONVERSATION_WAITS
         return provider, {**rec, "id": mid}
     return None, None
 

@@ -232,7 +232,9 @@ class OpenAICompatProvider(LocalHTTPProvider):
     # Free hosted tiers answer 429 "overloaded" when busy (Z.ai error 1305, seen on the
     # first real bench 2026-10-07: four busy replies, then success). Wait and try again
     # rather than fail the owner's conversation; give up with the service's own words.
-    BUSY = (429, 502, 503, 504)
+    # Z.ai also answers a one-off 500 "Operation failed" mid-conversation (seen in the
+    # owner's Codespace 2026-10-07; the same questions answered fine moments later).
+    BUSY = (429, 500, 502, 503, 504)
     waits = (5, 10, 20, 40)
     sleep = staticmethod(time.sleep)
 
