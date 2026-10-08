@@ -42,6 +42,18 @@ def test_plain_mode_briefing_and_commands(tmp_path):
     assert a.confirm(r.pending[0]["id"], True, "human:owner").get("error")   # one shot
 
 
+def test_jarvis_is_told_approving_is_never_his_and_has_no_tool_for_it(tmp_path):
+    # Rehearsal 2026-10-08 (live GLM-4.7-Flash): asked to approve a model he offered to,
+    # and for a payment he invented `bau approve` arguments. The persona now rules both out.
+    from bau.assistant import PERSONA
+    rules = " ".join(PERSONA.split())
+    assert "Approving is never yours, and never offer to do it" in rules
+    assert "bau set-status model <id> APPROVED" in rules and "never make them up" in rules
+    assert "kids videos only go to YouTube" in rules
+    a = make(tmp_path, [])
+    assert not [n for n in a.tools if "approv" in n or "set_status" in n]
+
+
 def test_config_and_history_carry_over(tmp_path):
     save_config(tmp_path, call_me="chief", model=None)
     a = make(tmp_path)
