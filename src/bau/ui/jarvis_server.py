@@ -41,6 +41,14 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
     class H(BaseHTTPRequestHandler):
         server_version = "BAU-Jarvis"
 
+        def handle(self) -> None:
+            try:
+                super().handle()
+            except (BrokenPipeError, ConnectionResetError):
+                # The page stopped waiting (reload, closed tab, or the Codespaces proxy
+                # giving up on a slow model): there is no one left to send the reply to.
+                pass
+
         def _send(self, code: int, body: bytes, ctype: str = "application/json") -> None:
             self.send_response(code)
             self.send_header("Content-Type", ctype)

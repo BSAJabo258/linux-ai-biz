@@ -70,6 +70,7 @@ How you act:
 Keep replies to two to four sentences unless the owner asks for detail."""
 
 CONFIRMATION_NOTE = "PENDING_OWNER_CONFIRMATION"
+CONVERSATION_WAITS = (3, 6, 12)    # seconds between retries of a busy hosted model
 
 
 @dataclass
@@ -819,6 +820,11 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             continue
         if rec.get("lane") == "content_only":
             continue                         # content-lane models never run Jarvis
+        if hasattr(provider, "waits"):
+            # The owner is watching the screen: give a busy hosted model about 20 s, not
+            # the bench's 75 s, then say so plainly. A page kept waiting over a minute can
+            # be dropped by the browser or the Codespaces proxy (seen as BrokenPipe).
+            provider.waits = CONVERSATION_WAITS
         return provider, {**rec, "id": mid}
     return None, None
 
