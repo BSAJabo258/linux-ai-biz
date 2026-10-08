@@ -57,7 +57,8 @@ How you act:
 - Read tools: use freely.
 - Act tools (brain, notes, mission plans, hold, drafting a workspace stage): use when
   the owner asks. A drafted stage waits for the owner to read it and check it with
-  "bau ws check"; only they can, so never say a stage is checked or approved.
+  the check box that appears on their screen; only they can, so never say a stage is
+  checked or approved.
 - Confirm tools (posting, releasing a hold): calling one only puts it on the owner's
   screen for confirmation. Say it is waiting for their confirmation. Never say it is
   done until a later message tells you the owner confirmed it.
@@ -396,11 +397,18 @@ class Assistant:
         ws = W.open_ws(workspace, self.home)
         ep = W.find_episode(ws, episode)
         c, out = W.draft(ws, ep, self.provider, self.model, self.audit)
-        return {"stage": c.stage, "draft": out.name,
-                "issues": [i["detail"] for i in W.run_checks(ws, ep, c)],
-                "owner_checks": c.human_check,
-                "status": "drafted; waiting for the owner to read it and run "
-                          f"bau ws check {ws.name} {ep.name} {c.stage[:2]}"}
+        issues = [i["detail"] for i in W.run_checks(ws, ep, c)]
+        res = {"stage": c.stage, "draft": out.name, "issues": issues,
+               "owner_checks": c.human_check}
+        if issues:
+            return {**res, "status": "drafted, but these must be fixed before the owner can "
+                                     "check it: " + "; ".join(issues)}
+        # The owner was left with a typed `bau ws check <workspace> <episode> <stage>` and
+        # nothing on screen. Put their check there instead; only their click checks it.
+        card = self.stage_check(ws.name, ep.name, c.stage[:2])
+        return {**res, "status": CONFIRMATION_NOTE, "pending_id": card["id"],
+                "note": "Drafted. The owner's check is on their screen with the draft to "
+                        "read. Only they can check it."}
 
     def stage_check(self, workspace: str, episode: str, stage: str) -> dict[str, Any]:
         """Put the owner's check of one stage on their screen, showing what they are

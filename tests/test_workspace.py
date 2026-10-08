@@ -156,6 +156,21 @@ def test_create_refuses_to_overwrite_and_unknown_templates(tmp_path):
         W.create("nope", home=tmp_path)
 
 
+def test_asking_jarvis_to_draft_puts_the_owners_check_on_screen(ws, tmp_path):
+    # The owner kept getting stuck: Jarvis drafted, then waited on a typed command.
+    from bau.assistant import Assistant
+    W.new_episode(ws, "Pip and the rainbow")
+    jv = Assistant(tmp_path, ScriptedProvider([
+        {"tool": "draft_stage", "input": {"workspace": "kids-channel", "episode": "ep-001"}},
+        "# Pip and the rainbow\nGoal: colours.",
+        "Drafted. Your check is on screen."]), MODEL, "human:owner")
+    r = jv.ask("draft the next step of episode 1")
+    assert r.text == "Drafted. Your check is on screen."
+    assert [p["tool"] for p in r.pending] == ["check_stage"]
+    out = jv.confirm(r.pending[0]["id"], True, "human:owner")
+    assert out["done"] and out["result"]["checked"] == "01_pitch"
+
+
 def test_jarvis_drafts_stages_but_has_no_way_to_check_them(ws, tmp_path):
     from bau.assistant import Assistant
     ep = W.new_episode(ws, "Pip and the rainbow")
@@ -165,7 +180,14 @@ def test_jarvis_drafts_stages_but_has_no_way_to_check_them(ws, tmp_path):
     assert jv.tools["draft_stage"].kind == "act"
     out, err = jv._run_tool("draft_stage", {"workspace": "kids-channel",
                                             "episode": "ep-001"})
-    assert not err and out["stage"] == "01_pitch" and "bau ws check" in out["status"]
+    assert not err and out["stage"] == "01_pitch"
+    # The owner's check pops up on their screen; it is never a tool the model can call.
+    from bau.assistant import CONFIRMATION_NOTE
+    assert out["status"] == CONFIRMATION_NOTE
+    card = jv.pending[out["pending_id"]]
+    assert card.tool == "check_stage" and "Pip and the rainbow" in card.summary
+    with pytest.raises(PermissionError):
+        jv.confirm(card.id, True, "agent:jarvis")                # still the owner's click
     seen, err = jv._run_tool("workspaces", {})
     assert seen["kids-channel"][ep.name][0] == "01_pitch: drafted: owner check needed"
     again, err = jv._run_tool("draft_stage", {"workspace": "kids-channel",
