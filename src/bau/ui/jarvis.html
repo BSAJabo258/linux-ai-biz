@@ -179,6 +179,17 @@ async function apiJson(path, body, ctype) {
   try { return JSON.parse(txt); }
   catch (e) { throw new Error("Jarvis didn't get an answer back" + (r.status !== 200 ? " (HTTP " + r.status + ")" : "") + ". Ask again in a moment."); }
 }
+// Slow model work (the free hosted model is often busy) comes back as {job}: check every
+// 2 s instead of holding one request open until a proxy cuts it off (504).
+async function settle(r) {
+  for (let i = 0; r && r.job && i < 150; i++) {
+    if (i === 2) caption("Still thinking… the model is slow right now.");
+    await new Promise((res) => setTimeout(res, 2000));
+    r = await apiJson("/api/job/" + encodeURIComponent(r.job));
+  }
+  if (r && r.job) throw new Error("Jarvis is taking too long. Ask again in a minute.");
+  return r;
+}
 
 // ---------------------------------------------------------------- state + core visual
 let STATE = "idle";            // idle | listening | thinking | speaking
@@ -417,7 +428,7 @@ async function answer(approve) {
   const choices = {}; $("cform").querySelectorAll("select").forEach(x => { choices[x.name] = x.value; });
   showing = null; $("confirm").classList.remove("show"); try { $("cvid").pause(); } catch (e) {}
   setState("thinking");
-  try { const r = await apiJson("/api/confirm", { id: item.id, approve, choices });
+  try { const r = await settle(await apiJson("/api/confirm", { id: item.id, approve, choices }));
     if (r.retry) { setState("idle"); caption(r.error); confirmQ.unshift(item); nextConfirm(); return; }
     const msg = !approve ? "Understood. I won't." : r.done ? "Done." : "That didn't go through: " + fmt((r.result || r).error || "unknown error");
     logLine("sys", (approve ? "Confirmed: " : "Declined: ") + item.tool);
@@ -441,7 +452,7 @@ function handle(r, you) {
 async function ask(text) {
   text = (text || "").trim(); if (!text || busy) return;
   busy = true; stopSpeaking(); logLine("owner", text); caption("", text); setState("thinking");
-  try { handle(await apiJson("/api/ask", { text }), text); }
+  try { handle(await settle(await apiJson("/api/ask", { text })), text); }
   catch (e) { caption(e.message); setState("idle"); }
   busy = false;
 }
@@ -602,7 +613,7 @@ function renderEpisodes(p, eps) {
     const nx = e.next;
     if (nx && nx.action === "draft") button(box, "Draft step " + nx.stage, async () => {
       setState("thinking"); caption("Drafting step " + nx.stage + "…");
-      const r = await apiJson("/api/draft", { workspace: e.workspace, episode: e.episode });
+      const r = await settle(await apiJson("/api/draft", { workspace: e.workspace, episode: e.episode }));
       setState("idle");
       const msg = r.error ? "That didn't work: " + fmt((r.result || {}).error) : "Step " + nx.stage + " is drafted. Read it, edit it if you like, then check it.";
       caption(msg); logLine("jarvis", msg); if (!r.error) renderCard({ tool: "draft_stage", data: r.result }); loadNodes(); });
@@ -634,7 +645,7 @@ async function wake() {
   try { speechSynthesis.getVoices(); } catch (e) {}
   const w = $("wake"); w.style.transition = "opacity .6s"; w.style.opacity = "0"; setTimeout(() => w.remove(), 600);
   setState("thinking"); caption("");
-  try { handle(await apiJson("/api/briefing")); }
+  try { handle(await settle(await apiJson("/api/briefing"))); }
   catch (e) { caption(e.message); setState("idle"); }
   $("text").focus();
 }
