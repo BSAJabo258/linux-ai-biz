@@ -1,0 +1,8 @@
+# Line endings. Everything BAU runs on Linux (Docker, the USB installer, the live image,
+# the VM scripts) needs LF, also when the repository is cloned on Windows, where Git
+# otherwise checks files out with CRLF ("exec bau-entrypoint failed: No such file").
+* text=auto eol=lf
+# Windows-only scripts keep Windows line endings.
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
