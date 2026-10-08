@@ -282,6 +282,45 @@ def _retry_after(e: urllib.error.HTTPError, default: int) -> int:
         return default
 
 
+class FallbackProvider(Provider):
+    """The owner's approved hosted models, in their order. When one is busy, refuses or
+    doesn't answer, the next answers the same turn; the one that failed rests for ten
+    minutes before it is tried first again. Only OpenAI-compatible providers are chained,
+    so tool calls and tool results keep one format whichever model answers."""
+
+    provider_id = "fallback"
+    REST = 600
+    clock = staticmethod(time.monotonic)
+
+    def __init__(self, providers: list[Provider]):
+        self.providers = list(providers)
+        self._resting: dict[int, float] = {}
+
+    def complete(self, system, messages, tools=None, max_tokens=16000):
+        now = self.clock()
+        order = sorted(range(len(self.providers)), key=lambda i: self._resting.get(i, 0) > now)
+        failed = []
+        for i in order:
+            try:
+                r = self.providers[i].complete(system, messages, tools, max_tokens)
+            except (ProviderError, OSError) as e:
+                self._resting[i] = now + self.REST
+                failed.append(e)
+                continue
+            self._resting.pop(i, None)
+            return r
+        if len(failed) == 1:
+            raise failed[0]
+        raise ProviderError("every approved model failed: "
+                            + "; ".join(str(e) or type(e).__name__ for e in failed)[:500])
+
+    def tool_result_message(self, results):
+        return self.providers[0].tool_result_message(results)
+
+    def health(self):
+        return {"ok": None, "chain": [getattr(p, "model", "?") for p in self.providers]}
+
+
 # ------------------------------------------------------------------ scripted
 
 @dataclass
