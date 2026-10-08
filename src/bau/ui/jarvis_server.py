@@ -238,7 +238,9 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     out, err = assistant._run_tool("draft_stage", {
                         "workspace": str(data.get("workspace", "")),
                         "episode": str(data.get("episode", ""))})
-                    return {"result": out, "error": err}
+                    p = assistant.pending.get(out.get("pending_id", "")) if not err else None
+                    return {"result": out, "error": err,
+                            "pending": [p.public()] if p else []}
                 self._json(*answer(draft))
             elif self.path == "/api/check":
                 # Checking is the owner's: this only puts it on screen; Confirm does it.

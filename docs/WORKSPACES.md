@@ -48,8 +48,11 @@ Then `bau ws run` again for the next step. `bau ws status kids-channel` shows ev
 episode and step: **checked**, **drafted** (waiting for your check), **ready**, or
 **waiting**.
 
-Or ask Jarvis: "where are my episodes?" or "draft the next step of episode 1". Jarvis can
-draft; only you can check.
+Or ask Jarvis: "where are my episodes?" or "draft the next step of episode 1", or press
+**Draft step** on the **Producer** node of his screen. When a step is drafted, a **Waiting
+for your confirmation** box pops up with the draft to read: press **Confirm** to check it,
+or **Not now** to edit the file first (then **Read & check** on the Producer node brings
+the box back). Jarvis can draft; only your click checks.
 
 ## What protects you
 

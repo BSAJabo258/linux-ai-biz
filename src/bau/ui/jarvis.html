@@ -74,7 +74,12 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:cente
 #yes{border:1px solid var(--green);color:var(--green)}#yes[disabled]{opacity:.35;cursor:not-allowed}
 #cvid{display:none;width:100%;max-height:34vh;background:#000;margin:0 0 12px}
 #cform label{display:block;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin:0 0 4px}
-#cform select{width:100%;margin:0 0 12px;background:#03101b;color:var(--ink);border:1px solid var(--line);padding:8px;font:inherit}
+#cform .opts{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+#confirm #cform .opt{border:1px solid var(--line);color:var(--ink);background:#03101b;padding:12px 14px;
+  font-size:14px;letter-spacing:normal;text-transform:none;text-align:left;flex:1 1 180px}
+#confirm #cform .opt.on{border-color:var(--green);color:var(--green);background:rgba(70,242,164,.1)}
+#cneed{font-size:12px;color:var(--amber);margin:0 0 10px}
+#confirm .btns button{padding:12px 20px}
 #cnote{font-size:12px;color:var(--dim);margin:0 0 14px}#no{border:1px solid var(--dim);color:var(--ink)}
 aside.r{display:none}body.showlog aside.r{display:block}
 #nodes{position:fixed;inset:0;pointer-events:none}
@@ -143,7 +148,7 @@ code.cmd{display:block;background:#03101b;border:1px solid var(--line);padding:6
 </footer>
 <div class="hint" id="hint">Hold space to talk · Enter to send · Esc to stop speaking</div>
 <div id="wake"><div><h1>JARVIS</h1><p>Tap or press any key to wake</p></div></div>
-<div id="confirm"><div class="box"><h2>Waiting for your confirmation</h2><video id="cvid" controls playsinline></video><pre id="csum"></pre><div id="cform"></div><p id="cnote"></p>
+<div id="confirm"><div class="box"><h2>Waiting for your confirmation</h2><video id="cvid" controls playsinline></video><pre id="csum"></pre><div id="cform"></div><p id="cneed"></p><p id="cnote"></p>
   <div class="btns"><button id="no">Not now</button><button id="yes">Confirm</button></div></div></div>
 <script>
 "use strict";
@@ -398,23 +403,31 @@ function paintState(s) {
 }
 
 // ---------------------------------------------------------------- confirmations
-let confirmQ = [], showing = null;
+let confirmQ = [], showing = null, picked = {};
 function queueConfirms(items) { for (const i of items) if (!confirmQ.some(x => x.id === i.id) && (!showing || showing.id !== i.id)) confirmQ.push(i); nextConfirm(); }
 let previewUrl = null;
 function nextConfirm() {
   if (showing || !confirmQ.length) return;
   showing = confirmQ.shift(); $("csum").textContent = showing.summary;
-  const form = $("cform"), note = $("cnote"), vid = $("cvid"); form.textContent = ""; note.textContent = "";
-  const sels = [];
+  const form = $("cform"), note = $("cnote"), need = $("cneed"), vid = $("cvid");
+  form.textContent = ""; note.textContent = ""; need.textContent = ""; picked = {};
   const fields = (showing.form && showing.form.fields) || [];
   const notes = (showing.form && showing.form.notes) || null;
-  const check = () => { $("yes").disabled = sels.some(x => !x.value);
-    if (notes) { const pr = sels.find(x => x.name === "promotes"); note.textContent = notes[(pr && pr.value) || ""] || notes.default; } };
+  const check = () => {
+    const missing = fields.filter(f => !picked[f.name]);
+    $("yes").disabled = missing.length > 0;
+    need.textContent = missing.length ? "To confirm, first choose: " + missing.map(f => f.label).join(" · ") : "";
+    if (notes) note.textContent = notes[picked.promotes || ""] || notes.default; };
   for (const f of fields) {               // owner-only choices: no default is ever preselected
     form.appendChild(el("label", null, f.label));
-    const sel = el("select"); sel.name = f.name; sel.appendChild(el("option", null, "Choose…")).value = "";
-    for (const [v, label] of f.options) { const o = el("option", null, label); o.value = v; sel.appendChild(o); }
-    sel.onchange = check; form.appendChild(sel); sels.push(sel);
+    const row = el("div", "opts");
+    for (const [v, label] of f.options) {
+      const b = el("button", "opt", label); b.type = "button";
+      b.onclick = () => { picked[f.name] = v;
+        row.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === b)); check(); };
+      row.appendChild(b);
+    }
+    form.appendChild(row);
   }
   check();
   vid.style.display = "none"; vid.removeAttribute("src");
@@ -426,11 +439,11 @@ function nextConfirm() {
       previewUrl = URL.createObjectURL(b); vid.src = previewUrl; vid.style.display = "block"; }).catch(() => {});
   }
   $("confirm").classList.add("show");
-  setTimeout(() => (sels[0] || $("yes")).focus(), 50);
+  setTimeout(() => (form.querySelector(".opt") || $("yes")).focus(), 50);
 }
 async function answer(approve) {
   if (!showing) return; const item = showing;
-  const choices = {}; $("cform").querySelectorAll("select").forEach(x => { choices[x.name] = x.value; });
+  const choices = { ...picked };
   showing = null; $("confirm").classList.remove("show"); try { $("cvid").pause(); } catch (e) {}
   setState("thinking");
   try { const r = await settle(await apiJson("/api/confirm", { id: item.id, approve, choices }));
@@ -621,8 +634,13 @@ function renderEpisodes(p, eps) {
       setState("thinking"); caption("Drafting step " + nx.stage + "…");
       const r = await settle(await apiJson("/api/draft", { workspace: e.workspace, episode: e.episode }));
       setState("idle");
-      const msg = r.error ? "That didn't work: " + fmt((r.result || {}).error) : "Step " + nx.stage + " is drafted. Read it, edit it if you like, then check it.";
-      caption(msg); logLine("jarvis", msg); if (!r.error) renderCard({ tool: "draft_stage", data: r.result }); loadNodes(); });
+      const ready = (r.pending || []).length > 0;
+      const msg = r.error ? "That didn't work: " + fmt((r.result || {}).error)
+        : ready ? "Step " + nx.stage + " is drafted. Read it on screen, then check it."
+        : "Step " + nx.stage + " is drafted, but it needs fixing first: " + fmt((r.result || {}).issues);
+      caption(msg); logLine("jarvis", msg); if (!r.error && !ready) renderCard({ tool: "draft_stage", data: r.result });
+      if (ready) queueConfirms(r.pending);
+      loadNodes(); });
     if (nx && nx.action === "check") button(box, "Read & check step " + nx.stage, async () => {
       const r = await apiJson("/api/check", { workspace: e.workspace, episode: e.episode, stage: nx.stage });
       if (r.error) { caption(r.error); logLine("sys", r.error); } else queueConfirms(r.pending); }, true);

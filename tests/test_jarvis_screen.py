@@ -113,6 +113,9 @@ def test_screen_endpoints_draft_and_stage_checks_behind_the_key(tmp_path):
         assert "not written yet" in r["error"]
         code, r = call(url, "/api/draft", {"workspace": ws.name, "episode": ep.name})
         assert code == 200 and not r["error"] and r["result"]["stage"] == "01_pitch"
+        # The owner's check comes back with the draft: the page pops it up at once.
+        assert r["pending"][0]["tool"] == "check_stage"
+        assert r["pending"][0]["id"] == r["result"]["pending_id"]
         code, r = call(url, "/api/check", {"workspace": ws.name, "episode": ep.name,
                                           "stage": "01"})
         pid = r["pending"][0]["id"]
@@ -120,3 +123,13 @@ def test_screen_endpoints_draft_and_stage_checks_behind_the_key(tmp_path):
         assert r["done"] and r["result"]["checked"] == "01_pitch"
     finally:
         srv.shutdown()
+
+
+def test_owner_choices_are_big_buttons_with_nothing_preselected():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert "<select" not in page and 'el("select")' not in page        # no fiddly drop-downs
+    assert 'el("button", "opt", label)' in page and "picked = {}" in page
+    assert "To confirm, first choose: " in page                      # says what's missing
+    assert "queueConfirms(r.pending)" in page                        # drafts pop the check
