@@ -57,7 +57,9 @@ else
 fi
 
 while read -r part; do
-  [[ -n "${part}" ]] && umount "/dev/${part}" 2>/dev/null || true
+  if [[ -n "${part}" ]]; then
+    umount "/dev/${part}" 2>/dev/null || true
+  fi
 done < <(lsblk -ln -o NAME "${DEV}" | tail -n +2)
 
 log "writing ${IMG} -> ${DEV}"

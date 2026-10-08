@@ -225,6 +225,7 @@ def test_ssh_signed_approvals(tmp_path):
     from bau.security.permissions import SshApprovals
     key = tmp_path / "k"
     subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)], check=True)
+    key.chmod(0o600)
     pub = " ".join(key.with_suffix(".pub").read_text().split()[:2])
     signers = tmp_path / "allowed_signers"
     signers.write_text(f'owner namespaces="bau-approval" {pub}\n')
@@ -260,6 +261,7 @@ def test_approval_is_void_if_content_changes(tmp_path, monkeypatch):
     from bau.security.permissions import SshApprovals
     key = tmp_path / "k"
     subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)], check=True)
+    key.chmod(0o600)
     pub = " ".join(key.with_suffix(".pub").read_text().split()[:2])
     (tmp_path / "signers").write_text(f'owner namespaces="bau-approval" {pub}\n')
     monkeypatch.setenv("BAU_ALLOWED_SIGNERS", str(tmp_path / "signers"))
