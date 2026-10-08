@@ -81,6 +81,7 @@ CONSTITUTION_MAX = 16000          # characters; bounds what every model call car
 
 CONFIRMATION_NOTE = "PENDING_OWNER_CONFIRMATION"
 CONVERSATION_WAITS = (3, 6, 12)    # seconds between retries of a busy hosted model
+CONVERSATION_TIMEOUT = 60          # seconds one hosted model call may take in conversation
 
 
 def load_constitution(home: Path) -> str:
@@ -621,7 +622,9 @@ class Assistant:
                 # A hosted model that fails mid-turn must not break the page or leave a
                 # half-finished exchange that makes the next question fail too.
                 del self.messages[start:]
-                said = str(e) if isinstance(e, ProviderError) else "the connection failed"
+                said = (str(e) if isinstance(e, ProviderError) else
+                        "it didn't answer in time" if isinstance(e, TimeoutError) else
+                        "the connection failed")
                 final = f"I couldn't reach my model just now: {said}. Ask me again in a minute."
                 self._log("jarvis", final)
                 return Reply(final, cards)
@@ -880,6 +883,9 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             # the bench's 75 s, then say so plainly. A page kept waiting over a minute can
             # be dropped by the browser or the Codespaces proxy (seen as BrokenPipe).
             provider.waits = CONVERSATION_WAITS
+            # Z.ai sometimes accepts a request and never answers (rehearsal 2026-10-08:
+            # "The read operation timed out" after the bench's 120 s). Give up sooner.
+            provider.timeout = CONVERSATION_TIMEOUT
         return provider, {**rec, "id": mid}
     return None, None
 
