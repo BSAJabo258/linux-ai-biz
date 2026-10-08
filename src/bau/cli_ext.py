@@ -637,6 +637,19 @@ def cmd_jarvis(a):
         _out(yaml.safe_load((bau_home() / "config" / "jarvis.yaml").read_text())
              if (bau_home() / "config" / "jarvis.yaml").exists() else {})
         return EXIT_OK
+    if a.jv_cmd == "constitution":
+        from .assistant import CONSTITUTION_MAX, load_constitution
+        from .home import data_dir
+        folder = data_dir("constitution", bau_home())
+        text = load_constitution(bau_home())
+        _out({"folder": str(folder),
+              "yours": folder.is_relative_to(bau_home()),
+              "files": sorted(f.name for f in folder.glob("*.md")),
+              "characters": len(text), "limit": CONSTITUTION_MAX,
+              "edit": "change the files in the folder; Jarvis reads them at every question"
+                      if folder.is_relative_to(bau_home())
+                      else "run 'bau init' first to get your own copy to edit"})
+        return EXIT_OK
     owner = _human()
     load_env_file()
     jv = build_assistant(owner=owner)
@@ -1347,6 +1360,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--voice-id", help="ElevenLabs voice id")
     x.add_argument("--listen", choices=["elevenlabs", "browser"],
                    help="where push-to-talk audio is transcribed")
+    jv.add_parser("constitution", help="where your operating constitution lives and what "
+                  "Jarvis loads from it")
     s.set_defaults(fn=cmd_jarvis)
 
     s = sub.add_parser("ui", help="Mission Control web dashboard (localhost, read-only)")
