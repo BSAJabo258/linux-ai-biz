@@ -15,6 +15,7 @@ stand and what is next.
 | `src/bau/workspace.py`, `data/workspaces/` | ICM workspaces (`bau ws`): numbered stage folders one agent walks, owner checks each stage; kids-channel pilot |
 | `src/bau/governor.py` | watchdog (hold / quarantine / resume, never approves) |
 | `src/bau/brain.py` | Second Brain (Markdown vault, nouns + verbs graph) |
+| `src/bau/chats.py` | chat library (`bau chats`): the owner's Claude/ChatGPT exports in SQLite FTS5; Jarvis reads them per `bau chats sharing` |
 | `src/bau/models/` | providers (Claude, llama.cpp, hosted OpenAI-compatible e.g. Z.ai), router, `bench.py`, `fetch.py` |
 | `installer/` | USB #1 image builder, USB #2 payload (`make-payload.sh`), `payload/install.sh` |
 | `image/`, `src/bau/live.py` | My Jarvis live USB: `build-live.sh` (Debian Live + BAU + llama.cpp), `live-build/` config, `jarvis-storage` (encrypted persistence); see `docs/MY-JARVIS.md` |

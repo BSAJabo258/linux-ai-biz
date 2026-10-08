@@ -196,6 +196,12 @@ class Assistant:
                  "lesson the owner wants kept).",
                  _schema({"title": {"type": "string"}, "note": {"type": "string"}}),
                  self.t_remember, kind="act"),
+            Tool("chat_search", "Search the owner's imported Claude and ChatGPT conversations "
+                 "for a topic. Returns excerpts, each with a conversation reference.",
+                 _schema({"query": {"type": "string"}}), self.t_chat_search),
+            Tool("chat_read", "Read one imported conversation by the reference chat_search "
+                 "gave, for example claude/1a2b3c.",
+                 _schema({"conversation": {"type": "string"}}), self.t_chat_read),
             Tool("recall", "Look up notes, decisions and lessons saved to long-term memory "
                  "in earlier conversations.",
                  _schema({"query": {"type": "string"}}), self.t_recall),
@@ -311,6 +317,25 @@ class Assistant:
         r = MemoryLane(self.home).add("decision", title[:120], note[:4000], tags=["jarvis"],
                                       source="jarvis-conversation")
         return {"saved": r.id}
+
+    def _chats(self):
+        """The chat library, if the owner's sharing choice lets this model read it. Any
+        model not on this machine counts as cloud."""
+        from .chats import ChatLibrary
+        lib = ChatLibrary(self.home)
+        if self.model.get("deployment") != "local" and lib.sharing() != "cloud":
+            raise PermissionError(
+                "the owner keeps old chats away from cloud models (bau chats sharing)"
+                if lib.sharing() else
+                "the owner hasn't decided whether old chats may go to a cloud model; they "
+                "choose with 'bau chats sharing cloud' or 'bau chats sharing local-only'")
+        return lib
+
+    def t_chat_search(self, query: str) -> list[dict[str, Any]]:
+        return self._chats().search(query, k=8)
+
+    def t_chat_read(self, conversation: str) -> dict[str, Any]:
+        return self._chats().conversation(conversation, max_chars=8000)
 
     def t_recall(self, query: str) -> list[dict[str, Any]]:
         from .memory import MemoryLane
