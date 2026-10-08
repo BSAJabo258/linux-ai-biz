@@ -166,6 +166,19 @@ async function api(path, body, ctype) {
   if (r.status === 403) throw new Error("Session expired: run 'bau jarvis' again and use its link.");
   return r;
 }
+// The JSON endpoints. Anything that isn't Jarvis's JSON (the codespace connection gave up on
+// a slow answer, the server stopped, a reload) becomes a plain sentence, not a parse error.
+async function apiJson(path, body, ctype) {
+  let r;
+  try { r = await api(path, body, ctype); }
+  catch (e) {
+    if (/expired/.test(e.message)) throw e;
+    throw new Error("Lost the connection to Jarvis. Check the terminal running 'bau jarvis', then ask again.");
+  }
+  const txt = await r.text().catch(() => "");
+  try { return JSON.parse(txt); }
+  catch (e) { throw new Error("Jarvis didn't get an answer back" + (r.status !== 200 ? " (HTTP " + r.status + ")" : "") + ". Ask again in a moment."); }
+}
 
 // ---------------------------------------------------------------- state + core visual
 let STATE = "idle";            // idle | listening | thinking | speaking
@@ -404,7 +417,7 @@ async function answer(approve) {
   const choices = {}; $("cform").querySelectorAll("select").forEach(x => { choices[x.name] = x.value; });
   showing = null; $("confirm").classList.remove("show"); try { $("cvid").pause(); } catch (e) {}
   setState("thinking");
-  try { const r = await (await api("/api/confirm", { id: item.id, approve, choices })).json();
+  try { const r = await apiJson("/api/confirm", { id: item.id, approve, choices });
     if (r.retry) { setState("idle"); caption(r.error); confirmQ.unshift(item); nextConfirm(); return; }
     const msg = !approve ? "Understood. I won't." : r.done ? "Done." : "That didn't go through: " + fmt((r.result || r).error || "unknown error");
     logLine("sys", (approve ? "Confirmed: " : "Declined: ") + item.tool);
@@ -428,7 +441,7 @@ function handle(r, you) {
 async function ask(text) {
   text = (text || "").trim(); if (!text || busy) return;
   busy = true; stopSpeaking(); logLine("owner", text); caption("", text); setState("thinking");
-  try { handle(await (await api("/api/ask", { text })).json(), text); }
+  try { handle(await apiJson("/api/ask", { text }), text); }
   catch (e) { caption(e.message); setState("idle"); }
   busy = false;
 }
@@ -475,7 +488,7 @@ async function stopListening() {
   const blob = new Blob(chunks, { type: (r.mimeType || "audio/webm") });
   if (blob.size < 2000) { setState("idle"); caption("Hold the button while you talk."); return; }
   setState("thinking"); caption("…");
-  try { const out = await (await api("/api/stt", blob, blob.type || "audio/webm")).json();
+  try { const out = await apiJson("/api/stt", blob, blob.type || "audio/webm");
     if (out.text) ask(out.text); else { setState("idle"); caption("Didn't catch that."); }
   } catch (e) { setState("idle"); caption(e.message); }
 }
@@ -535,7 +548,7 @@ function drawLinks(X, Y, R, now) {
 }
 async function loadNodes() {
   try {
-    const o = await (await api("/api/overview")).json();
+    const o = await apiJson("/api/overview");
     const box = $("nodes"), old = Object.fromEntries(NODES.map(n => [n.id, n]));
     NODES = o.nodes.map(n => ({ ...n, el: old[n.id] && old[n.id].el, phase: old[n.id] ? old[n.id].phase : Math.random() }));
     for (const n of NODES) {
@@ -589,12 +602,12 @@ function renderEpisodes(p, eps) {
     const nx = e.next;
     if (nx && nx.action === "draft") button(box, "Draft step " + nx.stage, async () => {
       setState("thinking"); caption("Drafting step " + nx.stage + "…");
-      const r = await (await api("/api/draft", { workspace: e.workspace, episode: e.episode })).json();
+      const r = await apiJson("/api/draft", { workspace: e.workspace, episode: e.episode });
       setState("idle");
       const msg = r.error ? "That didn't work: " + fmt((r.result || {}).error) : "Step " + nx.stage + " is drafted. Read it, edit it if you like, then check it.";
       caption(msg); logLine("jarvis", msg); if (!r.error) renderCard({ tool: "draft_stage", data: r.result }); loadNodes(); });
     if (nx && nx.action === "check") button(box, "Read & check step " + nx.stage, async () => {
-      const r = await (await api("/api/check", { workspace: e.workspace, episode: e.episode, stage: nx.stage })).json();
+      const r = await apiJson("/api/check", { workspace: e.workspace, episode: e.episode, stage: nx.stage });
       if (r.error) { caption(r.error); logLine("sys", r.error); } else queueConfirms(r.pending); }, true);
     if (nx && nx.action === "owner") box.appendChild(el("div", null, "Step " + nx.stage + " is yours: make the video, watch it all the way through, then queue it."));
     if (!nx) box.appendChild(el("div", null, "Every step is checked."));
@@ -621,14 +634,14 @@ async function wake() {
   try { speechSynthesis.getVoices(); } catch (e) {}
   const w = $("wake"); w.style.transition = "opacity .6s"; w.style.opacity = "0"; setTimeout(() => w.remove(), 600);
   setState("thinking"); caption("");
-  try { handle(await (await api("/api/briefing")).json()); }
+  try { handle(await apiJson("/api/briefing")); }
   catch (e) { caption(e.message); setState("idle"); }
   $("text").focus();
 }
 $("wake").addEventListener("click", wake);
 addEventListener("keydown", () => { if (!woke) wake(); }, { capture: true });
-api("/api/state").then(r => r.json()).then(paintState).catch(e => caption(e.message));
-setInterval(() => { if (!busy && woke) api("/api/state").then(r => r.json()).then(paintState).catch(() => {}); }, 30000);
+apiJson("/api/state").then(paintState).catch(e => caption(e.message));
+setInterval(() => { if (!busy && woke) apiJson("/api/state").then(paintState).catch(() => {}); }, 30000);
 </script>
 </body>
 </html>

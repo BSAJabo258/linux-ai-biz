@@ -21,7 +21,7 @@ LAYOUT = [
     "regulations", "ip", "tax", "data", "security", "audit", "evidence", "jobs",
     "checkpoints", "artifacts", "tests", "benchmarks", "snapshots", "reports",
     "consent", "suppression", "dsr", "approvals", "economics", "artifacts/drafts",
-    "artifacts/media_inbox", "artifacts/exports",
+    "artifacts/media_inbox", "artifacts/exports", "constitution",
 ]
 
 
@@ -47,7 +47,8 @@ def init_home(home: Path | None = None, overwrite_data: bool = False) -> Path:
         home.mkdir(parents=True, mode=0o750)
     for sub in LAYOUT:
         (home / sub).mkdir(parents=True, exist_ok=True)
-    for sub in ("regulations", "policies", "schemas"):
+    # Copied only when missing, so the owner's edits (e.g. to the constitution) survive.
+    for sub in ("regulations", "policies", "schemas", "constitution"):
         src = shipped_data() / sub
         if not src.is_dir():
             continue
