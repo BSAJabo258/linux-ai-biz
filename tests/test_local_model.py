@@ -119,3 +119,18 @@ def test_container_files_keep_ports_local(name):
         assert ports and all("127.0.0.1:" in ln for ln in ports)
     else:
         assert "USER owner" in text and "BAU_IN_CONTAINER=1" in text
+
+
+def test_scripts_keep_lf_line_endings_on_windows_checkouts():
+    # Seen 2026-10-08: an image built from the owner's Windows checkout restarted 948
+    # times with "exec bau-entrypoint failed: No such file or directory" ("#!/bin/sh\r").
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    attrs = (root / ".gitattributes").read_text().splitlines()
+    assert "* text=auto eol=lf" in attrs and "*.ps1 text eol=crlf" in attrs
+    docker = (root / "Dockerfile").read_text()
+    installed = re.findall(r"^COPY --chmod=0755 \S+ (/usr/local/bin/\S+)$", docker, re.M)
+    strip = re.search(r"^RUN sed -i 's/\\r\$//' (.+)$", docker, re.M)
+    assert installed and strip and set(installed) <= set(strip.group(1).split())
+    assert docker.index(strip.group(0)) < docker.index("USER owner")    # still root
