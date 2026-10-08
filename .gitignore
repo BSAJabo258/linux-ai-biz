@@ -13,6 +13,9 @@ dist/
 *.key
 *.pem
 .bau-home/
+# The owner's exported Claude / ChatGPT chats (personal data, docs/CHATS.md)
+chat-exports/
+conversations.json
 
 # API keys for the Docker test drive - never commit
 .env

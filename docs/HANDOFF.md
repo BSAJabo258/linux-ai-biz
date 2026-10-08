@@ -36,6 +36,13 @@ episodes with buttons: Draft (`/api/draft`, the same act Jarvis may do) and Read
 (`/api/check` stages an owner-only `check_stage` card in `Assistant.owner_tools`, never
 offered to a model; Confirm runs it). Model approval stays a typed command.
 
+**Chat library** (`chats.py`, `bau chats`, `docs/CHATS.md`): the owner's Claude and ChatGPT
+export ZIPs go into `BAU_HOME/chats/chats.db` (SQLite FTS5). Jarvis gets the read tools
+`chat_search` and `chat_read`. On any model not marked `deployment: local` they work only
+after the owner types `bau chats sharing cloud`; there's no default. Neither export layout
+is documented by its vendor; the parser is tolerant and reports skipped items. Not yet run
+on the owner's real exports.
+
 ## What was verified, and how
 
 - **My Jarvis live USB (MVP #1), 2026-10-07:** `my-jarvis-0.1.0-amd64.iso` (910 MB) was
