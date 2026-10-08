@@ -36,6 +36,12 @@ episodes with buttons: Draft (`/api/draft`, the same act Jarvis may do) and Read
 (`/api/check` stages an owner-only `check_stage` card in `Assistant.owner_tools`, never
 offered to a model; Confirm runs it). Model approval stays a typed command.
 
+The owner's **BAUBSA Operating Constitution** (`data/constitution/*.md`, six layers in the
+owner's words; `docs/CONSTITUTION.md`) goes into Jarvis's system prompt on every turn,
+after PERSONA's safety rules and below them. `bau init` copies it to
+`BAU_HOME/constitution` once; owner edits are kept and read live. Jarvis's `recall` tool
+reads back what `remember` saved (memory used to be write-only for him).
+
 ## What was verified, and how
 
 - **My Jarvis live USB (MVP #1), 2026-10-07:** `my-jarvis-0.1.0-amd64.iso` (910 MB) was
