@@ -327,6 +327,13 @@ class Assistant:
         model not on this machine counts as cloud."""
         from .chats import ChatLibrary
         lib = ChatLibrary(self.home)
+        barred = self._no_personal_data()
+        if barred:
+            # Not even the owner's 'cloud' choice opens this: the provider's own terms
+            # forbid personal data (NVIDIA API Trial terms 2.6a), and old chats are personal.
+            raise PermissionError(
+                f"{barred}'s terms don't allow personal data, and old chats are personal; "
+                "search them with 'bau chats search' or on a model without that rule")
         if self.model.get("deployment") != "local" and lib.sharing() != "cloud":
             raise PermissionError(
                 "the owner keeps old chats away from cloud models (bau chats sharing)"
@@ -334,6 +341,19 @@ class Assistant:
                 "the owner hasn't decided whether old chats may go to a cloud model; they "
                 "choose with 'bau chats sharing cloud' or 'bau chats sharing local-only'")
         return lib
+
+    def _no_personal_data(self) -> str | None:
+        """The first model Jarvis may use (backups included) whose provider's terms forbid
+        personal data. A backup counts: it may answer any turn with the whole history."""
+        from .registry import CapabilityRegistry
+        reg = CapabilityRegistry(self.home / "registry" / "capabilities.yaml")
+        for mid in [self.model.get("id"), *(self.model.get("fallbacks") or [])]:
+            rec = reg.data["model"].get(mid) or (self.model if mid == self.model.get("id")
+                                                 else {})
+            if reg.data["provider"].get(rec.get("provider", ""), {}).get(
+                    "personal_data_allowed") is False:
+                return mid
+        return None
 
     def t_chat_search(self, query: str) -> list[dict[str, Any]]:
         return self._chats().search(query, k=8)
@@ -864,21 +884,24 @@ def build_assistant(home: Path | None = None, owner: str = "human:owner") -> Ass
 
 def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any] | None]:
     """The model Jarvis (and the workspaces he walks) uses: the first APPROVED, reachable
-    one in the owner's order. (None, None) when nothing is approved."""
+    one in the owner's order. When that is a hosted model, the other approved hosted models
+    after it become its backups (FallbackProvider). (None, None) when nothing is approved."""
+    from .models.providers import FallbackProvider
     from .runtime import provider_for
     home = home or bau_home()
     cfg = YamlStore(home / "config" / "jarvis.yaml").load() or {}
-    for mid in [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "glm-4.7-flash-zai",
-                "qwen2.5-1.5b-instruct", "local-llm"]:
-        if not mid:
-            continue
+    chosen: list[tuple[Provider, dict[str, Any], str]] = []
+    order = [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "glm-4.7-flash-zai",
+             "nemotron-3-super-nim", "qwen2.5-1.5b-instruct", "local-llm"]
+    for mid in dict.fromkeys(m for m in order if m):
         try:
             provider, rec = provider_for(mid, home)
         except (KeyError, PermissionError, ImportError):
             continue
         if rec.get("lane") == "content_only":
             continue                         # content-lane models never run Jarvis
-        if hasattr(provider, "waits"):
+        hosted = hasattr(provider, "waits")
+        if hosted:
             # The owner is watching the screen: give a busy hosted model about 20 s, not
             # the bench's 75 s, then say so plainly. A page kept waiting over a minute can
             # be dropped by the browser or the Codespaces proxy (seen as BrokenPipe).
@@ -886,8 +909,19 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             # Z.ai sometimes accepts a request and never answers (rehearsal 2026-10-08:
             # "The read operation timed out" after the bench's 120 s). Give up sooner.
             provider.timeout = CONVERSATION_TIMEOUT
-        return provider, {**rec, "id": mid}
-    return None, None
+        if not chosen:
+            chosen.append((provider, rec, mid))
+            if not hosted:
+                break                        # Claude or a local model: no backup chain
+        elif hosted:
+            chosen.append((provider, rec, mid))
+    if not chosen:
+        return None, None
+    provider, rec, mid = chosen[0]
+    if len(chosen) > 1:
+        provider = FallbackProvider([p for p, _, _ in chosen])
+        rec = {**rec, "fallbacks": [m for _, _, m in chosen[1:]]}
+    return provider, {**rec, "id": mid}
 
 
 def save_config(home: Path, **values: Any) -> None:
