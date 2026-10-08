@@ -127,6 +127,7 @@ class Reply:
     cards: list[dict[str, Any]] = field(default_factory=list)
     pending: list[dict[str, Any]] = field(default_factory=list)
     mode: str = "model"                       # model | plain
+    model: str = ""                           # which model gave this answer
 
 
 def _now() -> str:
@@ -159,6 +160,7 @@ class Assistant:
         self.clients = clients or {}         # platform -> API client (tests inject fakes)
         self.messages: list[dict[str, Any]] = []
         self.pending: dict[str, Pending] = {}
+        self.last_model = ""                  # the model that gave the last answer
         self.tools = {t.name: t for t in self._tools()}
         # Started only by the owner from the screen; never offered to a model.
         self.owner_tools = {"check_stage": Tool(
@@ -648,6 +650,8 @@ class Assistant:
                 final = f"I couldn't reach my model just now: {said}. Ask me again in a minute."
                 self._log("jarvis", final)
                 return Reply(final, cards)
+            self.last_model = (getattr(self.provider, "answered_by", None)
+                               or self.model.get("id") or resp.model)
             usd = estimate_usd(self.model, resp.tokens_in, resp.tokens_out)
             if usd:
                 Ledger(self.home).cost("model", usd, agent="jarvis", provider=self.model.get(
@@ -686,7 +690,14 @@ class Assistant:
         final = re.sub(r"[*#`_]{1,3}", "", final).strip() or "Done."
         self._log("jarvis", final)
         pend = [self.pending[p].public() for p in staged if p in self.pending]
-        return Reply(final, cards, pend)
+        return Reply(final, cards, pend, model=self.last_model)
+
+    def model_summary(self) -> str:
+        """'nemotron-3-super-nim, backup: glm-4.7-flash-zai' - what the owner needs to see
+        to know which model Jarvis will use."""
+        backups = self.model.get("fallbacks") or []
+        main = self.model.get("id") or self.model.get("api_model") or "?"
+        return main + (f", backup: {', '.join(backups)}" if backups else "")
 
     def _trim(self, keep: int = 40) -> None:
         """Bound the live context. Cut only before a plain user utterance so tool calls
@@ -919,7 +930,7 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
         return None, None
     provider, rec, mid = chosen[0]
     if len(chosen) > 1:
-        provider = FallbackProvider([p for p, _, _ in chosen])
+        provider = FallbackProvider([p for p, _, _ in chosen], [m for _, _, m in chosen])
         rec = {**rec, "fallbacks": [m for _, _, m in chosen[1:]]}
     return provider, {**rec, "id": mid}
 

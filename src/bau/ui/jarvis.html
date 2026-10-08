@@ -386,7 +386,12 @@ function renderCard(c) {
 function holdChip(h) { const c = $("c-hold"); c.hidden = !h; c.className = "chip bad"; if (h) c.title = h; }
 function paintState(s) {
   if (!s) return;
-  $("c-mode").textContent = s.mode === "model" ? (s.model || "MODEL") : "PLAIN MODE";
+  const backups = s.backups || [];
+  $("c-mode").textContent = s.mode === "model"
+    ? (s.model || "MODEL") + (backups.length ? " + " + backups.length + " BACKUP" : "") : "PLAIN MODE";
+  $("c-mode").title = s.mode === "model"
+    ? "First choice: " + s.model + (backups.length ? "\nBackup: " + backups.join(", ") : "") +
+      (s.answered_by ? "\nLast answer from: " + s.answered_by : "") : "";
   $("c-mode").className = "chip " + (s.mode === "model" ? "on" : "warn");
   canListen = s.listen; paintMic();
   if (s.pending && s.pending.length) queueConfirms(s.pending);
@@ -445,6 +450,7 @@ let busy = false;
 function handle(r, you) {
   (r.cards || []).forEach(renderCard);
   caption(r.text, you); logLine("jarvis", r.text);
+  if (r.model) logLine("sys", "via " + r.model);
   paintState(r.state);
   if (r.pending && r.pending.length) queueConfirms(r.pending);
   speak(r.text); loadNodes();
@@ -626,7 +632,7 @@ function renderEpisodes(p, eps) {
   }
 }
 function renderModels(p, d) {
-  for (const m of d.models) kv(p, m.model, m.status + (m.tested === true ? " · tested ✓" : m.tested === false ? " · test failed" : ""));
+  for (const m of d.models) kv(p, m.model + (m.role ? " · " + m.role : ""), m.status + (m.tested === true ? " · tested ✓" : m.tested === false ? " · test failed" : ""));
   if (!d.active) {
     p.appendChild(el("div", null, "Turn one on yourself in the terminal: test it, then approve it. Approving stays a typed command on purpose: it's your signature, not a button."));
     cmd(p, "bau models bench glm-4.7-flash-zai"); cmd(p, "bau set-status model glm-4.7-flash-zai APPROVED");
