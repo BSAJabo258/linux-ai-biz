@@ -46,6 +46,8 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
         return {"call_me": assistant.cfg["call_me"],
                 "mode": "model" if assistant.provider else "plain",
                 "model": assistant.model.get("id") or assistant.model.get("api_model"),
+                "backups": list(assistant.model.get("fallbacks") or []),
+                "answered_by": assistant.last_model,
                 "voice": voice.available, "listen": voice.can_listen,
                 "pending": [p.public() for p in assistant.pending.values()]}
 

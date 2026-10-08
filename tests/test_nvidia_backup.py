@@ -98,6 +98,46 @@ def test_backup_answers_when_the_first_is_busy_and_the_first_rests():
     assert fb.complete("s", [{"role": "user", "content": "hi"}]).text == "Z back."
 
 
+def test_the_owner_can_see_which_model_answered(tmp_path, monkeypatch, capsys):
+    # The owner thought NVIDIA wasn't used: the screen only ever named the first choice.
+    fb = FallbackProvider([Flaky(script=["BUSY"]), Flaky(script=["From NVIDIA."])],
+                          ["glm-4.7-flash-zai", "nemotron-3-super-nim"])
+    a = Assistant(tmp_path, fb, {"id": "glm-4.7-flash-zai",
+                                 "fallbacks": ["nemotron-3-super-nim"]}, "human:owner",
+                  AuditLog(tmp_path / "audit" / "chain.jsonl", key=b""))
+    r = a.ask("hi")
+    assert r.text == "From NVIDIA." and r.model == "nemotron-3-super-nim"
+    assert a.model_summary() == "glm-4.7-flash-zai, backup: nemotron-3-super-nim"
+
+    from bau import cli_ext, overview
+    monkeypatch.setenv("BAU_HOME", str(tmp_path))
+    monkeypatch.setenv("ZAI_API_KEY", "z")
+    monkeypatch.setenv("NVIDIA_API_KEY", "n")
+    approve(tmp_path, "glm-4.7-flash-zai", "nemotron-3-super-nim")
+    rows = {m["model"]: m["role"] for m in overview._models(
+        tmp_path, build_assistant(tmp_path).model)["models"]}
+    assert rows["glm-4.7-flash-zai"] == "first" and rows["nemotron-3-super-nim"] == "backup"
+
+    class Srv:
+        def serve_forever(self):
+            raise KeyboardInterrupt
+    monkeypatch.setattr("bau.ui.jarvis_server.serve", lambda jv, v, port: (Srv(), "K"))
+    monkeypatch.setattr(cli_ext, "_human", lambda: "human:owner")
+
+    class Args:
+        jv_cmd, text, port, no_browser = None, False, 8766, True
+    cli_ext.cmd_jarvis(Args())
+    assert ("Jarvis is up (model glm-4.7-flash-zai, backup: nemotron-3-super-nim)"
+            in capsys.readouterr().err)
+
+
+def test_jarvis_page_shows_backups_and_who_answered():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert '" BACKUP"' in page and '"via " + r.model' in page and "Last answer from" in page
+
+
 def test_when_every_model_fails_the_owner_hears_why(tmp_path):
     fb = FallbackProvider([Flaky(script=["BUSY"]), Flaky(script=["HANG"])])
     with pytest.raises(ProviderError, match="every approved model failed: .*overloaded.*timed"):

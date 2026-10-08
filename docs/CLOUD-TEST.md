@@ -118,8 +118,12 @@ Z.ai is busy, NVIDIA answers the same question instead.
 
 4. Stop Jarvis (Ctrl+C) and start him again with `bau jarvis --no-browser`.
 
-Z.ai answers first, and NVIDIA steps in when it's busy. To have NVIDIA answer first
-instead, with Z.ai as the backup:
+Z.ai answers first, and NVIDIA steps in when it's busy. When Jarvis starts, he says which
+is which: `Jarvis is up (model glm-4.7-flash-zai, backup: nemotron-3-super-nim)`. On his
+screen, the chip at the top shows the first choice and `+ 1 BACKUP`, and the log (**LOG**,
+or press **L**) shows `via ...` under every answer, so you can see which model gave it.
+
+To have NVIDIA answer first instead, with Z.ai as the backup, run this and restart Jarvis:
 
 ```bash
 bau jarvis config --model nemotron-3-super-nim

@@ -59,13 +59,16 @@ def episodes(home: Path) -> list[dict[str, Any]]:
 def _models(home: Path, active: dict[str, Any]) -> dict[str, Any]:
     from .registry import CapabilityRegistry
     reg = CapabilityRegistry(home / "registry" / "capabilities.yaml")
+    backups = list(active.get("fallbacks") or [])
     rows = []
     for mid, rec in sorted(reg.data["model"].items()):
         bench = rec.get("benchmark") or {}
         rows.append({"model": mid, "status": rec.get("status"),
                      "where": rec.get("deployment"),
+                     "role": "first" if mid == active.get("id") else
+                             "backup" if mid in backups else "",
                      "tested": bool(bench.get("reply_ok")) if bench else None})
-    return {"active": active.get("id"), "models": rows}
+    return {"active": active.get("id"), "backups": backups, "models": rows}
 
 
 def overview(asst: Any) -> dict[str, Any]:
@@ -165,7 +168,7 @@ def overview(asst: Any) -> dict[str, Any]:
         nodes.append(_broken("models", "Models", "system", err))
     else:
         nodes.append(_node("models", "Models", "system", "ok" if asst.provider else "bad",
-                           f"thinking with {mdl['active']}" if asst.provider else
+                           f"thinking with {asst.model_summary()}" if asst.provider else
                            "no approved model: Jarvis runs in plain mode", mdl))
 
     def memory() -> dict[str, Any]:

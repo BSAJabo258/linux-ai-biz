@@ -292,8 +292,10 @@ class FallbackProvider(Provider):
     REST = 600
     clock = staticmethod(time.monotonic)
 
-    def __init__(self, providers: list[Provider]):
+    def __init__(self, providers: list[Provider], names: list[str] | None = None):
         self.providers = list(providers)
+        self.names = list(names or [getattr(p, "model", "?") for p in self.providers])
+        self.answered_by: str | None = None     # which model gave the last answer
         self._resting: dict[int, float] = {}
 
     def complete(self, system, messages, tools=None, max_tokens=16000):
@@ -308,6 +310,7 @@ class FallbackProvider(Provider):
                 failed.append(e)
                 continue
             self._resting.pop(i, None)
+            self.answered_by = self.names[i]
             return r
         if len(failed) == 1:
             raise failed[0]
