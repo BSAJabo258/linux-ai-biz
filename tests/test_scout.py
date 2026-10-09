@@ -263,7 +263,7 @@ def test_core_startup_does_not_load_the_scout():
 def test_cli_find_list_report_and_all_searches_failing(tmp_path, monkeypatch, capsys):
     from bau.cli import main
     src = FakeGitHub({"*": [item("acme/sim")]})
-    monkeypatch.setattr(S, "GitHub", lambda: src)
+    monkeypatch.setattr(S, "GitHub", lambda **kw: src)
     assert main(["scout", "find", REQ, "--max-queries", "2"]) == 0
     assert '"acme/sim"' in capsys.readouterr().out
     assert main(["scout", "list"]) == 0 and "needs review" in capsys.readouterr().out
@@ -273,3 +273,126 @@ def test_cli_find_list_report_and_all_searches_failing(tmp_path, monkeypatch, ca
     assert main(["scout", "show", "nobody/x"]) == 4
     src.fail = {"*"}
     assert main(["scout", "find", "video editing", "--max-queries", "2"]) == 3
+
+
+# ------------------------------------------------------------------ GitHub's rate limits
+
+class Clock:
+    def __init__(self, t=1_000_000.0):
+        self.t = t
+
+    def __call__(self):
+        return self.t
+
+    def sleep(self, s):
+        self.t += s
+
+
+def ok_resp(headers=None, body=None):
+    r = Resp(json.dumps(body or {"items": []}).encode())
+    r.headers = headers or {}
+    return r
+
+
+def limited(code, msg, headers=None):
+    return urllib.error.HTTPError("https://api.github.com/x", code, "Forbidden",
+                                  headers or {}, io.BytesIO(json.dumps({"message": msg})
+                                                            .encode()))
+
+
+def gh(tmp_path, answers, clock):
+    sent = []
+
+    def opener(req, timeout=0):
+        sent.append(req.full_url)
+        a = answers.pop(0)
+        if isinstance(a, Exception):
+            raise a
+        return a
+    g = GitHub(token="", opener=opener, sleep=clock.sleep, clock=clock,
+               state=tmp_path / "scout" / "github-rate.json")
+    return g, sent
+
+
+def test_spent_limit_means_nothing_is_sent_until_github_resets_it(tmp_path):
+    from bau.scout.github import RateLimited
+    clock = Clock()
+    reset = clock.t + 900
+    g, sent = gh(tmp_path, [ok_resp({"x-ratelimit-remaining": "0",
+                                     "x-ratelimit-reset": str(reset)}), ok_resp()], clock)
+    g.search("first")
+    with pytest.raises(RateLimited) as e:
+        g.search("second")
+    assert len(sent) == 1 and e.value.until == reset            # the second was never sent
+    other, sent2 = gh(tmp_path, [Resp(b"# r"), ok_resp()], clock)   # a new run (or Jarvis)
+    with pytest.raises(RateLimited):
+        other.search("again")
+    assert sent2 == [] and other.waiting().until == reset
+    assert other.readme("a/b") == "# r"           # GitHub counts other calls separately
+    clock.t = reset + 1
+    other.search("after the reset")
+    assert len(sent2) == 2
+
+
+def test_retry_after_and_unexplained_limits_back_off_and_reset(tmp_path):
+    from bau.scout.github import RateLimited
+    clock = Clock()
+    g, sent = gh(tmp_path, [limited(403, "slow down", {"retry-after": "30"})], clock)
+    with pytest.raises(RateLimited, match="will not ask again before"):
+        g.search("x")
+    assert g.waiting().until == clock.t + 30
+    clock.t += 31
+    sec = "You have exceeded a secondary rate limit."
+    g, sent = gh(tmp_path, [limited(403, sec), limited(429, sec), ok_resp(), ok_resp()],
+                 clock)
+    with pytest.raises(RateLimited):
+        g.search("a")
+    assert g.waiting().until == clock.t + 60                    # at least one minute
+    clock.t += 61
+    with pytest.raises(RateLimited):
+        g.search("b")
+    assert g.waiting().until == clock.t + 120                   # then longer each time
+    clock.t += 121
+    g.search("c")                                               # success clears the strikes
+    st = json.loads((tmp_path / "scout" / "github-rate.json").read_text())
+    assert st["search"]["strikes"] == 0
+
+
+def test_other_refusals_are_errors_not_waits_and_limits_are_paced_apart(tmp_path):
+    from bau.scout.github import RateLimited
+    clock = Clock()
+    g, sent = gh(tmp_path, [limited(403, "Resource not accessible"), ok_resp(), ok_resp(),
+                            Resp(b"# readme")], clock)
+    with pytest.raises(SourceError) as e:
+        g.search("x")
+    assert not isinstance(e.value, RateLimited) and g.waiting() is None
+    start = clock.t
+    g.search("y")
+    assert clock.t - start >= 6.5                               # 10 searches a minute
+    g.search("z")
+    t = clock.t
+    g.readme("a/b")                                             # core limit paced on its own
+    assert clock.t - t < 6.5
+
+
+def test_a_run_stops_asking_the_moment_github_says_wait(tmp_path):
+    from bau.scout.github import RateLimited
+
+    class Limited(FakeGitHub):
+        def search(self, q, per_page=10):
+            self.queries.append(q)
+            if len(self.queries) == 2:
+                raise RateLimited("GitHub rate limit (HTTP 429)", 2_000_000_000)
+            return [item("acme/sim")]
+
+        def readme(self, name):
+            raise AssertionError("nothing may be sent while GitHub asks us to wait")
+
+    src = Limited()
+    sc = scout(tmp_path, src)
+    run = sc.find(REQ, max_queries=5)
+    assert len(src.queries) == 2                                # stopped at the refusal
+    assert run["skipped_searches"] == 3 and run["rate_limited_until"].startswith("2033")
+    assert sum("not read: waiting for GitHub" in n for n in run["notes"]) == 1
+    text = S.report(sc)
+    assert "NOT SENT" in text and "GitHub asked BAU to wait until" in text

@@ -319,6 +319,8 @@ def cmd_scout(a):
             run = sc.find(a.request, a.max_queries, a.per_query, a.readmes)
             _out({"run": run["id"], "found": run["found"],
                   "failed_searches": [s for s in run["searches"] if "error" in s],
+                  "github_asked_to_wait_until": run["rate_limited_until"],
+                  "not_sent": run["skipped_searches"],
                   "top": run["ranked"][:a.top],
                   "next": "bau scout report   |   bau scout inspect OWNER/NAME"})
             if run["found"] == 0 and run["failed_searches"]:
