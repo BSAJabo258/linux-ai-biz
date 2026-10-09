@@ -96,6 +96,53 @@ your click checks a step; Jarvis can't. Approving a model stays a typed command 
 
 **Mission Control** is the **Ports** tab > **Mission Control** (port 8765).
 
+## A second free model for when Z.ai is busy: NVIDIA
+
+Z.ai's free service is often overloaded. NVIDIA runs **Nemotron 3 Super** free for testing,
+and it answered in about a second when we tried it (2026-10-08). Approve both, and when
+Z.ai is busy, NVIDIA answers the same question instead.
+
+1. Get an NVIDIA key (skip this if you already have one): sign in at **build.nvidia.com**
+   and open **build.nvidia.com/settings/api-keys** to create a key. Copy it.
+2. Add it to your Codespaces secrets like the Z.ai key (step 2 above), named
+   `NVIDIA_API_KEY`, with access to **linux-ai-biz**. Stop and start the codespace.
+3. In the terminal, test it, and if it shows `"reply_ok": true`, approve it yourself:
+
+   ```bash
+   bau models bench nemotron-3-super-nim
+   ```
+
+   ```bash
+   bau set-status model nemotron-3-super-nim APPROVED
+   ```
+
+4. Stop Jarvis (Ctrl+C) and start him again with `bau jarvis --no-browser`.
+
+Z.ai answers first, and NVIDIA steps in when it's busy. When Jarvis starts, he says which
+is which: `Jarvis is up (model glm-4.7-flash-zai, backup: nemotron-3-super-nim)`. On his
+screen, the chip at the top shows the first choice and `+ 1 BACKUP`, and the log (**LOG**,
+or press **L**) shows `via ...` under every answer, so you can see which model gave it.
+
+To have NVIDIA answer first instead, with Z.ai as the backup, run this and restart Jarvis:
+
+```bash
+bau jarvis config --model nemotron-3-super-nim
+```
+
+**NVIDIA's rules (its API Trial terms, checked 2026-10-08):**
+
+- **Testing only:** never for your real business.
+- **No personal or confidential data:** you agree not to send any. So while the NVIDIA
+  model is approved, Jarvis won't search your old chats (`docs/CHATS.md`), even as a backup.
+  You can still search them yourself with `bau chats search`.
+- NVIDIA doesn't keep what you send after each session, apart from security logs.
+
+To switch it off again:
+
+```bash
+bau set-status model nemotron-3-super-nim REGISTERED
+```
+
 ## Who can open these links
 
 Both ports are **private**: GitHub only opens them for you, signed in to your account. In

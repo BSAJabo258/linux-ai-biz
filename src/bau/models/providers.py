@@ -232,7 +232,9 @@ class OpenAICompatProvider(LocalHTTPProvider):
     # Free hosted tiers answer 429 "overloaded" when busy (Z.ai error 1305, seen on the
     # first real bench 2026-10-07: four busy replies, then success). Wait and try again
     # rather than fail the owner's conversation; give up with the service's own words.
-    BUSY = (429, 502, 503, 504)
+    # Z.ai also answers a one-off 500 "Operation failed" mid-conversation (seen in the
+    # owner's Codespace 2026-10-07; the same questions answered fine moments later).
+    BUSY = (429, 500, 502, 503, 504)
     waits = (5, 10, 20, 40)
     sleep = staticmethod(time.sleep)
 
@@ -278,6 +280,48 @@ def _retry_after(e: urllib.error.HTTPError, default: int) -> int:
         return max(1, min(60, int(e.headers.get("Retry-After", default))))
     except (TypeError, ValueError, AttributeError):
         return default
+
+
+class FallbackProvider(Provider):
+    """The owner's approved hosted models, in their order. When one is busy, refuses or
+    doesn't answer, the next answers the same turn; the one that failed rests for ten
+    minutes before it is tried first again. Only OpenAI-compatible providers are chained,
+    so tool calls and tool results keep one format whichever model answers."""
+
+    provider_id = "fallback"
+    REST = 600
+    clock = staticmethod(time.monotonic)
+
+    def __init__(self, providers: list[Provider], names: list[str] | None = None):
+        self.providers = list(providers)
+        self.names = list(names or [getattr(p, "model", "?") for p in self.providers])
+        self.answered_by: str | None = None     # which model gave the last answer
+        self._resting: dict[int, float] = {}
+
+    def complete(self, system, messages, tools=None, max_tokens=16000):
+        now = self.clock()
+        order = sorted(range(len(self.providers)), key=lambda i: self._resting.get(i, 0) > now)
+        failed = []
+        for i in order:
+            try:
+                r = self.providers[i].complete(system, messages, tools, max_tokens)
+            except (ProviderError, OSError) as e:
+                self._resting[i] = now + self.REST
+                failed.append(e)
+                continue
+            self._resting.pop(i, None)
+            self.answered_by = self.names[i]
+            return r
+        if len(failed) == 1:
+            raise failed[0]
+        raise ProviderError("every approved model failed: "
+                            + "; ".join(str(e) or type(e).__name__ for e in failed)[:500])
+
+    def tool_result_message(self, results):
+        return self.providers[0].tool_result_message(results)
+
+    def health(self):
+        return {"ok": None, "chain": [getattr(p, "model", "?") for p in self.providers]}
 
 
 # ------------------------------------------------------------------ scripted

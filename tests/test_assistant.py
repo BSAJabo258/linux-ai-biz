@@ -42,6 +42,18 @@ def test_plain_mode_briefing_and_commands(tmp_path):
     assert a.confirm(r.pending[0]["id"], True, "human:owner").get("error")   # one shot
 
 
+def test_jarvis_is_told_approving_is_never_his_and_has_no_tool_for_it(tmp_path):
+    # Rehearsal 2026-10-08 (live GLM-4.7-Flash): asked to approve a model he offered to,
+    # and for a payment he invented `bau approve` arguments. The persona now rules both out.
+    from bau.assistant import PERSONA
+    rules = " ".join(PERSONA.split())
+    assert "Approving is never yours, and never offer to do it" in rules
+    assert "bau set-status model <id> APPROVED" in rules and "never make them up" in rules
+    assert "kids videos only go to YouTube" in rules
+    a = make(tmp_path, [])
+    assert not [n for n in a.tools if "approv" in n or "set_status" in n]
+
+
 def test_config_and_history_carry_over(tmp_path):
     save_config(tmp_path, call_me="chief", model=None)
     a = make(tmp_path)
@@ -233,6 +245,74 @@ def test_server_conversation_confirm_and_preview(server):
     info = client.http.json_of("/video/init/")[0]["post_info"]
     assert info["privacy_level"] == "MUTUAL_FOLLOW_FRIENDS" and info["brand_organic_toggle"]
     assert call(url, "/api/tts", {"text": "hi"}, raw=True)[0] == 204    # no key: browser voice
+
+
+def test_slow_model_answers_as_a_job_the_page_checks_back_on(tmp_path, monkeypatch):
+    # The owner saw 504 in the codespace: a busy free model held one request open until
+    # the proxy gave up. Slow answers now come back as a job, never one long request.
+    import time
+
+    from bau.ui import jarvis_server
+    from bau.ui.jarvis_server import serve
+
+    class Slow(ScriptedProvider):
+        def complete(self, *a, **kw):
+            time.sleep(0.6)
+            return super().complete(*a, **kw)
+
+    monkeypatch.setattr(jarvis_server, "QUICK_REPLY", 0.1)
+    a = Assistant(tmp_path, Slow(script=["Here you are."]), {}, "human:owner",
+                  AuditLog(tmp_path / "audit" / "chain.jsonl", key=b""))
+    srv, _ = serve(a, Voice(tmp_path), 0, key="k123")
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        code, r = call(url, "/api/ask", {"text": "hi"})
+        assert code == 202 and r["job"]
+        assert call(url, "/api/job/" + r["job"], headers={"X-Jarvis-Key": "x"})[0] == 403
+        for _ in range(50):
+            code, out = call(url, "/api/job/" + r["job"])
+            if code == 200:
+                break
+            assert code == 202 and out == {"job": r["job"]}
+            time.sleep(0.1)
+        assert code == 200 and out["text"] == "Here you are." and "state" in out
+        assert call(url, "/api/job/" + r["job"])[0] == 404           # handed over once
+        monkeypatch.setattr(jarvis_server, "QUICK_REPLY", 5)
+        a.provider.script.append("Quick one.")
+        assert call(url, "/api/ask", {"text": "again"})[1]["text"] == "Quick one."
+    finally:
+        srv.shutdown()
+
+
+def test_hosted_model_calls_are_capped_in_conversation(tmp_path, monkeypatch):
+    import yaml as _yaml
+
+    from bau.assistant import CONVERSATION_TIMEOUT
+    from bau.runtime import seed_registry
+    monkeypatch.setenv("BAU_HOME", str(tmp_path))
+    monkeypatch.setenv("ZAI_API_KEY", "k")
+    seed_registry(tmp_path)
+    path = tmp_path / "registry" / "capabilities.yaml"
+    data = _yaml.safe_load(path.read_text())
+    data["model"]["glm-4.7-flash-zai"]["status"] = "APPROVED"
+    path.write_text(_yaml.safe_dump(data))
+    a = build_assistant(tmp_path)
+    assert a.provider.timeout == CONVERSATION_TIMEOUT <= 60
+
+    def hung(*args, **kw):
+        raise TimeoutError("The read operation timed out")
+    a.provider._open = hung
+    assert "didn't answer in time" in a.ask("hello").text and a.messages == []
+
+
+def test_jarvis_page_checks_back_on_slow_answers():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert "async function settle" in page and '"/api/job/"' in page
+    for path in ("/api/ask", "/api/briefing", "/api/confirm", "/api/draft"):
+        assert f'settle(await apiJson("{path}"' in page
 
 
 def test_server_refuses_non_human_owner(tmp_path):

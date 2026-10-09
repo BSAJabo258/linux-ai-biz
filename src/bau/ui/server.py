@@ -87,6 +87,12 @@ def make_handler(home: Path) -> type[BaseHTTPRequestHandler]:
     class H(BaseHTTPRequestHandler):
         server_version = "BAU-MissionControl"
 
+        def handle(self) -> None:
+            try:
+                super().handle()
+            except (BrokenPipeError, ConnectionResetError):
+                pass                      # the browser left before the reply was sent
+
         def _send(self, code: int, body: bytes, ctype: str) -> None:
             self.send_response(code)
             self.send_header("Content-Type", ctype)

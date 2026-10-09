@@ -38,6 +38,9 @@ RUN useradd --create-home --uid 1000 --shell /bin/bash owner \
  && install -d -m 0770 -o owner -g owner /var/lib/bau
 COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/bau-entrypoint
 COPY --chmod=0755 docker/approver-setup.sh /usr/local/bin/bau-approver-setup
+# A checkout made on Windows before .gitattributes existed still has CRLF scripts, and
+# "#!/bin/sh\r" can't start; strip it so the image works from any checkout.
+RUN sed -i 's/\r$//' /usr/local/bin/bau-entrypoint /usr/local/bin/bau-approver-setup
 
 USER owner
 WORKDIR /home/owner

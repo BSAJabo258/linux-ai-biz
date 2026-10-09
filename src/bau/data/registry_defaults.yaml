@@ -26,6 +26,21 @@ provider:
     privacy_url: https://docs.z.ai/legal-agreement/privacy-policy
     dpa_signed: false
     status: REGISTERED
+  nvidia:
+    # Checked 2026-10-08: NVIDIA API Trial Terms of Service, v. September 19, 2025.
+    # Trial use only, never in production (1.2). Content is not stored or used after the
+    # session (2.3) except logs for security, fraud and abuse (2.4, 3.3). No confidential
+    # information or personal data may be sent (2.6a), so personal_data_allowed is false.
+    provider_id: nvidia
+    data_sent: [Jarvis prompts, your messages, BAU status summaries and tool results]
+    data_retained: "not stored or used after each session, except logs for security, fraud and abuse (API Trial terms 2.3-2.4)"
+    training_on_customer_data: not stated; content is not used after the session (terms 2.3)
+    jurisdiction: US
+    commercial_rights: trial and evaluation only; production needs an NVIDIA AI Enterprise subscription
+    terms_url: https://assets.ngc.nvidia.com/products/api-catalog/legal/NVIDIA%20API%20Trial%20Terms%20of%20Service.pdf
+    personal_data_allowed: false
+    dpa_signed: false
+    status: REGISTERED
   local:
     provider_id: local
     data_sent: [nothing leaves the machine]
@@ -129,6 +144,35 @@ model:
     input_types: [text]
     quality: 0.75
     latency_ms: 4000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+  nemotron-3-super-nim:
+    model_id: nemotron-3-super-nim
+    name: NVIDIA Nemotron 3 Super, hosted free by NVIDIA - testing backup when Z.ai is busy
+    version: hosted
+    provider: nvidia
+    # Checked 2026-10-08 at docs.api.nvidia.com (llm-apis): POST
+    # https://integrate.api.nvidia.com/v1/chat/completions, OpenAI-compatible, Bearer key;
+    # free to NVIDIA Developer Program members "for prototyping". Live `bau models bench`
+    # logic the same day: reply_ok and tool_calls true, about 1 s. Models the docs still
+    # list (z-ai/glm4.7, meta/llama-3.3-70b-instruct, qwen/qwen3-next-80b-a3b-instruct,
+    # deepseek-ai/deepseek-v4-flash) answered 410 Gone, so only live tests count.
+    source: NVIDIA API Catalog (build.nvidia.com)
+    license: NVIDIA API Trial terms (trial only; see the nvidia provider record)
+    commercial_use: false
+    deployment: cloud
+    adapter: openai_compat
+    endpoint: https://integrate.api.nvidia.com/v1
+    chat_path: /chat/completions
+    api_model: nvidia/nemotron-3-super-120b-a12b
+    api_key_env: NVIDIA_API_KEY
+    trust_level: OFFICIAL
+    privacy: cloud
+    tools: true
+    input_types: [text]
+    quality: 0.75
+    latency_ms: 2000
     cost_in_per_mtok: 0
     cost_out_per_mtok: 0
     status: REGISTERED

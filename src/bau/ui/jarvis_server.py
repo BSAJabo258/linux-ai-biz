@@ -20,6 +20,7 @@ import os
 import secrets
 import shutil
 import threading
+from collections.abc import Callable
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
@@ -30,6 +31,8 @@ from .server import allowed_hosts_from_env, bind_address
 
 MAX_JSON = 64 * 1024
 MAX_AUDIO = 8 * 1024 * 1024
+QUICK_REPLY = 15        # seconds a request waits for an answer before it becomes a job
+MAX_JOBS = 50
 
 
 def make_handler(assistant: Assistant, voice: Voice, key: str
@@ -37,9 +40,55 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
     page = (resources.files("bau.ui") / "jarvis.html").read_bytes()
     allowed_hosts = allowed_hosts_from_env()
     lock = threading.Lock()               # one conversation, one turn at a time
+    jobs: dict[str, dict[str, Any]] = {}  # slow answers the page is checking back on
+
+    def state() -> dict[str, Any]:
+        return {"call_me": assistant.cfg["call_me"],
+                "mode": "model" if assistant.provider else "plain",
+                "model": assistant.model.get("id") or assistant.model.get("api_model"),
+                "backups": list(assistant.model.get("fallbacks") or []),
+                "answered_by": assistant.last_model,
+                "voice": voice.available, "listen": voice.can_listen,
+                "pending": [p.public() for p in assistant.pending.values()]}
+
+    def answer(work: Callable[[], dict[str, Any]]) -> tuple[int, dict[str, Any]]:
+        """Run one piece of model work. A quick answer comes back at once; a slow one (a
+        busy free hosted model can take minutes) becomes a job the page checks every few
+        seconds, so no proxy in between - Codespaces, VS Code port forwarding - cuts a
+        long request off (the owner saw 504)."""
+        box: dict[str, Any] = {}
+
+        def run() -> None:
+            try:
+                with lock:
+                    box["reply"] = work()
+            except Exception as e:  # never leave the page waiting for nothing
+                box["reply"] = {"text": f"Something went wrong on my side "
+                                        f"({type(e).__name__}). Ask me again?",
+                                "cards": [], "pending": [], "mode": "plain",
+                                "error": str(e)[:300]}
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        t.join(QUICK_REPLY)
+        if "reply" in box:
+            return 200, box["reply"]
+        job = secrets.token_urlsafe(12)
+        for old in list(jobs)[:-MAX_JOBS]:        # a page that never came back
+            jobs.pop(old, None)
+        jobs[job] = box
+        return 202, {"job": job}
 
     class H(BaseHTTPRequestHandler):
         server_version = "BAU-Jarvis"
+
+        def handle(self) -> None:
+            try:
+                super().handle()
+            except (BrokenPipeError, ConnectionResetError):
+                # The page stopped waiting (reload, closed tab, or the Codespaces proxy
+                # giving up on a slow model): there is no one left to send the reply to.
+                pass
 
         def _send(self, code: int, body: bytes, ctype: str = "application/json") -> None:
             self.send_response(code)
@@ -87,11 +136,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
             return self.rfile.read(n)
 
         def _state(self) -> dict[str, Any]:
-            return {"call_me": assistant.cfg["call_me"],
-                    "mode": "model" if assistant.provider else "plain",
-                    "model": assistant.model.get("id") or assistant.model.get("api_model"),
-                    "voice": voice.available, "listen": voice.can_listen,
-                    "pending": [p.public() for p in assistant.pending.values()]}
+            return state()
 
         def do_GET(self) -> None:  # noqa: N802
             path, _, query = self.path.partition("?")
@@ -137,9 +182,16 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 with lock:
                     self._json(200, overview(assistant))
             elif path == "/api/briefing":
-                with lock:
-                    r = assistant.briefing()
-                self._json(200, {**asdict(r), "state": self._state()})
+                self._json(*answer(lambda: {**asdict(assistant.briefing()), "state": state()}))
+            elif path.startswith("/api/job/"):
+                job = path.rsplit("/", 1)[-1]
+                box = jobs.get(job)
+                if box is None:
+                    self._json(404, {"error": "no such job (already answered?)"})
+                elif "reply" in box:
+                    self._json(200, jobs.pop(job)["reply"])
+                else:
+                    self._json(202, {"job": job})
             else:
                 self._send(404, b"not found", "text/plain")
 
@@ -167,25 +219,29 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 self._send(400, b"bad JSON", "text/plain")
                 return
             if self.path == "/api/ask":
-                with lock:
-                    r = assistant.ask(str(data.get("text", "")))
-                self._json(200, {**asdict(r), "state": self._state()})
+                text = str(data.get("text", ""))
+                self._json(*answer(lambda: {**asdict(assistant.ask(text)), "state": state()}))
             elif self.path == "/api/confirm":
                 # The click on Confirm is the owner's act; the identity is the human
                 # who started this server from their own login.
-                with lock:
-                    choices = data.get("choices")
+                choices = data.get("choices")
+
+                def confirm() -> dict[str, Any]:
                     out = assistant.confirm(str(data.get("id", "")),
                                             data.get("approve") is True, assistant.owner,
                                             choices if isinstance(choices, dict) else None)
-                self._json(200, {**out, "state": self._state()})
+                    return {**out, "state": state()}
+                self._json(*answer(confirm))
             elif self.path == "/api/draft":
                 # The owner pressed Draft on an episode: the same act Jarvis may do.
-                with lock:
+                def draft() -> dict[str, Any]:
                     out, err = assistant._run_tool("draft_stage", {
                         "workspace": str(data.get("workspace", "")),
                         "episode": str(data.get("episode", ""))})
-                self._json(200, {"result": out, "error": err})
+                    p = assistant.pending.get(out.get("pending_id", "")) if not err else None
+                    return {"result": out, "error": err,
+                            "pending": [p.public()] if p else []}
+                self._json(*answer(draft))
             elif self.path == "/api/check":
                 # Checking is the owner's: this only puts it on screen; Confirm does it.
                 from ..workspace import WorkspaceError

@@ -681,6 +681,36 @@ def cmd_graph(a):
     return EXIT_OK
 
 
+def cmd_chats(a):
+    from .chats import ChatLibrary
+    lib = ChatLibrary(bau_home())
+    if a.chats_cmd == "import":
+        results = []
+        for f in a.files:
+            try:
+                results.append(lib.import_file(Path(f)))
+            except (OSError, ValueError) as e:      # a bad file never stops the others
+                results.append({"file": f, "error": str(e)[:300]})
+        _out({"imported": results, "now": lib.stats()})
+        return EXIT_OK if all("error" not in r for r in results) else EXIT_BLOCKED
+    if a.chats_cmd == "search":
+        _out(lib.search(a.query, k=a.n, source=a.source))
+    elif a.chats_cmd == "show":
+        try:
+            _out(lib.conversation(a.conversation, max_chars=200000))
+        except KeyError as e:
+            _out({"error": str(e).strip("'\"")})
+            return EXIT_BLOCKED
+    elif a.chats_cmd == "sharing":
+        if a.choice:
+            lib.set_sharing(a.choice)       # typed by the owner; never set by a model
+        _out({"sharing": lib.sharing() or "not decided: Jarvis on a cloud model can't read "
+              "your chats until you choose 'cloud' or 'local-only'"})
+    else:
+        _out(lib.stats())
+    return EXIT_OK
+
+
 def cmd_jarvis(a):
     from .assistant import Voice, build_assistant, load_env_file, save_config
     if a.jv_cmd == "config":
@@ -690,6 +720,19 @@ def cmd_jarvis(a):
             save_config(bau_home(), **values)
         _out(yaml.safe_load((bau_home() / "config" / "jarvis.yaml").read_text())
              if (bau_home() / "config" / "jarvis.yaml").exists() else {})
+        return EXIT_OK
+    if a.jv_cmd == "constitution":
+        from .assistant import CONSTITUTION_MAX, load_constitution
+        from .home import data_dir
+        folder = data_dir("constitution", bau_home())
+        text = load_constitution(bau_home())
+        _out({"folder": str(folder),
+              "yours": folder.is_relative_to(bau_home()),
+              "files": sorted(f.name for f in folder.glob("*.md")),
+              "characters": len(text), "limit": CONSTITUTION_MAX,
+              "edit": "change the files in the folder; Jarvis reads them at every question"
+                      if folder.is_relative_to(bau_home())
+                      else "run 'bau init' first to get your own copy to edit"})
         return EXIT_OK
     owner = _human()
     load_env_file()
@@ -703,7 +746,7 @@ def cmd_jarvis(a):
         url = (f"https://{os.environ['CODESPACE_NAME']}-{a.port}."
                f"{os.environ.get('GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN', 'app.github.dev')}"
                f"/?k={key}")
-    mode = f"model {jv.model.get('id')}" if jv.provider else "plain mode (no model connected)"
+    mode = f"model {jv.model_summary()}" if jv.provider else "plain mode (no model connected)"
     print(f"Jarvis is up ({mode}). Open: {url}\nCtrl+C to stop.", file=sys.stderr)
     if not a.no_browser:
         import webbrowser
@@ -1422,7 +1465,25 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--voice-id", help="ElevenLabs voice id")
     x.add_argument("--listen", choices=["elevenlabs", "browser"],
                    help="where push-to-talk audio is transcribed")
+    jv.add_parser("constitution", help="where your operating constitution lives and what "
+                  "Jarvis loads from it")
     s.set_defaults(fn=cmd_jarvis)
+
+    s = sub.add_parser("chats", help="your exported Claude and ChatGPT conversations: "
+                       "import, search, read")
+    cs = s.add_subparsers(dest="chats_cmd", required=True)
+    x = cs.add_parser("import", help="load export ZIPs or conversations.json files")
+    x.add_argument("files", nargs="+")
+    x = cs.add_parser("search", help="find messages about a topic")
+    x.add_argument("query")
+    x.add_argument("--source", choices=["claude", "chatgpt"])
+    x.add_argument("-n", type=int, default=10)
+    x = cs.add_parser("show", help="read one conversation (reference from search)")
+    x.add_argument("conversation")
+    cs.add_parser("stats", help="what is loaded, per service")
+    x = cs.add_parser("sharing", help="may Jarvis send excerpts to a cloud model? your choice")
+    x.add_argument("choice", nargs="?", choices=["cloud", "local-only"])
+    s.set_defaults(fn=cmd_chats)
 
     s = sub.add_parser("ui", help="Mission Control web dashboard (localhost, read-only)")
     s.add_argument("--port", type=int, default=8765)
