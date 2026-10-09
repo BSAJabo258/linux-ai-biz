@@ -103,7 +103,7 @@ Each phase is one pull request with tests, and is boot-tested where it touches t
 | 7 | MCP servers with explicit capability profiles (default DENY) | Uses the existing `mcp` registry kind |
 | 8 | God's Eye: wider observation, event records (§21), "green means verified" | Grows from the Governor |
 | 9 | OpenHands engineering worker in a sandbox; PRs only, never push to main | GitHub-hosted or ephemeral runners, never this laptop as a public runner |
-| 10 | Question graph and evidence as a knowledge-bundle workspace; Capability Registry; Repo Scout | Structure first (ICM); discovery ≠ installation |
+| 10 | Question graph and evidence as a knowledge-bundle workspace; Capability Registry; Repo Scout | **Repo Scout started 2026-10-09** (`bau scout`, `docs/engineering/repo-intelligence.md`): discovery, evidence, licence/security gates, quarantine + Sentinel inspection. Next: sandbox validation reports, licence review record, adapter interface, first integration. Discovery ≠ installation |
 | 11 | Self-Lab: trajectories, regression database, challenge generator, promotion gates | |
 | 12 | AMD Developer Cloud worker (ROCm + vLLM, one model, one benchmark), create-run-destroy discipline | Read credit terms from the AMD dashboard, never hard-code them |
 | 13 | Model training (LoRA/QLoRA, DPO …) | Only with enough trajectories and benchmarks |

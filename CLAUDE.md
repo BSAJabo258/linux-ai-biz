@@ -13,6 +13,7 @@ stand and what is next.
 | `src/bau/assistant.py`, `ui/jarvis_server.py`, `ui/jarvis.html` | Jarvis: briefing, conversation, tools, voice HUD |
 | `src/bau/publishing.py` | publishing hub; platforms are adapters (`tiktok.py`, `youtube.py`); `kids.py` = made-for-kids rules |
 | `src/bau/workspace.py`, `data/workspaces/` | ICM workspaces (`bau ws`): numbered stage folders one agent walks, owner checks each stage; kids-channel pilot |
+| `src/bau/scout/`, `data/scout.yaml` | Repo Scout (`bau scout`): finds open-source projects for a capability, keeps claims apart from inspected and tested facts, licence/security gates; never installs or runs them. See `docs/engineering/repo-intelligence.md` |
 | `src/bau/governor.py` | watchdog (hold / quarantine / resume, never approves) |
 | `src/bau/brain.py` | Second Brain (Markdown vault, nouns + verbs graph) |
 | `src/bau/chats.py` | chat library (`bau chats`): the owner's Claude/ChatGPT exports in SQLite FTS5; Jarvis reads them per `bau chats sharing` |
