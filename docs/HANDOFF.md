@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 277 tests pass; 49 regulations / 65 policies validate.
+State: 282 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -46,6 +46,16 @@ The full Jarvis screen (2026-10-09):
 - light theme, zoom, a key for every button.
 
 Tests were written first: `tests/test_jarvis_live.py`. The page passes `bau a11y lint`.
+
+The look (2026-10-09, `tests/test_jarvis_look.py` written first):
+- a rotating 720-point particle orb in a golden halo;
+- energy streams across the screen, and circuit traces from the screen edges to every
+  node, with pulses that speed up while that node works;
+- a voice bar with a waveform, a "Speaking - tap to stop" pill, and a Chat/Voice pill;
+- calmer motion for reduced-motion users.
+
+A test runs `node --check` on the page script, because a text check missed a syntax error
+once. It runs at 60 fps at 1600x900 and on a phone-sized screen in headless Chromium.
 
 The Jarvis screen (`ui/jarvis.html`, data from `overview.py` via `/api/overview`) shows the
 business as live nodes around the core (team, systems, connections). Producer walks

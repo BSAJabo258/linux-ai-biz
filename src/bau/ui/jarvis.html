@@ -6,11 +6,11 @@
 <title>BAU Jarvis</title>
 <style>
 :root{--bg:#02060b;--ink:#cfefff;--dim:#5d8aa3;--line:rgba(80,200,255,.22);--cyan:#3fd6ff;
-  --amber:#ffb340;--green:#46f2a4;--red:#ff4d5e;--violet:#a98bff;--panel:rgba(6,22,34,.62);
+  --amber:#ffb340;--green:#46f2a4;--red:#ff4d5e;--violet:#a98bff;--panel:rgba(6,22,34,.62);--gold:#ffcf4d;
   --solid:#061624;--field:#03101b;--off:#3d6175;--glow:#e8f8ff;
-  --sky:radial-gradient(ellipse at 50% 45%,#06223a 0%,#020a12 55%,#010307 100%)}
+  --sky:radial-gradient(ellipse at 50% 45%,#0b4374 0%,#062a52 30%,#03152c 62%,#010812 100%)}
 :root[data-theme="light"]{--bg:#eef5fa;--ink:#08263a;--dim:#4b6a7c;--line:rgba(10,90,140,.25);
-  --cyan:#0a78a8;--amber:#a86200;--green:#0b7d4c;--red:#c22538;--violet:#5f45c4;
+  --cyan:#0a78a8;--amber:#a86200;--gold:#b88600;--green:#0b7d4c;--red:#c22538;--violet:#5f45c4;
   --panel:rgba(255,255,255,.86);--solid:#ffffff;--field:#f4f9fc;--off:#8aa3b2;--glow:#062033;
   --sky:radial-gradient(ellipse at 50% 45%,#ffffff 0%,#e3eff7 60%,#d5e6f1 100%)}
 *{box-sizing:border-box}
@@ -35,9 +35,22 @@ header .r{display:flex;gap:14px;align-items:center}
 .chip.warn{color:var(--amber);border-color:rgba(255,179,64,.5)}
 .chip.bad{color:var(--red);border-color:rgba(255,77,94,.5)}
 button.chip{background:none;color:inherit;font:inherit;cursor:pointer;letter-spacing:inherit;text-transform:inherit}
-#statelabel{pointer-events:none;position:fixed;left:50%;top:calc(50% + min(26vh,210px));transform:translateX(-50%);
-  font-size:12px;letter-spacing:.42em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
-#caption{pointer-events:none;position:fixed;left:50%;bottom:118px;transform:translateX(-50%);width:min(760px,calc(100% - 32px));
+#voicebar{pointer-events:none;position:fixed;left:50%;bottom:98px;transform:translateX(-50%);text-align:center;
+  display:flex;align-items:center;gap:10px}
+#voicebar .rule{width:120px;height:1px;background:linear-gradient(90deg,transparent,var(--line))}
+#voicebar .rule.r{background:linear-gradient(90deg,var(--line),transparent)}
+#wave{width:220px;height:34px;display:block}
+#statelabel{font-size:10px;letter-spacing:.42em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+#speakpill{position:fixed;left:50%;top:54px;transform:translateX(-50%);z-index:4;background:var(--solid);
+  border:1px solid var(--gold);color:var(--gold);border-radius:14px;padding:4px 14px;font:inherit;font-size:11px;
+  letter-spacing:.24em;text-transform:uppercase;cursor:pointer;box-shadow:0 0 16px rgba(255,207,77,.35)}
+#speakpill{white-space:nowrap}
+#speakpill .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-right:8px;
+  animation:blink 1s infinite}
+#modepill{border:1px solid var(--line);border-radius:18px;background:none;color:var(--ink);font:inherit;font-size:11px;
+  letter-spacing:.18em;padding:8px 12px;cursor:pointer;flex:none}
+#modepill b{color:var(--gold);font-weight:600}
+#caption{pointer-events:none;position:fixed;left:50%;bottom:150px;transform:translateX(-50%);width:min(760px,calc(100% - 32px));
   text-align:center;font-size:20px;line-height:1.4;color:var(--glow);text-shadow:0 0 18px rgba(63,214,255,.35);
   min-height:2.8em}
 #caption .you{color:var(--dim);font-size:15px;display:block;margin-bottom:6px}
@@ -96,8 +109,10 @@ aside.r{display:none}body.showlog aside.r{display:block}
 .node{position:absolute;transform:translate(-50%,-50%);transition:left .4s,top .4s;pointer-events:auto;background:none;border:0;
   color:var(--ink);font:inherit;font-size:14px;letter-spacing:.06em;cursor:pointer;display:flex;
   align-items:center;gap:8px;padding:6px;white-space:nowrap}
-.node .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--cyan);flex:none;
-  box-shadow:0 0 10px rgba(63,214,255,.5);background:var(--solid)}
+.node .dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--cyan);flex:none;
+  box-shadow:0 0 0 4px rgba(63,214,255,.12),0 0 12px rgba(63,214,255,.55);background:var(--solid)}
+.node .lbl{text-shadow:0 0 10px rgba(63,214,255,.45);font-weight:600}
+.node.warn .dot{border-color:var(--gold)!important}
 .node.left{flex-direction:row-reverse}
 .node.ok .dot{border-color:var(--green);box-shadow:0 0 10px rgba(70,242,164,.55)}
 .node.warn .dot{border-color:var(--amber);box-shadow:0 0 14px rgba(255,179,64,.7);animation:pulse 1.6s infinite}
@@ -111,7 +126,7 @@ aside.r{display:none}body.showlog aside.r{display:block}
   box-shadow:0 0 16px rgba(169,139,255,.8)}
 .node.busy .lbl{color:var(--violet)}
 @keyframes spin{to{transform:rotate(360deg)}}
-#ticker{pointer-events:none;position:fixed;left:50%;top:calc(50% + min(26vh,210px) + 20px);transform:translateX(-50%);
+#ticker{pointer-events:none;position:fixed;left:50%;top:86px;transform:translateX(-50%);
   font-size:12px;color:var(--violet);white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
 .live{border-top:1px dashed var(--line);margin-top:8px;padding-top:6px;font-size:12px;color:var(--violet)}
 .live div{margin:2px 0}.live .error{color:var(--red)}.live .done{color:var(--green)}
@@ -156,7 +171,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   aside.l.open{left:8px;right:8px;width:auto;top:auto;bottom:96px;max-height:58vh;z-index:5}
   aside.r,#timeline{left:8px;right:8px;width:auto;top:auto;bottom:96px;max-height:58vh;z-index:6}
   header .r{overflow-x:auto;max-width:72vw;scrollbar-width:none}
-  .hint{display:none}header>div:first-child{white-space:nowrap}header .chip{padding:2px 6px;font-size:10px;letter-spacing:.08em}header{padding:12px 16px;letter-spacing:.14em}header .r{gap:8px}#caption{font-size:17px;bottom:104px}#statelabel{top:calc(50% + 24vw)}}
+  .hint{display:none}header>div:first-child{white-space:nowrap}header .chip{padding:2px 6px;font-size:10px;letter-spacing:.08em}header{padding:12px 16px;letter-spacing:.14em}header .r{gap:8px}#caption{font-size:16px;bottom:138px}#voicebar{bottom:92px}#voicebar .rule{width:40px}#wave{width:160px}}
 </style>
 </head>
 <body>
@@ -184,12 +199,14 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 <aside class="l" id="cards"></aside>
 <aside class="r" id="log" aria-label="Conversation log"></aside>
 <aside id="timeline" aria-label="Timeline"></aside>
-<div id="statelabel">STANDBY</div>
+<div id="voicebar" aria-hidden="true"><span class="rule"></span><div><canvas id="wave"></canvas><div id="statelabel">STANDBY</div></div><span class="rule r"></span></div>
+<button id="speakpill" data-key="S" title="Stop speaking (S)" hidden><span class="dot"></span>Speaking · tap to stop</button>
 <div id="caption" aria-live="polite"></div>
 <div id="ticker" aria-live="polite"></div>
 </main>
 <footer>
   <div class="bar">
+    <button id="modepill" data-key="V" title="Chat (text only) or Voice (Jarvis speaks) (V)"><b>VOICE</b> · chat</button>
     <button id="mic" data-key="Space" title="Hold to talk (Space)" aria-label="Talk">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
     </button>
@@ -214,7 +231,8 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
     <li><kbd>1</kbd>…<kbd>9</kbd>Open a part of the business (in order around the core)</li>
     <li><kbd>G</kbd>Go into the open panel, then Tab and Enter</li>
     <li><kbd>T</kbd>Timeline</li><li><kbd>C</kbd>Mission Control</li><li><kbd>L</kbd>Conversation log</li>
-    <li><kbd>M</kbd>Voice on or off</li><li><kbd>W</kbd>Wake word on or off</li>
+    <li><kbd>M</kbd>Voice on or off</li><li><kbd>V</kbd>Chat or Voice mode</li>
+    <li><kbd>S</kbd>Stop Jarvis speaking</li><li><kbd>W</kbd>Wake word on or off</li>
     <li><kbd>A</kbd>Alerts on or off</li><li><kbd>D</kbd>Light or dark</li>
     <li><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd>Zoom the map in, out, back</li><li><kbd>?</kbd>This list</li>
   </ul>
@@ -271,30 +289,126 @@ let level = 0, target = 0;     // speaking/listening loudness 0..1
 let analyser = null, actx = null, buf = null;
 const LABEL = { idle: "STANDBY", listening: "LISTENING", thinking: "PROCESSING", speaking: "SPEAKING" };
 const HUE = { idle: [63, 214, 255], listening: [255, 179, 64], thinking: [169, 139, 255], speaking: [63, 214, 255] };
-function setState(s) { STATE = s; $("statelabel").textContent = LABEL[s]; }
+function setState(s) { STATE = s; $("statelabel").textContent = LABEL[s];
+  const pill = document.getElementById("speakpill"); if (pill) pill.hidden = s !== "speaking"; }
 
 const cv = $("core"), cx = cv.getContext("2d");
 let W = 0, H = 0, DPR = 1, col = [63, 214, 255];
 function resize() { DPR = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
   cv.width = W * DPR; cv.height = H * DPR; cx.setTransform(DPR, 0, 0, DPR, 0, 0); }
 addEventListener("resize", resize); resize();
-const sparks = Array.from({ length: 90 }, () => ({ a: Math.random() * 6.283, r: 0.55 + Math.random() * 0.9,
-  s: (Math.random() - 0.5) * 0.004, z: Math.random() }));
+const REDUCED = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
+const SPEED = REDUCED ? 0.15 : 1;            // calm, not frozen, for reduced-motion users
+// The orb: points spread evenly on a sphere (Fibonacci lattice), turned in 3D each frame.
+const ORB_POINTS = 720;
+const orb = Array.from({ length: ORB_POINTS }, (_, i) => {
+  const y = 1 - (i + 0.5) * 2 / ORB_POINTS, r = Math.sqrt(1 - y * y), th = i * 2.39996323;
+  return [Math.cos(th) * r, y, Math.sin(th) * r, Math.random()]; });
 const rings = [ // radius factor, width, arc length, speed, dash count
-  [1.00, 2, 1.6, 0.0035, 1], [1.10, 1, 6.2, -0.002, 48], [1.22, 3, 0.9, 0.006, 3],
-  [1.36, 1, 4.4, -0.0045, 1], [1.52, 1, 6.2, 0.001, 120], [0.78, 2, 2.4, -0.008, 2]];
-let t0 = performance.now();
+  [1.22, 1, 6.2, -0.002, 60], [1.36, 2, 1.2, 0.004, 3], [1.52, 1, 6.2, 0.001, 120]];
+const STREAMS = Array.from({ length: REDUCED ? 8 : 16 }, (_, i) => ({ y: (i + 0.5) / (REDUCED ? 8 : 16),
+  a: 0.5 + Math.random() * 1.6, f: 0.6 + Math.random() * 1.4, p: Math.random() * 6.283, w: 0.6 + Math.random() * 1.4 }));
+let t0 = performance.now(), spinA = 0, realAudio = false;
 
 function rgba(c, a) { return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + a + ")"; }
+const GOLD = [255, 207, 77];
+function themeLight() { return document.documentElement.dataset.theme === "light"; }
+// Energy streams: soft ribbons flowing across the whole screen, bending through the core.
+function drawStreams(X, Y, R, now) {
+  const t = now * 0.00018 * SPEED, boost = 0.5 + level * 0.9 + (STATE === "thinking" ? 0.3 : 0);
+  cx.lineCap = "round";
+  for (const s of STREAMS) {
+    const base = s.y * H, pull = (Y - base) * 0.78;
+    cx.strokeStyle = rgba(themeLight() ? [10, 120, 168] : [70, 170, 255], (REDUCED ? 0.1 : 0.1 + 0.06 * Math.sin(t * 3 + s.p)) * boost);
+    cx.lineWidth = s.w; cx.beginPath();
+    for (let x = -20; x <= W + 20; x += 24) {
+      const u = x / W, bend = Math.exp(-Math.pow((x - X) / (W * 0.22), 2));
+      const y = base + pull * bend + Math.sin(u * 6.283 * s.f + t * 6 + s.p) * H * 0.035 * s.a;
+      x === -20 ? cx.moveTo(x, y) : cx.lineTo(x, y);
+    }
+    cx.stroke();
+  }
+}
+// Circuit traces: right-angled tracks from the screen edge to every node, with a pulse
+// running along each one (fast and violet while that node is working).
+function drawTraces(now) {
+  if (W < 760) return;
+  for (const n of NODES) {
+    if (n.x == null || n.state === "off") continue;
+    const fromLeft = n.x < (W / 2 + offX), ex = fromLeft ? 0 : W, step = fromLeft ? 1 : -1;
+    const kneeX = n.x - step * Math.min(120, Math.abs(n.x - ex) * 0.35), y0 = n.y + (n.phase - 0.5) * 60;
+    const busyNode = BUSY[n.id] != null, c = busyNode ? [169, 139, 255] : STATE_COL[n.state] || STATE_COL.idle;
+    const trace = [[ex, y0], [kneeX - step * 24, y0], [kneeX, n.y], [n.x - step * 14, n.y]];
+    cx.strokeStyle = rgba(c, busyNode ? 0.5 : 0.22); cx.lineWidth = 1.2; cx.beginPath();
+    trace.forEach(([x, y], i) => i ? cx.lineTo(x, y) : cx.moveTo(x, y)); cx.stroke();
+    cx.fillStyle = rgba(c, 0.9); cx.beginPath(); cx.arc(ex + step * 3, y0, 2, 0, 6.283); cx.fill();
+    // a pulse travelling along the trace
+    const segs = [], lens = []; let total = 0;
+    for (let i = 1; i < trace.length; i++) { const l = Math.hypot(trace[i][0] - trace[i - 1][0], trace[i][1] - trace[i - 1][1]); segs.push(i); lens.push(l); total += l; }
+    let d = (((now / (busyNode ? 600 : 3200)) * SPEED + n.phase) % 1) * total;
+    for (let i = 0; i < lens.length; i++) { if (d <= lens[i]) { const a = trace[i], b2 = trace[i + 1], k = d / lens[i];
+        cx.fillStyle = rgba(c, 1); cx.beginPath(); cx.arc(a[0] + (b2[0] - a[0]) * k, a[1] + (b2[1] - a[1]) * k, busyNode ? 3 : 2.2, 0, 6.283); cx.fill(); break; }
+      d -= lens[i]; }
+  }
+}
+// The golden halo round the orb; it brightens with the voice and turns the state's colour.
+function drawHalo(X, Y, R, now) {
+  const hc = STATE === "idle" || STATE === "speaking" ? GOLD : col, rr = R * (1.02 + level * 0.06);
+  cx.save();
+  cx.shadowColor = rgba(hc, 0.9); cx.shadowBlur = 18 + level * 30;
+  cx.strokeStyle = rgba(hc, 0.95); cx.lineWidth = 3 + level * 3;
+  cx.beginPath(); cx.arc(X, Y, rr, 0, 6.283); cx.stroke();
+  cx.shadowBlur = 0; cx.strokeStyle = rgba(hc, 0.35); cx.lineWidth = 8 + level * 10;
+  cx.beginPath(); cx.arc(X, Y, rr, 0, 6.283); cx.stroke();
+  cx.restore();
+}
+// The orb itself: a turning sphere of points with a soft glow behind it.
+function drawOrb(X, Y, R, now) {
+  const g = cx.createRadialGradient(X, Y, 0, X, Y, R * 1.02);
+  g.addColorStop(0, rgba([180, 235, 255], 0.55 + level * 0.3)); g.addColorStop(0.55, rgba(col, 0.22));
+  g.addColorStop(1, rgba(col, 0.04));
+  cx.fillStyle = g; cx.beginPath(); cx.arc(X, Y, R, 0, 6.283); cx.fill();
+  const rad = R * 0.9 * (1 + level * 0.12), tilt = 0.42, ct = Math.cos(tilt), st = Math.sin(tilt);
+  const ca = Math.cos(spinA), sa = Math.sin(spinA);
+  for (const [px, py, pz, j] of orb) {
+    const x1 = px * ca + pz * sa, z1 = -px * sa + pz * ca;
+    const y2 = py * ct - z1 * st, z2 = py * st + z1 * ct;
+    const wob = 1 + (STATE === "speaking" || STATE === "listening" ? Math.sin(now / 120 + j * 20) * level * 0.08 : 0);
+    const depth = (z2 + 1) / 2, sx = X + x1 * rad * wob, sy = Y + y2 * rad * wob;
+    cx.fillStyle = rgba(themeLight() ? (depth > 0.5 ? [10, 95, 140] : [10, 120, 168]) : depth > 0.5 ? [225, 248, 255] : col, 0.18 + depth * 0.75);
+    const sz = 0.6 + depth * 1.5; cx.fillRect(sx - sz / 2, sy - sz / 2, sz, sz);
+  }
+}
+// The voice bar under the orb: bars that follow the real audio when there is some.
+const wv = document.getElementById("wave"), wx = wv ? wv.getContext("2d") : null;
+function drawWave(now) {
+  if (!wx) return;
+  const w = wv.width = wv.clientWidth * DPR, h = wv.height = wv.clientHeight * DPR, bars = 31, mid = h / 2;
+  wx.clearRect(0, 0, w, h);
+  const c = STATE === "idle" ? [93, 138, 163] : STATE === "speaking" ? GOLD : col;
+  for (let i = 0; i < bars; i++) {
+    const k = Math.abs(i - (bars - 1) / 2) / ((bars - 1) / 2), shape = 1 - k * 0.75;
+    const v = realAudio ? Math.abs(buf[(i * 29) % buf.length] - 128) / 128 * 3
+      : Math.abs(Math.sin(now / 140 * SPEED + i * 0.7) * Math.sin(now / 330 * SPEED + i));
+    const bh = Math.max(2 * DPR, Math.min(1, v) * Math.min(1, level * 1.6 + 0.1) * h * shape);
+    wx.fillStyle = rgba(c, 0.9); wx.fillRect(i * w / bars + w / bars * 0.25, mid - bh / 2, w / bars * 0.5, bh);
+  }
+}
 function frame(now) {
   try {
     const dt = Math.min(64, now - t0); t0 = now;
     // loudness: real analyser when audio plays, else a speech-like synthetic envelope
+    // The browser's own voice never passes through the analyser, so silence there while
+    // speaking falls back to the envelope instead of a dead orb.
+    let heard = 0;
     if (analyser && (STATE === "speaking" || STATE === "listening")) {
       analyser.getByteTimeDomainData(buf); let sum = 0;
       for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
-      target = Math.min(1, Math.sqrt(sum / buf.length) * 4);
-    } else if (STATE === "speaking") {
+      heard = Math.min(1, Math.sqrt(sum / buf.length) * 4);
+    }
+    realAudio = heard > 0.02;
+    if (realAudio) target = heard;
+    else if (STATE === "speaking") {
       target = 0.35 + 0.35 * Math.abs(Math.sin(now / 90) * Math.sin(now / 230));
     } else target = STATE === "thinking" ? 0.15 : 0.05;
     level += (target - level) * 0.25;
@@ -304,50 +418,26 @@ function frame(now) {
     offX += (offTarget - offX) * 0.12;
     const { X, Y, R } = centre();
     const spin = STATE === "thinking" ? 3.2 : STATE === "listening" ? 1.6 : 1;
+    spinA += dt * 0.00035 * spin * SPEED;
+    drawStreams(X, Y, R, now);
+    drawTraces(now);
     drawLinks(X, Y, R, now);
-    // glow core
-    const g = cx.createRadialGradient(X, Y, 0, X, Y, R * (0.95 + level * 0.5));
-    g.addColorStop(0, rgba([235, 252, 255], 0.95)); g.addColorStop(0.18, rgba(col, 0.85));
-    g.addColorStop(0.5, rgba(col, 0.18)); g.addColorStop(1, rgba(col, 0));
-    cx.fillStyle = g; cx.beginPath(); cx.arc(X, Y, R * (0.95 + level * 0.5), 0, 6.283); cx.fill();
-    // inner hex-ish ring of segments (the "reactor")
+    // thin HUD rings and ticks round the halo
     cx.lineCap = "round";
-    for (let i = 0; i < 10; i++) {
-      const a = i * 0.6283 + now * 0.0004 * spin;
-      cx.strokeStyle = rgba(col, 0.55 + level * 0.4); cx.lineWidth = 3;
-      cx.beginPath(); cx.arc(X, Y, R * (0.42 + level * 0.08), a, a + 0.42); cx.stroke();
-    }
-    // rotating rings
     for (const [f, w, len, sp, dashes] of rings) {
-      const rr = R * f * (1 + level * 0.12), base = now * sp * spin;
-      cx.lineWidth = w; cx.strokeStyle = rgba(col, 0.25 + 0.35 * (w > 1 ? 1 : 0.5));
-      if (dashes === 1) { cx.beginPath(); cx.arc(X, Y, rr, base, base + len); cx.stroke(); }
-      else { const step = 6.283 / dashes;
-        for (let d = 0; d < dashes; d++) { const a = base + d * step;
-          cx.beginPath(); cx.arc(X, Y, rr, a, a + Math.min(len / dashes, step * 0.5)); cx.stroke(); } }
+      const rr = R * f, base = now * sp * spin * SPEED;
+      cx.lineWidth = w; cx.strokeStyle = rgba(col, 0.22);
+      const step = 6.283 / dashes;
+      for (let d = 0; d < dashes; d++) { const a = base + d * step;
+        cx.beginPath(); cx.arc(X, Y, rr, a, a + Math.min(len / dashes, step * 0.5)); cx.stroke(); }
     }
-    // voice waveform ring
-    cx.strokeStyle = rgba(col, 0.7); cx.lineWidth = 1.4; cx.beginPath();
-    for (let i = 0; i <= 128; i++) {
-      const a = (i / 128) * 6.283;
-      const n = Math.sin(a * 6 + now / 140) * Math.sin(a * 3 - now / 310);
-      const rr = R * 1.29 + n * R * 0.22 * level;
-      const px = X + Math.cos(a) * rr, py = Y + Math.sin(a) * rr;
-      i ? cx.lineTo(px, py) : cx.moveTo(px, py);
-    }
-    cx.closePath(); cx.stroke();
-    // drifting sparks
-    for (const p of sparks) {
-      p.a += p.s * dt * spin;
-      const rr = R * (1.6 + p.r) + Math.sin(now / 900 + p.z * 9) * 6;
-      cx.fillStyle = rgba(col, 0.15 + p.z * 0.5);
-      cx.fillRect(X + Math.cos(p.a) * rr, Y + Math.sin(p.a) * rr, 1.6, 1.6);
-    }
-    // tick marks
-    cx.strokeStyle = rgba(col, 0.35); cx.lineWidth = 1;
+    cx.strokeStyle = rgba(col, 0.3); cx.lineWidth = 1;
     for (let i = 0; i < 72; i++) { const a = i * 0.0873, r1 = R * 1.68, r2 = r1 + (i % 6 ? 4 : 10);
       cx.beginPath(); cx.moveTo(X + Math.cos(a) * r1, Y + Math.sin(a) * r1);
       cx.lineTo(X + Math.cos(a) * r2, Y + Math.sin(a) * r2); cx.stroke(); }
+    drawOrb(X, Y, R, now);
+    drawHalo(X, Y, R, now);
+    drawWave(now);
   } catch (e) { /* never let one bad frame stop the animation */ }
   requestAnimationFrame(frame);
 }
@@ -356,7 +446,9 @@ requestAnimationFrame(frame);
 // ---------------------------------------------------------------- audio out
 let muted = false, current = null, speakToken = 0;
 try { muted = localStorage.getItem("jarvis-muted") === "1"; } catch (e) {}
-function paintMute() { $("c-mute").textContent = muted ? "VOICE OFF" : "VOICE ON"; $("c-mute").classList.toggle("warn", muted); }
+function paintMute() { $("c-mute").textContent = muted ? "VOICE OFF" : "VOICE ON"; $("c-mute").classList.toggle("warn", muted);
+  const m = document.getElementById("modepill"); if (m) { m.textContent = ""; const b = document.createElement("b");
+    b.textContent = muted ? "CHAT" : "VOICE"; m.appendChild(b); m.appendChild(document.createTextNode(muted ? " · voice" : " · chat")); } }
 paintMute();
 function ensureAudio() {
   if (actx) return;
@@ -607,6 +699,9 @@ addEventListener("keydown", (e) => {
 addEventListener("keyup", (e) => { if (e.code === "Space" && document.activeElement !== $("text")) stopListening(); });
 $("c-mute").onclick = () => { muted = !muted; try { localStorage.setItem("jarvis-muted", muted ? "1" : "0"); } catch (e) {}
   paintMute(); if (muted) stopSpeaking(); };
+// Chat: Jarvis answers in text only. Voice: he speaks too. Same switch as VOICE ON/OFF.
+$("modepill").onclick = () => $("c-mute").onclick();
+$("speakpill").onclick = () => stopSpeaking();
 
 // ---------------------------------------------------------------- the constellation
 // One node per part of the business, built from what BAU really measures (/api/overview).
@@ -966,7 +1061,8 @@ addEventListener("keydown", (e) => {
     else if (SEL) closeDetail();
     return; }
   if (typing) return;
-  const k = e.key.toLowerCase(), act = { t: "c-time", c: "c-mc", l: "c-log", w: "c-wake", a: "c-alerts", d: "c-theme", "?": "c-help" }[k];
+  const k = e.key.toLowerCase(), act = { t: "c-time", c: "c-mc", l: "c-log", w: "c-wake", a: "c-alerts", d: "c-theme", "?": "c-help", v: "modepill" }[k];
+  if (k === "s" && !$("speakpill").hidden) { stopSpeaking(); return; }
   if (act) { e.preventDefault(); $(act).onclick(); return; }
   if (k === "/") { e.preventDefault(); $("text").focus(); return; }
   if (k === "+" || k === "=") { setZoom(ZOOM * 1.1); return; }
