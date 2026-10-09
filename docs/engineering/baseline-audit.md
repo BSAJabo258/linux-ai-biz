@@ -9,7 +9,7 @@ already there. Every figure below was measured, not assumed.
 | | |
 |---|---|
 | Repository | `bsajabo258/linux-ai-biz`, default branch `main` |
-| Baseline commit | `1d8bab7` (Jarvis screen, PR #16) |
+| Baseline commit | `fe7be92` (`main` after PR #26) |
 | Working tree | clean |
 | Language | Python only (3.11 and 3.13 in CI); shell for the installer and image |
 | Packaging | `pyproject.toml` (setuptools). One runtime dependency: `PyYAML>=6.0`. Extras: `dev` (pytest, ruff), `claude` (anthropic). There is no lockfile: BAU is stdlib-first by design |
@@ -34,7 +34,7 @@ so they were reused instead of being written a second time:
 
 | Check | Result |
 |---|---|
-| `python -m pytest -q` | **212 passed**, 0 failed, about 28.5 s |
+| `python -m pytest -q` | **246 passed**, 0 failed, about 30 s |
 | `ruff check .` | clean |
 | `bau reg validate` | valid (49 regulations, 65 policies) |
 | `bau secrets .` | no findings |
@@ -60,7 +60,7 @@ Third-party actions are pinned to major tags (`actions/checkout@v4`, `actions/se
 | `import bau.cli` | about 0.11 s |
 | Mission Control server resident memory | about 25.5 MB |
 | Mission Control first response | about 2 ms |
-| Test suite | about 28 s |
+| Test suite | about 30 s |
 | Codespace definition | `hostRequirements.cpus: 2`. The owner's codespace runs 4 cores and 16 GB |
 
 ## Concerns found

@@ -51,7 +51,7 @@ stdlib plus PyYAML, which BAU already uses.
 
 | After this upgrade | Baseline | Now |
 |---|---|---|
-| Tests | 212 in about 28.5 s | 225 in about 27.5 s |
+| Tests | 246 in about 30 s | 259 in about 30 s |
 | `import bau.cli` | about 0.11 s | about 0.07 s (unchanged, within noise) |
 | Mission Control memory | about 25.5 MB | about 25.6 MB |
 | New code on disk | | 44 KB (`src/bau/scout/`) |
