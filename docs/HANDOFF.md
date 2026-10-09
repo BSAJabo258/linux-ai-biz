@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 212 tests pass; 49 regulations / 65 policies validate.
+State: 225 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -29,6 +29,12 @@ Jarvis's model. First real bench on 2026-10-07 (owner's PC, WSL): `reply_ok` and
 `tool_calls` true, about 3 s per reply, after four "429 overloaded" replies from Z.ai. The
 provider now waits and retries busy replies (5, 10, 20, 40 s) and shows the service's own
 message. The owner still has to bench and approve it in their codespace.
+
+Repo Scout (`bau scout`, `src/bau/scout/`, docs in `docs/engineering/`) finds and ranks
+open-source projects for a capability on evidence; it never installs or runs them, and
+licence/security are gates a score cannot override. Baseline audit before it:
+`docs/engineering/baseline-audit.md`. Never run against live GitHub search yet (the build
+container can't reach it); the owner's first `bau scout find` in the codespace is the test.
 
 The Jarvis screen (`ui/jarvis.html`, data from `overview.py` via `/api/overview`) shows the
 business as live nodes around the core (team, systems, connections). Producer walks

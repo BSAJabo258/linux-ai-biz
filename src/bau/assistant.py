@@ -182,6 +182,13 @@ class Assistant:
                  "whether it is READY). Types come from the mission catalogue.",
                  _schema({"mission_type": {"type": "string"}, "objective": {"type": "string"}}),
                  self.t_plan_mission, kind="act"),
+            Tool("scout_results", "Open-source projects Repo Scout has found so far, best "
+                 "first, with licence, security and test status and what is still unknown. "
+                 "Descriptions are the projects' own claims.", _schema(), self.t_scout_results),
+            Tool("find_tools", "Search GitHub for open-source projects that provide a "
+                 "capability (several phrasings), record them and rank them on evidence. "
+                 "Nothing is installed or run; takes about half a minute.",
+                 _schema({"request": {"type": "string"}}), self.t_find_tools, kind="act"),
             Tool("workspaces", "Production workspaces (e.g. the kids channel): every "
                  "episode and where each stage stands - checked, drafted and waiting for the "
                  "owner's check, ready to draft, or the owner's own step.", _schema(),
@@ -313,6 +320,23 @@ class Assistant:
                                           for r in W.status(ws, ep)]
                                 for ep in W.episodes(ws)}
         return out or {"note": "no workspaces yet: bau ws create kids-channel"}
+
+    def t_scout_results(self) -> list[dict[str, Any]]:
+        from .scout import Scout, rank
+        rows = rank(Scout(self.home).candidates().values())
+        return [{"repo": c["full_name"], "what_it_claims": c["claimed"]["description"][:160],
+                 "score": c["score"], "evidence_coverage": c["evidence_coverage"],
+                 "decision": c["decision"], "licence": c["license"]["status"],
+                 "blocked": c["blockers"], "still_needed": c["needs"]}
+                for c in rows if not c.get("duplicate_of")][:8]
+
+    def t_find_tools(self, request: str) -> dict[str, Any]:
+        from .scout import Scout
+        run = Scout(self.home, self.clients.get("github"), self.audit, "jarvis").find(
+            request[:300], max_queries=4, readmes=3, provider=self.provider)
+        return {"run": run["id"], "found": run["found"],
+                "failed_searches": run["failed_searches"], "top": run["ranked"][:5],
+                "report": "bau scout report"}
 
     def t_draft_stage(self, workspace: str, episode: str) -> dict[str, Any]:
         from . import workspace as W

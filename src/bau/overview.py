@@ -199,6 +199,28 @@ def overview(asst: Any) -> dict[str, Any]:
                            f"{au['records']} record(s), chain intact" if au["intact"]
                            else "chain check FAILED: " + au["check"], au))
 
+    def scout() -> dict[str, Any]:
+        from .scout import Scout, rank
+        sc = Scout(home)
+        runs, cands = sc.runs(), sc.candidates()
+        top = [c for c in rank(cands.values()) if not c.get("duplicate_of")]
+        return {"last_search": (f"{runs[-1]['request']} ({runs[-1]['at'][:10]}, "
+                                f"{runs[-1]['failed_searches']} failed search(es))")
+                if runs else None,
+                "candidates": len(top),
+                "best": [f"{c['full_name']}: {c['decision']}, score {c['score']}, "
+                         f"coverage {c['evidence_coverage']}%" for c in top[:6]]}
+    sc, err = _safe(scout)
+    if err:
+        nodes.append(_broken("scout", "Scout", "system", err))
+    else:
+        failed = "0 failed" not in (sc["last_search"] or "0 failed")
+        nodes.append(_node("scout", "Scout", "system",
+                           "idle" if not sc["candidates"] else "warn" if failed else "ok",
+                           f"{sc['candidates']} open-source candidate(s) found"
+                           if sc["candidates"] else "no searches yet", sc,
+                           "What open-source tools have you found?"))
+
     # ---------------------------------------------------------------- connections
     for nid, label in (("youtube", "YouTube"), ("tiktok", "TikTok")):
         signed = (home / "secrets" / f"{nid}.json").exists()

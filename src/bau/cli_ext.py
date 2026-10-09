@@ -7,6 +7,7 @@ import datetime as dt
 import getpass
 import json
 import os
+import subprocess
 import sys
 from dataclasses import asdict
 from decimal import Decimal
@@ -301,6 +302,59 @@ def cmd_spatial(a):
         export_scene(create_scene([data], a.purpose), Path(a.out))
     _out({"count": data["bau"]["count"], "licence": data["bau"]["licence"],
           "out": a.out})
+    return EXIT_OK
+
+
+# ------------------------------------------------------------------ repo scout
+
+def cmd_scout(a):
+    from . import scout as S
+    from .assistant import load_env_file
+    load_env_file()                           # an optional GITHUB_TOKEN raises the rate limit
+    # Searching needs no human; the actor just says who ran it.
+    who = ("human:" if sys.stdin.isatty() else "process:") + getpass.getuser()
+    sc = S.Scout(audit=AuditLog(), actor=who)
+    try:
+        if a.scout_cmd == "find":
+            run = sc.find(a.request, a.max_queries, a.per_query, a.readmes)
+            _out({"run": run["id"], "found": run["found"],
+                  "failed_searches": [s for s in run["searches"] if "error" in s],
+                  "top": run["ranked"][:a.top],
+                  "next": "bau scout report   |   bau scout inspect OWNER/NAME"})
+            if run["found"] == 0 and run["failed_searches"]:
+                return EXIT_BLOCKED       # every search failed: say so, never "nothing exists"
+        elif a.scout_cmd == "list":
+            rows = S.rank(sc.candidates().values())
+            _out([{"repo": c["full_name"], "score": c["score"],
+                   "coverage": c["evidence_coverage"], "decision": c["decision"],
+                   "licence": c["license"]["status"], "security": c["security"]["status"]}
+                  for c in rows if not c.get("duplicate_of")][:a.top])
+        elif a.scout_cmd == "show":
+            c = sc.candidates().get(a.repo.lower())
+            if c is None:
+                print(f"{a.repo} is not a candidate", file=sys.stderr)
+                return EXIT_ERROR
+            _out(c)
+        elif a.scout_cmd == "inspect":
+            c = sc.inspect(a.repo)
+            _out({"repo": c["full_name"], "commit": c["inspected"]["commit"],
+                  "sentinel": c["inspected"]["verdict"], "reasons": c["inspected"]["reasons"],
+                  "licence": c["license"], "decision": c["decision"],
+                  "still_needed": c["needs"], "blocked": c["blockers"]})
+        elif a.scout_cmd == "report":
+            text = S.report(sc, a.run, a.top)
+            if a.out:
+                Path(a.out).write_text(text)
+                _out({"report": a.out})
+            else:
+                print(text)
+    except (KeyError, ValueError) as e:
+        print(str(e).strip("'\""), file=sys.stderr)
+        return EXIT_ERROR
+    except subprocess.CalledProcessError as e:
+        print(f"download failed: {(e.stderr or b'').decode(errors='replace')[-300:]}",
+              file=sys.stderr)
+        return EXIT_BLOCKED
     return EXIT_OK
 
 
@@ -1058,6 +1112,27 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("episode")
     x.add_argument("stage", help="stage number or name, e.g. 02")
     s.set_defaults(fn=cmd_ws)
+
+    s = sub.add_parser("scout", help="Repo Scout: find, evaluate and rank open-source "
+                       "projects for a capability (never installs or runs them)")
+    w = s.add_subparsers(dest="scout_cmd", required=True)
+    x = w.add_parser("find", help="search for a capability, record and rank candidates")
+    x.add_argument("request", help='e.g. "simulate customers to test a business idea"')
+    x.add_argument("--max-queries", type=int, default=6)
+    x.add_argument("--per-query", type=int, default=10)
+    x.add_argument("--readmes", type=int, default=5, help="READMEs read for the leaders")
+    x.add_argument("--top", type=int, default=8)
+    x = w.add_parser("list", help="every candidate so far, best first")
+    x.add_argument("--top", type=int, default=20)
+    x = w.add_parser("show", help="everything recorded about one candidate")
+    x.add_argument("repo", help="OWNER/NAME")
+    x = w.add_parser("inspect", help="download one into quarantine and scan it statically")
+    x.add_argument("repo", help="OWNER/NAME")
+    x = w.add_parser("report", help="a plain-words report of a run (latest by default)")
+    x.add_argument("--run")
+    x.add_argument("--top", type=int, default=10)
+    x.add_argument("--out", help="write the Markdown to this file")
+    s.set_defaults(fn=cmd_scout)
 
     s = sub.add_parser("factory", help="business factories")
     fs = s.add_subparsers(dest="fac_cmd", required=True)

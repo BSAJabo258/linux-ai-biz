@@ -1,0 +1,17 @@
+# Repo Scout scoring (docs/engineering/repo-intelligence.md). Weights are a starting point,
+# not truths: change them here, and compare against which candidates later passed testing.
+# A dimension with no evidence scores nothing and is listed as unknown - never guessed.
+weights:
+  functional_relevance: 20
+  verified_capability: 15
+  integration_feasibility: 15
+  license: 15
+  security: 15
+  resource_compatibility: 10
+  maintenance: 5
+  business_value: 5
+# Maintenance by days since the last push.
+active_days: 180
+slowing_days: 540
+# Largest repository `bau scout inspect` will download (GitHub's size, in KB).
+max_inspect_kb: 300000
