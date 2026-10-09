@@ -23,7 +23,7 @@ import yaml
 
 from ..home import bau_home, shipped_data
 from .evaluate import evaluate, readme_signals
-from .github import GitHub, SourceError
+from .github import GitHub, RateLimited, SourceError
 from .plan import plan
 
 NAME = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
@@ -45,11 +45,12 @@ class Scout:
                  actor: str = "human:owner", cloner: Any = None):
         self.home = home or bau_home()
         self.dir = self.home / "scout"
-        self.source = source or GitHub()
+        self.source = source or GitHub(state=self.dir / "github-rate.json")
         self.audit = audit
         self.actor = actor
         self.cloner = cloner or git_clone
         self.cfg = config()
+        self.stopped: RateLimited | None = None
 
     # ---------------------------------------------------------------- storage
     @property
@@ -84,11 +85,20 @@ class Scout:
         p = plan(request, max_queries, provider)
         store = self.candidates()
         found: dict[str, dict[str, Any]] = {}
-        searches = []
+        searches: list[dict[str, Any]] = []
+        self.stopped = None                       # GitHub asked us to wait: send nothing more
         for q in p.queries:
+            if self.stopped:
+                searches.append({"q": q.q, "origin": q.origin,
+                                 "skipped": f"waiting for GitHub until {self.stopped.when}"})
+                continue
             try:
                 items = self.source.search(q.q, per_query)
                 searches.append({"q": q.q, "origin": q.origin, "found": len(items)})
+            except RateLimited as e:
+                self.stopped = e
+                searches.append({"q": q.q, "origin": q.origin, "error": str(e)})
+                continue
             except SourceError as e:
                 searches.append({"q": q.q, "origin": q.origin, "error": str(e)})
                 continue
@@ -114,8 +124,14 @@ class Scout:
         for c in ranked[:readmes]:              # README claims for the leaders only
             if c.get("duplicate_of") or c["claimed"].get("readme"):
                 continue
+            if self.stopped:
+                notes.append(f"README of {c['full_name']} not read: waiting for GitHub")
+                continue
             try:
                 c["claimed"]["readme"] = readme_signals(self.source.readme(c["full_name"]))
+            except RateLimited as e:
+                self.stopped = e
+                notes.append(f"README of {c['full_name']} not read: {e}")
             except SourceError as e:
                 notes.append(f"README of {c['full_name']} not read: {e}")
             evaluate(c, p.keywords, self.cfg)
@@ -126,6 +142,9 @@ class Scout:
         run = {"id": "sc_" + secrets.token_hex(4), "at": _now(), "request": request,
                "plan": p.public(), "source": getattr(self.source, "name", "?"),
                "searches": searches, "failed_searches": len(failed),
+               "skipped_searches": sum(1 for s in searches if "skipped" in s),
+               "rate_limited_until": (dt.datetime.fromtimestamp(self.stopped.until, dt.UTC)
+                                      .isoformat(timespec="seconds") if self.stopped else None),
                "found": len(found), "notes": notes,
                "ranked": [{"id": c["id"], "score": c["score"],
                            "coverage": c["evidence_coverage"], "decision": c["decision"]}
@@ -154,8 +173,16 @@ class Scout:
         duplicate of it. Lookups are capped: each one is a request against the limit."""
         notes = []
         for c in [c for c in found.values() if c["metadata"]["fork"]][:lookups]:
+            if self.stopped:
+                notes.append(f"upstream of fork {c['full_name']} not looked up: "
+                             "waiting for GitHub")
+                continue
             try:
                 up = self.source.upstream(c["full_name"])
+            except RateLimited as e:
+                self.stopped = e
+                notes.append(f"upstream of fork {c['full_name']} unknown: {e}")
+                continue
             except SourceError as e:
                 notes.append(f"upstream of fork {c['full_name']} unknown: {e}")
                 continue
@@ -255,13 +282,17 @@ def report(sc: Scout, run_id: str | None = None, top: int = 10) -> str:
            f"Run {run['id']} at {run['at']} on {run['source']}. {run['found']} repositories "
            f"found by {len(run['searches'])} searches"
            + (f"; **{run['failed_searches']} search(es) failed**" if run["failed_searches"]
-              else "") + ".", "",
+              else "")
+           + (f"; **GitHub asked BAU to wait until {run['rate_limited_until']}, so "
+              f"{run.get('skipped_searches', 0)} search(es) were not sent**"
+              if run.get("rate_limited_until") else "") + ".", "",
            "Nothing here was installed or run. Scores use only facts that exist; "
            "*coverage* is how much of the scoring had evidence at all.", "",
            "## Searches", "", "| Search | Why | Result |", "|---|---|---|"]
     for s in run["searches"]:
         out.append(f"| {s['q']} | {s['origin']} | "
-                   + (f"FAILED: {s['error']}" if "error" in s else f"{s['found']} found")
+                   + (f"FAILED: {s['error']}" if "error" in s else
+                      f"NOT SENT: {s['skipped']}" if "skipped" in s else f"{s['found']} found")
                    + " |")
     out += ["", "## Ranked candidates", ""]
     for i, r in enumerate(run["ranked"][:top], 1):

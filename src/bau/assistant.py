@@ -413,7 +413,9 @@ class Assistant:
         run = Scout(self.home, self.clients.get("github"), self.audit, "jarvis").find(
             request[:300], max_queries=4, readmes=3, provider=self.provider)
         return {"run": run["id"], "found": run["found"],
-                "failed_searches": run["failed_searches"], "top": run["ranked"][:5],
+                "failed_searches": run["failed_searches"],
+                "github_asked_to_wait_until": run["rate_limited_until"],
+                "top": run["ranked"][:5],
                 "report": "bau scout report"}
 
     def t_draft_stage(self, workspace: str, episode: str) -> dict[str, Any]:

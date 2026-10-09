@@ -24,6 +24,25 @@ To raise the limit, put a GitHub token with no scopes in `GITHUB_TOKEN`: as a Co
 secret, in `.env` for Docker, or in `/etc/bau/models.env` on the laptop. The token only
 raises the limit; nothing a candidate repository runs ever sees it.
 
+## GitHub's rate limits
+
+Checked 2026-10-09 against GitHub's *Rate limits* and *Best practices* pages for the REST
+API. BAU follows GitHub's published rules:
+
+| GitHub's rule | What BAU does |
+|---|---|
+| Search: 10 requests a minute (30 with a token). Other calls: 60 an hour (5,000 with a token) | Searches go at least 6.5 seconds apart (2.2 with a token), other calls at least 2 seconds apart (1 with a token). Each run is capped: 6 searches by default, 5 README reads, 5 fork lookups |
+| Make requests one at a time, not concurrently | One request at a time, always |
+| When `x-ratelimit-remaining` is 0, don't send again before `x-ratelimit-reset` | Read from every answer. The wait is stored |
+| On 403/429 with `retry-after`, wait that many seconds | Stored and obeyed |
+| Otherwise wait at least a minute, longer each time it repeats | 1 minute, then 2, 4… up to an hour. A success clears it |
+| "Continuing to make requests while you are rate limited may result in the banning of your integration" | The moment GitHub says wait, the run **stops**. The remaining searches are recorded as *not sent*, and nothing else goes out until the time GitHub gave |
+
+The wait is kept in `BAU_HOME/scout/github-rate.json`. Starting a second search straight
+away, or asking Jarvis, still respects it: those requests are refused on your side without
+reaching GitHub. The report says when GitHub asked BAU to wait and which searches weren't
+sent.
+
 ## How it works
 
 ```
@@ -51,7 +70,7 @@ stdlib plus PyYAML, which BAU already uses.
 
 | After this upgrade | Baseline | Now |
 |---|---|---|
-| Tests | 246 in about 30 s | 259 in about 30 s |
+| Tests | 246 in about 30 s | 263 in about 31 s |
 | `import bau.cli` | about 0.11 s | about 0.07 s (unchanged, within noise) |
 | Mission Control memory | about 25.5 MB | about 25.6 MB |
 | New code on disk | | 44 KB (`src/bau/scout/`) |
