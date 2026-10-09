@@ -122,6 +122,9 @@ What else is on the screen:
   something needs you while it's in the background. On an iPhone, alerts only work after you
   add the page to your Home Screen. Nothing is sent anywhere else.
 - **LIGHT/DARK**, zoom (`+`, `-`, `0`), and a key for every button. Press `?` for the list.
+- **VOICE · chat** (bottom left) switches between Jarvis speaking his answers and text
+  only. While he speaks, **SPEAKING · TAP TO STOP** appears at the top. Tap it, or press
+  `S`, to stop him.
 
 **Mission Control** on its own is the **Ports** tab > **Mission Control** (port 8765).
 
