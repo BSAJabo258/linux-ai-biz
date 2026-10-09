@@ -94,7 +94,36 @@ write it; **Read & check step 01** shows you the draft and waits for your **Conf
 your click checks a step; Jarvis can't. Approving a model stays a typed command on purpose
 (the Models panel shows it, click to copy). **LOG** at the top shows the conversation.
 
-**Mission Control** is the **Ports** tab > **Mission Control** (port 8765).
+What else is on the screen:
+
+- **Work shows live.** While Jarvis drafts, Scout searches or a model is tested, that dot
+  spins violet, its lines run fast, and its panel lists each step as it happens.
+- **Panels you work in.**
+  - **Producer:** **Read / edit** opens the draft in the panel and you save your changes
+    there. Saving a checked step undoes its check, so you check it again. You can write the
+    review step (06) there too.
+  - **Scout:** type what you're looking for and press **Search**. You get one card per
+    project, **Report** for the full write-up, and **Inspect safely** to download one into
+    quarantine and scan it.
+  - **Models:** **Test** runs the same check as `bau models bench`. Approving still happens
+    in the terminal.
+- **TIMELINE** lists everything that happened today, newest first: drafts, checks,
+  searches, waits and confirmations. It comes from BAU's tamper-evident record, and each line
+  has its record number.
+- **MISSION CONTROL** opens the Mission Control data in the same screen: status, missions,
+  jobs, regulations, legal queue, money, Watchdog, incidents and the Second Brain. The
+  separate page on port 8765 still works.
+- **On the phone** the dots stay in a ring round Jarvis. Pinch to zoom, and swipe a panel
+  left or right to move to the next part.
+- **WAKE WORD** is off every time you open the page. Turn it on and the page listens, in
+  that tab only, for "Jarvis" followed by your question. It stops when you leave the page.
+  It needs a browser with speech recognition (Chrome or Edge; Safari support varies).
+- **ALERTS** asks your permission once. After that, the page shows a notification when
+  something needs you while it's in the background. On an iPhone, alerts only work after you
+  add the page to your Home Screen. Nothing is sent anywhere else.
+- **LIGHT/DARK**, zoom (`+`, `-`, `0`), and a key for every button. Press `?` for the list.
+
+**Mission Control** on its own is the **Ports** tab > **Mission Control** (port 8765).
 
 ## A second free model for when Z.ai is busy: NVIDIA
 

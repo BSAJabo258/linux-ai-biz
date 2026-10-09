@@ -62,23 +62,15 @@ def cmd_models(a):
               "ranked": [m["model_id"] for m in r.candidates], "rejected": r.rejected})
         return EXIT_OK if r.model or a.kind in ("format", "validate") else EXIT_BLOCKED
     elif a.models_cmd == "bench":
-        from .assistant import load_env_file
-        from .models.bench import benchmark
-        load_env_file()                       # hosted models read their key from it
-        rec = reg.data["model"].get(a.model)
-        if rec is None:
+        from .models.bench import record
+        try:
+            res = record(a.model, f"human:{getpass.getuser()}", audit=AuditLog())
+        except KeyError:
             print(f"model {a.model} not registered", file=sys.stderr)
             return EXIT_ERROR
-        try:
-            res = benchmark(rec)
         except Exception as e:  # unreachable server, bad reply: nothing is recorded
             print(f"benchmark failed: {type(e).__name__}: {e}"[:300], file=sys.stderr)
             return EXIT_BLOCKED
-        rec["benchmark"] = res
-        reg.path.write_text(yaml.safe_dump(reg.data, sort_keys=True))
-        AuditLog().append("model.benchmarked", f"human:{getpass.getuser()}",
-                          {"model": a.model, "reply_ok": res["reply_ok"],
-                           "tool_calls": res["tool_calls"]})
         _out(res)
         return EXIT_OK if res["reply_ok"] else EXIT_BLOCKED
     elif a.models_cmd == "fetch":
