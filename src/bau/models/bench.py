@@ -39,3 +39,28 @@ def benchmark(rec: dict[str, Any], provider: Provider | None = None) -> dict[str
         "tool_calls": any(c.name == PROBE_TOOL.name for c in rt.tool_calls),
         "tool_latency_ms": int(took_tool * 1000),
     }
+
+
+def record(model_id: str, actor: str, home: Any = None, audit: Any = None) -> dict[str, Any]:
+    """Benchmark a registered model and store the result on its record. Never approves:
+    approval stays the owner's typed ``bau set-status``. Raises KeyError for an unknown
+    model; anything the model server does wrong propagates and nothing is recorded."""
+    import yaml
+
+    from ..assistant import load_env_file
+    from ..audit import AuditLog
+    from ..home import bau_home
+    from ..registry import CapabilityRegistry
+    home = home or bau_home()
+    load_env_file()                       # hosted models read their key from it
+    reg = CapabilityRegistry(home / "registry" / "capabilities.yaml")
+    rec = reg.data["model"].get(model_id)
+    if rec is None:
+        raise KeyError(f"model {model_id} not registered")
+    res = benchmark(rec)
+    rec["benchmark"] = res
+    reg.path.write_text(yaml.safe_dump(reg.data, sort_keys=True))
+    (audit or AuditLog(home / "audit" / "chain.jsonl")).append(
+        "model.benchmarked", actor, {"model": model_id, "reply_ok": res["reply_ok"],
+                                     "tool_calls": res["tool_calls"]})
+    return res

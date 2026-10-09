@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 263 tests pass; 49 regulations / 65 policies validate.
+State: 277 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -35,6 +35,17 @@ open-source projects for a capability on evidence; it never installs or runs the
 licence/security are gates a score cannot override. Baseline audit before it:
 `docs/engineering/baseline-audit.md`. Never run against live GitHub search yet (the build
 container can't reach it); the owner's first `bau scout find` in the codespace is the test.
+
+The full Jarvis screen (2026-10-09):
+- live work per node: `activity.py`, `/api/activity`;
+- working panels: Scout search/inspect/report, model Test, draft editing (`ui/screen.py`);
+- timeline from the audit chain (`/api/timeline`);
+- Mission Control views inside (`/api/mc/<view>`);
+- phone ring with pinch and swipe;
+- opt-in wake word and alerts;
+- light theme, zoom, a key for every button.
+
+Tests were written first: `tests/test_jarvis_live.py`. The page passes `bau a11y lint`.
 
 The Jarvis screen (`ui/jarvis.html`, data from `overview.py` via `/api/overview`) shows the
 business as live nodes around the core (team, systems, connections). Producer walks

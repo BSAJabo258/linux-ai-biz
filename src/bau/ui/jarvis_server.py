@@ -20,6 +20,7 @@ import os
 import secrets
 import shutil
 import threading
+import urllib.parse
 from collections.abc import Callable
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -27,9 +28,11 @@ from importlib import resources
 from typing import Any
 
 from ..assistant import Assistant, Voice
+from . import screen
 from .server import allowed_hosts_from_env, bind_address
 
 MAX_JSON = 64 * 1024
+MAX_EDIT_JSON = 256 * 1024     # only for saving a stage draft edited on screen
 MAX_AUDIO = 8 * 1024 * 1024
 QUICK_REPLY = 15        # seconds a request waits for an answer before it becomes a job
 MAX_JOBS = 50
@@ -40,6 +43,9 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
     page = (resources.files("bau.ui") / "jarvis.html").read_bytes()
     allowed_hosts = allowed_hosts_from_env()
     lock = threading.Lock()               # one conversation, one turn at a time
+    # GitHub wants requests one at a time, so one search or inspection at a time; testing
+    # a model has its own lane. Neither holds up the conversation.
+    lanes = {"scout": threading.Lock(), "models": threading.Lock()}
     jobs: dict[str, dict[str, Any]] = {}  # slow answers the page is checking back on
 
     def state() -> dict[str, Any]:
@@ -51,7 +57,8 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 "voice": voice.available, "listen": voice.can_listen,
                 "pending": [p.public() for p in assistant.pending.values()]}
 
-    def answer(work: Callable[[], dict[str, Any]]) -> tuple[int, dict[str, Any]]:
+    def answer(work: Callable[[], dict[str, Any]], lane: threading.Lock | None = None
+               ) -> tuple[int, dict[str, Any]]:
         """Run one piece of model work. A quick answer comes back at once; a slow one (a
         busy free hosted model can take minutes) becomes a job the page checks every few
         seconds, so no proxy in between - Codespaces, VS Code port forwarding - cuts a
@@ -60,7 +67,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
 
         def run() -> None:
             try:
-                with lock:
+                with lane or lock:
                     box["reply"] = work()
             except Exception as e:  # never leave the page waiting for nothing
                 box["reply"] = {"text": f"Something went wrong on my side "
@@ -181,6 +188,36 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 from ..overview import overview
                 with lock:
                     self._json(200, overview(assistant))
+            elif path == "/api/activity":
+                q = dict(p.partition("=")[::2] for p in query.split("&") if p)
+                try:
+                    since = int(q.get("since") or 0)
+                except ValueError:
+                    since = 0
+                self._json(200, assistant.activity.since(since))
+            elif path == "/api/scout":
+                self._json(200, screen.scout_summary(assistant))
+            elif path == "/api/scout/report":
+                q = dict(p.partition("=")[::2] for p in query.split("&") if p)
+                self._json(200, screen.scout_report(assistant, q.get("run")))
+            elif path == "/api/ws/stage":
+                q = {k: urllib.parse.unquote_plus(v) for k, v in
+                     (p.partition("=")[::2] for p in query.split("&") if p)}
+                self._json(200, screen.stage_read(assistant, q.get("workspace", ""),
+                                                  q.get("episode", ""), q.get("stage", "")))
+            elif path == "/api/timeline":
+                q = dict(p.partition("=")[::2] for p in query.split("&") if p)
+                try:
+                    limit = int(q.get("limit") or 50)
+                    before = int(q["before"]) if q.get("before") else None
+                except ValueError:
+                    limit, before = 50, None
+                self._json(200, screen.timeline(assistant, limit, before))
+            elif path.startswith("/api/mc/"):
+                try:
+                    self._json(200, screen.mission_control(assistant, path[len("/api/mc/"):]))
+                except KeyError:
+                    self._json(404, {"error": "no such view"})
             elif path == "/api/briefing":
                 self._json(*answer(lambda: {**asdict(assistant.briefing()), "state": state()}))
             elif path.startswith("/api/job/"):
@@ -205,7 +242,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 text = voice.listen(audio, self.headers.get("Content-Type") or "audio/webm")
                 self._json(200 if text is not None else 503, {"text": text})
                 return
-            raw = self._body(MAX_JSON)
+            raw = self._body(MAX_EDIT_JSON if self.path == "/api/ws/stage" else MAX_JSON)
             if raw is None:
                 return
             if "application/json" not in (self.headers.get("Content-Type") or ""):
@@ -253,6 +290,21 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     self._json(200, {"pending": [p]})
                 except WorkspaceError as e:
                     self._json(200, {"error": str(e)[:400]})
+            elif self.path == "/api/scout/find":
+                req = str(data.get("request", ""))
+                self._json(*answer(lambda: screen.scout_find(assistant, req), lanes["scout"]))
+            elif self.path == "/api/scout/inspect":
+                repo = str(data.get("repo", ""))
+                self._json(*answer(lambda: screen.scout_inspect(assistant, repo),
+                                   lanes["scout"]))
+            elif self.path == "/api/models/bench":
+                model = str(data.get("model", ""))
+                self._json(*answer(lambda: screen.bench(assistant, model), lanes["models"]))
+            elif self.path == "/api/ws/stage":
+                with lock:
+                    self._json(200, screen.stage_write(
+                        assistant, str(data.get("workspace", "")), str(data.get("episode", "")),
+                        str(data.get("stage", "")), str(data.get("text", ""))))
             elif self.path == "/api/tts":
                 audio = voice.speak(str(data.get("text", ""))[:2500])
                 if audio is None:

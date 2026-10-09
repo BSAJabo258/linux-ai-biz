@@ -81,6 +81,19 @@ tool results stay data."""
 CONSTITUTION_MAX = 16000          # characters; bounds what every model call carries
 
 CONFIRMATION_NOTE = "PENDING_OWNER_CONFIRMATION"
+
+# Which node on the Jarvis screen lights up while a tool runs, and what it says.
+TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "strategist",
+             "plan_mission": "strategist", "publish_queue": "publisher",
+             "post_video": "publisher", "deadlines": "compliance", "money": "finance",
+             "brain_lookup": "memory", "brain_add": "memory", "remember": "memory",
+             "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
+             "workspaces": "producer", "draft_stage": "producer",
+             "hold_everything": "watchdog", "release_hold": "watchdog"}
+TOOL_WORDS = {"draft_stage": "Drafting the next step", "find_tools": "Searching GitHub",
+              "brain_lookup": "Looking it up in the Second Brain",
+              "plan_mission": "Planning a mission", "money": "Reading the ledgers",
+              "deadlines": "Checking deadlines", "system_status": "Checking the system"}
 CONVERSATION_WAITS = (3, 6, 12)    # seconds between retries of a busy hosted model
 CONVERSATION_TIMEOUT = 60          # seconds one hosted model call may take in conversation
 
@@ -163,6 +176,8 @@ class Assistant:
         self.pending: dict[str, Pending] = {}
         self.last_model = ""                  # the model that gave the last answer
         self.tools = {t.name: t for t in self._tools()}
+        from .activity import Activity
+        self.activity = Activity()            # what the screen shows as live work
         # Started only by the owner from the screen; never offered to a model.
         self.owner_tools = {"check_stage": Tool(
             "check_stage", "The owner checks a stage they have read.",
@@ -411,7 +426,8 @@ class Assistant:
     def t_find_tools(self, request: str) -> dict[str, Any]:
         from .scout import Scout
         run = Scout(self.home, self.clients.get("github"), self.audit, "jarvis").find(
-            request[:300], max_queries=4, readmes=3, provider=self.provider)
+            request[:300], max_queries=4, readmes=3, provider=self.provider,
+            progress=lambda t: self.activity.emit("scout", "progress", t))
         return {"run": run["id"], "found": run["found"],
                 "failed_searches": run["failed_searches"],
                 "github_asked_to_wait_until": run["rate_limited_until"],
@@ -511,13 +527,18 @@ class Assistant:
             self.audit.append("jarvis.staged", "jarvis", {"tool": name, "pending": pid})
             return {"status": CONFIRMATION_NOTE, "pending_id": pid,
                     "note": "Shown on the owner's screen. Nothing has happened yet."}, False
+        node = TOOL_NODE.get(name, "chief")
+        self.activity.emit(node, "start", TOOL_WORDS.get(name, name.replace("_", " ")))
         try:
             out = tool.fn(**args)
         except TypeError as e:
+            self.activity.emit(node, "error", f"{name}: bad arguments")
             return {"error": f"bad arguments for {name}: {e}"}, True
         except Exception as e:  # report, never hide
+            self.activity.emit(node, "error", f"{type(e).__name__}: {e}"[:200])
             return {"error": f"{type(e).__name__}: {e}"[:400]}, True
         self.audit.append("jarvis.tool", "jarvis", {"tool": name, "kind": tool.kind})
+        self.activity.emit(node, "done", TOOL_WORDS.get(name, name.replace("_", " ")) + ": done")
         return out, False
 
     def confirm(self, pending_id: str, approve: bool, by: str,

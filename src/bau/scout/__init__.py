@@ -81,26 +81,33 @@ class Scout:
 
     # ---------------------------------------------------------------- discovery
     def find(self, request: str, max_queries: int = 8, per_query: int = 10,
-             readmes: int = 5, provider: Any = None) -> dict[str, Any]:
+             readmes: int = 5, provider: Any = None,
+             progress: Any = None) -> dict[str, Any]:
+        say = progress or (lambda text: None)    # live progress for the Jarvis screen
         p = plan(request, max_queries, provider)
+        n = len(p.queries)
         store = self.candidates()
         found: dict[str, dict[str, Any]] = {}
         searches: list[dict[str, Any]] = []
         self.stopped = None                       # GitHub asked us to wait: send nothing more
-        for q in p.queries:
+        for i, q in enumerate(p.queries, 1):
             if self.stopped:
                 searches.append({"q": q.q, "origin": q.origin,
                                  "skipped": f"waiting for GitHub until {self.stopped.when}"})
+                say(f"Search {i} of {n}: '{q.q}' not sent (GitHub asked to wait)")
                 continue
             try:
                 items = self.source.search(q.q, per_query)
                 searches.append({"q": q.q, "origin": q.origin, "found": len(items)})
+                say(f"Search {i} of {n}: '{q.q}' found {len(items)}")
             except RateLimited as e:
                 self.stopped = e
                 searches.append({"q": q.q, "origin": q.origin, "error": str(e)})
+                say(f"Search {i} of {n}: '{q.q}' failed: GitHub asked to wait")
                 continue
             except SourceError as e:
                 searches.append({"q": q.q, "origin": q.origin, "error": str(e)})
+                say(f"Search {i} of {n}: '{q.q}' failed")
                 continue
             for it in items:
                 if not NAME.match(it["full_name"]):
@@ -121,6 +128,8 @@ class Scout:
             c["keywords"] = p.keywords
             evaluate(c, p.keywords, self.cfg)
         ranked = rank(found.values())
+        if ranked[:readmes]:
+            say("Reading the leaders' READMEs")
         for c in ranked[:readmes]:              # README claims for the leaders only
             if c.get("duplicate_of") or c["claimed"].get("readme"):
                 continue
@@ -136,6 +145,7 @@ class Scout:
                 notes.append(f"README of {c['full_name']} not read: {e}")
             evaluate(c, p.keywords, self.cfg)
         ranked = rank(found.values())
+        say(f"Ranked {len(found)} candidate(s)")
         store.update(found)
         self._save(store)
         failed = [s for s in searches if "error" in s]
