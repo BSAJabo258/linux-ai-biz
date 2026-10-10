@@ -354,6 +354,27 @@ def cmd_scout(a):
 
 # ------------------------------------------------------------------ video studio
 
+def cmd_series(a):
+    from . import workspace as W
+    from .series import Series
+    if a.series_cmd == "formats":
+        ws_dir = W.open_ws(a.workspace) if a.workspace else Path(".")
+        _out({k: v["about"] for k, v in Series(ws_dir).formats().items()})
+        return EXIT_OK
+    ws = W.open_ws(a.workspace)
+    sr = Series(ws)
+    if a.series_cmd == "check":
+        probs = sr.problems()
+        _out({"characters": sorted(sr.chars), "problems": probs})
+        return EXIT_OK if not probs else EXIT_BLOCKED
+    if a.series_cmd == "prompt":
+        print(sr.prompt(a.scene, a.cast.split(",")))
+        return EXIT_OK
+    cast = a.cast.split(",") if a.cast else None
+    _out(sr.plan(W.find_episode(ws, a.episode), a.format, a.seconds, cast))
+    return EXIT_OK
+
+
 def cmd_toolbox(a):
     from .toolbox import Toolbox
     tb = Toolbox()
@@ -1287,6 +1308,24 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--wait", type=float, default=0, help="seconds to wait per clip")
     x.add_argument("--top", type=int, default=20)
     s.set_defaults(fn=cmd_video)
+
+    s = sub.add_parser("series", help="kids series: same characters and look in every clip")
+    w = s.add_subparsers(dest="series_cmd", required=True)
+    x = w.add_parser("check", help="are the character and style sheets filled in?")
+    x.add_argument("workspace")
+    x = w.add_parser("prompt", help="a clip prompt with the characters locked in")
+    x.add_argument("workspace")
+    x.add_argument("scene")
+    x.add_argument("--cast", required=True, help="character ids, e.g. pip,mo")
+    x = w.add_parser("plan", help="an episode's clips from a story format")
+    x.add_argument("workspace")
+    x.add_argument("episode")
+    x.add_argument("--format", required=True)
+    x.add_argument("--seconds", type=int, default=60)
+    x.add_argument("--cast", help="character ids (default: all)")
+    x = w.add_parser("formats", help="the story formats")
+    x.add_argument("workspace", nargs="?")
+    s.set_defaults(fn=cmd_series)
 
     s = sub.add_parser("toolbox", help="researched open-source tools; ask before guessing")
     w = s.add_subparsers(dest="toolbox_cmd", required=True)

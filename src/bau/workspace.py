@@ -184,6 +184,13 @@ def run_checks(ws: Path, ep: Path, c: Contract) -> list[dict[str, str]]:
                 issues += [i for i in kids.scan("", text) if i["issue"] != "clickbait"]
             elif name == "kids_metadata":
                 issues += _metadata_issues(ws, ep, text)
+            elif name == "series_lock":
+                from .series import Series
+                sr = Series(ws)
+                # Applies once the owner has filled in the character sheets; until then the
+                # series bible alone describes the characters.
+                if not sr.problems():
+                    issues += sr.drift(text)
             else:
                 raise WorkspaceError(f"{c.path}: unknown check {name!r}")
     return issues

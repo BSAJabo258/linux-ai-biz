@@ -1,0 +1,8 @@
+# The look of the whole channel. Fill in every {{...}} once; every clip prompt starts
+# with these words, so every clip looks like the same show.
+art_style: "{{e.g. soft 3D clay animation, rounded shapes}}"
+palette: "{{e.g. warm pastels: peach, mint and sky blue}}"
+lighting: "{{e.g. soft, warm daylight}}"
+camera: "{{e.g. slow, steady moves at a child's eye level}}"
+aspect_ratio: "{{16:9 for YouTube, 9:16 for Shorts}}"
+avoid: [scary faces, fast flashing, sharp objects, text on screen, brand logos]

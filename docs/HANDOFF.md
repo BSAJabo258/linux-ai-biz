@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 332 tests pass; 49 regulations / 65 policies validate.
+State: 343 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -51,6 +51,15 @@ The video studio (2026-10-10, the first paid integration, tests written first in
 
 Never called against the real Higgsfield API yet: the owner's first `bau video quote` is the
 first real call.
+
+The kids series engine (2026-10-10, tests first in `tests/test_series.py`): `series.py`
+reads `_shared/characters/*.yaml` + `_shared/style.yaml` (templates with placeholders in
+the kids-channel workspace); `lock(id)` is the fixed character sentence every prompt
+carries; `prompt()` = style + locks + scene + avoid (kids scan, 2500-char cap); `drift()`
+flags off-sheet colours/"never" traits and names without their lock (stage 04 check
+`series_lock`, active once sheets are filled); `plan()` scales `data/series_formats.yaml`
+beats to 3-15 s clips, writes `series.yaml` + `series-plan.md`, warns on four same formats
+in a row or a near-duplicate idea. Jarvis tools `clip_prompt`, `plan_episode`; `bau series`.
 
 The repo's look (2026-10-10, tests in `tests/test_repo_look.py`): README opens with an
 animated banner and feature cards (`assets/*.svg`, dark and light via `<picture>`, drawn by
