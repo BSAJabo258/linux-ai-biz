@@ -5,6 +5,12 @@
   "name": "BAU test drive",
   "image": "mcr.microsoft.com/devcontainers/python:3.13",
   "hostRequirements": { "cpus": 2 },
+  "features": {
+    // `gh codespace ssh` (GitHub's tunnel, your login only): run checks from another computer.
+    "ghcr.io/devcontainers/features/sshd:1": {},
+    // Claude Code in the terminal: type `claude` and sign in with your Claude account.
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
   "containerEnv": {
     "BAU_HOME": "/workspaces/.bau-home"
   },

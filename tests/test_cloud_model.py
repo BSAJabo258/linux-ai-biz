@@ -110,6 +110,17 @@ def test_codespaces_ports_stay_private_and_named():
     assert [h.split(".")[0].rsplit("-", 1)[1] for h in hosts] == ["8765", "8766"]
 
 
+def test_codespace_comes_with_ssh_and_claude_code_from_official_features():
+    # `gh codespace ssh` needs an SSH server in the image (it had none on 2026-10-10), and
+    # the owner wanted Claude Code in the codespace terminal. Official features only.
+    import re
+    from pathlib import Path
+    raw = (Path(__file__).resolve().parents[1] / ".devcontainer" / "devcontainer.json").read_text()
+    feats = json.loads(re.sub(r"^\s*//.*$", "", raw, flags=re.M))["features"]
+    assert set(feats) == {"ghcr.io/devcontainers/features/sshd:1",
+                          "ghcr.io/anthropics/devcontainer-features/claude-code:1.0"}
+
+
 def test_jarvis_prints_the_private_codespace_link(monkeypatch, capsys, tmp_path):
     from bau import cli_ext
     monkeypatch.setenv("BAU_HOME", str(tmp_path))

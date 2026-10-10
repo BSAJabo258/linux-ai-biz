@@ -13,6 +13,11 @@ default - keep it that way.
 Codespaces secret `ZAI_API_KEY`, then `bau models bench glm-4.7-flash-zai`, approve it,
 and `bau jarvis --no-browser`. Works from a computer or an iPhone.
 
+**Claude Code is installed:** type `claude` in the terminal and sign in with your Claude
+account (it shows a link to open). It works from any computer or phone, right next to BAU.
+The codespace also has an SSH server, so `gh codespace ssh` can run checks from another
+computer, only through GitHub's tunnel with your login.
+
 Try:
 
 ```bash
