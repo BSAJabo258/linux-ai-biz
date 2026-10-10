@@ -16,6 +16,7 @@ stand and what is next.
 | `src/bau/scout/`, `data/scout.yaml` | Repo Scout (`bau scout`): finds open-source projects for a capability, keeps claims apart from inspected and tested facts, licence/security gates; never installs or runs them. See `docs/engineering/repo-intelligence.md` |
 | `src/bau/studio.py`, `src/bau/media/higgsfield.py` | Video studio (`bau video`): paid Higgsfield clips under the owner's budget; priced first, owner-confirmed, downloaded with provenance, cost in the ledger. See `docs/STUDIO.md` |
 | `src/bau/usage.py` | Usage meter (`bau usage`): every model call's tokens and dollars per model (free ones too), owner-set daily limits, busy replies, rate-limit headers, GitHub's wait. See `docs/USAGE.md` |
+| `src/bau/toolbox.py`, `data/toolbox.yaml` | Toolbox (`bau toolbox`): 77 researched open-source tools (connectors, grounding, evals, agents, memory, local models, voice, video) with sources and check date; Jarvis's `toolbox` tool; `check` hands one to Repo Scout. See `docs/TOOLBOX.md` |
 | `src/bau/governor.py` | watchdog (hold / quarantine / resume, never approves) |
 | `src/bau/brain.py` | Second Brain (Markdown vault, nouns + verbs graph) |
 | `src/bau/chats.py` | chat library (`bau chats`): the owner's Claude/ChatGPT exports in SQLite FTS5; Jarvis reads them per `bau chats sharing` |
@@ -72,6 +73,8 @@ These are the product's safety model, not style preferences:
 
 ## Conventions
 
+- Before building something new, look for what others already built: `bau toolbox ask "..."`
+  (and `bau scout find` for more). Prefer a vetted tool behind an adapter to writing it again.
 - Match the surrounding code: stdlib first, small functions, comments only where the
   reason is not obvious. New policy rules go in `src/bau/data/policies/*.yaml` and must
   reference existing `reg_id`s (the loader refuses dangling references).

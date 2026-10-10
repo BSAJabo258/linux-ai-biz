@@ -23,7 +23,7 @@ import yaml
 
 from ..home import bau_home, shipped_data
 from .evaluate import evaluate, readme_signals
-from .github import GitHub, RateLimited, SourceError
+from .github import GitHub, RateLimited, SourceError, normalise
 from .plan import plan
 
 NAME = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
@@ -165,6 +165,32 @@ class Scout:
         self._record("scout.run", {"run": run["id"], "queries": len(searches),
                                    "failed": len(failed), "found": len(found)})
         return run
+
+    def add(self, full_name: str, keywords: list[str] | None = None,
+            origin: str = "owner") -> dict[str, Any]:
+        """Make one named repository a candidate (for example a toolbox entry), from its
+        GitHub record. One request; nothing is downloaded or run."""
+        if not NAME.match(full_name) or {".", ".."} & set(full_name.split("/")):
+            raise ValueError("give the repository as OWNER/NAME")
+        it = normalise(self.source.repo(full_name))
+        if not NAME.match(it["full_name"]):
+            raise SourceError(f"GitHub returned no repository for {full_name}")
+        store = self.candidates()
+        old = store.get(it["full_name"].lower())
+        c = self._new(it)
+        if old:
+            for k in KEEP:
+                if k in old:
+                    c[k] = old[k]
+            c["queries"] = old.get("queries", [])
+        c["origin"] = origin
+        c["upstream"] = it["full_name"] if not it["fork"] else (old or {}).get("upstream")
+        c["keywords"] = list(keywords or [])
+        evaluate(c, c["keywords"], self.cfg)
+        store[c["id"]] = c
+        self._save(store)
+        self._record("scout.added", {"repo": c["full_name"], "origin": origin})
+        return c
 
     def _new(self, it: dict[str, Any]) -> dict[str, Any]:
         return {"id": it["full_name"].lower(), "full_name": it["full_name"],

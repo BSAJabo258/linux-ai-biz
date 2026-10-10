@@ -354,6 +354,34 @@ def cmd_scout(a):
 
 # ------------------------------------------------------------------ video studio
 
+def cmd_toolbox(a):
+    from .toolbox import Toolbox
+    tb = Toolbox()
+    if a.toolbox_cmd == "ask":
+        _out(tb.ask(a.question, a.category, a.top))
+    elif a.toolbox_cmd == "list":
+        _out([tb._public(e, tb._scout()) for e in tb.entries
+              if a.category in (None, e["category"])])
+    elif a.toolbox_cmd == "check":
+        from .assistant import load_env_file
+        from .scout.github import SourceError
+        load_env_file()                       # an optional GITHUB_TOKEN raises the rate limit
+        who = ("human:" if sys.stdin.isatty() else "process:") + getpass.getuser()
+        try:
+            c = tb.check(a.name, audit=AuditLog(), actor=who)
+        except SourceError as e:              # includes GitHub asking BAU to wait
+            print(str(e), file=sys.stderr)
+            return EXIT_BLOCKED
+        _out({"repo": c["full_name"], "decision": c["decision"],
+              "security": c["security"], "licence": c["license"],
+              "blocked": c["blockers"], "needs": c["needs"]})
+    else:
+        probs = tb.problems()
+        _out({"entries": len(tb.entries), "checked": tb.checked, "problems": probs})
+        return EXIT_OK if not probs else EXIT_BLOCKED
+    return EXIT_OK
+
+
 def cmd_usage(a):
     from .usage import Usage
     u = Usage(audit=AuditLog())
@@ -1236,6 +1264,19 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--wait", type=float, default=0, help="seconds to wait per clip")
     x.add_argument("--top", type=int, default=20)
     s.set_defaults(fn=cmd_video)
+
+    s = sub.add_parser("toolbox", help="researched open-source tools; ask before guessing")
+    w = s.add_subparsers(dest="toolbox_cmd", required=True)
+    x = w.add_parser("ask", help="tools for a problem, in plain words")
+    x.add_argument("question")
+    x.add_argument("--category")
+    x.add_argument("--top", type=int, default=5)
+    x = w.add_parser("list", help="every tool (optionally one category)")
+    x.add_argument("--category")
+    x = w.add_parser("check", help="have Repo Scout fetch and safely inspect one tool")
+    x.add_argument("name")
+    w.add_parser("validate", help="check the catalogue: sources, dates, no claims")
+    s.set_defaults(fn=cmd_toolbox)
 
     s = sub.add_parser("usage", help="tokens and dollars per model; your daily limits")
     w = s.add_subparsers(dest="usage_cmd")

@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 310 tests pass; 49 regulations / 65 policies validate.
+State: 317 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -51,6 +51,15 @@ The video studio (2026-10-10, the first paid integration, tests written first in
 
 Never called against the real Higgsfield API yet: the owner's first `bau video quote` is the
 first real call.
+
+The toolbox (2026-10-10, tests first in `tests/test_toolbox.py`): `data/toolbox.yaml` has
+77 open-source tools researched that day (connectors/MCP, Claude Code setup, grounding,
+structured output, guardrails, evals, agents incl. Hermes Agent and Hermes 4, memory, local
+models, voice, video), each with sources, licence and caveats; validated by `bau toolbox
+validate`. `Toolbox.ask` answers plain-words questions; Jarvis's `toolbox` tool and system
+prompt make him look there before guessing; the Scout panel shows "Already known" first.
+`bau toolbox check NAME` -> `Scout.add` (one GitHub record) + `Scout.inspect`. Rebuilt from
+research because the owner's own transcript collection was lost with a codespace.
 
 The usage meter (2026-10-10, tests first in `tests/test_usage.py`):
 - `usage.py`: `Metered` wraps the provider for Jarvis's turns, workspace drafts and Scout;

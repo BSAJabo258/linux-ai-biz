@@ -1,0 +1,859 @@
+# The toolbox (src/bau/toolbox.py): open-source tools for the problems Jarvis meets.
+# Researched on the `checked` date from each project's GitHub page and the sources listed;
+# star counts are approximate and change daily. Everything here is a CLAIM until Repo
+# Scout inspects it (`bau toolbox check NAME`). Licences matter: several voice models are
+# non-commercial only and must not be used in monetised videos (see caveats).
+checked: "2026-10-10"
+entries:
+  # ---------------------------------------------------------------- connecting models to tools
+  - name: MCP Registry
+    repo: modelcontextprotocol/registry
+    url: https://github.com/modelcontextprotocol/registry
+    category: connect
+    problem: Assistants need one trusted list of available MCP connectors and who owns each name.
+    how_used: Look up servers through the registry (registry.modelcontextprotocol.io); authors publish after proving they own the name.
+    licence: MIT moving to Apache-2.0; docs CC-BY-4.0 (GitHub shows NOASSERTION)
+    stars: "~7.3k (2026-10-10)"
+    last_activity: "2026-10-08"
+    sources: [https://github.com/modelcontextprotocol/registry]
+    caveats: In preview since 2025-09-08. Being listed proves who owns a name, not that the server is safe.
+  - name: MCP reference servers
+    repo: modelcontextprotocol/servers
+    url: https://github.com/modelcontextprotocol/servers
+    category: connect
+    problem: Models need simple connectors to read files, fetch web pages, keep a memory graph and think step by step (sequential-thinking).
+    how_used: Run one server (for example filesystem limited to chosen folders) from the client's MCP config with npx or uvx.
+    licence: MIT for existing code, Apache-2.0 for new (GitHub shows NOASSERTION)
+    stars: "~91.1k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/modelcontextprotocol/servers]
+    caveats: The README calls them educational examples, not production-ready. Many old servers (GitHub, Slack, Drive...) moved to servers-archived. Fetched pages and files can carry prompt injection.
+  - name: MCP Inspector
+    repo: modelcontextprotocol/inspector
+    url: https://github.com/modelcontextprotocol/inspector
+    category: connect
+    problem: You can't check what a connector really does without seeing and calling its tools directly.
+    how_used: Run `npx @modelcontextprotocol/inspector`, connect it to a server and try each tool before trusting it.
+    licence: MIT moving to Apache-2.0 (GitHub shows NOASSERTION)
+    stars: "~11.0k (2026-10-10)"
+    last_activity: "2026-10-08"
+    sources: [https://github.com/modelcontextprotocol/inspector]
+    caveats: Without an OS keychain it writes tokens to ~/.mcp-inspector/secrets.json; a developer tool, don't leave it running.
+  - name: GitHub MCP Server
+    repo: github/github-mcp-server
+    url: https://github.com/github/github-mcp-server
+    category: connect
+    problem: Agents need permissioned access to repositories, issues, pull requests and Actions instead of scraping.
+    how_used: Use GitHub's hosted server with OAuth or a token, or run the Docker image locally; pick toolsets, and --read-only for research.
+    licence: MIT
+    stars: "~33.5k (2026-10-10)"
+    last_activity: "2026-10-08"
+    sources: [https://github.com/github/github-mcp-server]
+    caveats: Use a least-privilege token per project; issue and PR text is untrusted input.
+  - name: Playwright MCP
+    repo: microsoft/playwright-mcp
+    url: https://github.com/microsoft/playwright-mcp
+    category: connect
+    problem: Models need to drive a real browser without screenshots and a vision model.
+    how_used: Add `npx @playwright/mcp@latest` as a connector; the model works from the page's accessibility tree.
+    licence: Apache-2.0
+    stars: "~38.0k (2026-10-10)"
+    last_activity: "2026-10-08"
+    sources: [https://github.com/microsoft/playwright-mcp]
+    caveats: The README says it is not a security boundary and browser_run_code_unsafe equals running any code. Use --isolated.
+  - name: Chrome DevTools MCP
+    repo: ChromeDevTools/chrome-devtools-mcp
+    url: https://github.com/ChromeDevTools/chrome-devtools-mcp
+    category: connect
+    problem: Coding agents can't see what a page really does (console, network, speed) while they fix it.
+    how_used: Add it as a connector so the agent can control and inspect a live Chrome.
+    licence: Apache-2.0
+    stars: "~53.2k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/ChromeDevTools/chrome-devtools-mcp]
+    caveats: Only its GitHub record was read, not the README. A browser that sees your logins is sensitive.
+  - name: Context7
+    repo: upstash/context7
+    url: https://github.com/upstash/context7
+    category: docs-grounding
+    problem: Models write code against outdated or invented library APIs because their training lags behind releases.
+    how_used: Add the remote connector (https://mcp.context7.com/mcp) or run `npx ctx7 setup`; the agent pulls current docs into its prompt.
+    licence: MIT (connector and CLI only; the service behind it is private)
+    stars: "~62.9k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/upstash/context7]
+    caveats: Questions go to Upstash's hosted service. Docs are community-contributed and nobody checks them, so treat them as untrusted data.
+  - name: awesome-mcp-servers
+    repo: punkpeye/awesome-mcp-servers
+    url: https://github.com/punkpeye/awesome-mcp-servers
+    category: connect
+    problem: There are thousands of connectors and no single place to browse them by topic.
+    how_used: Browse the list (or glama.ai/mcp/servers) to find candidates, then check each one with Repo Scout.
+    licence: MIT
+    stars: "~96.0k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/punkpeye/awesome-mcp-servers]
+    caveats: A list of links, not reviewed for safety.
+  - name: mcp-use
+    repo: mcp-use/mcp-use
+    url: https://github.com/mcp-use/mcp-use
+    category: connect
+    problem: Your own agents and apps (outside Claude or Cursor) need to connect to MCP connectors too.
+    how_used: Use the Python package mcp-use or the TypeScript client to give any agent MCP tools, or build servers.
+    licence: MIT
+    stars: "~10.7k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/mcp-use/mcp-use]
+    caveats: Which model providers it supports and its hosted pricing were not confirmed.
+  - name: Docker MCP Gateway
+    repo: docker/mcp-gateway
+    url: https://github.com/docker/mcp-gateway
+    category: gateway
+    problem: Running many connectors straight on the computer is messy and risky, with secrets in environment variables.
+    how_used: Use `docker mcp` to run connectors in containers behind one endpoint, with per-tool allowlists.
+    licence: MIT
+    stars: "~1.6k (2026-10-10)"
+    last_activity: "2026-09-23"
+    sources: [https://github.com/docker/mcp-gateway]
+    caveats: Needs Docker Desktop 4.59+ with MCP Toolkit (a Docker CE workaround exists). Containers reduce risk, not remove it.
+  - name: IBM ContextForge
+    repo: IBM/mcp-context-forge
+    url: https://github.com/IBM/mcp-context-forge
+    category: gateway
+    problem: Teams need one governed doorway to many tools with sign-in, rate limits and logs.
+    how_used: Deploy it in front of connectors and offer "virtual servers" that bundle only chosen tools.
+    licence: Apache-2.0
+    stars: "~4.6k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/IBM/mcp-context-forge]
+    caveats: Release candidate; change its development defaults; heavy for a one-owner laptop.
+  - name: LiteLLM
+    repo: BerriAI/litellm
+    url: https://github.com/BerriAI/litellm
+    category: gateway
+    problem: Every model provider has a different API, which makes switching models and tracking spend hard.
+    how_used: Call 100+ providers in one OpenAI format, or run its proxy with keys, spend tracking, fallbacks and shared MCP tools.
+    licence: MIT except the enterprise folder (GitHub shows NOASSERTION)
+    stars: "~60.9k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/BerriAI/litellm, "https://pypistats.com/blog/litellm-pypi-supply-chain-compromise-how-a-popular-llm-proxy-became-a-credential-stealing-backdoor-march-24-2026"]
+    caveats: "SECURITY: third-party reports say PyPI releases 1.82.7 and 1.82.8 (2026-03-24) stole credentials (not checked against a primary advisory). Pin versions and hashes. BAU already does fallback and spend tracking itself."
+  - name: agentgateway
+    repo: agentgateway/agentgateway
+    url: https://github.com/agentgateway/agentgateway
+    category: gateway
+    problem: Agents need a proxy for connector and agent-to-agent traffic, like an API gateway.
+    how_used: Run it as a proxy in front of connectors and agents.
+    licence: Apache-2.0
+    stars: "~5.3k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/agentgateway/agentgateway]
+    caveats: Only its GitHub record was read; features and maturity unconfirmed.
+  - name: mcp-proxy
+    repo: sparfenyuk/mcp-proxy
+    url: https://github.com/sparfenyuk/mcp-proxy
+    category: gateway
+    problem: Some clients only speak stdio and some connectors only HTTP, so they can't talk to each other.
+    how_used: Run it as a bridge between the stdio and Streamable HTTP transports.
+    licence: MIT
+    stars: "~2.8k (2026-10-10)"
+    last_activity: "2026-07-20"
+    sources: [https://github.com/sparfenyuk/mcp-proxy]
+    caveats: Only its GitHub record was read. Bind it to localhost only.
+  - name: Claude Code Router
+    repo: musistudio/claude-code-router
+    url: https://github.com/musistudio/claude-code-router
+    category: gateway
+    problem: Claude Code is tied to one provider; people want to send its requests to other models too.
+    how_used: Install it, run `ccr ui` (127.0.0.1), add providers such as OpenRouter or DeepSeek, and route Claude Code through it.
+    licence: MIT
+    stars: "~37.6k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/musistudio/claude-code-router]
+    caveats: Independent project, not Anthropic's. It holds your provider keys. Node 22+.
+  # ---------------------------------------------------------------- Claude Code itself
+  - name: Claude Code
+    repo: anthropics/claude-code
+    url: https://github.com/anthropics/claude-code
+    category: claude-code
+    problem: A coding agent needs project memory, fixed guardrails and reusable workflows to stay reliable between sessions.
+    how_used: Put project rules in CLAUDE.md, add hooks in settings to run checks automatically, define subagents, add skills and plugins with /plugin.
+    licence: Proprietary (Anthropic Commercial Terms)
+    stars: "~150.0k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/anthropics/claude-code, https://code.claude.com/docs/en/hooks-guide]
+    caveats: Needs an Anthropic plan or key. Hooks are shell commands with your permissions - review any you copy.
+  - name: Anthropic Agent Skills
+    repo: anthropics/skills
+    url: https://github.com/anthropics/skills
+    category: claude-code
+    problem: Models need reusable instructions and scripts for special jobs, loaded only when needed.
+    how_used: "`/plugin marketplace add anthropics/skills`, then install example or document skills; each is a folder with a SKILL.md."
+    licence: Many skills Apache-2.0; document skills source-available (check each folder)
+    stars: "~180.3k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/anthropics/skills]
+    caveats: For demonstration and learning; skills can carry scripts that run.
+  - name: Claude Code plugin directory
+    repo: anthropics/claude-plugins-official
+    url: https://github.com/anthropics/claude-plugins-official
+    category: claude-code
+    problem: People need a curated place to find and install Claude Code plugins.
+    how_used: "`/plugin install NAME@claude-plugins-official`, or browse /plugin > Discover."
+    licence: Apache-2.0 (each plugin keeps its own)
+    stars: "~37.6k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/anthropics/claude-plugins-official]
+    caveats: external_plugins are third-party; the README says Anthropic doesn't verify them.
+  - name: awesome-claude-code
+    repo: hesreallyhim/awesome-claude-code
+    url: https://github.com/hesreallyhim/awesome-claude-code
+    category: claude-code
+    problem: The Claude Code world (skills, agents, plugins, tools) is scattered and hard to survey.
+    how_used: Browse the list to find community skills, agents and tools, then check each one.
+    licence: CC BY-NC-ND 4.0 (link to it; don't copy it into a product)
+    stars: "~55.4k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/hesreallyhim/awesome-claude-code]
+    caveats: Not affiliated with Anthropic; listed tools are not reviewed for safety.
+  - name: Superpowers
+    repo: obra/superpowers
+    url: https://github.com/obra/superpowers
+    category: claude-code
+    problem: Coding agents skip design, planning and testing and hand over unreviewed changes.
+    how_used: "`/plugin install superpowers@claude-plugins-official`; its skills make the agent brainstorm, plan, test first and review each task."
+    licence: MIT
+    stars: "~297.1k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/obra/superpowers]
+    caveats: Sends a version ping from one feature (SUPERPOWERS_DISABLE_TELEMETRY turns it off). Long runs still need owner review.
+  # ---------------------------------------------------------------- stop made-up answers
+  - name: LlamaIndex
+    repo: run-llama/llama_index
+    url: https://github.com/run-llama/llama_index
+    category: grounding
+    problem: Answers drift away from your own documents unless the right passages are found and handed to the model.
+    how_used: Load documents, build an index, and query it so answers are built from retrieved passages.
+    licence: MIT
+    stars: "~52.5k (2026-10-10)"
+    last_activity: "2026-10-08"
+    sources: [https://github.com/run-llama/llama_index]
+    caveats: The company now focuses on LlamaParse (a separate platform); the README does not mention citations.
+  - name: Haystack
+    repo: deepset-ai/haystack
+    url: https://github.com/deepset-ai/haystack
+    category: grounding
+    problem: RAG systems become opaque when retrieval, ranking and generation are tangled together.
+    how_used: Build explicit pipelines from components (retriever, ranker, generator, evaluator); providers can be swapped, local ones included.
+    licence: Apache-2.0
+    stars: "~26.7k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/deepset-ai/haystack]
+    caveats: deepset also sells a commercial platform.
+  - name: RAGFlow
+    repo: infiniflow/ragflow
+    url: https://github.com/infiniflow/ragflow
+    category: grounding
+    problem: Messy documents (PDFs, tables, scans) are parsed badly, so the model gets poor sources and answers wrongly.
+    how_used: Run it as a Docker service, upload documents, pick a chunking template, and chat with answers that carry citations.
+    licence: Apache-2.0
+    stars: "~91.9k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/infiniflow/ragflow]
+    caveats: Heavy - the README asks for 4+ CPU cores, 16 GB RAM, 50 GB disk and Docker. Fewer hallucinations is the project's own claim.
+  - name: Microsoft GraphRAG
+    repo: microsoft/graphrag
+    url: https://github.com/microsoft/graphrag
+    category: grounding
+    problem: Plain vector search misses themes and relationships that run across many documents.
+    how_used: Index a text collection into a model-built knowledge graph with community summaries, then ask local or global questions.
+    licence: MIT
+    stars: "~36.3k (2026-10-10)"
+    last_activity: "2026-10-08"
+    sources: [https://github.com/microsoft/graphrag]
+    caveats: The README says it is largely in maintenance mode, a demonstration rather than a supported product, and that indexing can be expensive.
+  - name: LightRAG
+    repo: HKUDS/LightRAG
+    url: https://github.com/HKUDS/LightRAG
+    category: grounding
+    problem: Graph-based retrieval is usually slow and costly; this is a lighter mix of knowledge graph and vector search.
+    how_used: Run the server (web UI and REST API), add documents, and query in local, global, hybrid, naive or mix mode; citations since 2025.03.
+    licence: MIT
+    stars: "~40.1k (2026-10-10)"
+    last_activity: "2026-10-08"
+    sources: [https://github.com/HKUDS/LightRAG]
+    caveats: Works with Ollama, but entity extraction needs a capable model (the README names Qwen3-30B-A3B as a reasonable local minimum).
+  - name: Instructor
+    repo: 567-labs/instructor
+    url: https://github.com/567-labs/instructor
+    category: structured-output
+    problem: Models return malformed or invalid JSON that breaks the code reading it.
+    how_used: Pass a Pydantic model as response_model and get a validated object back; failed validations are retried with the error.
+    licence: MIT
+    stars: "~14.0k (2026-10-10)"
+    last_activity: "2026-10-08"
+    sources: [https://github.com/567-labs/instructor]
+    caveats: It checks the shape of an answer, not whether it is true - a well-formed answer can still be made up.
+  - name: Outlines
+    repo: dottxt-ai/outlines
+    url: https://github.com/dottxt-ai/outlines
+    category: structured-output
+    problem: Fixing bad output afterwards is fragile; this makes the model follow a schema while it writes.
+    how_used: Call model(prompt, output_type) with a Pydantic or JSON schema, regex, choice list or grammar (transformers, llama.cpp, vLLM, Ollama).
+    licence: Apache-2.0
+    stars: "~15.9k (2026-10-10)"
+    last_activity: "2026-09-21"
+    sources: [https://github.com/dottxt-ai/outlines]
+    caveats: Controls structure, not facts. The README doesn't say whether hosted-API backends behave the same as local ones.
+  - name: Guidance
+    repo: guidance-ai/guidance
+    url: https://github.com/guidance-ai/guidance
+    category: structured-output
+    problem: Plain prompting cannot force a model to follow a format or mix program logic with its writing.
+    how_used: Write Python programs that interleave control flow with constrained gen() calls (regex, select, JSON, grammars).
+    licence: MIT
+    stars: "~21.8k (2026-10-10)"
+    last_activity: "2026-05-21"
+    sources: [https://github.com/guidance-ai/guidance]
+    caveats: Updated less often than its peers; full grammar control only on backends that support it.
+  - name: BAML
+    repo: BoundaryML/baml
+    url: https://github.com/BoundaryML/baml
+    category: structured-output
+    problem: Untyped model calls let type and format mistakes reach the application.
+    how_used: Define typed model functions in BAML and call them from Python, TypeScript, Go and others; includes a test framework.
+    licence: Apache-2.0
+    stars: "~9.4k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/BoundaryML/baml]
+    caveats: A new language to learn; it now presents itself more broadly ("the programming language for agents"), so read the docs first.
+  - name: Guardrails AI
+    repo: guardrails-ai/guardrails
+    url: https://github.com/guardrails-ai/guardrails
+    category: guardrails
+    problem: Model inputs and outputs need checks (format, toxicity, regex and more) before they reach people.
+    how_used: Install validators from Guardrails Hub and combine them into input and output guards around model calls.
+    licence: Apache-2.0
+    stars: "~7.5k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/guardrails-ai/guardrails, https://www.guardrailsai.com/docs/getting_started/quickstart]
+    caveats: "`guardrails configure` asks about anonymous metrics - answer no. Validators vary in quality and some call models."
+  - name: NeMo Guardrails
+    repo: NVIDIA-NeMo/Guardrails
+    url: https://github.com/NVIDIA-NeMo/Guardrails
+    category: guardrails
+    problem: Conversational systems need programmable rules for topics, moderation, fact-checking and hallucination detection.
+    how_used: Write a config with Colang flows and rails such as 'self check facts' and 'self check hallucination', plus retrieval rails.
+    licence: Apache-2.0 (per README; GitHub shows NOASSERTION)
+    stars: "~7.3k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/NVIDIA-NeMo/Guardrails]
+    caveats: Moved from NVIDIA/NeMo-Guardrails; self-check rails cost extra model calls; Colang is one more language.
+  - name: promptfoo
+    repo: promptfoo/promptfoo
+    url: https://github.com/promptfoo/promptfoo
+    category: evals
+    problem: Prompt and model changes cause silent regressions and security holes unless they are tested.
+    how_used: Write test configs (prompts, providers, assertions) and run them from the command line or CI; also red-teams prompts.
+    licence: MIT
+    stars: "~25.9k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/promptfoo/promptfoo]
+    caveats: The README says promptfoo is now part of OpenAI and stays MIT-licensed. Tested model APIs still receive the prompts.
+  - name: DeepEval
+    repo: confident-ai/deepeval
+    url: https://github.com/confident-ai/deepeval
+    category: evals
+    problem: Model apps need repeatable unit tests for hallucination, faithfulness and relevance.
+    how_used: Write pytest-style cases and run `deepeval test run` with metrics such as Hallucination, Faithfulness and G-Eval.
+    licence: Apache-2.0
+    stars: "~18.7k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/confident-ai/deepeval]
+    caveats: Most metrics use a model as judge, so they cost money and vary between runs; its cloud account is optional.
+  - name: Ragas
+    repo: vibrantlabsai/ragas
+    url: https://github.com/vibrantlabsai/ragas
+    category: evals
+    problem: You can't tell whether answers stay faithful to the retrieved sources without measuring it.
+    how_used: Score retrieval-based answers with ready-made model-judged and classic metrics, or build your own.
+    licence: Apache-2.0
+    stars: "~16.0k (2026-10-10)"
+    last_activity: "2026-02-24"
+    sources: [https://github.com/vibrantlabsai/ragas]
+    caveats: Probably moved from explodinggradients/ragas (not confirmed); no push for about 7 months and many open issues - check it is maintained.
+  - name: Arize Phoenix
+    repo: Arize-ai/phoenix
+    url: https://github.com/Arize-ai/phoenix
+    category: evals
+    problem: You can't see where a model app went wrong (retrieval, prompt or answer) without tracing and evaluation.
+    how_used: Run `phoenix serve` locally, instrument the app with OpenTelemetry, and run response and retrieval evals.
+    licence: Elastic License 2.0 (source-available, not OSI open source)
+    stars: "~11.8k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/Arize-ai/phoenix]
+    caveats: The Elastic licence forbids offering it as a hosted service to others.
+  - name: Langfuse
+    repo: langfuse/langfuse
+    url: https://github.com/langfuse/langfuse
+    category: evals
+    problem: Without traces, prompt versions and scores, wrong answers and regressions in use go unnoticed.
+    how_used: Self-host with Docker Compose, send traces from the SDKs, version prompts, and score outputs with judges, code or people.
+    licence: MIT except the ee folders (GitHub shows NOASSERTION)
+    stars: "~35.6k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/langfuse/langfuse]
+    caveats: Enterprise (ee) features have separate terms; self-hosting is several services.
+  - name: LM Evaluation Harness
+    repo: EleutherAI/lm-evaluation-harness
+    url: https://github.com/EleutherAI/lm-evaluation-harness
+    category: evals
+    problem: Comparing models fairly needs standard, repeatable benchmark runs.
+    how_used: Run 60+ academic benchmarks against transformers, vLLM, a llama.cpp server or an OpenAI-compatible API.
+    licence: MIT
+    stars: "~14.2k (2026-10-10)"
+    last_activity: "2026-09-14"
+    sources: [https://github.com/EleutherAI/lm-evaluation-harness]
+    caveats: Measures general model ability, not your own app's mistakes (that is what bau models bench and evals are for).
+  - name: DSPy
+    repo: stanfordnlp/dspy
+    url: https://github.com/stanfordnlp/dspy
+    category: context-engineering
+    problem: Hand-written prompts are brittle and break when the model or task changes.
+    how_used: Write small Python modules and let DSPy optimise their prompts against a metric and examples.
+    licence: MIT
+    stars: "~38.6k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/stanfordnlp/dspy]
+    caveats: Optimising needs a metric and example data, and costs model calls; details are at dspy.ai.
+  - name: Prompt Engineering Guide
+    repo: dair-ai/Prompt-Engineering-Guide
+    url: https://github.com/dair-ai/Prompt-Engineering-Guide
+    category: context-engineering
+    problem: There is no single reference for prompting, context engineering, retrieval and agent techniques.
+    how_used: Read it (also at promptingguide.ai) when designing Jarvis's prompts and context.
+    licence: MIT
+    stars: "~79.0k (2026-10-10)"
+    last_activity: "2026-03-11"
+    sources: [https://github.com/dair-ai/Prompt-Engineering-Guide]
+    caveats: A guide, not a library.
+  # ---------------------------------------------------------------- agents, memory, local models
+  - name: Hermes Agent
+    repo: NousResearch/hermes-agent
+    url: https://github.com/NousResearch/hermes-agent
+    category: agents
+    problem: A personal assistant that isn't tied to one model, keeps memory between sessions and learns reusable skills.
+    how_used: Install with its script (Linux, macOS, WSL2) and run `hermes`; one gateway connects it to Telegram, Discord, Slack, WhatsApp, Signal and email.
+    licence: MIT
+    stars: "~252k (2026-10-10, unusually high for a 2025 repo)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/NousResearch/hermes-agent, https://hermes-agent.nousresearch.com]
+    caveats: Acts on its own - runs shell commands, schedules jobs, writes its own skills - so in BAU it needs a sandbox and owner confirmation in front of it. Only the README was read.
+  - name: Hermes 4 models
+    repo: NousResearch/Hermes-4-70B
+    url: https://huggingface.co/collections/NousResearch/hermes-4-collection-68a731bfd452e20816725728
+    category: local-models
+    problem: Open-weight chat models with switchable reasoning and reliable tool calling that you run yourself.
+    how_used: Download the weights or a GGUF (e.g. Hermes-4.3-36B-GGUF) and serve with llama.cpp, vLLM or Ollama.
+    licence: 70B/405B Llama 3 community licence (not OSI); 14B/36B Apache-2.0 per secondary sources only
+    stars: n/a (Hugging Face)
+    last_activity: "Hermes 4 Aug-Sep 2025; Hermes 4.3 Dec 2025"
+    sources: [https://huggingface.co/NousResearch/Hermes-4-70B, https://huggingface.co/collections/NousResearch/hermes-4-collection-68a731bfd452e20816725728]
+    caveats: 70B and 405B are far too big for the laptop; only 14B/36B quantisations are realistic and must pass `bau models bench`. Expect fewer refusals than mainstream models.
+  - name: LangGraph
+    repo: langchain-ai/langgraph
+    url: https://github.com/langchain-ai/langgraph
+    category: agents
+    problem: Long-running agent work needs to pause, resume and wait for a human at chosen steps.
+    how_used: Define nodes and edges in a StateGraph, compile it with a checkpointer, and add interrupts where a human must approve.
+    licence: MIT
+    stars: "~43.0k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/langchain-ai/langgraph]
+    caveats: LangSmith and LangGraph Platform are paid add-ons. Only its GitHub record was read.
+  - name: CrewAI
+    repo: crewAIInc/crewAI
+    url: https://github.com/crewAIInc/crewAI
+    category: agents
+    problem: Splitting a multi-step job between several role-based agents that work as a team.
+    how_used: Define agents (role, goal, tools) and tasks, then run them as a Crew or an event-driven Flow.
+    licence: MIT
+    stars: "~59.5k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/crewAIInc/crewAI]
+    caveats: Has a commercial hosted platform. Only its GitHub record was read.
+  - name: OpenAI Agents SDK
+    repo: openai/openai-agents-python
+    url: https://github.com/openai/openai-agents-python
+    category: agents
+    problem: A light way to build multi-agent workflows with handoffs, guardrails and tracing.
+    how_used: Define an Agent with instructions and tools and run it with Runner.
+    licence: MIT
+    stars: "~30.0k (2026-10-10)"
+    last_activity: "2026-10-08"
+    sources: [https://github.com/openai/openai-agents-python]
+    caveats: OpenAI-first; tracing goes to OpenAI's platform by default. Only its GitHub record was read.
+  - name: Pydantic AI
+    repo: pydantic/pydantic-ai
+    url: https://github.com/pydantic/pydantic-ai
+    category: agents
+    problem: Agent outputs and tool arguments arrive unchecked; this gives typed, validated agents across many providers.
+    how_used: Create Agent(model, output_type=...), register tools with decorators, and run it; tool arguments are validated first.
+    licence: MIT
+    stars: "~20.5k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/pydantic/pydantic-ai]
+    caveats: Promotes Logfire (paid, free tier); any OpenTelemetry backend works.
+  - name: smolagents
+    repo: huggingface/smolagents
+    url: https://github.com/huggingface/smolagents
+    category: agents
+    problem: A minimal agent library whose agents act by writing Python code instead of JSON tool calls.
+    how_used: Create a CodeAgent with tools and a model (local or hosted) and call agent.run(task).
+    licence: Apache-2.0
+    stars: "~29.8k (2026-10-10)"
+    last_activity: "2026-10-06"
+    sources: [https://github.com/huggingface/smolagents]
+    caveats: Code-writing agents must run in a sandbox, never straight on the computer.
+  - name: Agno
+    repo: agno-agi/agno
+    url: https://github.com/agno-agi/agno
+    category: agents
+    problem: Building agents and running them as a self-hosted service with storage, an API and a control screen.
+    how_used: Write agents with the SDK, or start from its Docker template (Postgres, MCP server, control plane).
+    licence: Apache-2.0
+    stars: "~42.6k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/agno-agi/agno]
+    caveats: Telemetry is on by default (AGNO_TELEMETRY=false turns it off). Supports human approval of tool calls, which fits BAU.
+  - name: OpenHands
+    repo: OpenHands/OpenHands
+    url: https://github.com/OpenHands/OpenHands
+    category: agents
+    problem: A self-hosted control centre for AI coding agents and automations.
+    how_used: Run its Docker image (UI on localhost); it runs the OpenHands agent and can drive Claude Code, Codex or Gemini CLI.
+    licence: MIT
+    stars: "~90.5k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/OpenHands/OpenHands]
+    caveats: Moved from All-Hands-AI. The README warns local mode has full access to your files - use its per-conversation containers.
+  - name: Browser Use
+    repo: browser-use/browser-use
+    url: https://github.com/browser-use/browser-use
+    category: agents
+    problem: Lets an AI agent work a real web browser to finish tasks on websites.
+    how_used: Create an Agent with a model and a task and call agent.run(); local models work through Ollama.
+    licence: MIT
+    stars: "~117.5k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/browser-use/browser-use]
+    caveats: Its own recommended model and cloud browsers are paid. Web pages it reads can carry prompt injection.
+  - name: Letta
+    repo: letta-ai/letta
+    url: https://github.com/letta-ai/letta
+    category: memory
+    problem: Agents that keep and edit their own long-term memory, so they learn over time instead of forgetting.
+    how_used: Run `letta server` to self-host, or use the SDK and the letta-code terminal app.
+    licence: Apache-2.0
+    stars: "~25.1k (2026-10-10)"
+    last_activity: "2026-09-10"
+    sources: [https://github.com/letta-ai/letta]
+    caveats: Formerly MemGPT; active work has moved to letta-ai/letta-code.
+  - name: Mem0
+    repo: mem0ai/mem0
+    url: https://github.com/mem0ai/mem0
+    category: memory
+    problem: Assistants forget what people told them; this adds a memory layer that recalls facts across sessions.
+    how_used: Use it as a Python library or self-host its server with Docker Compose.
+    licence: Apache-2.0
+    stars: "~66.9k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/mem0ai/mem0]
+    caveats: Defaults to OpenAI models and embeddings, so data leaves the machine unless it is set up for local models.
+  - name: Graphiti
+    repo: getzep/graphiti
+    url: https://github.com/getzep/graphiti
+    category: memory
+    problem: Agent memory that overwrites facts loses history; this keeps a knowledge graph where each fact has a time window.
+    how_used: Use the Python library with Neo4j or FalkorDB, add episodes and search; includes an MCP server.
+    licence: Apache-2.0
+    stars: "~31.6k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/getzep/graphiti]
+    caveats: Needs your own graph database; Zep's hosted platform is commercial.
+  - name: Cognee
+    repo: topoteretes/cognee
+    url: https://github.com/topoteretes/cognee
+    category: memory
+    problem: Turning documents and conversations into a memory graph agents can recall from.
+    how_used: Install it and call remember/recall from Python or cognee-cli; includes an MCP server.
+    licence: Apache-2.0
+    stars: "~31.9k (2026-10-10)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/topoteretes/cognee]
+    caveats: Works without a model key using local extraction; setting a key sends data to that provider. Older tutorials use an old API.
+  - name: llama.cpp
+    repo: ggml-org/llama.cpp
+    url: https://github.com/ggml-org/llama.cpp
+    category: local-models
+    problem: Running models on your own computer's CPU or GPU, offline, with compressed (GGUF) models.
+    how_used: Run `llama-server -m model.gguf` for a local OpenAI-compatible API. BAU already uses it.
+    licence: MIT
+    stars: "~130.7k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/ggml-org/llama.cpp]
+    caveats: Changes fast; pin a version.
+  - name: Ollama
+    repo: ollama/ollama
+    url: https://github.com/ollama/ollama
+    category: local-models
+    problem: Makes downloading and running open models locally a one-command job.
+    how_used: Run `ollama run MODEL` and use the local API on localhost:11434 (also OpenAI-compatible).
+    licence: MIT
+    stars: "~182.6k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/ollama/ollama]
+    caveats: Some listed models may run on Ollama's cloud rather than locally (unconfirmed). Keep it on localhost.
+  - name: vLLM
+    repo: vllm-project/vllm
+    url: https://github.com/vllm-project/vllm
+    category: local-models
+    problem: Serving models fast and memory-efficiently on GPUs.
+    how_used: Run `vllm serve MODEL` for an OpenAI-compatible server.
+    licence: Apache-2.0
+    stars: "~93.5k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/vllm-project/vllm]
+    caveats: Made for data-centre GPUs; a poor fit for the CPU-only laptop.
+  - name: LocalAI
+    repo: mudler/LocalAI
+    url: https://github.com/mudler/LocalAI
+    category: local-models
+    problem: One self-hosted, OpenAI-compatible API for local text, vision, voice and image models, without a GPU.
+    how_used: Run its Docker image and point any OpenAI-compatible client at it.
+    licence: MIT
+    stars: "~49.5k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/mudler/LocalAI]
+    caveats: Bundles many backends, so images are large.
+  - name: n8n
+    repo: n8n-io/n8n
+    url: https://github.com/n8n-io/n8n
+    category: automation
+    problem: Connecting apps into workflows visually, with 400+ integrations and AI agent steps.
+    how_used: Self-host with Docker and build workflows in its editor; agents call it through webhooks or MCP.
+    licence: Sustainable Use License (fair-code, not OSI open source)
+    stars: "~206.9k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/n8n-io/n8n]
+    caveats: Limited to internal business use; offering it to others needs a commercial licence. Ask counsel before commercial use.
+  - name: Activepieces
+    repo: activepieces/activepieces
+    url: https://github.com/activepieces/activepieces
+    category: automation
+    problem: Open-source workflow automation (a Zapier alternative) whose pieces agents can use as MCP tools.
+    how_used: Self-host with Docker and build flows in the web screen, or expose its pieces to agents over MCP.
+    licence: Community Edition MIT; enterprise parts commercial
+    stars: "~25.0k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/activepieces/activepieces]
+    caveats: Use only the MIT Community Edition unless licensed.
+  # ---------------------------------------------------------------- voice and video
+  - name: faster-whisper
+    repo: SYSTRAN/faster-whisper
+    url: https://github.com/SYSTRAN/faster-whisper
+    category: speech-to-text
+    problem: OpenAI's own Whisper is slow and memory-hungry on ordinary computers.
+    how_used: Transcribe the owner's speech or a video's audio on the laptop CPU (int8) or a GPU, from Python.
+    licence: MIT (Whisper weights are OpenAI's)
+    stars: "~25.8k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/SYSTRAN/faster-whisper]
+    caveats: "Up to 4x faster is its own claim. README: small model, CPU int8, 13 min of audio in 1m42s using about 1.5 GB RAM."
+  - name: WhisperX
+    repo: m-bain/whisperX
+    url: https://github.com/m-bain/whisperX
+    category: speech-to-text
+    problem: Plain Whisper timestamps can be off by seconds, which is not good enough for captions.
+    how_used: Run it on a finished voice-over to get word-level timings (and who is speaking) for captions.
+    licence: BSD-2-Clause
+    stars: "~24.5k (2026-10-10)"
+    last_activity: "2026-09-26"
+    sources: [https://github.com/m-bain/whisperX]
+    caveats: Telling speakers apart needs pyannote and a Hugging Face token with an accepted user agreement.
+  - name: whisper.cpp
+    repo: ggml-org/whisper.cpp
+    url: https://github.com/ggml-org/whisper.cpp
+    category: speech-to-text
+    problem: Whisper normally needs Python and PyTorch, which is heavy for a small offline machine.
+    how_used: Run whisper-server (OpenAI-style API) or its command-line tool next to llama.cpp for offline transcription.
+    licence: MIT
+    stars: "~54.3k (2026-10-10)"
+    last_activity: "2026-10-06"
+    sources: [https://github.com/ggml-org/whisper.cpp]
+    caveats: Same family as llama.cpp, which fits BAU's local setup.
+  - name: Piper
+    repo: OHF-Voice/piper1-gpl
+    url: https://github.com/OHF-Voice/piper1-gpl
+    category: text-to-speech
+    problem: A fast, fully local voice that runs even on low-power hardware.
+    how_used: "`pip install piper-tts` and give Jarvis a quick, light spoken voice."
+    licence: GPL-3.0 (the old rhasspy/piper was MIT); each voice has its own licence
+    stars: "~5.8k (2026-10-10)"
+    last_activity: "2026-10-06"
+    sources: [https://github.com/OHF-Voice/piper1-gpl, https://github.com/rhasspy/piper]
+    caveats: rhasspy/piper was archived 2025-10-06 and moved here. Check each voice's licence before using it in paid videos.
+  - name: Kokoro
+    repo: hexgrad/kokoro
+    url: https://github.com/hexgrad/kokoro
+    category: text-to-speech
+    problem: Natural-sounding narration from a small model that can be used commercially.
+    how_used: "`pip install kokoro` and voice kids' video narration on the laptop."
+    licence: Apache-2.0 (code and Kokoro-82M weights)
+    stars: "~9.2k (2026-10-10)"
+    last_activity: "2025-08-06"
+    sources: [https://github.com/hexgrad/kokoro, https://huggingface.co/hexgrad/Kokoro-82M]
+    caveats: 82M parameters, 8 languages, 54 voices, no voice cloning; needs espeak-ng. No push since August 2025.
+  - name: Chatterbox
+    repo: resemble-ai/chatterbox
+    url: https://github.com/resemble-ai/chatterbox
+    category: text-to-speech
+    problem: Expressive narration and voice cloning under a permissive licence.
+    how_used: Make expressive narration or a house voice; the Nano model runs on CPU, Turbo and Multilingual want a GPU.
+    licence: MIT
+    stars: "~26.8k (2026-10-10)"
+    last_activity: "2026-07-21"
+    sources: [https://github.com/resemble-ai/chatterbox]
+    caveats: Every output carries Resemble's invisible watermark. Only clone voices you have the right to use.
+  - name: Coqui XTTS-v2 (idiap fork)
+    repo: idiap/coqui-ai-TTS
+    url: https://github.com/idiap/coqui-ai-TTS
+    category: text-to-speech
+    problem: Many speech models and voice cloning in many languages from one toolkit.
+    how_used: Tests and non-commercial experiments only.
+    licence: Code MPL-2.0; XTTS-v2 weights Coqui Public Model License (non-commercial use only)
+    stars: "~2.3k (2026-10-10)"
+    last_activity: "2026-10-02"
+    sources: [https://github.com/idiap/coqui-ai-TTS, https://huggingface.co/coqui/XTTS-v2/blob/main/LICENSE.txt]
+    caveats: "DO NOT use XTTS audio in monetised videos: the weights licence allows non-commercial use only. The original Coqui project is unmaintained."
+  - name: F5-TTS
+    repo: SWivid/F5-TTS
+    url: https://github.com/SWivid/F5-TTS
+    category: text-to-speech
+    problem: High-quality voice cloning from a short reference clip.
+    how_used: Research and testing only.
+    licence: Code MIT; pretrained weights CC-BY-NC (non-commercial)
+    stars: "~15.4k (2026-10-10)"
+    last_activity: "2026-09-21"
+    sources: [https://github.com/SWivid/F5-TTS]
+    caveats: "DO NOT use its pretrained voices in monetised videos (non-commercial weights). Needs a GPU in practice."
+  - name: openWakeWord
+    repo: dscripka/openWakeWord
+    url: https://github.com/dscripka/openWakeWord
+    category: wake-word
+    problem: An always-on, local "hey Jarvis" trigger that sends no audio to the cloud.
+    how_used: Run it on the microphone stream with its "hey jarvis" model, or train a custom word in its notebook.
+    licence: Code Apache-2.0; bundled models CC BY-NC-SA 4.0 (non-commercial)
+    stars: "~2.8k (2026-10-10)"
+    last_activity: "2025-12-30"
+    sources: [https://github.com/dscripka/openWakeWord]
+    caveats: The ready-made models are non-commercial - a question for counsel before using them in a business product; a self-trained model avoids it.
+  - name: Home Assistant Assist
+    repo: home-assistant/core
+    url: https://github.com/home-assistant/core
+    category: voice-assistant
+    problem: A complete, private, local voice-assistant chain (wake word, speech-to-text, intent, voice) from open parts.
+    how_used: Use it as the reference design for Jarvis's voice chain (Whisper, Piper and wake word over the Wyoming protocol).
+    licence: Apache-2.0
+    stars: "~91.4k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://www.home-assistant.io/voice_control/, https://www.home-assistant.io/voice_control/voice_remote_local_assistant/]
+    caveats: A whole home-automation platform, not a library.
+  - name: Wyoming protocol
+    repo: OHF-Voice/wyoming
+    url: https://github.com/OHF-Voice/wyoming
+    category: voice-assistant
+    problem: Voice services (speech-to-text, voice, wake word) need one simple way to talk to each other.
+    how_used: Run wyoming-faster-whisper, wyoming-piper and wyoming-openwakeword as local services Jarvis connects to.
+    licence: MIT
+    stars: "~0.4k (2026-10-10)"
+    last_activity: "2026-09-29"
+    sources: [https://github.com/OHF-Voice/wyoming]
+    caveats: No authentication or encryption by design - bind to localhost only (BAU host rule).
+  - name: FFmpeg
+    repo: FFmpeg/FFmpeg
+    url: https://github.com/FFmpeg/FFmpeg
+    category: video-editing
+    problem: Converting, cutting, joining, mixing, captioning and encoding video files.
+    how_used: The base of every render step (9:16 crops, loudness, burned-in captions, final encode), called from scripts. BAU already uses it.
+    licence: LGPL-2.1+ by default; GPL when built with GPL parts; nonfree builds can't be redistributed
+    stars: "~64.9k (2026-10-10, GitHub mirror)"
+    last_activity: "2026-10-10"
+    sources: [https://ffmpeg.org/legal.html, https://github.com/FFmpeg/FFmpeg]
+    caveats: FFmpeg's legal page warns about codec patents for commercial use; varies by country.
+  - name: MoviePy
+    repo: Zulko/moviepy
+    url: https://github.com/Zulko/moviepy
+    category: video-editing
+    problem: Scripting video edits (cuts, joins, titles, layering) in Python.
+    how_used: A factory assembles a short from clips, voice-over and caption text in a Python script.
+    licence: MIT
+    stars: "~15.0k (2026-10-10)"
+    last_activity: "2026-08-26"
+    sources: [https://github.com/Zulko/moviepy]
+    caveats: v2 broke v1 code and most online examples are v1; slower than calling ffmpeg directly.
+  - name: Remotion
+    repo: remotion-dev/remotion
+    url: https://github.com/remotion-dev/remotion
+    category: video-editing
+    problem: Building videos from code so templates, data and animated captions come out the same every time.
+    how_used: Templated kids'-video intros, animated captions and data-driven shorts, rendered from the command line.
+    licence: Remotion License (free for individuals and companies up to 3 employees; not OSI open source)
+    stars: "~63.0k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/remotion-dev/remotion/blob/main/LICENSE.md]
+    caveats: A one-owner business fits the free tier today; re-check past 3 staff and at Remotion 5.0. Needs Node.js.
+  - name: auto-editor
+    repo: WyattBlue/auto-editor
+    url: https://github.com/WyattBlue/auto-editor
+    category: video-editing
+    problem: Cutting silences and dead air out of recordings by hand takes ages.
+    how_used: Run it on raw recordings to drop silence, or export a cut timeline to DaVinci Resolve, Premiere or Kdenlive.
+    licence: Unlicense (public domain)
+    stars: "~5.5k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/WyattBlue/auto-editor]
+    caveats: Now written in Nim; install steps are on auto-editor.com.
+  - name: ComfyUI
+    repo: Comfy-Org/ComfyUI
+    url: https://github.com/Comfy-Org/ComfyUI
+    category: generation
+    problem: Running image, video and audio generation models as repeatable node graphs with a local API.
+    how_used: Saved workflows (e.g. Wan 2.2 text-to-video) called through ComfyUI's local API by a studio factory on a GPU machine.
+    licence: GPL-3.0
+    stars: "~136.7k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/Comfy-Org/ComfyUI]
+    caveats: CPU-only is not recommended. Custom nodes are third-party code - check them like any repo. Each model keeps its own licence.
+  - name: Wan 2.2
+    repo: Wan-Video/Wan2.2
+    url: https://github.com/Wan-Video/Wan2.2
+    category: generation
+    problem: Open-weight text-to-video and image-to-video as a local alternative to paid video services.
+    how_used: Generate short clips through ComfyUI or its scripts on a 24 GB+ GPU with the TI2V-5B model.
+    licence: Apache-2.0 (code and weights)
+    stars: "~17.8k (2026-10-10)"
+    last_activity: "2026-09-21"
+    sources: [https://github.com/Wan-Video/Wan2.2]
+    caveats: 14B models need 80 GB of GPU memory, TI2V-5B at least 24 GB - not the BAU laptop. AI clips need the platforms' AI labels.
+  - name: MoneyPrinterTurbo
+    repo: harry0703/MoneyPrinterTurbo
+    url: https://github.com/harry0703/MoneyPrinterTurbo
+    category: generation
+    problem: Turning a topic into a finished short (script, stock footage, voice-over, captions, music) in one step.
+    how_used: A reference design, or a sandboxed tool, for an automated shorts pipeline; output still goes through owner review.
+    licence: MIT
+    stars: "~129.4k (2026-10-10)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/harry0703/MoneyPrinterTurbo]
+    caveats: Its bundled background music comes from YouTube videos - never publish with it. Mass-produced content can break platform rules; kids content needs BAU's made-for-kids checks.
