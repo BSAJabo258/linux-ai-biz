@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 317 tests pass; 49 regulations / 65 policies validate.
+State: 327 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -51,6 +51,18 @@ The video studio (2026-10-10, the first paid integration, tests written first in
 
 Never called against the real Higgsfield API yet: the owner's first `bau video quote` is the
 first real call.
+
+The owner's own cloud server (2026-10-10, tests first in `tests/test_cloud_vm.py`; the
+owner chose DigitalOcean, Debian 13, no GPU): `installer/cloud/cloud-init.yaml` +
+`prepare.sh` (admin login from the droplet's key, sshd keys only, payload built in the
+admin's home; a temporary NOPASSWD sudoers file that `install.sh --cloud` removes after
+the owner sets a password), `install.sh --cloud` (`nftables-cloud.conf` = laptop rules +
+rate-limited SSH, sticky via `/etc/bau/cloud`; `bau-jarvis.service` as the owner on
+127.0.0.1 with a fixed key from `bau jarvis url`; audit `install.cloud`). Rehearsed end to
+end in a systemd Debian 13 container: prepare, install over SSH with typed answers, new
+SSH login after the firewall, root and passwords refused, Jarvis 200 through the tunnel,
+403 with a wrong key, unreachable directly, key not in the journal, SSH kept on a plain
+re-run. Not yet run on a real droplet. Owner guide: `docs/CLOUD-VM.md`.
 
 The toolbox (2026-10-10, tests first in `tests/test_toolbox.py`): `data/toolbox.yaml` has
 77 open-source tools researched that day (connectors/MCP, Claude Code setup, grounding,

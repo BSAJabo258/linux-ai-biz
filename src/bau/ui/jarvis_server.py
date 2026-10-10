@@ -25,6 +25,7 @@ from collections.abc import Callable
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
+from pathlib import Path
 from typing import Any
 
 from ..assistant import Assistant, Voice
@@ -355,6 +356,24 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
             return
 
     return H
+
+
+def service_key(path: Path) -> str:
+    """The fixed key for Jarvis running as a service (on the owner's cloud server): made
+    once, readable by the owner only, the same after every restart."""
+    try:
+        key = path.read_text().strip()
+        if len(key) >= 32:
+            return key
+    except OSError:
+        pass
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    key = secrets.token_urlsafe(32)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(key + "\n")
+    os.chmod(path, 0o600)
+    return key
 
 
 def serve(assistant: Assistant, voice: Voice, port: int = 8766, key: str | None = None

@@ -1,0 +1,9 @@
+#cloud-config
+# BAU on your own cloud server: paste this into "User data" when you create the
+# DigitalOcean droplet (Debian 13), with your SSH key selected. docs/CLOUD-VM.md
+package_update: true
+packages:
+  - git
+runcmd:
+  - [git, clone, --depth, "1", "https://github.com/BSAJabo258/linux-ai-biz", /opt/bau-src]
+  - [bash, /opt/bau-src/installer/cloud/prepare.sh, bauadmin]

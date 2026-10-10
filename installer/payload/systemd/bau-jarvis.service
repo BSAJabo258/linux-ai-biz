@@ -1,0 +1,30 @@
+# Jarvis for good on the owner's cloud server (install.sh --cloud fills in @ADMIN@).
+# Runs as the owner's own login - confirmations are the owner's clicks behind the fixed
+# key - and listens on 127.0.0.1 only: the owner reaches it through an SSH tunnel.
+[Unit]
+Description=BAU Jarvis (http://127.0.0.1:8766, through your SSH tunnel)
+After=network-online.target bau-ui.service
+Wants=network-online.target
+
+[Service]
+User=@ADMIN@
+Group=bau
+Environment=BAU_HOME=/var/lib/bau
+Environment=BAU_AUDIT_KEY=/etc/bau/audit.key
+Environment=BAU_ALLOWED_SIGNERS=/etc/bau/allowed_signers
+ExecStart=/usr/local/bin/bau jarvis --service --port 8766
+Restart=on-failure
+RestartSec=5
+UMask=0007
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/bau @HOME@/.config/bau
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

@@ -23,6 +23,7 @@ stand and what is next.
 | `src/bau/models/` | providers (Claude, llama.cpp, hosted OpenAI-compatible e.g. Z.ai), router, `bench.py`, `fetch.py` |
 | `installer/` | USB #1 image builder, USB #2 payload (`make-payload.sh`), `payload/install.sh` |
 | `image/`, `src/bau/live.py` | My Jarvis live USB: `build-live.sh` (Debian Live + BAU + llama.cpp), `live-build/` config, `jarvis-storage` (encrypted persistence); see `docs/MY-JARVIS.md` |
+| `installer/cloud/` | the owner's own cloud server (DigitalOcean, Debian 13): `cloud-init.yaml` + `prepare.sh` (admin login from the droplet key, SSH keys only), then `install.sh --cloud` (SSH the one open port, `bau-jarvis.service` on 127.0.0.1). See `docs/CLOUD-VM.md` |
 | `Dockerfile`, `docker-compose.yml`, `docker/` | test drive in containers |
 | `vm/` | VirtualBox rehearsal scripts (`create-vm.ps1`, `create-vm.sh`) |
 | `docs/` | `INSTALL.md` (owner guide), `LIVE-USB.md`, `CLOUD-TEST.md` (free Codespaces + Z.ai), `WORKSPACES.md`, `MY-JARVIS.md` (spec + build order), `ARCHITECTURE.md`, `HANDOFF.md` |
@@ -36,7 +37,7 @@ python3 -m pytest -q                      # all tests (~30 s)
 ruff check .                              # lint (line length 100)
 bau reg validate                          # regulations + policies cross-check
 bau secrets .                             # secret scan (CI runs it)
-shellcheck -x installer/*.sh installer/lib/*.sh installer/payload/*.sh installer/firstboot/*.sh docker/*.sh vm/*.sh image/*.sh
+shellcheck -x installer/*.sh installer/lib/*.sh installer/payload/*.sh installer/firstboot/*.sh installer/cloud/*.sh docker/*.sh vm/*.sh image/*.sh
 bash installer/make-payload.sh --skip-tests --out /tmp/pl   # build USB #2
 bash image/build-live.sh --out /tmp/live                    # live USB image (Docker, ~15 GB disk)
 docker compose up -d --build                                # test drive: http://localhost:8765
@@ -58,7 +59,8 @@ These are the product's safety model, not style preferences:
   come from a model and never have defaults.
 - **Never weaken the host.** Don't open firewall ports, disable AppArmor or encryption,
   or bind servers beyond localhost (containers bind their interface only with
-  `BAU_IN_CONTAINER=1`; ports are published on 127.0.0.1).
+  `BAU_IN_CONTAINER=1`; ports are published on 127.0.0.1). The one exception is the
+  owner's cloud server (`install.sh --cloud`): SSH on 22, key login only, rate-limited.
 - **Untrusted data stays data.** Tool results go to models wrapped by `agents.untrusted()`;
   Jarvis never reads `<untrusted_data>` blocks aloud.
 - **Kids content** goes only to platforms with `allows_kids` (YouTube, made for kids). Never

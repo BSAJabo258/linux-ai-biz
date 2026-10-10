@@ -802,21 +802,44 @@ def cmd_jarvis(a):
                       if folder.is_relative_to(bau_home())
                       else "run 'bau init' first to get your own copy to edit"})
         return EXIT_OK
-    owner = _human()
+    service = getattr(a, "service", False)
+    key_file = getattr(a, "key_file", None) or Path.home() / ".config" / "bau" / "jarvis.key"
+    if a.jv_cmd == "url":
+        from .ui.jarvis_server import service_key
+        key = service_key(key_file)
+        print(f"On your own computer, keep this running:\n"
+              f"  ssh -L 8766:127.0.0.1:8766 -L 8765:127.0.0.1:8765 "
+              f"{getpass.getuser()}@YOUR_SERVER_IP\n"
+              f"then open:\n  http://127.0.0.1:{a.port}/?k={key}")
+        return EXIT_OK
+    if service:
+        # The owner's own login runs it (systemd, no terminal): confirmations are still the
+        # owner's clicks behind the key. Never root, never the agent account.
+        who = getpass.getuser()
+        if who in ("root", "bau"):
+            raise PermissionError("Jarvis runs as the owner's own login, not root or 'bau'")
+        owner = f"human:{who}"
+    else:
+        owner = _human()
     load_env_file()
     jv = build_assistant(owner=owner)
     if a.text:
         return _jarvis_terminal(jv)
-    from .ui.jarvis_server import serve
-    srv, key = serve(jv, Voice(), a.port)
+    from .ui.jarvis_server import serve, service_key
+    srv, key = (serve(jv, Voice(), a.port, key=service_key(key_file)) if service
+                else serve(jv, Voice(), a.port))
     url = f"http://127.0.0.1:{a.port}/?k={key}"
     if os.environ.get("CODESPACE_NAME"):      # GitHub Codespaces: the private forwarded port
         url = (f"https://{os.environ['CODESPACE_NAME']}-{a.port}."
                f"{os.environ.get('GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN', 'app.github.dev')}"
                f"/?k={key}")
     mode = f"model {jv.model_summary()}" if jv.provider else "plain mode (no model connected)"
-    print(f"Jarvis is up ({mode}). Open: {url}\nCtrl+C to stop.", file=sys.stderr)
-    if not a.no_browser:
+    if service:                                # never write the key into the system log
+        print(f"Jarvis is up ({mode}) on 127.0.0.1:{a.port}; `bau jarvis url` shows the "
+              "address.", file=sys.stderr)
+    else:
+        print(f"Jarvis is up ({mode}). Open: {url}\nCtrl+C to stop.", file=sys.stderr)
+    if not a.no_browser and not service:
         import webbrowser
         webbrowser.open(url)
     try:
@@ -1566,7 +1589,13 @@ def register(sub: argparse._SubParsersAction) -> None:
     s.add_argument("--port", type=int, default=8766)
     s.add_argument("--text", action="store_true", help="talk in this terminal instead")
     s.add_argument("--no-browser", action="store_true")
+    s.add_argument("--service", action="store_true",
+                   help="run for good under your own login (cloud server): fixed key, no browser")
+    s.add_argument("--key-file", type=Path, default=None,
+                   help="the fixed key (default ~/.config/bau/jarvis.key)")
     jv = s.add_subparsers(dest="jv_cmd")
+    x = jv.add_parser("url", help="the address to open through your SSH tunnel")
+    x.add_argument("--key-file", type=Path, default=None)
     x = jv.add_parser("config", help="how Jarvis addresses you, which model, which voice")
     x.add_argument("--call-me")
     x.add_argument("--model", help="registered, approved model id (default claude-opus-5-5)")

@@ -31,6 +31,7 @@ systemctl enable nftables.service apparmor.service chrony.service
 # BAU services: the laptop's units, started only when the encrypted storage is unlocked
 # (the drop-ins add ConditionPathExists=/run/bau-live/private).
 install -m 0644 "$P"/systemd/*.service "$P"/systemd/*.timer /etc/systemd/system/
+rm -f /etc/systemd/system/bau-jarvis.service   # a template for the cloud server only
 for u in bau-recover.service bau-ui.service bau-governor.service bau-regwatch.service \
          bau-llm.service; do
   install -d "/etc/systemd/system/$u.d"
