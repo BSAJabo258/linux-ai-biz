@@ -61,6 +61,7 @@ Then follow **[docs/INSTALL.md](docs/INSTALL.md)** in order: audit, backup and v
 | [docs/EMAIL_AND_MESSAGING_COMPLIANCE.md](docs/EMAIL_AND_MESSAGING_COMPLIANCE.md) | The exact order every commercial email and marketing text goes through, and what you must set up |
 | [docs/REGULATORY_STATUS.md](docs/REGULATORY_STATUS.md) | What changed in the law through 2026-10-04, with sources |
 | [docs/INSTALL.md](docs/INSTALL.md) | Phase-by-phase install runbook |
+| [docs/VM-USB-PLAN.md](docs/VM-USB-PLAN.md) | Test gates and rehearsal plan for the full OS and two USB install |
 | [docs/LIVE-USB.md](docs/LIVE-USB.md) | My Jarvis live USB: write, boot, encrypted storage, local model |
 | [docs/CLOUD-TEST.md](docs/CLOUD-TEST.md) | Free cloud test drive: GitHub Codespaces + the full GLM-4.7-Flash via Z.ai, from a computer or iPhone |
 | [docs/WORKSPACES.md](docs/WORKSPACES.md) | Make an episode step by step: ICM workspaces (`bau ws`), you check every step |

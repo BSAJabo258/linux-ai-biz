@@ -12,6 +12,7 @@ Build both on any Linux machine with `python3`, `xorriso`, `gpg`, `curl`. Stick 
 **Try it before the laptop.** Two safe rehearsals, nothing gets wiped:
 - [Docker test drive](../docker/README.md): run BAU, Jarvis and an optional free local model on your own computer in minutes.
 - [Virtual machine rehearsal](../vm/README.md): run the real two-stick install inside a VirtualBox "test laptop".
+- [VM and two-USB readiness plan](VM-USB-PLAN.md): repository checks, image build, VM acceptance gates, and Claude setup.
 
 > Nothing here can undo a wipe. Follow the phases in order. Every destructive step asks you to type something that proves you are looking at the right disk.
 
