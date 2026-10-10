@@ -201,6 +201,8 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 except ValueError:
                     since = 0
                 self._json(200, assistant.activity.since(since))
+            elif path == "/api/usage":
+                self._json(200, screen.usage_summary(assistant))
             elif path == "/api/studio":
                 self._json(*answer(lambda: screen.studio_summary(assistant), lanes["studio"]))
             elif path.startswith("/api/studio/clip/"):

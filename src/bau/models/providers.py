@@ -160,6 +160,7 @@ class LocalHTTPProvider(Provider):
         self.extra_body: dict[str, Any] = {}
         self.timeout = timeout
         self._open = opener or urllib.request.urlopen
+        self.last_limits: dict[str, str] = {}
 
     def _headers(self) -> dict[str, str]:
         return {"Content-Type": "application/json"}
@@ -168,6 +169,10 @@ class LocalHTTPProvider(Provider):
         req = urllib.request.Request(self.base_url + path, data=json.dumps(body).encode(),
                                      headers=self._headers())
         with self._open(req, timeout=self.timeout) as r:
+            # Rate-limit headers, when the service sends them, are shown on the usage meter.
+            self.last_limits = {k.lower(): str(v) for k, v in (getattr(r, "headers", None)
+                                                               or {}).items()
+                                if k.lower().startswith("x-ratelimit-")}
             return json.loads(r.read())
 
     def complete(self, system, messages, tools=None, max_tokens=16000):
@@ -296,21 +301,26 @@ class FallbackProvider(Provider):
         self.providers = list(providers)
         self.names = list(names or [getattr(p, "model", "?") for p in self.providers])
         self.answered_by: str | None = None     # which model gave the last answer
+        self.last_failed: list[tuple[str, str]] = []   # who failed before that, and why
+        self.last_limits: dict[str, str] = {}
         self._resting: dict[int, float] = {}
 
     def complete(self, system, messages, tools=None, max_tokens=16000):
         now = self.clock()
         order = sorted(range(len(self.providers)), key=lambda i: self._resting.get(i, 0) > now)
         failed = []
+        self.last_failed = []
         for i in order:
             try:
                 r = self.providers[i].complete(system, messages, tools, max_tokens)
             except (ProviderError, OSError) as e:
                 self._resting[i] = now + self.REST
                 failed.append(e)
+                self.last_failed.append((self.names[i], str(e) or type(e).__name__))
                 continue
             self._resting.pop(i, None)
             self.answered_by = self.names[i]
+            self.last_limits = getattr(self.providers[i], "last_limits", None) or {}
             return r
         if len(failed) == 1:
             raise failed[0]

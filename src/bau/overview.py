@@ -183,6 +183,18 @@ def overview(asst: Any) -> dict[str, Any]:
                            st, "What's the system status?"))
 
     # ---------------------------------------------------------------- systems
+    us, err = _safe(asst.t_usage)
+    if err:
+        nodes.append(_broken("usage", "Usage", "system", err))
+    else:
+        t = us["today"]
+        nodes.append(_node("usage", "Usage", "system",
+                           "warn" if us["warnings"] else "ok" if t["calls"] else "idle",
+                           f"today {t['tokens']:,} tokens in {t['calls']} call(s), "
+                           f"${t['usd']:.2f}" + (f"; {len(us['warnings'])} warning(s)"
+                                                 if us["warnings"] else ""),
+                           us, "How much have we used today?"))
+
     mdl, err = _safe(_models, home, asst.model or {})
     if err:
         nodes.append(_broken("models", "Models", "system", err))
