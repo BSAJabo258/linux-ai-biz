@@ -1,9 +1,11 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
-  <img src="assets/banner-light.svg" width="100%" alt="BAU Jarvis: compliance-first AI business computer, with Jarvis's orb in a golden halo">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/hero-dark.svg">
+  <img src="assets/hero-light.svg" width="100%" alt="BAU Jarvis: a holographic globe turning in a golden halo beside the title, compliance-first AI business computer">
 </picture>
+
+<img src="assets/jarvis-demo.gif" width="100%" alt="Jarvis live: the owner asks how much has been used today, Jarvis checks the usage meter and answers, and the Usage panel opens">
 
 <p>
   <a href="https://github.com/BSAJabo258/linux-ai-biz/actions/workflows/ci.yml"><img src="https://github.com/BSAJabo258/linux-ai-biz/actions/workflows/ci.yml/badge.svg" alt="CI status: tests, lint and checks"></a>
@@ -43,9 +45,12 @@ someone, publishes generated media, sells a subscription, monetizes an asset or 
 > unresolved. Every regulation ships **awaiting counsel sign-off**, so nothing gets a clean
 > PASS until a qualified human reviews it.
 
-## Meet Jarvis
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/divider-dark.svg">
+  <img src="assets/divider-light.svg" width="100%" alt="section divider">
+</picture>
 
-<img src="assets/jarvis-demo.gif" width="100%" alt="Jarvis live: the orb wakes, the owner asks how much has been used today, Jarvis checks the usage meter and answers, and the Usage panel opens">
+## Meet Jarvis
 
 Jarvis is the front door: a spoken briefing, conversation, and a live map of the business.
 Each node is a part of the team (producer, scout, studio, watchdog and more) and lights up while
@@ -64,6 +69,11 @@ only **staged**: it runs when you press **Confirm**.
   <img src="assets/terminal-light.svg" width="100%" alt="A terminal typing three BAU commands: asking the toolbox how to stop made-up answers, planning a kids episode with the series engine, and checking token usage">
 </picture>
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/divider-dark.svg">
+  <img src="assets/divider-light.svg" width="100%" alt="section divider">
+</picture>
+
 ## How it works
 
 ```mermaid
@@ -79,6 +89,11 @@ flowchart LR
     G["Governor / watchdog"] -.->|can HOLD, never approves| T
     U["Usage meter"] -.->|tokens and dollars, your daily limits| J
 ```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/divider-dark.svg">
+  <img src="assets/divider-light.svg" width="100%" alt="section divider">
+</picture>
 
 ## Where it runs
 
@@ -108,6 +123,11 @@ flowchart LR
   - a keyboard-first Mission Control dashboard.
 
 </details>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/divider-dark.svg">
+  <img src="assets/divider-light.svg" width="100%" alt="section divider">
+</picture>
 
 ## Quick start
 

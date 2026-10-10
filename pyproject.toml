@@ -39,3 +39,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# SVG markup templates read better unwrapped.
+"assets/make_art.py" = ["E501"]
