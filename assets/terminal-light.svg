@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 1280 548" width="1280" height="548" role="img" aria-labelledby="t d">
+<title id="t">BAU at the terminal</title>
+<desc id="d">Three commands: asking the toolbox, planning a kids episode, checking usage.</desc>
+<style>
+.ln { animation-duration: 22.0s; animation-iteration-count: infinite;
+       animation-timing-function: linear; clip-path: inset(0 100% 0 0); white-space: pre; }
+@keyframes l0 { 0%, 2.73% { clip-path: inset(0 100% 0 0); } 12.75%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l1 { 0%, 15.93% { clip-path: inset(0 100% 0 0); } 16.48%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l2 { 0%, 17.52% { clip-path: inset(0 100% 0 0); } 18.07%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l3 { 0%, 19.11% { clip-path: inset(0 100% 0 0); } 19.66%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l4 { 0%, 20.70% { clip-path: inset(0 100% 0 0); } 31.61%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l5 { 0%, 34.80% { clip-path: inset(0 100% 0 0); } 35.34%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l6 { 0%, 36.39% { clip-path: inset(0 100% 0 0); } 36.93%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l7 { 0%, 37.98% { clip-path: inset(0 100% 0 0); } 38.52%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l8 { 0%, 39.57% { clip-path: inset(0 100% 0 0); } 40.11%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l9 { 0%, 41.16% { clip-path: inset(0 100% 0 0); } 43.00%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l10 { 0%, 46.18% { clip-path: inset(0 100% 0 0); } 46.73%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l11 { 0%, 47.77% { clip-path: inset(0 100% 0 0); } 48.32%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@media (prefers-reduced-motion: reduce) { .ln { animation: none !important;
+       clip-path: none !important; } }
+</style>
+<defs>
+  <radialGradient id="sky" cx="50%" cy="45%" r="75%">
+    <stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#e3eff7"/>
+    <stop offset="1" stop-color="#d5e6f1"/></radialGradient>
+  <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+    <path d="M32 0H0V32" fill="none" stroke="#0a78a8" stroke-width="1"
+          opacity="0.10"/></pattern>
+  <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+    <stop offset="0" stop-color="#0a78a8" stop-opacity=".55"/>
+    <stop offset="1" stop-color="#0a78a8" stop-opacity="0"/></radialGradient>
+  <linearGradient id="title" x1="0" x2="1">
+    <stop offset="0" stop-color="#08263a"/><stop offset=".5" stop-color="#0a78a8"/>
+    <stop offset="1" stop-color="#a87900"/></linearGradient>
+</defs>
+<rect width="1280" height="548" rx="18" fill="url(#sky)"/>
+<rect width="1280" height="548" rx="18" fill="url(#grid)"/>
+<rect x="24" y="22" width="1232" height="504" rx="14" fill="#ffffff"
+      fill-opacity="0.85" stroke="#0a78a8" stroke-opacity=".35"/>
+<circle cx="52" cy="48" r="6" fill="#ff5f57"/><circle cx="74" cy="48" r="6" fill="#febc2e"/>
+<circle cx="96" cy="48" r="6" fill="#28c840"/>
+<text x="640.0" y="53" text-anchor="middle" font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, monospace" font-size="14"
+      fill="#3f5f72">bau — outputs abbreviated, sample data</text>
+<g font-family="'JetBrains Mono', 'SFMono-Regular', Consolas, monospace" font-size="19" xml:space="preserve">
+<text x="48" y="92" class="ln" style="animation-name:l0" fill="#08263a"><tspan fill="#0a78a8">jarvis@cloud</tspan><tspan fill="#3f5f72">:~$ </tspan>bau toolbox ask "stop the model making things up"</text>
+<text x="48" y="126" class="ln" style="animation-name:l1" fill="#3f5f72">DeepEval      evals            Apache-2.0   claimed</text>
+<text x="48" y="160" class="ln" style="animation-name:l2" fill="#3f5f72">Context7      docs-grounding   MIT          claimed</text>
+<text x="48" y="194" class="ln" style="animation-name:l3" fill="#3f5f72">LlamaIndex    grounding        MIT          claimed</text>
+<text x="48" y="228" class="ln" style="animation-name:l4" fill="#08263a"><tspan fill="#0a78a8">jarvis@cloud</tspan><tspan fill="#3f5f72">:~$ </tspan>bau series plan kids-channel ep-001 --format problem-song-solution</text>
+<text x="48" y="262" class="ln" style="animation-name:l5" fill="#3f5f72">1  hook    5s  Pip notices a small problem.</text>
+<text x="48" y="296" class="ln" style="animation-name:l6" fill="#3f5f72">2  try    13s  Pip tries to fix it alone...</text>
+<text x="48" y="330" class="ln" style="animation-name:l7" fill="#3f5f72">3  help    9s  Mo comes to help Pip... (part 1 of 2)</text>
+<text x="48" y="364" class="ln" style="animation-name:l8" fill="#a87900">✓ 6 clips · 60 s · every prompt carries the same character lock</text>
+<text x="48" y="398" class="ln" style="animation-name:l9" fill="#08263a"><tspan fill="#0a78a8">jarvis@cloud</tspan><tspan fill="#3f5f72">:~$ </tspan>bau usage</text>
+<text x="48" y="432" class="ln" style="animation-name:l10" fill="#3f5f72">today    32,850 tokens · 9 calls · $0.00</text>
+<text x="48" y="466" class="ln" style="animation-name:l11" fill="#a87900">⚠ 98% of your daily token limit</text>
+</g>
+</svg>

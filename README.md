@@ -32,6 +32,12 @@ someone, publishes generated media, sells a subscription, monetizes an asset or 
   <img src="assets/features-light.svg" width="100%" alt="Six features: Jarvis, compliance engine, human-only approvals, video studio, toolbox and Repo Scout, and your own hardware">
 </picture>
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/stats-dark.svg">
+  <img src="assets/stats-light.svg" width="100%" alt="BAU in numbers: regulations tracked, policy rules, researched tools, story formats, and zero approvals by AI">
+</picture>
+
+> [!IMPORTANT]
 > BAU never claims to be "compliant" or "legally protected" (spec §121). It reports which
 > requirements it identified, which controls ran, what evidence exists, and what is
 > unresolved. Every regulation ships **awaiting counsel sign-off**, so nothing gets a clean
@@ -39,12 +45,24 @@ someone, publishes generated media, sells a subscription, monetizes an asset or 
 
 ## Meet Jarvis
 
-<img src="assets/jarvis-hud.png" width="100%" alt="The Jarvis screen: the team as live nodes around a glowing orb, the usage panel open, and the voice bar">
+<img src="assets/jarvis-demo.gif" width="100%" alt="Jarvis live: the orb wakes, the owner asks how much has been used today, Jarvis checks the usage meter and answers, and the Usage panel opens">
 
 Jarvis is the front door: a spoken briefing, conversation, and a live map of the business.
 Each node is a part of the team (producer, scout, studio, watchdog and more) and lights up while
 it works. Jarvis can look things up, draft and price things, but anything with consequences is
 only **staged**: it runs when you press **Confirm**.
+
+<details>
+<summary><b>Still picture</b></summary>
+<img src="assets/jarvis-hud.png" width="100%" alt="The Jarvis screen: the team as live nodes around a glowing orb, the usage panel open, and the voice bar">
+</details>
+
+### At the terminal
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/terminal-dark.svg">
+  <img src="assets/terminal-light.svg" width="100%" alt="A terminal typing three BAU commands: asking the toolbox how to stop made-up answers, planning a kids episode with the series engine, and checking token usage">
+</picture>
 
 ## How it works
 
@@ -70,6 +88,10 @@ flowchart LR
 | 🔑 | **Live USB**: boot any PC from one stick, encrypted storage, local model | [docs/LIVE-USB.md](docs/LIVE-USB.md) |
 | ☁️ | **Your own cloud server** (DigitalOcean): Jarvis always on, reached through a private SSH tunnel | [docs/CLOUD-VM.md](docs/CLOUD-VM.md) |
 | 🧪 | **Free test drive** in GitHub Codespaces with a free hosted model | [docs/CLOUD-TEST.md](docs/CLOUD-TEST.md) |
+
+> [!TIP]
+> A codespace can be deleted with everything in it. For the real business, use the laptop
+> or your own cloud server: [docs/CLOUD-VM.md](docs/CLOUD-VM.md) sets one up in about 30 minutes.
 
 <details>
 <summary><b>Everything inside</b></summary>

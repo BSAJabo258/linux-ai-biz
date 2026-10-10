@@ -536,6 +536,20 @@ function renderCard(c) {
     holdChip(nt.hold);
   } else if (d && d.error) {
     p = panel(t, "bad"); p.appendChild(el("div", null, d.error));
+  } else if (c.tool === "usage_today" && d && d.today) {
+    p = panel("Usage", d.warnings && d.warnings.length ? "warn" : ""); usageView(p, d);
+  } else if (c.tool === "toolbox" && d && Array.isArray(d.answers)) {
+    p = panel("Toolbox · " + d.answers.length);
+    for (const h of d.answers.slice(0, 4)) p.appendChild(toolCard(h));
+    if (!d.answers.length) p.appendChild(el("div", null, "Nothing in the toolbox fits; Scout can search GitHub."));
+  } else if (c.tool === "plan_episode" && d && Array.isArray(d.scenes)) {
+    p = panel("Episode plan · " + d.format, d.warnings && d.warnings.length ? "warn" : "");
+    kv(p, "Episode", d.idea); kv(p, "Length", d.seconds + " s in " + d.scenes.length + " clips");
+    for (const w of d.warnings || []) p.appendChild(el("div", "issue", w));
+    list(p, d.scenes.map(x => x.n + " · " + x.beat + " · " + x.seconds + " s — " + x.scene));
+  } else if (c.tool === "clip_prompt" && d && d.prompt) {
+    p = panel("Clip prompt · " + d.characters + " characters");
+    const pre = el("div", null, d.prompt); pre.style.whiteSpace = "pre-wrap"; pre.style.fontSize = "13px"; p.appendChild(pre);
   } else if (Array.isArray(d)) {
     p = panel(t + " · " + d.length); list(p, d.map(x => x.title ? ((x.platform ? x.platform + ": " : "") + x.title + (x.made_for_kids ? " (kids)" : "")) : (x.caption || x.objective || x.detail || x)));
     if (!d.length) p.appendChild(el("div", null, "Nothing here."));
@@ -937,6 +951,9 @@ async function renderStudio(p) {
 async function renderUsage(p) {
   const wrap = el("div"); p.appendChild(wrap);
   let d; try { d = await settle(await apiJson("/api/usage")); } catch (e) { wrap.appendChild(el("div", "issue", e.message)); return; }
+  usageView(wrap, d);
+}
+function usageView(wrap, d) {
   const line = t => t.tokens.toLocaleString() + " tokens · " + t.calls + " call(s) · $" + t.usd.toFixed(2) + (t.errors ? " · " + t.errors + " failed" : "");
   kv(wrap, "Today", line(d.today)); kv(wrap, "Last 7 days", line(d.week));
   const lim = d.limits || {};
@@ -966,13 +983,17 @@ async function showKnown(box, question) {
   let d; try { d = await apiJson("/api/toolbox?q=" + encodeURIComponent(question)); } catch (e) { return; }
   if (!d.answers || !d.answers.length) return;
   box.appendChild(el("div", null, "Already known (toolbox):"));
-  for (const h of d.answers.slice(0, 4)) {
+  for (const h of d.answers.slice(0, 4)) box.appendChild(toolCard(h));
+}
+function toolCard(h) {
+  {
     const card = el("div", "card"); const a = el("a", null, h.name); a.href = "https://github.com/" + h.repo; a.target = "_blank"; a.rel = "noopener";
     if (h.repo.indexOf(" ") < 0 && h.sources && h.sources[0] && h.sources[0].indexOf("github.com") < 0) a.href = h.sources[0];
     card.appendChild(el("span", "badge " + (h.evidence.startsWith("inspected") ? "eligible" : "needs"), h.evidence.startsWith("inspected") ? "inspected" : "claimed"));
     card.appendChild(a); card.appendChild(el("div", null, h.problem));
     card.appendChild(el("div", null, h.category + " · " + h.licence + (h.caveats ? " · " + h.caveats : "")));
-    cmd(card, h.next.startsWith("bau ") ? h.next.split("   ")[0] : h.next); box.appendChild(card);
+    cmd(card, h.next.startsWith("bau ") ? h.next.split("   ")[0] : h.next);
+    return card;
   }
 }
 // Repo Scout: search, the ranked candidates as cards, the report, a safe inspection.

@@ -215,10 +215,133 @@ toolbox and Repo Scout, and running on hardware you own.</desc>
 """
 
 
+def facts() -> dict[str, int]:
+    """The numbers on the stats panel, read from the repository (never typed in)."""
+    import sys
+    sys.path.insert(0, str(HERE.parent / "src"))
+    from bau.policy import PolicyEngine
+    from bau.regulations import Registry
+    from bau.series import Series
+    from bau.toolbox import Toolbox
+    reg = Registry.load()
+    return {"regulations": len(reg.regs), "policies": len(PolicyEngine.load(reg).policies),
+            "tools": len(Toolbox().entries), "formats": len(Series(HERE.parent).formats())}
+
+
+def stats(theme: str) -> str:
+    t = THEMES[theme]
+    f = facts()
+    tiles = [(f["regulations"], "REGULATIONS TRACKED", "each awaiting counsel review"),
+             (f["policies"], "POLICY RULES", "PASS · REVIEW · BLOCK"),
+             (f["tools"], "RESEARCHED TOOLS", "in the toolbox, with sources"),
+             (f["formats"], "STORY FORMATS", "for the kids series engine"),
+             (0, "APPROVALS BY AI", "money and legal: humans only")]
+    w, h, tw = 1280, 210, 232
+    gap = (w - 5 * tw) / 6
+    out = []
+    for i, (num, label, sub) in enumerate(tiles):
+        x = gap + i * (tw + gap)
+        accent = t["gold"] if i == 4 else t["cyan"]
+        out.append(f"""<g class="tile" style="animation-delay:{i * .4:.1f}s">
+  <rect x="{x}" y="28" width="{tw}" height="154" rx="14" fill="{t['panel']}"
+        fill-opacity="{t['panel_op']}" stroke="{accent}" stroke-opacity=".4"/>
+  <path d="M{x + 14} 28h54" stroke="{accent}" stroke-width="3" stroke-linecap="round"/>
+  <text x="{x + tw / 2}" y="104" text-anchor="middle" font-size="58" font-weight="700"
+        fill="{accent}" class="num">{num}</text>
+  <text x="{x + tw / 2}" y="138" text-anchor="middle" font-size="14" font-weight="700"
+        letter-spacing="1.6" fill="{t['ink']}">{label}</text>
+  <text x="{x + tw / 2}" y="162" text-anchor="middle" font-size="14"
+        fill="{t['dim']}">{sub}</text>
+</g>""")
+    return f"""<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-labelledby="t d">
+<title id="t">BAU in numbers</title>
+<desc id="d">{f['regulations']} regulations tracked, {f['policies']} policy rules,
+{f['tools']} researched tools, {f['formats']} story formats, 0 approvals by AI.</desc>
+<style>
+.tile {{ animation: glow 4s ease-in-out infinite; }}
+@keyframes glow {{ 50% {{ opacity: .82; }} }}
+{CALM}
+</style>
+{_sky(t, w, h)}
+<g font-family="{FONT}">
+{chr(10).join(out)}
+</g>
+</svg>
+"""
+
+
+# A terminal session: real BAU commands with their output, abbreviated.
+SESSION = [
+    ("$", 'bau toolbox ask "stop the model making things up"'),
+    (" ", "DeepEval      evals            Apache-2.0   claimed"),
+    (" ", "Context7      docs-grounding   MIT          claimed"),
+    (" ", "LlamaIndex    grounding        MIT          claimed"),
+    ("$", "bau series plan kids-channel ep-001 --format problem-song-solution"),
+    (" ", "1  hook    5s  Pip notices a small problem."),
+    (" ", "2  try    13s  Pip tries to fix it alone..."),
+    (" ", "3  help    9s  Mo comes to help Pip... (part 1 of 2)"),
+    ("~", "6 clips · 60 s · every prompt carries the same character lock"),
+    ("$", "bau usage"),
+    (" ", "today    32,850 tokens · 9 calls · $0.00"),
+    ("!", "98% of your daily token limit"),
+]
+
+
+def terminal(theme: str) -> str:
+    t = THEMES[theme]
+    w, top, lh = 1280, 92, 34
+    h = top + lh * len(SESSION) + 48
+    cycle = 22.0
+    lines, keys = [], []
+    at = 0.6
+    for i, (kind, text) in enumerate(SESSION):
+        y = top + i * lh
+        start = at / cycle * 100
+        type_dur = (min(2.4, 0.045 * len(text)) if kind == "$" else 0.12) / cycle * 100
+        keys.append(f"@keyframes l{i} {{ 0%, {start:.2f}% {{ clip-path: inset(0 100% 0 0); }}"
+                    f" {start + type_dur:.2f}%, 96% {{ clip-path: inset(0 0 0 0); }}"
+                    f" 100% {{ clip-path: inset(0 100% 0 0); }} }}")
+        colour = {"$": t["ink"], "~": t["gold"], "!": t["gold"]}.get(kind, t["dim"])
+        prompt = ""
+        if kind == "$":
+            prompt = f'<tspan fill="{t["cyan"]}">jarvis@cloud</tspan><tspan fill="{t["dim"]}">' \
+                     f':~$ </tspan>'
+        mark = {"!": "⚠ ", "~": "✓ "}.get(kind, "")
+        lines.append(f'<text x="48" y="{y}" class="ln" style="animation-name:l{i}" '
+                     f'fill="{colour}">{prompt}{mark}{text}</text>')
+        at += (min(2.4, 0.045 * len(text)) + 0.7) if kind == "$" else 0.35
+    return f"""<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-labelledby="t d">
+<title id="t">BAU at the terminal</title>
+<desc id="d">Three commands: asking the toolbox, planning a kids episode, checking usage.</desc>
+<style>
+.ln {{ animation-duration: {cycle}s; animation-iteration-count: infinite;
+       animation-timing-function: linear; clip-path: inset(0 100% 0 0); white-space: pre; }}
+{chr(10).join(keys)}
+@media (prefers-reduced-motion: reduce) {{ .ln {{ animation: none !important;
+       clip-path: none !important; }} }}
+</style>
+{_sky(t, w, h)}
+<rect x="24" y="22" width="{w - 48}" height="{h - 44}" rx="14" fill="{t['panel']}"
+      fill-opacity="{t['panel_op']}" stroke="{t['cyan']}" stroke-opacity=".35"/>
+<circle cx="52" cy="48" r="6" fill="#ff5f57"/><circle cx="74" cy="48" r="6" fill="#febc2e"/>
+<circle cx="96" cy="48" r="6" fill="#28c840"/>
+<text x="{w / 2}" y="53" text-anchor="middle" font-family="{MONO}" font-size="14"
+      fill="{t['dim']}">bau — outputs abbreviated, sample data</text>
+<g font-family="{MONO}" font-size="19" xml:space="preserve">
+{chr(10).join(lines)}
+</g>
+</svg>
+"""
+
+
 def main() -> None:
     for theme in THEMES:
         (HERE / f"banner-{theme}.svg").write_text(banner(theme))
         (HERE / f"features-{theme}.svg").write_text(features(theme))
+        (HERE / f"stats-{theme}.svg").write_text(stats(theme))
+        (HERE / f"terminal-{theme}.svg").write_text(terminal(theme))
 
 
 if __name__ == "__main__":
