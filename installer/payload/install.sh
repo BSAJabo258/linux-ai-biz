@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # BAU control-plane installer. Runs on the new Debian system from USB #2.
 #
-#   sudo ./install.sh [--wipe-gate-record FILE] [--expect-fpr GPG_FPR] [--offline]
+#   sudo ./install.sh [--wipe-gate-record FILE] [--expect-fpr GPG_FPR] [--offline] [--cloud]
+#
+# --cloud: the owner's own cloud server (docs/CLOUD-VM.md). SSH stays open (key login
+# only, rate-limited) because it is the only way in, and Jarvis runs as a service for the
+# owner on 127.0.0.1. Remembered in /etc/bau/cloud, so a later re-run never locks SSH.
 #
 # Idempotent: safe to re-run for upgrades; existing keys, state and the audit
 # chain are never overwritten.
@@ -16,12 +20,14 @@ GATE=""
 EXPECT_FPR=""
 OFFLINE=0
 ALLOW_OS=0
+CLOUD=0
 while (($#)); do
   case $1 in
     --wipe-gate-record) GATE=$2; shift 2 ;;
     --expect-fpr) EXPECT_FPR=$2; shift 2 ;;
     --offline) OFFLINE=1; shift ;;
     --allow-other-os) ALLOW_OS=1; shift ;;
+    --cloud) CLOUD=1; shift ;;
     -h|--help) sed -n '2,8p' "$0"; exit 0 ;;
     *) die "unknown argument $1" ;;
   esac
@@ -128,7 +134,14 @@ runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
 log "BAU $(/usr/local/bin/bau --version) installed"
 
 # ---------------------------------------------------------------- 6. host hardening
-install -m 0644 "${HERE}/hardening/nftables.conf" /etc/nftables.conf
+[[ -f /etc/bau/cloud ]] && CLOUD=1
+fw="${HERE}/hardening/nftables.conf"
+if ((CLOUD)); then
+  fw="${HERE}/hardening/nftables-cloud.conf"
+  date -u +%FT%TZ > /etc/bau/cloud
+  log "cloud server: SSH (port 22, key login only) stays open; nothing else does"
+fi
+install -m 0644 "${fw}" /etc/nftables.conf
 systemctl enable --now nftables >/dev/null
 nft -c -f /etc/nftables.conf || die "firewall rules invalid"
 install -m 0644 "${HERE}/hardening/99-bau-sysctl.conf" /etc/sysctl.d/99-bau.conf
@@ -143,13 +156,27 @@ systemctl enable --now auditd >/dev/null 2>&1 || true
 aa-enabled -q 2>/dev/null || log "WARNING: AppArmor is not enabled"
 
 # ---------------------------------------------------------------- 7. services
-install -m 0644 "${HERE}"/systemd/*.service "${HERE}"/systemd/*.timer /etc/systemd/system/
+for u in "${HERE}"/systemd/*.service "${HERE}"/systemd/*.timer; do
+  [[ "$(basename "$u")" == bau-jarvis.service ]] && continue    # cloud only, below
+  install -m 0644 "$u" /etc/systemd/system/
+done
+if ((CLOUD)); then
+  home="$(getent passwd "${ADMIN}" | cut -d: -f6)"
+  runuser -u "${ADMIN}" -- mkdir -p -m 0700 "${home}/.config/bau"
+  sed -e "s|@ADMIN@|${ADMIN}|g" -e "s|@HOME@|${home}|g" "${HERE}/systemd/bau-jarvis.service" \
+    > /etc/systemd/system/bau-jarvis.service
+  chmod 0644 /etc/systemd/system/bau-jarvis.service
+fi
 systemctl daemon-reload
 systemctl enable bau-recover.service bau-regwatch.timer bau-governor.timer bau-ui.service >/dev/null
 systemctl start bau-regwatch.timer bau-governor.timer
 # restart, not start: on an upgrade the dashboard must load the new code now,
 # not at the next reboot (timer jobs pick up new code on their next run).
 systemctl restart bau-ui.service
+if ((CLOUD)); then
+  systemctl enable bau-jarvis.service >/dev/null
+  systemctl restart bau-jarvis.service
+fi
 
 # ---------------------------------------------------------------- 8. wipe-gate evidence
 audit() { runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
@@ -171,6 +198,20 @@ print(json.dumps({"payload_version": m["version"], "git_commit": m["git_commit"]
                   "git_dirty": m["git_dirty"], "built_at": m["built_at"]}))' \
   "${HERE}/MANIFEST.json")"
 audit install.completed "${manifest}"
+if ((CLOUD)); then
+  audit install.cloud '{"inbound": "ssh 22 only, key login", "jarvis": "127.0.0.1:8766"}'
+fi
+
+# Cloud server: prepare.sh let the admin use sudo without a password until now. The owner
+# chooses one here (typed by a person, never stored by BAU), then that exception is removed.
+if ((CLOUD)) && [[ -f /etc/sudoers.d/90-bau-setup ]]; then
+  if [[ "$(passwd -S "${ADMIN}" | awk '{print $2}')" != P ]]; then
+    log "choose a sudo password for ${ADMIN} (you need it for upgrades and 'sudo' later)"
+    passwd "${ADMIN}"
+  fi
+  rm -f /etc/sudoers.d/90-bau-setup
+  log "sudo now asks for ${ADMIN}'s password"
+fi
 
 # Desktop launcher: Jarvis runs as the owner in a terminal (its confirmations are the
 # owner's own clicks), with the HUD opened in the browser.
@@ -194,3 +235,4 @@ log "self-test:"
 runuser -u bau -- env BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
   /usr/local/bin/bau selftest | tee -a "${LOG}" || true
 log "done. Log out and back in (group membership), then run: bau status"
+if ((CLOUD)); then log "Jarvis's address (through your SSH tunnel): bau jarvis url"; fi
