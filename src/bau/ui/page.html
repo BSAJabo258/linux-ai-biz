@@ -5,37 +5,80 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BAU Mission Control</title>
 <style>
-:root { --bg:#0f1115; --fg:#eef1f5; --muted:#b4bcc8; --card:#1a1e26; --line:#2e3542;
-  --green:#5fd38d; --yellow:#f2d35b; --orange:#f5a356; --red:#ff7a7a; --black:#ffffff;
-  --focus:#7fb4ff; }
-@media (prefers-color-scheme: light) { :root { --bg:#ffffff; --fg:#111418; --muted:#3d4653;
-  --card:#f3f5f8; --line:#c9d0da; --green:#0b6b34; --yellow:#7a5d00; --orange:#9a4a00;
-  --red:#a40e0e; --black:#000000; --focus:#0b4fd6; } }
+/* Mission Control in Jarvis's look: deep-space blue, cyan glow, gold accents. Offline:
+   system fonts only, nothing loaded from outside. */
+:root { --bg:#02060b; --fg:#e8f8ff; --muted:#a3c4d6; --card:rgba(6,22,34,.78); --line:rgba(80,200,255,.24);
+  --cyan:#3fd6ff; --glow:#e8f8ff; --gold:#ffcf4d;
+  --green:#46f2a4; --yellow:#ffe066; --orange:#ffb340; --red:#ff7a85; --black:#ffffff;
+  --focus:#ffcf4d;
+  --sky:radial-gradient(ellipse at 50% -10%,#0b4374 0%,#062a52 35%,#03152c 70%,#010812 100%); }
+@media (prefers-color-scheme: light) { :root { --bg:#eef5fa; --fg:#08263a; --muted:#35556a;
+  --card:rgba(255,255,255,.9); --line:rgba(10,90,140,.28); --cyan:#0a78a8; --glow:#062033;
+  --gold:#8a6400; --green:#0b6b34; --yellow:#6b5200; --orange:#8f4400; --red:#a40e0e;
+  --black:#000000; --focus:#0b4fd6;
+  --sky:radial-gradient(ellipse at 50% -10%,#ffffff 0%,#e3eff7 60%,#d5e6f1 100%); } }
 @media (prefers-contrast: more) { :root { --line:currentColor; } }
 @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, sans-serif; }
+body { margin:0; min-height:100vh; color:var(--fg); background:var(--sky) fixed, var(--bg);
+  font:16px/1.55 "Rajdhani","Segoe UI",system-ui,sans-serif; letter-spacing:.01em; }
+body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:-1;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:40px 40px; opacity:.28;
+  mask-image:radial-gradient(ellipse at 50% 0%,#000 30%,transparent 80%); }
 .skip { position:absolute; left:-999px; top:0; background:var(--fg); color:var(--bg); padding:8px 12px; }
 .skip:focus { left:8px; top:8px; z-index:10; }
-header, main { max-width:1100px; margin:0 auto; padding:16px; }
-nav ul { display:flex; flex-wrap:wrap; gap:8px; list-style:none; padding:0; margin:8px 0 0; }
+header, main { max-width:1180px; margin:0 auto; padding:18px 20px; }
+header { display:grid; gap:4px; }
+.brand { display:flex; align-items:center; gap:14px; }
+.brand svg { width:46px; height:46px; flex:none; filter:drop-shadow(0 0 10px var(--cyan)); }
+.brand .halo { transform-origin:50% 50%; animation:spin 24s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+h1 { margin:0; font-size:clamp(26px,4vw,40px); font-weight:700; letter-spacing:.18em; text-transform:uppercase;
+  background:linear-gradient(90deg,var(--glow),var(--cyan) 55%,var(--gold)); -webkit-background-clip:text;
+  background-clip:text; color:transparent; }
+h2 { font-size:15px; letter-spacing:.32em; text-transform:uppercase; color:var(--cyan); margin:18px 0 6px; }
+h2::before { content:"// "; color:var(--gold); }
+nav ul { display:flex; flex-wrap:wrap; gap:8px; list-style:none; padding:0; margin:12px 0 0; }
 button, a { color:inherit; }
-button { font:inherit; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:6px 12px; cursor:pointer; }
-button[aria-pressed="true"] { border-color:var(--focus); font-weight:600; }
+a { color:var(--cyan); }
+button { font:inherit; font-size:13px; letter-spacing:.14em; text-transform:uppercase; background:var(--card);
+  border:1px solid var(--line); border-radius:999px; padding:6px 16px; cursor:pointer;
+  transition:border-color .2s, box-shadow .2s, color .2s; }
+button:hover { border-color:var(--cyan); box-shadow:0 0 14px -4px var(--cyan); }
+button[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); font-weight:700;
+  box-shadow:0 0 18px -6px var(--gold), inset 0 0 12px -8px var(--gold); }
 :focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
-section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin:12px 0; }
-table { width:100%; border-collapse:collapse; }
-th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-.badge { display:inline-block; min-width:5.5em; font-weight:700; }
-.GREEN{color:var(--green)} .YELLOW{color:var(--yellow)} .ORANGE{color:var(--orange)}
-.RED{color:var(--red)} .BLACK{color:var(--black); text-decoration:underline}
+main:focus-visible { outline:none; }   /* focused by script after a view change, not a control */
+section { position:relative; background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:18px; margin:14px 0; backdrop-filter:blur(6px);
+  box-shadow:0 0 0 1px rgba(0,0,0,.2), 0 18px 40px -24px rgba(0,0,0,.6); }
+section::before { content:""; position:absolute; left:16px; top:-1px; width:72px; height:3px;
+  border-radius:2px; background:var(--gold); }
+section::after { content:""; position:absolute; right:22px; bottom:-1px; width:18px; height:3px;
+  border-radius:2px; background:var(--cyan); }
+table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+th { font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+tbody tr:hover td { background:rgba(63,214,255,.06); }
+.badge { display:inline-block; min-width:5.5em; font-weight:700; letter-spacing:.12em; }
+.GREEN{color:var(--green); text-shadow:0 0 10px rgba(70,242,164,.35)}
+.YELLOW{color:var(--yellow)} .ORANGE{color:var(--orange)}
+.RED{color:var(--red); text-shadow:0 0 10px rgba(255,77,94,.3)} .BLACK{color:var(--black); text-decoration:underline}
 .muted { color:var(--muted); }
-dialog { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:8px; width:min(640px,92vw); }
-dialog input { width:100%; font:inherit; padding:8px; background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:6px; }
+#live { font-family:"JetBrains Mono",Consolas,monospace; font-size:13px; }
+dialog { background:var(--card); color:var(--fg); border:1px solid var(--cyan); border-radius:14px;
+  width:min(640px,92vw); box-shadow:0 0 40px -10px var(--cyan); backdrop-filter:blur(10px); }
+dialog::backdrop { background:rgba(1,8,18,.6); }
+dialog input { width:100%; font:inherit; padding:10px; background:var(--bg); color:var(--fg);
+  border:1px solid var(--line); border-radius:8px; }
 dialog ul { list-style:none; padding:0; max-height:50vh; overflow:auto; }
-dialog li[aria-selected="true"] { background:var(--line); }
-kbd { border:1px solid var(--line); border-radius:4px; padding:0 4px; }
-svg.brain { width:100%; height:auto; background:var(--bg); border:1px solid var(--line); border-radius:8px; }
+dialog li[aria-selected="true"] { background:var(--line); border-radius:6px; }
+kbd { border:1px solid var(--line); border-radius:4px; padding:0 5px; font-family:"JetBrains Mono",Consolas,monospace;
+  font-size:.85em; color:var(--gold); }
+code { font-family:"JetBrains Mono",Consolas,monospace; color:var(--cyan); }
+svg.brain { width:100%; height:auto; background:transparent; border:1px solid var(--line); border-radius:14px; }
 svg.brain line { stroke:var(--line); stroke-width:1; }
 svg.brain text { fill:var(--muted); font-size:10px; }
 </style>
@@ -43,7 +86,14 @@ svg.brain text { fill:var(--muted); font-size:10px; }
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <header>
-  <h1>BAU Mission Control</h1>
+  <div class="brand">
+    <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <circle cx="24" cy="24" r="10" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--cyan)"/>
+      <circle cx="24" cy="24" r="4" fill="var(--cyan)"/>
+      <circle class="halo" cx="24" cy="24" r="17" fill="none" stroke="var(--gold)" stroke-width="2" stroke-dasharray="2 5"/>
+    </svg>
+    <h1>BAU Mission Control</h1>
+  </div>
   <p class="muted">Read-only view. Changes and approvals are made with the <code>bau</code> command at a terminal.
   Press <kbd>Ctrl</kbd>+<kbd>K</kbd> for the command palette, <kbd>1</kbd>-<kbd>9</kbd> to switch views.</p>
   <nav aria-label="Views"><ul id="tabs"></ul></nav>

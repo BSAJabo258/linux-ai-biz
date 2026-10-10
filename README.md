@@ -1,22 +1,91 @@
-# BAU/BSA: Compliance-First AI Business Computer
+<div align="center">
 
-The BAU/BSA autonomous business platform:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+  <img src="assets/banner-light.svg" width="100%" alt="BAU Jarvis: compliance-first AI business computer, with Jarvis's orb in a golden halo">
+</picture>
+
+<p>
+  <a href="https://github.com/BSAJabo258/linux-ai-biz/actions/workflows/ci.yml"><img src="https://github.com/BSAJabo258/linux-ai-biz/actions/workflows/ci.yml/badge.svg" alt="CI status: tests, lint and checks"></a>
+  <img src="https://img.shields.io/badge/python-3.11%20%7C%203.13-0b4374?style=flat-square&logo=python&logoColor=ffcf4d" alt="Python 3.11 and 3.13">
+  <img src="https://img.shields.io/badge/Debian-13-0b4374?style=flat-square&logo=debian&logoColor=3fd6ff" alt="Runs on Debian 13">
+  <img src="https://img.shields.io/badge/approvals-human--only-ffcf4d?style=flat-square" alt="Approvals are human-only">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-3fd6ff?style=flat-square" alt="MIT licence"></a>
+</p>
+
+**[Quick start](#quick-start)** · **[Jarvis](#meet-jarvis)** · **[How it works](#how-it-works)** · **[Where it runs](#where-it-runs)** · **[Docs](#documents)**
+
+</div>
+
+---
+
+BAU/BSA is an AI business system for one owner. AI agents do the work, a rule engine checks it
+against the law, and **you** decide anything that matters. Before BAU sends an email, texts
+someone, publishes generated media, sells a subscription, monetizes an asset or moves money, it:
+
+1. finds which rules apply **on that date, in that place**;
+2. decides **PASS / REVIEW / BLOCK**;
+3. records the evidence in a **tamper-evident audit chain**.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/features-dark.svg">
+  <img src="assets/features-light.svg" width="100%" alt="Six features: Jarvis, compliance engine, human-only approvals, video studio, toolbox and Repo Scout, and your own hardware">
+</picture>
+
+> BAU never claims to be "compliant" or "legally protected" (spec §121). It reports which
+> requirements it identified, which controls ran, what evidence exists, and what is
+> unresolved. Every regulation ships **awaiting counsel sign-off**, so nothing gets a clean
+> PASS until a qualified human reviews it.
+
+## Meet Jarvis
+
+<img src="assets/jarvis-hud.png" width="100%" alt="The Jarvis screen: the team as live nodes around a glowing orb, the usage panel open, and the voice bar">
+
+Jarvis is the front door: a spoken briefing, conversation, and a live map of the business.
+Each node is a part of the team (producer, scout, studio, watchdog and more) and lights up while
+it works. Jarvis can look things up, draft and price things, but anything with consequences is
+only **staged**: it runs when you press **Confirm**.
+
+## How it works
+
+```mermaid
+flowchart LR
+    You(["👤 You"]) -->|ask, by voice or text| J["Jarvis"]
+    J -->|tools| T["Agents · Toolbox · Studio · Scout"]
+    T -->|every action| PRule engine<br/>PASS · REVIEW · BLOCK
+    P -->|REVIEW / consequential| C["Staged for you"]
+    C -->|your Confirm or SSH-signed approval| A["Action runs"]
+    P -->|PASS| A
+    P -->|BLOCK| X["Stopped, with the reason"]
+    A --> L[("Audit chain<br/>tamper-evident")]
+    G["Governor / watchdog"] -.->|can HOLD, never approves| T
+    U["Usage meter"] -.->|tokens and dollars, your daily limits| J
+```
+
+## Where it runs
+
+| | Where | Guide |
+|---|---|---|
+| 💻 | **Encrypted laptop** from two USB sticks: hardened Debian + BAU | [docs/INSTALL.md](docs/INSTALL.md) |
+| 🔑 | **Live USB**: boot any PC from one stick, encrypted storage, local model | [docs/LIVE-USB.md](docs/LIVE-USB.md) |
+| ☁️ | **Your own cloud server** (DigitalOcean): Jarvis always on, reached through a private SSH tunnel | [docs/CLOUD-VM.md](docs/CLOUD-VM.md) |
+| 🧪 | **Free test drive** in GitHub Codespaces with a free hosted model | [docs/CLOUD-TEST.md](docs/CLOUD-TEST.md) |
+
+<details>
+<summary><b>Everything inside</b></summary>
+
 - a **USB installer** that turns a laptop into an encrypted, hardened Debian machine;
 - the **BAU control plane**, where compliance is part of the machine rather than a document beside it;
 - the **work layers** that run on top of it:
-  - Jarvis missions, agents and the model router (Claude, local llama.cpp, K3 offload);
-  - MAYA memory and Project Genesis;
-  - media, music-video and public-data spatial tools;
+  - Jarvis missions, agents and the model router (Claude, local llama.cpp, hosted models with backups);
+  - MAYA memory, the Second Brain and Project Genesis;
+  - the video studio, media, music-video and public-data spatial tools (God's Eye);
+  - the toolbox, Repo Scout and the usage meter;
   - six business factories and the Opportunity Miner;
   - economics, accounting and sanctions screening;
   - a keyboard-first Mission Control dashboard.
 
-Before BAU sends an email, texts someone, publishes generated media, sells a subscription, monetizes an asset or moves money, it:
-1. determines which rules apply on that date, in that jurisdiction;
-2. decides PASS / REVIEW / BLOCK;
-3. records the evidence in a tamper-evident audit chain.
-
-> BAU never claims to be "compliant" or "legally protected" (spec §121). It reports which requirements it identified, which controls ran, what evidence exists, and what is unresolved. Every regulation ships **awaiting counsel sign-off**, so nothing gets a clean PASS until a qualified human reviews it.
+</details>
 
 ## Quick start
 
@@ -93,6 +162,14 @@ installer/  build-usb-image.sh write-usb.sh make-payload.sh hw-audit*.{sh,ps1}
             preseed/ firstboot/ payload/{install.sh, systemd/, hardening/}
 tests/      engine, email/SMS, commerce, trust plane, orchestration, knowledge/media, business/ops
 ```
+
+## Mission Control
+
+<img src="assets/mission-control.png" width="100%" alt="Mission Control: the read-only dashboard in the same deep-blue and gold look as Jarvis">
+
+A read-only dashboard at `http://127.0.0.1:8765`: status, missions, legal review, regulations,
+jobs, economics, incidents, the Governor and the Second Brain. Changes and approvals happen at
+the terminal with `bau`.
 
 ## Status
 
