@@ -201,6 +201,10 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 except ValueError:
                     since = 0
                 self._json(200, assistant.activity.since(since))
+            elif path == "/api/toolbox":
+                q = dict(p.partition("=")[::2] for p in query.split("&") if p)
+                self._json(200, assistant.t_toolbox(urllib.parse.unquote_plus(
+                    q.get("q", ""))))
             elif path == "/api/usage":
                 self._json(200, screen.usage_summary(assistant))
             elif path == "/api/studio":

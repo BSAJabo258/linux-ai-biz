@@ -958,13 +958,33 @@ async function renderUsage(p) {
   for (const [b, g] of Object.entries(d.github || {}))
     kv(wrap, "GitHub " + b, (g.remaining != null ? g.remaining + " left" : "no reading yet") + (g.waiting_until ? " · waiting until " + g.waiting_until : ""));
 }
+// The toolbox: tools others already built for this problem (researched, with sources),
+// shown before Scout searches GitHub. A claim until Scout has inspected it.
+let lastScoutQ = "";
+async function showKnown(box, question) {
+  box.textContent = "";
+  let d; try { d = await apiJson("/api/toolbox?q=" + encodeURIComponent(question)); } catch (e) { return; }
+  if (!d.answers || !d.answers.length) return;
+  box.appendChild(el("div", null, "Already known (toolbox):"));
+  for (const h of d.answers.slice(0, 4)) {
+    const card = el("div", "card"); const a = el("a", null, h.name); a.href = "https://github.com/" + h.repo; a.target = "_blank"; a.rel = "noopener";
+    if (h.repo.indexOf(" ") < 0 && h.sources && h.sources[0] && h.sources[0].indexOf("github.com") < 0) a.href = h.sources[0];
+    card.appendChild(el("span", "badge " + (h.evidence.startsWith("inspected") ? "eligible" : "needs"), h.evidence.startsWith("inspected") ? "inspected" : "claimed"));
+    card.appendChild(a); card.appendChild(el("div", null, h.problem));
+    card.appendChild(el("div", null, h.category + " · " + h.licence + (h.caveats ? " · " + h.caveats : "")));
+    cmd(card, h.next.startsWith("bau ") ? h.next.split("   ")[0] : h.next); box.appendChild(card);
+  }
+}
 // Repo Scout: search, the ranked candidates as cards, the report, a safe inspection.
 async function renderScout(p) {
   const wrap = el("div"); p.appendChild(wrap);
   const lab = el("label", "sr", "What capability should Scout look for?"); const q = el("input", "q"); q.id = "scout-q";
   lab.htmlFor = q.id; q.placeholder = "e.g. simulate customers to test a business idea"; wrap.appendChild(lab); wrap.appendChild(q);
   q.addEventListener("focus", () => { p.dataset.keep = "1"; });
+  const known = el("div"); wrap.appendChild(known);
+  if (lastScoutQ) showKnown(known, lastScoutQ);       // survives the refresh after a search
   const go = async () => { const v = q.value.trim(); if (!v) return; delete p.dataset.keep;
+    lastScoutQ = v; await showKnown(known, v);
     caption("Scout is searching GitHub, one request at a time…");
     const r = await settle(await apiJson("/api/scout/find", { request: v }));
     caption(r.error || ("Found " + r.found + "." + (r.waiting_until ? " GitHub asked us to wait until " + r.waiting_until + "." : "")));
