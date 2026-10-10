@@ -151,6 +151,26 @@ def overview(asst: Any) -> dict[str, Any]:
                            if has else "no money recorded yet", money,
                            "How's the money looking?"))
 
+    def studio() -> dict[str, Any]:
+        st = asst.studio()
+        jobs = st.jobs()
+        return {"budget": {k: v for k, v in st.budget().items() if k.endswith("_usd")},
+                "spent_this_month": st.spent_this_month(),
+                "in_progress": sum(1 for j in jobs if j["status"] == "submitted"),
+                "clips": [f"{j['id']}: {j['status']}, ${j['usd']:.2f}" for j in jobs[:6]]}
+    sd, err = _safe(studio)
+    if err:
+        nodes.append(_broken("studio", "Studio", "team", err))
+    else:
+        b = sd["budget"]
+        nodes.append(_node("studio", "Studio", "team",
+                           "idle" if not b else "warn" if sd["in_progress"] else "ok",
+                           "no video budget set yet" if not b else
+                           f"${sd['spent_this_month']:.2f} of ${b['monthly_usd']:.2f} spent "
+                           f"this month" + (f", {sd['in_progress']} clip(s) in progress"
+                                            if sd["in_progress"] else ""),
+                           sd, "What clips have we made?"))
+
     st, err = _safe(asst.t_status)
     if err:
         nodes.append(_broken("watchdog", "Watchdog", "team", err))

@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 282 tests pass; 49 regulations / 65 policies validate.
+State: 294 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -35,6 +35,22 @@ open-source projects for a capability on evidence; it never installs or runs the
 licence/security are gates a score cannot override. Baseline audit before it:
 `docs/engineering/baseline-audit.md`. Never run against live GitHub search yet (the build
 container can't reach it); the owner's first `bau scout find` in the codespace is the test.
+
+The video studio (2026-10-10, the first paid integration, tests written first in
+`tests/test_studio.py`):
+- `bau video`, `studio.py` and `media/higgsfield.py`;
+- Higgsfield's API facts are checked and dated in the module docstring, and its provider
+  record is in `registry_defaults.yaml`;
+- the money rules: an owner-set budget with no default; the provider approved by the owner;
+  each clip priced by Higgsfield's estimate and refused when over the per-clip or monthly
+  budget; clips start only on a human Confirm or `y`; HOLD stops new clips; finished clips
+  are downloaded through the media gateway (provenance sidecar) and their cost goes in the
+  ledger;
+- Jarvis has `make_video` (confirm) and `video_clips`, and a Studio node and panel;
+- owner guide: `docs/STUDIO.md`.
+
+Never called against the real Higgsfield API yet: the owner's first `bau video quote` is the
+first real call.
 
 The full Jarvis screen (2026-10-09):
 - live work per node: `activity.py`, `/api/activity`;

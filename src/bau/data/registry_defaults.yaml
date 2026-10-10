@@ -12,6 +12,23 @@ provider:
     terms_url: https://www.anthropic.com/legal/commercial-terms
     dpa_signed: false
     status: REGISTERED
+  higgsfield:
+    # Checked 2026-10-10: docs.higgsfield.ai (API, pay per generation, failed/moderated
+    # requests not charged, outputs kept 7+ days) and the help centre article "Who owns
+    # my generations": the customer owns outputs, commercial use is not restricted, and
+    # Higgsfield may use content to train its models while it is kept there (the licence
+    # ends when the content or account is deleted). Company jurisdiction is not stated in
+    # those pages. Read the Terms of Use before approving.
+    provider_id: higgsfield
+    data_sent: [video prompts written in BAU workspaces]
+    data_retained: "generated outputs kept at least 7 days; content may be used to train Higgsfield models until deleted"
+    training_on_customer_data: true (until the content or account is deleted)
+    jurisdiction: not stated in the docs or help centre (check the Terms of Use)
+    commercial_rights: customer owns outputs; commercial use not restricted (help centre, Terms 4.4)
+    terms_url: https://higgsfield.ai/terms-of-use-agreement
+    personal_data_allowed: false
+    dpa_signed: false
+    status: REGISTERED
   zai:
     # Checked 2026-10-07 at docs.z.ai: operated by JINGSHENG HENGXING TECHNOLOGY PTE. LTD.
     # from Singapore; the API data processing terms say API content is processed in real
