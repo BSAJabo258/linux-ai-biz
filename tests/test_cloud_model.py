@@ -118,7 +118,13 @@ def test_codespace_comes_with_ssh_and_claude_code_from_official_features():
     raw = (Path(__file__).resolve().parents[1] / ".devcontainer" / "devcontainer.json").read_text()
     feats = json.loads(re.sub(r"^\s*//.*$", "", raw, flags=re.M))["features"]
     assert set(feats) == {"ghcr.io/devcontainers/features/sshd:1",
+                          "ghcr.io/devcontainers/features/node:1",
                           "ghcr.io/anthropics/devcontainer-features/claude-code:1.0"}
+    # Without Node the Claude Code feature fails, the whole build fails, and Codespaces
+    # falls back to a bare recovery container (no SSH, no BAU): Node must come first.
+    order = list(feats)
+    assert order.index("ghcr.io/devcontainers/features/node:1") < order.index(
+        "ghcr.io/anthropics/devcontainer-features/claude-code:1.0")
 
 
 def test_jarvis_prints_the_private_codespace_link(monkeypatch, capsys, tmp_path):

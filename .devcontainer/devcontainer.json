@@ -8,6 +8,9 @@
   "features": {
     // `gh codespace ssh` (GitHub's tunnel, your login only): run checks from another computer.
     "ghcr.io/devcontainers/features/sshd:1": {},
+    // Claude Code needs Node.js and can't install it on this image by itself (its own
+    // error message, 2026-10-10: "Please add the Node.js feature").
+    "ghcr.io/devcontainers/features/node:1": {},
     // Claude Code in the terminal: type `claude` and sign in with your Claude account.
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
