@@ -506,7 +506,7 @@ function logLine(role, text) {
 const TITLES = { briefing: "System", system_status: "Status", night_report: "While you were away",
   publish_queue: "Publishing queue", post_video: "Posted", deadlines: "Deadlines", money: "Money", missions: "Missions",
   brain_lookup: "Second Brain", brain_gaps: "Brain gaps", brain_add: "Added to brain",
-  remember: "Remembered", plan_mission: "Mission plan", hold_everything: "Hold", release_hold: "Hold" };
+  remember: "Remembered", recall: "Memory", plan_mission: "Mission plan", hold_everything: "Hold", release_hold: "Hold" };
 function fmt(v) { if (v == null) return "—"; if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(2);
   if (typeof v === "boolean") return v ? "yes" : "no"; if (Array.isArray(v)) return v.map(fmt).join(", ");
   if (typeof v === "object") return Object.entries(v).filter(([, x]) => x).map(([k, x]) => k.toLowerCase() + " " + fmt(x)).join(" · ") || "none";
