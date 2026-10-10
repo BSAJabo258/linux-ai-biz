@@ -247,6 +247,46 @@ def test_server_conversation_confirm_and_preview(server):
     assert call(url, "/api/tts", {"text": "hi"}, raw=True)[0] == 204    # no key: browser voice
 
 
+def test_a_check_shows_while_a_slow_model_is_still_answering(tmp_path, monkeypatch):
+    # Live run 2026-10-10: the drafted stage's check was ready at 06:52:05 but reached the
+    # owner's screen only at 06:52:44, when the slow model finished its reply.
+    import time
+
+    from bau.ui import jarvis_server
+    from bau.ui.jarvis_server import serve
+
+    class SlowAfterStaging(ScriptedProvider):
+        def complete(self, *a, **kw):
+            if self.calls:                      # the reply after the tool call is slow
+                time.sleep(1.5)
+            return super().complete(*a, **kw)
+
+    Governor(tmp_path, audit=AuditLog(tmp_path / "audit" / "chain.jsonl", key=b""),
+             systemctl="").hold("test", by="human:owner")
+    monkeypatch.setattr(jarvis_server, "QUICK_REPLY", 0.1)
+    a = Assistant(tmp_path, SlowAfterStaging(script=[{"tool": "release_hold", "input": {}},
+                                                     "It's on your screen."]),
+                  {}, "human:owner", AuditLog(tmp_path / "audit" / "chain.jsonl", key=b""))
+    srv, _ = serve(a, Voice(tmp_path), 0, key="k123")
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        code, r = call(url, "/api/ask", {"text": "release the hold"})
+        assert code == 202
+        seen_early = False
+        for _ in range(60):
+            code, out = call(url, "/api/job/" + r["job"])
+            if code == 200:
+                break
+            seen_early = seen_early or any(p["tool"] == "release_hold"
+                                           for p in out.get("pending", []))
+            time.sleep(0.05)
+        assert seen_early                       # on screen before the reply was finished
+        assert code == 200 and out["text"] == "It's on your screen."
+    finally:
+        srv.shutdown()
+
+
 def test_slow_model_answers_as_a_job_the_page_checks_back_on(tmp_path, monkeypatch):
     # The owner saw 504 in the codespace: a busy free model held one request open until
     # the proxy gave up. Slow answers now come back as a job, never one long request.
@@ -274,7 +314,7 @@ def test_slow_model_answers_as_a_job_the_page_checks_back_on(tmp_path, monkeypat
             code, out = call(url, "/api/job/" + r["job"])
             if code == 200:
                 break
-            assert code == 202 and out == {"job": r["job"]}
+            assert code == 202 and out["job"] == r["job"] and out["pending"] == []
             time.sleep(0.1)
         assert code == 200 and out["text"] == "Here you are." and "state" in out
         assert call(url, "/api/job/" + r["job"])[0] == 404           # handed over once

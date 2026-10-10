@@ -71,10 +71,17 @@ cp "${ROOT}/LICENSE" "${P}/"
 chmod 0755 "${P}/install.sh" "${P}/hw-audit.sh"
 
 commit="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
-dirty="$(git -C "${ROOT}" status --porcelain 2>/dev/null | head -c1 | wc -c)"
+# Not a git checkout, or git refuses to read it ("dubious ownership" on a mounted folder):
+# record "unknown" like the commit, instead of stopping here silently under `set -e`.
+if changes="$(git -C "${ROOT}" status --porcelain 2>/dev/null)"; then
+  dirty="$([[ -n "${changes}" ]] && echo true || echo false)"
+else
+  warn "not a git checkout git can read: commit and local changes recorded as unknown"
+  dirty=null
+fi
 cat > "${P}/MANIFEST.json" <<EOF
 {"name": "BAU-PAYLOAD", "version": "${version}", "git_commit": "${commit}",
- "git_dirty": $([[ "${dirty}" -gt 0 ]] && echo true || echo false),
+ "git_dirty": ${dirty},
  "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "target": "Debian 13+ amd64"}
 EOF
 
