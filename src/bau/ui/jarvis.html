@@ -104,6 +104,7 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:cente
 #confirm #cform .opt.on{border-color:var(--green);color:var(--green);background:rgba(70,242,164,.1)}
 #cneed{font-size:12px;color:var(--amber);margin:0 0 10px}
 #confirm .btns button{padding:12px 20px}
+#confirm .box:focus{outline:none}
 #cnote{font-size:12px;color:var(--dim);margin:0 0 14px}#no{border:1px solid var(--dim);color:var(--ink)}
 aside.r{display:none}body.showlog aside.r{display:block}
 #nodes{position:fixed;inset:0;pointer-events:none}
@@ -217,7 +218,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 </footer>
 <div class="hint" id="hint">Hold space to talk · Enter to send · Esc to stop speaking</div>
 <div id="wake"><div><h1>JARVIS</h1><p>Tap or press any key to wake</p></div></div>
-<div id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"><div class="box"><h2 id="confirm-title">Waiting for your confirmation</h2><video id="cvid" controls playsinline></video><pre id="csum"></pre><div id="cform"></div><p id="cneed"></p><p id="cnote"></p>
+<div id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"><div class="box" tabindex="-1"><h2 id="confirm-title">Waiting for your confirmation</h2><video id="cvid" controls playsinline></video><pre id="csum"></pre><div id="cform"></div><p id="cneed"></p><p id="cnote"></p>
   <div class="btns"><button id="no" data-key="Esc" title="Not now (Esc)">Not now</button><button id="yes" data-key="Y" title="Confirm (Y)">Confirm</button></div></div></div>
 <div id="mcbox" class="overlay" role="dialog" aria-label="Mission Control"><div class="box">
   <button class="act" id="mc-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
@@ -276,6 +277,7 @@ async function apiJson(path, body, ctype) {
 // 2 s instead of holding one request open until a proxy cuts it off (504).
 async function settle(r) {
   for (let i = 0; r && r.job && i < 150; i++) {
+    if (r.pending && r.pending.length) queueConfirms(r.pending);   // show checks as soon as they exist
     if (i === 2) caption("Still thinking… the model is slow right now.");
     await new Promise((res) => setTimeout(res, 2000));
     r = await apiJson("/api/job/" + encodeURIComponent(r.job));
@@ -566,7 +568,11 @@ function paintState(s) {
 }
 
 // ---------------------------------------------------------------- confirmations
-let confirmQ = [], showing = null, picked = {};
+let confirmQ = [], showing = null, picked = {}, shownAt = 0;
+// A confirmation is a deliberate act: Confirm never takes keyboard focus, and nothing counts
+// in the first moment after the box opens (an Enter, Space or "y" already on its way, or a
+// tap meant for something else, must not approve what the owner has not read).
+const CONFIRM_SETTLE_MS = 900;
 function queueConfirms(items) { for (const i of items) if (!confirmQ.some(x => x.id === i.id) && (!showing || showing.id !== i.id)) confirmQ.push(i); nextConfirm(); }
 let previewUrl = null;
 function nextConfirm() {
@@ -602,10 +608,13 @@ function nextConfirm() {
       previewUrl = URL.createObjectURL(b); vid.src = previewUrl; vid.style.display = "block"; }).catch(() => {});
   }
   $("confirm").classList.add("show");
-  setTimeout(() => (form.querySelector(".opt") || $("yes")).focus(), 50);
+  shownAt = performance.now();
+  setTimeout(() => (form.querySelector(".opt") || $("confirm").querySelector(".box")).focus(), 50);
 }
 async function answer(approve) {
-  if (!showing) return; const item = showing;
+  if (!showing) return;
+  if (approve && performance.now() - shownAt < CONFIRM_SETTLE_MS) return;
+  const item = showing;
   const choices = { ...picked };
   showing = null; $("confirm").classList.remove("show"); try { $("cvid").pause(); } catch (e) {}
   setState("thinking");
