@@ -18,6 +18,7 @@ stand and what is next.
 | `src/bau/studio.py`, `src/bau/media/higgsfield.py` | Video studio (`bau video`): paid Higgsfield clips under the owner's budget; priced first, owner-confirmed, downloaded with provenance, cost in the ledger. See `docs/STUDIO.md` |
 | `src/bau/usage.py` | Usage meter (`bau usage`): every model call's tokens and dollars per model (free ones too), owner-set daily limits, busy replies, rate-limit headers, GitHub's wait. See `docs/USAGE.md` |
 | `src/bau/toolbox.py`, `data/toolbox.yaml` | Toolbox (`bau toolbox`): 77 researched open-source tools (connectors, grounding, evals, agents, memory, local models, voice, video) with sources and check date; Jarvis's `toolbox` tool; `check` hands one to Repo Scout. See `docs/TOOLBOX.md` |
+| `src/bau/spatial.py`, `ui/screen.py` (`godseye_*`), `data/world-land.json` | God's Eye: public earthquakes / aircraft (wide named regions only, private planes unnamed) / satellites on a world map in Jarvis; 5-min cache, honours 429, every query audited with its purpose; `world_watch` tool. See `docs/GODS-EYE.md` |
 | `src/bau/governor.py` | watchdog (hold / quarantine / resume, never approves) |
 | `src/bau/brain.py` | Second Brain (Markdown vault, nouns + verbs graph) |
 | `src/bau/chats.py` | chat library (`bau chats`): the owner's Claude/ChatGPT exports in SQLite FTS5; Jarvis reads them per `bau chats sharing` |

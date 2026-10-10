@@ -47,7 +47,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
     # GitHub wants requests one at a time, so one search or inspection at a time; testing
     # a model has its own lane. Neither holds up the conversation.
     lanes = {"scout": threading.Lock(), "models": threading.Lock(),
-             "studio": threading.Lock()}
+             "studio": threading.Lock(), "godseye": threading.Lock()}
     jobs: dict[str, dict[str, Any]] = {}  # slow answers the page is checking back on
 
     def state() -> dict[str, Any]:
@@ -202,6 +202,8 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 except ValueError:
                     since = 0
                 self._json(200, assistant.activity.since(since))
+            elif path == "/api/godseye/world":
+                self._json(200, screen.godseye_world())
             elif path == "/api/toolbox":
                 q = dict(p.partition("=")[::2] for p in query.split("&") if p)
                 self._json(200, assistant.t_toolbox(urllib.parse.unquote_plus(
@@ -319,6 +321,9 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     self._json(200, {"pending": [p]})
                 except WorkspaceError as e:
                     self._json(200, {"error": str(e)[:400]})
+            elif self.path == "/api/godseye":
+                self._json(*answer(lambda: screen.godseye_screen(assistant, data),
+                                   lanes["godseye"]))
             elif self.path == "/api/studio/stage":
                 # Prices the clip and puts it on screen; only the owner's Confirm starts it.
                 self._json(*answer(lambda: screen.studio_stage(assistant, data),

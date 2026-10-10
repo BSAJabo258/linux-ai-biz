@@ -97,7 +97,8 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
              "clip_prompt": "producer", "plan_episode": "producer",
-             "toolbox": "scout", "video_clips": "studio", "make_video": "studio",
+             "toolbox": "scout", "world_watch": "godseye",
+             "video_clips": "studio", "make_video": "studio",
              "usage_today": "usage",
              "hold_everything": "watchdog", "release_hold": "watchdog"}
 TOOL_WORDS = {"draft_stage": "Drafting the next step", "find_tools": "Searching GitHub",
@@ -246,6 +247,14 @@ class Assistant:
             Tool("scout_results", "Open-source projects Repo Scout has found so far, best "
                  "first, with licence, security and test status and what is still unknown. "
                  "Descriptions are the projects' own claims.", _schema(), self.t_scout_results),
+            Tool("world_watch", "God's Eye: public world data - recent earthquakes "
+                 "(window all_hour, all_day, all_week, significant_week), aircraft over a "
+                 "named region (usa-east, usa-west, florida, new-york-area, caribbean, "
+                 "uk-ireland, europe, japan) or satellites (CelesTrak group). Say why; it "
+                 "is recorded. Never for following or locating a person.",
+                 _schema({"layer": {"type": "string"}, "why": {"type": "string"},
+                          "window": {"type": "string"}, "region": {"type": "string"},
+                          "group": {"type": "string"}}, ["layer", "why"]), self.t_world_watch),
             Tool("toolbox", "Researched open-source tools for a problem, in plain words (e.g. "
                  "'stop the model making things up', 'long-term memory', 'connect to "
                  "Gmail'): what each solves, licence, sources, and whether Repo Scout has "
@@ -517,6 +526,17 @@ class Assistant:
                  "decision": c["decision"], "licence": c["license"]["status"],
                  "blocked": c["blockers"], "still_needed": c["needs"]}
                 for c in rows if not c.get("duplicate_of")][:8]
+
+    def t_world_watch(self, layer: str, why: str, window: str = "all_day", region: str = "",
+                      group: str = "stations") -> dict[str, Any]:
+        from .ui.screen import godseye_query
+        d = godseye_query(self, layer, why, window, region, group)
+        out = {"layer": layer, "count": d["count"], "licence": d["licence"],
+               "top": d["points"][:5] or d["list"][:5], "on_screen": "the God's Eye node"}
+        if layer == "earthquakes" and d["points"]:
+            p = d["points"][0]
+            out["strongest"] = f"M{p['mag']} {p['label']}"
+        return out
 
     def t_toolbox(self, question: str) -> dict[str, Any]:
         from .toolbox import Toolbox

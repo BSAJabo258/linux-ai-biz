@@ -135,12 +135,19 @@ aside.r{display:none}body.showlog aside.r{display:block}
 .live div{margin:2px 0}.live .error{color:var(--red)}.live .done{color:var(--green)}
 textarea.edit{width:100%;min-height:220px;background:var(--field);color:var(--ink);border:1px solid var(--line);
   font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:8px;resize:vertical}
-input.q{width:100%;background:var(--field);color:var(--ink);border:1px solid var(--line);padding:8px;font:inherit;margin:4px 0}
+input.q,select.q{width:100%;background:var(--field);color:var(--ink);border:1px solid var(--line);padding:8px;font:inherit;margin:4px 0}
 .card{border:1px solid var(--line);padding:8px;margin:8px 0;font-size:13px}
 .card a{color:var(--cyan);font-weight:600}.badge{float:right;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   border:1px solid currentColor;padding:1px 6px}.badge.rejected{color:var(--red)}.badge.needs{color:var(--amber)}.badge.eligible{color:var(--green)}
 pre.md{white-space:pre-wrap;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;max-height:50vh;overflow:auto}
 #timeline{position:fixed;top:56px;bottom:110px;right:16px;width:340px;overflow:auto;display:none}
+#eye{position:fixed;top:60px;left:336px;right:24px;bottom:118px;z-index:5;display:flex;flex-direction:column;gap:8px;
+  background:var(--solid);border:1px solid var(--cyan);border-radius:14px;padding:12px 14px;box-shadow:0 0 40px -12px var(--cyan)}
+#eye .eyehead{display:flex;align-items:center;gap:12px;padding:0;font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--cyan)}
+#eye .eyehead b{color:var(--gold);font-weight:600}#eye .eyehead .x{margin-left:auto;background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;width:30px;height:30px;font-size:18px;cursor:pointer}
+#eye canvas{flex:1;min-height:0;width:100%;border-radius:10px;background:var(--field)}
+#eye .legend{font-size:12px;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px 16px}
+#eye ol{margin:0;padding-left:20px;max-height:22%;overflow:auto;font-size:13px}
 body.showtime #timeline{display:block}body.showtime aside.r{display:none}
 .tl{font-size:12px;border-left:2px solid var(--line);padding:2px 0 6px 8px;margin:0 0 4px}
 .tl{overflow-wrap:anywhere}.tl b{color:var(--cyan);font-weight:600}.tl small{color:var(--dim);display:block}
@@ -173,6 +180,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   .node.connector .lbl{display:none}
   aside.l.open{left:8px;right:8px;width:auto;top:auto;bottom:96px;max-height:58vh;z-index:5}
   aside.r,#timeline{left:8px;right:8px;width:auto;top:auto;bottom:96px;max-height:58vh;z-index:6}
+  #eye{left:8px;right:8px;top:52px;bottom:96px}
   header .r{overflow-x:auto;max-width:72vw;scrollbar-width:none}
   .hint{display:none}header>div:first-child{white-space:nowrap}header .chip{padding:2px 6px;font-size:10px;letter-spacing:.08em}header{padding:12px 16px;letter-spacing:.14em}header .r{gap:8px}#caption{font-size:16px;bottom:138px}#voicebar{bottom:92px}#voicebar .rule{width:40px}#wave{width:160px}}
 </style>
@@ -827,6 +835,7 @@ function showDetail(n) {
   else if (n.id === "scout") renderScout(p);
   else if (n.id === "studio") renderStudio(p);
   else if (n.id === "usage") renderUsage(p);
+  else if (n.id === "godseye") renderGodsEye(p);
   else if (d && d.error) p.appendChild(el("div", "issue", d.error));
   else if (Array.isArray(d)) list(p, d.map(i => typeof i === "object" ? (i.title || i.objective || i.detail || Object.values(i).map(fmt).join(" · ")) : i));
   else if (d && typeof d === "object") for (const [k, v] of Object.entries(d)) {
@@ -945,6 +954,81 @@ async function renderStudio(p) {
       card.appendChild(v); p.dataset.keep = "1"; v.play().catch(() => {}); });
     wrap.appendChild(card);
   }
+}
+// God's Eye: public world data on a map (earthquakes, aircraft over named regions,
+// satellites). Every query is recorded with its purpose on the server; nothing here can
+// aim at a place or a person - aircraft come only for wide named regions.
+let WORLD = null, EYE = null;
+async function renderGodsEye(p) {
+  const wrap = el("div"); p.appendChild(wrap);
+  const row = (label, opts, val, layer, key) => {
+    const box = el("div", "ep"); const sel = field(box, label, choice(opts, val));
+    button(box, "Show on the map", () => showLayer({ layer, [key]: sel.value })); wrap.appendChild(box); };
+  row("Earthquakes", ["all_hour", "all_day", "all_week", "significant_week"], "all_day", "earthquakes", "window");
+  row("Aircraft over", ["florida", "usa-east", "usa-west", "new-york-area", "caribbean", "uk-ireland", "europe", "japan"], "florida", "aircraft", "region");
+  row("Satellites", ["stations", "visual", "weather", "gps-ops"], "stations", "satellites", "group");
+  wrap.appendChild(el("div", null, "Public sources only: USGS, OpenSky (non-commercial terms), CelesTrak. Never used to follow a person."));
+}
+async function showLayer(q) {
+  caption("God's Eye is reading public " + q.layer + " data…");
+  let d; try { d = await settle(await apiJson("/api/godseye", q)); } catch (e) { caption(e.message); return; }
+  if (d.error) { caption(d.error); return; }
+  if (!WORLD) { try { WORLD = await apiJson("/api/godseye/world"); } catch (e) { WORLD = { land: [], credit: "" }; } }
+  caption(d.count + " " + d.layer + (d.cached ? " (from the last five minutes)" : "") + ".");
+  openEye(d); loadNodes();
+}
+function openEye(d) {
+  let box = $("eye");
+  if (!box) { box = el("section"); box.id = "eye"; box.setAttribute("aria-label", "God's Eye world map"); document.body.appendChild(box);
+    box.addEventListener("keydown", ev => { if (ev.key === "Escape") closeEye(); }); }
+  box.textContent = "";
+  const head = el("div", "eyehead"); head.appendChild(el("span", null, "God's Eye · ")); head.appendChild(el("b", null, d.layer + " · " + d.count));
+  const x = el("button", "x", "×"); x.setAttribute("aria-label", "Close the map"); x.onclick = closeEye; head.appendChild(x); box.appendChild(head);
+  const cv = el("canvas"); cv.setAttribute("role", "img");
+  cv.setAttribute("aria-label", "World map with " + d.count + " " + d.layer + (d.points[0] ? "; the first: " + d.points[0].label : ""));
+  box.appendChild(cv);
+  const lg = el("div", "legend"); lg.appendChild(el("span", null, "Source: " + d.licence)); lg.appendChild(el("span", null, WORLD.credit || ""));
+  if (d.note) lg.appendChild(el("span", null, d.note)); box.appendChild(lg);
+  const items = d.points.length ? d.points.slice(0, 12).map(p => (p.mag != null ? "M" + p.mag + " · " : "") + p.label + (p.alt ? " · " + Math.round(p.alt) + " m" : ""))
+    : d.list.slice(0, 12).map(s => s.name + " · " + s.inclination + "° · " + s.orbits_per_day + " orbits a day");
+  const ol = el("ol"); items.forEach(t => ol.appendChild(el("li", null, t))); box.appendChild(ol);
+  EYE = { d, cv, t0: performance.now() }; x.focus();
+  requestAnimationFrame(eyeFrame);
+}
+function closeEye() { const b = $("eye"); if (b) b.remove(); EYE = null; }
+function eyeFrame(t) {
+  if (!EYE) return;
+  const { cv, d } = EYE, css = getComputedStyle(document.documentElement), dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) { requestAnimationFrame(eyeFrame); return; }
+  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const cyan = css.getPropertyValue("--cyan").trim(), gold = css.getPropertyValue("--gold").trim(), red = css.getPropertyValue("--red").trim();
+  const X = lon => (lon + 180) / 360 * w, Y = lat => (85 - Math.max(-60, Math.min(85, lat))) / 145 * h;
+  g.strokeStyle = cyan; g.globalAlpha = .12; g.lineWidth = 1;                          // graticule
+  for (let lon = -150; lon <= 150; lon += 30) { g.beginPath(); g.moveTo(X(lon), 0); g.lineTo(X(lon), h); g.stroke(); }
+  for (let lat = -60; lat <= 80; lat += 20) { g.beginPath(); g.moveTo(0, Y(lat)); g.lineTo(w, Y(lat)); g.stroke(); }
+  g.globalAlpha = 1;
+  for (const ring of (WORLD && WORLD.land) || []) {                                     // land
+    g.beginPath();
+    for (let i = 0; i < ring.length; i += 2) { const px = X(ring[i]), py = Y(ring[i + 1]); i ? g.lineTo(px, py) : g.moveTo(px, py); }
+    g.closePath(); g.fillStyle = cyan; g.globalAlpha = .10; g.fill(); g.globalAlpha = .55; g.strokeStyle = cyan; g.stroke();
+  }
+  const s = REDUCED ? 0 : (t - EYE.t0) / 1000;
+  if (!REDUCED) {                                                                        // radar sweep
+    const sx = (s * 0.08 % 1) * w, grad = g.createLinearGradient(sx - 120, 0, sx, 0);
+    grad.addColorStop(0, "rgba(0,0,0,0)"); grad.addColorStop(1, cyan);
+    g.globalAlpha = .18; g.fillStyle = grad; g.fillRect(sx - 120, 0, 120, h); g.globalAlpha = .7; g.fillRect(sx - 1, 0, 2, h);
+  }
+  for (const p of d.points) {                                                           // the layer
+    const px = X(p.lon), py = Y(p.lat);
+    if (p.mag != null) {
+      const r = 3 + Math.pow(Math.max(p.mag, 0), 1.6), pulse = REDUCED ? 0 : (Math.sin(s * 2 + p.lon) + 1) * 3;
+      g.globalAlpha = .25; g.fillStyle = p.mag >= 5 ? red : gold; g.beginPath(); g.arc(px, py, r + pulse, 0, 7); g.fill();
+      g.globalAlpha = .95; g.beginPath(); g.arc(px, py, Math.max(2, r / 3), 0, 7); g.fill();
+    } else { g.globalAlpha = .9; g.fillStyle = cyan; g.beginPath(); g.arc(px, py, 2.2, 0, 7); g.fill(); }
+  }
+  g.globalAlpha = 1;
+  if (!REDUCED) requestAnimationFrame(eyeFrame);
 }
 // The usage meter: tokens and dollars per model today and this week, the owner's daily
 // limits (set only in the terminal), warnings, and GitHub's limits from Repo Scout.

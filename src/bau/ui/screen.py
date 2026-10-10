@@ -8,6 +8,9 @@ a stage still goes through the owner's Confirm.
 
 from __future__ import annotations
 
+import datetime as dt
+import time
+import urllib.error
 from typing import Any
 
 MAX_EDIT = 200_000           # characters in one stage file edited on screen
@@ -225,3 +228,118 @@ def studio_clip(asst: Any, clip_id: str) -> Any:
         return None
     f = asst.home / "studio" / "clips" / f"{clip_id}.mp4"
     return f if f.is_file() else None
+
+
+# ------------------------------------------------------------------ God's Eye
+# Aircraft are shown only for wide named regions (never a box around one place), and every
+# query is recorded with its purpose. Results are kept five minutes so the public sources
+# (USGS, OpenSky, CelesTrak) are asked at most once per view in that time.
+GODSEYE_REGIONS = {      # (lat min, lon min, lat max, lon max)
+    "usa-east": (24.0, -90.0, 47.0, -66.0), "usa-west": (31.0, -125.0, 49.0, -102.0),
+    "florida": (24.5, -87.6, 31.0, -80.0), "new-york-area": (39.5, -75.5, 42.0, -71.5),
+    "caribbean": (10.0, -90.0, 27.0, -59.0), "uk-ireland": (49.5, -11.0, 59.0, 2.0),
+    "europe": (35.0, -10.0, 60.0, 30.0), "japan": (30.0, 129.0, 46.0, 146.0),
+}
+GODSEYE_TTL = 300
+MAX_POINTS = 400
+
+
+def godseye_query(asst: Any, layer: str, purpose: str, window: str = "all_day",
+                  region: str = "", group: str = "stations") -> dict[str, Any]:
+    """One public layer, ready to plot. Raises ValueError / SpatialRefused on a bad ask."""
+    from ..spatial import GodsEye
+    if layer not in ("earthquakes", "aircraft", "satellites"):
+        raise ValueError("layer must be earthquakes, aircraft or satellites")
+    if layer == "aircraft" and region not in GODSEYE_REGIONS:
+        raise ValueError(f"choose a region: {', '.join(GODSEYE_REGIONS)}")
+    key = (layer, window if layer == "earthquakes" else region if layer == "aircraft"
+           else group)
+    waits = asst.__dict__.setdefault("_godseye_wait", {})
+    if waits.get(layer, 0) > time.time():
+        until = dt.datetime.fromtimestamp(waits[layer], dt.UTC).strftime("%H:%M UTC")
+        raise ValueError(f"the {layer} source asked BAU to wait until {until}; "
+                         "nothing was sent")
+    cache = asst.__dict__.setdefault("_godseye", {})
+    hit = cache.get(key)
+    if hit and time.monotonic() - hit[0] < GODSEYE_TTL:
+        return {**hit[1], "cached": True}
+    ge = GodsEye(opener=asst.clients.get("spatial_opener"))
+    asst.activity.emit("godseye", "start", f"Reading public {layer} data")
+    if layer == "earthquakes":
+        raw = ge.earthquakes(purpose, window)
+        pts = [{"lon": f["geometry"]["coordinates"][0], "lat": f["geometry"]["coordinates"][1],
+                "mag": f["properties"]["mag"], "label": str(f["properties"].get("place", ""))}
+               for f in raw["features"] if f["properties"].get("mag") is not None]
+        pts.sort(key=lambda p: -p["mag"])
+        out = {"points": pts[:MAX_POINTS], "list": [], "total": len(pts)}
+    elif layer == "aircraft":
+        raw = ge.aircraft(purpose, GODSEYE_REGIONS[region])
+        pts = [{"lon": f["geometry"]["coordinates"][0], "lat": f["geometry"]["coordinates"][1],
+                "label": f"{_flight(f['properties']['callsign'])} · "
+                         f"{f['properties']['origin_country']}",
+                "alt": f["properties"]["altitude_m"]} for f in raw["features"]]
+        out = {"points": pts[:MAX_POINTS], "list": [], "region": region, "total": len(pts)}
+    else:
+        raw = ge.satellites(purpose, group)
+        out = {"points": [], "note": "orbital elements only: positions are not computed",
+               "list": [{"name": f["properties"]["OBJECT_NAME"],
+                         "norad": f["properties"]["NORAD_CAT_ID"],
+                         "inclination": f["properties"]["INCLINATION"],
+                         "orbits_per_day": f["properties"]["MEAN_MOTION"]}
+                        for f in raw["features"]][:MAX_POINTS], "total": len(raw["features"])}
+    meta = raw["bau"]
+    result = {"layer": layer, "count": out.pop("total"), "licence": meta["licence"],
+              "retrieved_at": meta["retrieved_at"], **out}
+    asst.audit.append("godseye.query", asst.owner, {"layer": layer, "option": key[1],
+                                                    "purpose": purpose[:200],
+                                                    "count": result["count"]})
+    asst.activity.emit("godseye", "done", f"{result['count']} {layer}")
+    cache[key] = (time.monotonic(), result)
+    return result
+
+
+def _flight(callsign: str) -> str:
+    """Airline flights keep their flight number (ICAO airline code + digits); anything else
+    - a private registration such as N4791E - can point to one person and is not named."""
+    import re
+    cs = (callsign or "").strip().upper()
+    return cs if re.fullmatch(r"[A-Z]{3}\d{1,4}[A-Z]{0,2}", cs) else "private aircraft"
+
+
+def godseye_layer(asst: Any, data: dict[str, Any]) -> dict[str, Any]:
+    layer = str(data.get("layer", ""))
+    if "bbox" in data:
+        raise ValueError("aircraft are shown by named region only, never a box you draw")
+    return godseye_query(asst, layer, f"Owner viewing public {layer} data on the Jarvis "
+                         "screen", str(data.get("window", "all_day")),
+                         str(data.get("region", "")), str(data.get("group", "stations")))
+
+
+def godseye_screen(asst: Any, data: dict[str, Any]) -> dict[str, Any]:
+    from ..spatial import SpatialRefused
+    try:
+        return godseye_layer(asst, data)
+    except (ValueError, SpatialRefused) as e:
+        return {"error": str(e)}
+    except urllib.error.HTTPError as e:
+        if e.code == 429:                      # "slow down": honour it, like Repo Scout
+            try:
+                wait = max(60, min(3600, int(e.headers.get("Retry-After", 600))))
+            except (TypeError, ValueError, AttributeError):
+                wait = 600
+            layer = str(data.get("layer", ""))
+            asst.__dict__.setdefault("_godseye_wait", {})[layer] = time.time() + wait
+            until = dt.datetime.fromtimestamp(time.time() + wait, dt.UTC).strftime("%H:%M UTC")
+            asst.activity.emit("godseye", "error", f"{layer} source asked BAU to wait")
+            return {"error": f"the {layer} source asked BAU to wait until {until} "
+                             "(too many requests); BAU sends nothing before then"}
+        return {"error": f"the public source refused (HTTP {e.code})"}
+    except OSError as e:                       # the public source didn't answer
+        asst.activity.emit("godseye", "error", "a public data source didn't answer")
+        return {"error": f"the public source didn't answer: {str(e)[:120]}"}
+
+
+def godseye_world() -> dict[str, Any]:
+    import json
+    from importlib import resources
+    return json.loads((resources.files("bau") / "data" / "world-land.json").read_text())

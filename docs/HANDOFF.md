@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 348 tests pass; 49 regulations / 65 policies validate.
+State: 358 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -51,6 +51,14 @@ The video studio (2026-10-10, the first paid integration, tests written first in
 
 Never called against the real Higgsfield API yet: the owner's first `bau video quote` is the
 first real call.
+
+God's Eye panel (2026-10-10, tests first in `tests/test_godseye_panel.py`): node `godseye`,
+`screen.godseye_query/layer/screen/world`, `/api/godseye` (lane `godseye`) and
+`/api/godseye/world`, Jarvis tool `world_watch`, a map overlay (`#eye`, canvas, radar sweep,
+reduced-motion still) over `data/world-land.json` (Natural Earth 110m land, simplified,
+public domain). Aircraft by wide named region only and private registrations masked;
+5-minute cache; a 429 sets a wait per layer; `godseye.query` audit with purpose. Driven
+against the real USGS, OpenSky (got 429, wait honoured) and CelesTrak feeds.
 
 The repo page, round two (2026-10-10, tests in `tests/test_repo_look.py`): a real Jarvis
 GIF (`assets/jarvis-demo.gif`, recorded with Playwright, 960x540, 76 frames), an animated
