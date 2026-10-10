@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 358 tests pass; 49 regulations / 65 policies validate.
+State: 360 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -51,6 +51,12 @@ The video studio (2026-10-10, the first paid integration, tests written first in
 
 Never called against the real Higgsfield API yet: the owner's first `bau video quote` is the
 first real call.
+
+The repo page, round three (2026-10-10): `hero-*.svg` replaces the banner - a holographic
+globe (Natural Earth land rolling behind a shaded clip circle), golden halo rings, ripples,
+twinkling stars, an animated title gradient and a typing line cycling four phrases; the
+demo GIF now sits right under it (800x450, 48 frames, ~2 MB, starts on the action);
+`divider-*.svg` between sections. `assets/make_art.py` is exempt from E501 (SVG templates).
 
 God's Eye panel (2026-10-10, tests first in `tests/test_godseye_panel.py`): node `godseye`,
 `screen.godseye_query/layer/screen/world`, `/api/godseye` (lane `godseye`) and

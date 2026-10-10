@@ -69,73 +69,6 @@ def _traces(t: dict, w: int, h: int, seed: int) -> str:
     return "\n".join(out)
 
 
-def _orb(t: dict, cx: float, cy: float, r: float) -> str:
-    """A sphere of points (golden-angle spiral) inside a dashed golden halo."""
-    pts = []
-    n = 260
-    for i in range(n):
-        z = 1 - 2 * (i + 0.5) / n
-        rad = math.sqrt(1 - z * z)
-        a = i * math.pi * (3 - math.sqrt(5))
-        x, y = rad * math.cos(a), rad * math.sin(a)
-        if z < -0.15:
-            continue                                     # back half hidden: reads as a ball
-        size = 0.7 + 1.3 * (z + 0.15)
-        pts.append(f'<circle cx="{cx + x * r:.1f}" cy="{cy + y * r:.1f}" '
-                   f'r="{size:.2f}" opacity="{0.35 + 0.6 * (z + 0.15):.2f}"/>')
-    return f"""<circle cx="{cx}" cy="{cy}" r="{r * 2.1:.0f}" fill="url(#glow)" class="breathe"/>
-<g class="spin" style="transform-origin:{cx}px {cy}px">
-  <circle cx="{cx}" cy="{cy}" r="{r * 1.32:.0f}" fill="none" stroke="{t['gold']}"
-          stroke-width="2.5" stroke-dasharray="3 9" opacity=".9"/></g>
-<g class="spin rev" style="transform-origin:{cx}px {cy}px">
-  <circle cx="{cx}" cy="{cy}" r="{r * 1.5:.0f}" fill="none" stroke="{t['cyan']}"
-          stroke-width="1" stroke-dasharray="60 14 6 14" opacity=".55"/></g>
-<circle cx="{cx}" cy="{cy}" r="{r * 1.18:.0f}" fill="none" stroke="{t['gold']}"
-        stroke-width="1.2" opacity=".55"/>
-<g fill="{t['orb']}" class="breathe">{''.join(pts)}</g>"""
-
-
-def banner(theme: str) -> str:
-    t = THEMES[theme]
-    w, h = 1280, 400
-    return f"""<svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-labelledby="t d">
-<title id="t">BAU · Jarvis</title>
-<desc id="d">Compliance-first AI business computer: Jarvis's orb in a golden halo.</desc>
-<style>
-.tr {{ fill: none; stroke: {t['line']}; stroke-width: 1.2; opacity: .28; }}
-.pad {{ fill: {t['cyan']}; opacity: .6; }}
-.pulse {{ fill: none; stroke: {t['cyan']}; stroke-width: 2.4; stroke-linecap: round;
-         stroke-dasharray: 24 900; animation: flow linear infinite; }}
-@keyframes flow {{ from {{ stroke-dashoffset: 924; }} to {{ stroke-dashoffset: 0; }} }}
-.spin {{ animation: spin 28s linear infinite; }}
-.rev {{ animation-direction: reverse; animation-duration: 40s; }}
-@keyframes spin {{ to {{ transform: rotate(360deg); }} }}
-.breathe {{ animation: breathe 5s ease-in-out infinite; }}
-@keyframes breathe {{ 50% {{ opacity: .72; }} }}
-.cursor {{ animation: blink 1.1s steps(1) infinite; }}
-@keyframes blink {{ 50% {{ opacity: 0; }} }}
-{CALM}
-</style>
-{_sky(t, w, h)}
-{_traces(t, w, h, 7)}
-{_orb(t, 1080, 200, 84)}
-<g font-family="{FONT}">
-  <text x="72" y="92" font-family="{MONO}" font-size="15" letter-spacing="6"
-        fill="{t['cyan']}">// SYSTEM ONLINE<tspan class="cursor"> _</tspan></text>
-  <text x="68" y="196" font-size="96" font-weight="700" letter-spacing="8"
-        fill="url(#title)">BAU · JARVIS</text>
-  <text x="72" y="244" font-size="27" letter-spacing="3" fill="{t['ink']}">
-    Compliance-first AI business computer</text>
-  <text x="72" y="290" font-family="{MONO}" font-size="15" letter-spacing="1.5"
-        fill="{t['dim']}">{TAGLINE}</text>
-  <rect x="72" y="318" width="210" height="3" rx="1.5" fill="{t['gold']}"/>
-  <rect x="290" y="318" width="60" height="3" rx="1.5" fill="{t['cyan']}"/>
-</g>
-</svg>
-"""
-
-
 CARDS = [
     ("JARVIS", "Voice-first assistant, live HUD.", "He stages actions; you confirm.", "orb"),
     ("COMPLIANCE", "49 regulations, 65 policies.", "PASS, REVIEW or BLOCK + evidence.",
@@ -336,12 +269,168 @@ def terminal(theme: str) -> str:
 """
 
 
+PHRASES = ["compliance checked before every action",
+           "approvals signed by you, never by a model",
+           "your AI team on hardware you own",
+           "every clip priced first, made on your Confirm"]
+
+
+def _land_path(ox: float, oy: float, w: float, h: float) -> str:
+    """The Natural Earth outline, equirectangular, as one SVG path."""
+    import json
+    land = json.loads((HERE.parent / "src" / "bau" / "data" / "world-land.json").read_text())
+    out = []
+    for ring in land["land"]:
+        pts = [(ox + (ring[i] + 180) / 360 * w, oy + (90 - ring[i + 1]) / 180 * h)
+               for i in range(0, len(ring), 2)]
+        out.append("M" + "L".join(f"{x:.1f} {y:.1f}" for x, y in pts) + "Z")
+    return "".join(out)
+
+
+def hero(theme: str) -> str:
+    t = THEMES[theme]
+    w, h = 1280, 560
+    cx, cy, r = 1010, 280, 176
+    mw, mh = 4 * r, 2 * r                       # the map behind the globe: half shows at once
+    rnd = random.Random(11)
+    stars = "".join(
+        f'<circle cx="{rnd.uniform(0, w):.0f}" cy="{rnd.uniform(0, h):.0f}" '
+        f'r="{rnd.uniform(.5, 1.6):.1f}" class="twinkle" style="animation-delay:'
+        f'-{rnd.uniform(0, 6):.1f}s;animation-duration:{rnd.uniform(3, 7):.1f}s"/>'
+        for _ in range(110))
+    land = _land_path(cx - r, cy - r, mw, mh) + _land_path(cx - r + mw, cy - r, mw, mh)
+    lats = "".join(f'<ellipse cx="{cx}" cy="{cy + r * math.sin(math.radians(a)):.1f}" '
+                   f'rx="{r * math.cos(math.radians(a)):.1f}" ry="{r * .09 * math.cos(math.radians(a)):.1f}"/>'
+                   for a in (-60, -30, 0, 30, 60))
+    mers = "".join(f'<ellipse cx="{cx}" cy="{cy}" rx="{r * abs(math.sin(math.radians(a))):.1f}" '
+                   f'ry="{r}"/>' for a in (30, 60, 90))
+    cycle = 16.0
+    keys, phrases = [], []
+    for i, text in enumerate(PHRASES):
+        a = i / len(PHRASES) * 100
+        b = (i + 1) / len(PHRASES) * 100
+        typed = a + 1.8 / cycle * 100 * len(text) / 40
+        keys.append(f"@keyframes p{i} {{ 0%, {a:.2f}% {{ clip-path: inset(0 100% 0 0); opacity: 1; }}"
+                    f" {typed:.2f}%, {b - 1:.2f}% {{ clip-path: inset(0 0 0 0); opacity: 1; }}"
+                    f" {b:.2f}%, 100% {{ clip-path: inset(0 0 0 0); opacity: 0; }} }}")
+        phrases.append(f'<text x="74" y="318" class="phrase p{i}" style="animation-name:p{i}">'
+                       f'<tspan fill="{t["gold"]}">&gt; </tspan>{text}</text>')
+    return f"""<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-labelledby="t d">
+<title id="t">BAU · Jarvis</title>
+<desc id="d">A holographic globe turns inside a golden halo while the title reads BAU Jarvis,
+compliance-first AI business computer, and a typing line cycles what BAU does.</desc>
+<defs>
+  <radialGradient id="sky" cx="72%" cy="45%" r="80%">
+    <stop offset="0" stop-color="{t['bg0']}"/><stop offset=".5" stop-color="{t['bg1']}"/>
+    <stop offset="1" stop-color="{t['bg2']}"/></radialGradient>
+  <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+    <path d="M32 0H0V32" fill="none" stroke="{t['cyan']}" stroke-width="1" opacity="{t['grid_op']}"/></pattern>
+  <radialGradient id="aura" cx="50%" cy="50%" r="50%">
+    <stop offset=".55" stop-color="{t['cyan']}" stop-opacity=".35"/>
+    <stop offset="1" stop-color="{t['cyan']}" stop-opacity="0"/></radialGradient>
+  <radialGradient id="shade" cx="38%" cy="34%" r="70%">
+    <stop offset="0" stop-color="#ffffff" stop-opacity=".16"/>
+    <stop offset=".55" stop-color="{t['bg2']}" stop-opacity="0"/>
+    <stop offset="1" stop-color="{t['bg2']}" stop-opacity=".85"/></radialGradient>
+  <radialGradient id="sea" cx="50%" cy="50%" r="50%">
+    <stop offset="0" stop-color="{t['cyan']}" stop-opacity=".22"/>
+    <stop offset="1" stop-color="{t['cyan']}" stop-opacity=".06"/></radialGradient>
+  <clipPath id="ball"><circle cx="{cx}" cy="{cy}" r="{r}"/></clipPath>
+  <linearGradient id="title" x1="0" x2="1" gradientUnits="objectBoundingBox">
+    <stop offset="0" stop-color="{t['ink']}"/><stop offset=".35" stop-color="{t['cyan']}"/>
+    <stop offset=".65" stop-color="{t['gold']}"/><stop offset="1" stop-color="{t['ink']}"/>
+    <animateTransform attributeName="gradientTransform" type="translate" values="-1 0;1 0"
+                      dur="7s" repeatCount="indefinite"/></linearGradient>
+</defs>
+<style>
+.tr {{ fill: none; stroke: {t['line']}; stroke-width: 1.2; opacity: .22; }}
+.pad {{ fill: {t['cyan']}; opacity: .55; }}
+.pulse {{ fill: none; stroke: {t['cyan']}; stroke-width: 2.4; stroke-linecap: round;
+         stroke-dasharray: 24 900; animation: flow linear infinite; }}
+@keyframes flow {{ from {{ stroke-dashoffset: 924; }} to {{ stroke-dashoffset: 0; }} }}
+.twinkle {{ fill: {t['ink']}; animation: twinkle ease-in-out infinite; }}
+@keyframes twinkle {{ 0%, 100% {{ opacity: .15; }} 50% {{ opacity: .9; }} }}
+.spin-globe {{ animation: roll 48s linear infinite; }}
+@keyframes roll {{ from {{ transform: translateX(0); }} to {{ transform: translateX(-{mw}px); }} }}
+.land {{ fill: {t['cyan']}; fill-opacity: .32; stroke: {t['cyan']}; stroke-width: 1.1; stroke-opacity: .9; }}
+.wire ellipse {{ fill: none; stroke: {t['cyan']}; stroke-opacity: .22; }}
+.halo {{ transform-origin: {cx}px {cy}px; animation: spin 26s linear infinite; }}
+.halo.rev {{ animation-direction: reverse; animation-duration: 38s; }}
+@keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+.ripple {{ fill: none; stroke: {t['cyan']}; transform-origin: {cx}px {cy}px;
+          animation: ripple 4.5s ease-out infinite; }}
+@keyframes ripple {{ from {{ transform: scale(1); opacity: .7; }} to {{ transform: scale(1.65); opacity: 0; }} }}
+.phrase {{ font-family: {MONO}; font-size: 22px; fill: {t['ink']}; white-space: pre;
+          opacity: 0; animation-duration: {cycle}s; animation-iteration-count: infinite;
+          animation-timing-function: linear; }}
+{chr(10).join(keys)}
+.cursor {{ animation: blink 1.1s steps(1) infinite; }}
+@keyframes blink {{ 50% {{ opacity: 0; }} }}
+@media (prefers-reduced-motion: reduce) {{ * {{ animation: none !important; }}
+  .phrase {{ opacity: 0; }} .p0 {{ opacity: 1; clip-path: none; }} }}
+</style>
+<rect width="{w}" height="{h}" rx="20" fill="url(#sky)"/>
+<rect width="{w}" height="{h}" rx="20" fill="url(#grid)"/>
+<g>{stars}</g>
+{_traces(t, w, h, 5)}
+<circle cx="{cx}" cy="{cy}" r="{r * 1.75:.0f}" fill="url(#aura)"/>
+<circle cx="{cx}" cy="{cy}" r="{r}" class="ripple" stroke-width="1.5"/>
+<circle cx="{cx}" cy="{cy}" r="{r}" class="ripple" stroke-width="1.5" style="animation-delay:-2.2s"/>
+<circle cx="{cx}" cy="{cy}" r="{r}" fill="{t['bg2']}"/>
+<g clip-path="url(#ball)">
+  <circle cx="{cx}" cy="{cy}" r="{r}" fill="url(#sea)"/>
+  <g class="spin-globe"><path class="land" d="{land}"/></g>
+  <g class="wire">{lats}{mers}</g>
+  <circle cx="{cx}" cy="{cy}" r="{r}" fill="url(#shade)"/>
+</g>
+<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{t['cyan']}" stroke-opacity=".7" stroke-width="1.5"/>
+<g class="halo"><circle cx="{cx}" cy="{cy}" r="{r * 1.16:.0f}" fill="none" stroke="{t['gold']}"
+   stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round"/></g>
+<g class="halo rev"><circle cx="{cx}" cy="{cy}" r="{r * 1.3:.0f}" fill="none" stroke="{t['cyan']}"
+   stroke-width="1.2" stroke-dasharray="80 18 8 18" opacity=".7"/></g>
+<circle cx="{cx}" cy="{cy}" r="{r * 1.08:.0f}" fill="none" stroke="{t['gold']}" stroke-opacity=".6"/>
+<g font-family="{FONT}">
+  <text x="74" y="118" font-family="{MONO}" font-size="16" letter-spacing="6"
+        fill="{t['cyan']}">// SYSTEM ONLINE<tspan class="cursor"> _</tspan></text>
+  <text x="68" y="222" font-size="98" font-weight="700" letter-spacing="8"
+        fill="url(#title)">BAU · JARVIS</text>
+  <text x="74" y="268" font-size="29" letter-spacing="3" fill="{t['ink']}">Compliance-first AI business computer</text>
+  {''.join(phrases)}
+  <rect x="74" y="356" width="230" height="3" rx="1.5" fill="{t['gold']}"/>
+  <rect x="312" y="356" width="70" height="3" rx="1.5" fill="{t['cyan']}"/>
+  <text x="74" y="404" font-family="{MONO}" font-size="15" letter-spacing="3" fill="{t['dim']}">JARVIS · STUDIO · SERIES · SCOUT · TOOLBOX · GOD'S EYE</text>
+</g>
+</svg>
+"""
+
+
+def divider(theme: str) -> str:
+    t = THEMES[theme]
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 24" width="1280" height="24"
+     role="img" aria-labelledby="t">
+<title id="t">section divider</title>
+<defs><linearGradient id="g" x1="0" x2="1">
+  <stop offset="0" stop-color="{t['cyan']}" stop-opacity="0"/>
+  <stop offset=".5" stop-color="{t['gold']}"/>
+  <stop offset="1" stop-color="{t['cyan']}" stop-opacity="0"/>
+  <animateTransform attributeName="gradientTransform" type="translate" values="-1 0;1 0"
+                    dur="5s" repeatCount="indefinite"/></linearGradient></defs>
+<style>{CALM}</style>
+<rect x="0" y="11" width="1280" height="1" fill="{t['cyan']}" opacity=".25"/>
+<rect x="0" y="10" width="1280" height="3" rx="1.5" fill="url(#g)"/>
+<circle cx="640" cy="12" r="4" fill="{t['gold']}"/>
+</svg>
+"""
+
+
 def main() -> None:
     for theme in THEMES:
-        (HERE / f"banner-{theme}.svg").write_text(banner(theme))
         (HERE / f"features-{theme}.svg").write_text(features(theme))
         (HERE / f"stats-{theme}.svg").write_text(stats(theme))
         (HERE / f"terminal-{theme}.svg").write_text(terminal(theme))
+        (HERE / f"hero-{theme}.svg").write_text(hero(theme))
+        (HERE / f"divider-{theme}.svg").write_text(divider(theme))
 
 
 if __name__ == "__main__":

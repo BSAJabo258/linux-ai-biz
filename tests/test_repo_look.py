@@ -20,7 +20,7 @@ def svgs():
 
 def test_banner_and_cards_come_in_dark_and_light():
     names = {p.stem for p in svgs()}
-    for base in ("banner", "features"):
+    for base in ("hero", "features"):
         assert {f"{base}-dark", f"{base}-light"} <= names, base
 
 
@@ -39,7 +39,7 @@ def test_svgs_are_valid_self_contained_and_calm_on_request():
 
 
 def test_readme_shows_the_artwork_with_theme_switching_and_alt_text():
-    for base in ("banner", "features"):
+    for base in ("hero", "features"):
         assert f'srcset="assets/{base}-dark.svg"' in README
         assert f'src="assets/{base}-light.svg"' in README
         assert 'media="(prefers-color-scheme: dark)"' in README
@@ -113,3 +113,24 @@ def test_jarvis_answer_cards_read_like_the_panels():
     for tool in ("usage_today", "toolbox", "plan_episode", "clip_prompt"):
         assert f'c.tool === "{tool}"' in page, tool
     assert "function usageView" in page and "function toolCard" in page
+
+
+# ------------------------------------------------------------------ round three: the hero
+
+def test_hero_is_cinematic_and_still_calm_on_request():
+    for theme in ("dark", "light"):
+        text = (ART / f"hero-{theme}.svg").read_text()
+        assert "spin-globe" in text                  # the continents roll across the globe
+        assert text.count('class="phrase') >= 4      # the typing line cycles what BAU does
+        assert "twinkle" in text and "ripple" in text
+        assert "prefers-reduced-motion" in text
+    readme_top = README[:README.index("## Meet Jarvis")]
+    assert 'srcset="assets/hero-dark.svg"' in readme_top
+
+
+def test_demo_gif_leads_the_page_and_loads_fast():
+    gif = (ART / "jarvis-demo.gif").read_bytes()
+    assert len(gif) < 2_600_000                       # starts quickly, even on a phone
+    first_img = re.findall(r'<img src="([^"]+)"', README)
+    assert "assets/jarvis-demo.gif" in first_img[:3]   # right under the hero
+    assert (ART / "divider-dark.svg").is_file() and "assets/divider-dark.svg" in README
