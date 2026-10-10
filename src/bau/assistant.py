@@ -92,7 +92,7 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "brain_lookup": "memory", "brain_add": "memory", "remember": "memory",
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
-             "video_clips": "studio", "make_video": "studio",
+             "video_clips": "studio", "make_video": "studio", "usage_today": "usage",
              "hold_everything": "watchdog", "release_hold": "watchdog"}
 TOOL_WORDS = {"draft_stage": "Drafting the next step", "find_tools": "Searching GitHub",
               "brain_lookup": "Looking it up in the Second Brain",
@@ -252,6 +252,9 @@ class Assistant:
                           "duration": {"type": "integer"},
                           "aspect_ratio": {"type": "string"}, "sound": {"type": "string"}}),
                  self.t_make_video, kind="confirm", stage=self._video_card),
+            Tool("usage_today", "How much the AI models have been used: tokens and dollars "
+                 "today and this week, for each model, busy replies, the owner's daily limits "
+                 "and any rate-limit warnings (GitHub's too).", _schema(), self.t_usage),
             Tool("video_clips", "Clips the studio has made or is making: checks the ones in "
                  "progress, saves finished ones, and reports this month's video spending.",
                  _schema(), self.t_video_clips, kind="act"),
@@ -432,6 +435,27 @@ class Assistant:
                                 for ep in W.episodes(ws)}
         return out or {"note": "no workspaces yet: bau ws create kids-channel"}
 
+    def t_usage(self) -> dict[str, Any]:
+        from .usage import Usage
+        s = Usage(self.home).summary()
+        return {**s, "by_model": s["by_model"][:8]}
+
+    def _price(self, mid: str) -> dict[str, Any]:
+        """The registry record a model is priced by (the one Jarvis runs, or a backup)."""
+        if not mid or mid == self.model.get("id"):
+            return self.model
+        from .registry import CapabilityRegistry
+        reg = CapabilityRegistry(self.home / "registry" / "capabilities.yaml")
+        return reg.data["model"].get(mid) or {}
+
+    def metered(self, agent: str = "jarvis"):
+        """The model, counted on the usage meter and held to the owner's daily limits."""
+        from .usage import Metered, Usage
+        if self.provider is None:
+            return None
+        return Metered(self.provider, Usage(self.home, self.audit), self._price,
+                       self.model.get("id") or "", agent)
+
     def studio(self):
         from .studio import Studio
         return Studio(self.home, self.audit, self.clients.get("higgsfield"))
@@ -473,7 +497,7 @@ class Assistant:
     def t_find_tools(self, request: str) -> dict[str, Any]:
         from .scout import Scout
         run = Scout(self.home, self.clients.get("github"), self.audit, "jarvis").find(
-            request[:300], max_queries=4, readmes=3, provider=self.provider,
+            request[:300], max_queries=4, readmes=3, provider=self.metered("scout"),
             progress=lambda t: self.activity.emit("scout", "progress", t))
         return {"run": run["id"], "found": run["found"],
                 "failed_searches": run["failed_searches"],
@@ -487,7 +511,7 @@ class Assistant:
             raise W.WorkspaceError("no approved model to draft with")
         ws = W.open_ws(workspace, self.home)
         ep = W.find_episode(ws, episode)
-        c, out = W.draft(ws, ep, self.provider, self.model, self.audit)
+        c, out = W.draft(ws, ep, self.metered("producer"), self.model, self.audit)
         issues = [i["detail"] for i in W.run_checks(ws, ep, c)]
         res = {"stage": c.stage, "draft": out.name, "issues": issues,
                "owner_checks": c.human_check}
@@ -730,9 +754,9 @@ class Assistant:
 
     def _turn(self, user_text: str, max_steps: int = 8) -> Reply:
         from .agents import untrusted
-        from .economics import Ledger
         from .models.providers import ProviderError
-        from .models.router import estimate_usd
+        from .usage import UsageLimit
+        model = self.metered()
         start = len(self.messages)
         self.messages.append({"role": "user", "content": user_text})
         cards: list[dict[str, Any]] = []
@@ -740,8 +764,13 @@ class Assistant:
         final = ""
         for _ in range(max_steps):
             try:
-                resp = self.provider.complete(self.system_prompt(), self.messages,
-                                              self.specs(), max_tokens=2000)
+                resp = model.complete(self.system_prompt(), self.messages,
+                                      self.specs(), max_tokens=2000)
+            except UsageLimit as e:
+                del self.messages[start:]
+                final = str(e)
+                self._log("jarvis", final)
+                return Reply(final, cards)
             except (ProviderError, OSError) as e:
                 # A hosted model that fails mid-turn must not break the page or leave a
                 # half-finished exchange that makes the next question fail too.
@@ -754,11 +783,6 @@ class Assistant:
                 return Reply(final, cards)
             self.last_model = (getattr(self.provider, "answered_by", None)
                                or self.model.get("id") or resp.model)
-            usd = estimate_usd(self.model, resp.tokens_in, resp.tokens_out)
-            if usd:
-                Ledger(self.home).cost("model", usd, agent="jarvis", provider=self.model.get(
-                    "provider", ""), model=resp.model, tokens_in=resp.tokens_in,
-                    tokens_out=resp.tokens_out)
             if resp.refused:
                 self.messages.pop()            # keep history valid for the next turn
                 final = "I can't help with that one."

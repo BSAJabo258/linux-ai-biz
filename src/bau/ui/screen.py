@@ -180,6 +180,12 @@ def mission_control(asst: Any, view: str) -> Any:
     return _api(f"/api/{view}", asst.home)
 
 
+def usage_summary(asst: Any) -> dict[str, Any]:
+    """The usage meter: tokens and dollars per model, limits, warnings (no secrets)."""
+    from ..usage import Usage
+    return Usage(asst.home).summary()
+
+
 def studio_summary(asst: Any, refresh: bool = True) -> dict[str, Any]:
     """Budget, this month's spending and the clips; checks clips in progress once."""
     st = asst.studio()

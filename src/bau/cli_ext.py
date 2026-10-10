@@ -354,6 +354,16 @@ def cmd_scout(a):
 
 # ------------------------------------------------------------------ video studio
 
+def cmd_usage(a):
+    from .usage import Usage
+    u = Usage(audit=AuditLog())
+    if a.usage_cmd == "limits":
+        _out(u.set_limits(a.daily_tokens, a.daily_usd, _human()))
+        return EXIT_OK
+    _out(u.summary())
+    return EXIT_OK
+
+
 def cmd_video(a):
     from .assistant import load_env_file
     from .media.higgsfield import HiggsfieldError
@@ -1226,6 +1236,13 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--wait", type=float, default=0, help="seconds to wait per clip")
     x.add_argument("--top", type=int, default=20)
     s.set_defaults(fn=cmd_video)
+
+    s = sub.add_parser("usage", help="tokens and dollars per model; your daily limits")
+    w = s.add_subparsers(dest="usage_cmd")
+    x = w.add_parser("limits", help="you: set daily limits (leave one out for no limit)")
+    x.add_argument("--daily-tokens", type=int)
+    x.add_argument("--daily-usd", type=float)
+    s.set_defaults(fn=cmd_usage)
 
     s = sub.add_parser("factory", help="business factories")
     fs = s.add_subparsers(dest="fac_cmd", required=True)

@@ -812,6 +812,7 @@ function showDetail(n) {
   else if (n.id === "models" && d) renderModels(p, d);
   else if (n.id === "scout") renderScout(p);
   else if (n.id === "studio") renderStudio(p);
+  else if (n.id === "usage") renderUsage(p);
   else if (d && d.error) p.appendChild(el("div", "issue", d.error));
   else if (Array.isArray(d)) list(p, d.map(i => typeof i === "object" ? (i.title || i.objective || i.detail || Object.values(i).map(fmt).join(" · ")) : i));
   else if (d && typeof d === "object") for (const [k, v] of Object.entries(d)) {
@@ -930,6 +931,32 @@ async function renderStudio(p) {
       card.appendChild(v); p.dataset.keep = "1"; v.play().catch(() => {}); });
     wrap.appendChild(card);
   }
+}
+// The usage meter: tokens and dollars per model today and this week, the owner's daily
+// limits (set only in the terminal), warnings, and GitHub's limits from Repo Scout.
+async function renderUsage(p) {
+  const wrap = el("div"); p.appendChild(wrap);
+  let d; try { d = await settle(await apiJson("/api/usage")); } catch (e) { wrap.appendChild(el("div", "issue", e.message)); return; }
+  const line = t => t.tokens.toLocaleString() + " tokens · " + t.calls + " call(s) · $" + t.usd.toFixed(2) + (t.errors ? " · " + t.errors + " failed" : "");
+  kv(wrap, "Today", line(d.today)); kv(wrap, "Last 7 days", line(d.week));
+  const lim = d.limits || {};
+  if (lim.daily_tokens == null && lim.daily_usd == null) { wrap.appendChild(el("div", null, "No daily limits yet. You can set them in the terminal:"));
+    cmd(wrap, "bau usage limits --daily-tokens 2000000 --daily-usd 5"); }
+  else kv(wrap, "Your daily limits", [lim.daily_tokens != null ? lim.daily_tokens.toLocaleString() + " tokens" : null,
+    lim.daily_usd != null ? "$" + Number(lim.daily_usd).toFixed(2) : null].filter(Boolean).join(" · "));
+  for (const w of d.warnings) wrap.appendChild(el("div", "issue", w));
+  if (d.by_model.length) {
+    const t = el("table", "mc"), head = el("tr");
+    for (const h of ["Model", "Today", "Week", "Cost", "Failed"]) head.appendChild(el("th", null, h));
+    t.appendChild(head);
+    for (const m of d.by_model) { const r = el("tr");
+      for (const v of [m.model, m.today_tokens.toLocaleString(), m.tokens.toLocaleString(), "$" + m.usd.toFixed(2), m.errors + (m.busy ? " (" + m.busy + " busy)" : "")]) r.appendChild(el("td", null, String(v)));
+      if (m.last_error) r.title = m.last_error;
+      t.appendChild(r); }
+    const sc = el("div"); sc.style.overflowX = "auto"; sc.appendChild(t); wrap.appendChild(sc);
+  } else wrap.appendChild(el("div", null, "No model calls recorded yet."));
+  for (const [b, g] of Object.entries(d.github || {}))
+    kv(wrap, "GitHub " + b, (g.remaining != null ? g.remaining + " left" : "no reading yet") + (g.waiting_until ? " · waiting until " + g.waiting_until : ""));
 }
 // Repo Scout: search, the ranked candidates as cards, the report, a safe inspection.
 async function renderScout(p) {
