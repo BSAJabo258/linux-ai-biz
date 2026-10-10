@@ -178,3 +178,44 @@ def mission_control(asst: Any, view: str) -> Any:
     if view not in MC_VIEWS:
         raise KeyError(view)
     return _api(f"/api/{view}", asst.home)
+
+
+def studio_summary(asst: Any, refresh: bool = True) -> dict[str, Any]:
+    """Budget, this month's spending and the clips; checks clips in progress once."""
+    st = asst.studio()
+    before = {j["id"]: j["status"] for j in st.jobs()}
+    jobs = st.refresh() if refresh else st.jobs()
+    for j in jobs:                          # say so once, when a clip changes state
+        if before.get(j["id"]) == "submitted" and j["status"] != "submitted":
+            asst.activity.emit("studio", "done" if j["status"] == "completed" else "error",
+                               f"Clip {j['id']}: " + ("ready" if j["status"] == "completed"
+                                                      else j.get("note") or j["status"]))
+    return {"budget": st.budget(), "spent_this_month": st.spent_this_month(),
+            "clips": [{k: j.get(k) for k in ("id", "at", "status", "model", "duration",
+                                              "aspect_ratio", "usd", "prompt", "note")}
+                      for j in jobs[:20]]}
+
+
+def studio_stage(asst: Any, data: dict[str, Any]) -> dict[str, Any]:
+    """Put one priced clip on the owner's screen (the same card Jarvis would stage)."""
+    try:
+        duration = int(data.get("duration", 5))
+    except (TypeError, ValueError):
+        return {"error": "duration must be a whole number of seconds"}
+    out, err = asst._run_tool("make_video", {
+        "prompt": str(data.get("prompt", "")), "model": str(data.get("model", "")),
+        "duration": duration, "aspect_ratio": str(data.get("aspect_ratio", "")),
+        "sound": str(data.get("sound", ""))})
+    if err:
+        return {"error": out.get("error", "could not price that clip")}
+    p = asst.pending.get(out["pending_id"])
+    return {"pending": [p.public()] if p else []}
+
+
+def studio_clip(asst: Any, clip_id: str) -> Any:
+    """The saved file of one finished clip - only from the studio's own folder."""
+    import re
+    if not re.fullmatch(r"clip_[0-9a-f]{10}", clip_id):
+        return None
+    f = asst.home / "studio" / "clips" / f"{clip_id}.mp4"
+    return f if f.is_file() else None

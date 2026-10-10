@@ -352,6 +352,42 @@ def cmd_scout(a):
     return EXIT_OK
 
 
+# ------------------------------------------------------------------ video studio
+
+def cmd_video(a):
+    from .assistant import load_env_file
+    from .media.higgsfield import HiggsfieldError
+    from .studio import Studio
+    load_env_file()                           # HIGGSFIELD_API_KEY_ID / _SECRET
+    st = Studio(audit=AuditLog())
+    if a.video_cmd == "budget":
+        _out(st.set_budget(a.monthly, a.per_clip, _human(), a.max_running))
+        return EXIT_OK
+    if a.video_cmd == "clips":
+        jobs = st.refresh(max_wait=a.wait)
+        _out({"spent_this_month": st.spent_this_month(), "budget": st.budget(),
+              "clips": jobs[:a.top]})
+        return EXIT_OK
+    q = st.quote(a.prompt, a.model, a.duration, a.aspect, a.sound)
+    shown = {k: v for k, v in q.items() if k != "body"}
+    if a.video_cmd == "quote" or not q["allowed"]:
+        _out(shown)
+        return EXIT_OK if q["allowed"] else EXIT_BLOCKED
+    who = _human()                            # a paid clip: a person at the terminal
+    print(f"{a.duration} s {a.model} clip, estimated ${q['usd']:.2f}; "
+          f"${q['left_this_month'] - q['usd']:.2f} left this month after it.", file=sys.stderr)
+    if input("Make it? [y/N] ").strip().lower() != "y":
+        _out({"made": False})
+        return EXIT_OK
+    try:
+        job = st.make(a.prompt, a.model, a.duration, a.aspect, a.sound, who)
+    except HiggsfieldError as e:
+        print(str(e), file=sys.stderr)
+        return EXIT_BLOCKED
+    _out({**job, "next": "bau video clips --wait 600   (or watch the Studio dot in Jarvis)"})
+    return EXIT_OK
+
+
 # ------------------------------------------------------------------ business
 
 def cmd_ws(a):
@@ -1170,6 +1206,26 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--top", type=int, default=10)
     x.add_argument("--out", help="write the Markdown to this file")
     s.set_defaults(fn=cmd_scout)
+
+    s = sub.add_parser("video", help="paid AI video clips (Higgsfield) under your budget")
+    w = s.add_subparsers(dest="video_cmd", required=True)
+    x = w.add_parser("budget", help="you: set the monthly and per-clip video budget")
+    x.add_argument("--monthly", type=float, required=True)
+    x.add_argument("--per-clip", type=float, required=True)
+    x.add_argument("--max-running", type=int, default=2)
+    for name, text in (("quote", "price a clip (nothing is made)"),
+                       ("make", "make a clip after showing its price (asks y/N)")):
+        x = w.add_parser(name, help=text)
+        x.add_argument("prompt")
+        x.add_argument("--model", default="kling-3-std",
+                       choices=["kling-3-turbo", "kling-3-std", "kling-3-pro"])
+        x.add_argument("--duration", type=int, default=5)
+        x.add_argument("--aspect", default="16:9", choices=["16:9", "9:16", "1:1"])
+        x.add_argument("--sound", default="off", choices=["on", "off"])
+    x = w.add_parser("clips", help="check clips in progress, save finished ones")
+    x.add_argument("--wait", type=float, default=0, help="seconds to wait per clip")
+    x.add_argument("--top", type=int, default=20)
+    s.set_defaults(fn=cmd_video)
 
     s = sub.add_parser("factory", help="business factories")
     fs = s.add_subparsers(dest="fac_cmd", required=True)

@@ -122,7 +122,8 @@ aside.r{display:none}body.showlog aside.r{display:block}
 .node.idle .dot{border-color:var(--cyan);opacity:.75}
 .node.off{color:var(--off)}.node.off .dot{border:1px dashed var(--off);box-shadow:none;width:12px;height:12px}
 .node.connector{font-size:12px}
-.node:hover .dot,.node.sel .dot{transform:scale(1.25)}.node.sel{color:#fff}
+.node:hover .dot,.node.sel .dot{transform:scale(1.25)}.node.sel{color:var(--glow)}
+.ep label{display:block;font-size:12px;color:var(--dim);margin:8px 0 2px}.ep select.q{width:100%}
 @keyframes pulse{50%{box-shadow:0 0 2px rgba(255,179,64,.2)}}
 .node.busy .dot{border-color:var(--violet);border-top-color:transparent;animation:spin .9s linear infinite;
   box-shadow:0 0 16px rgba(169,139,255,.8)}
@@ -810,6 +811,7 @@ function showDetail(n) {
   if (n.id === "producer" && d) renderEpisodes(p, d.episodes);
   else if (n.id === "models" && d) renderModels(p, d);
   else if (n.id === "scout") renderScout(p);
+  else if (n.id === "studio") renderStudio(p);
   else if (d && d.error) p.appendChild(el("div", "issue", d.error));
   else if (Array.isArray(d)) list(p, d.map(i => typeof i === "object" ? (i.title || i.objective || i.detail || Object.values(i).map(fmt).join(" · ")) : i));
   else if (d && typeof d === "object") for (const [k, v] of Object.entries(d)) {
@@ -891,6 +893,43 @@ async function openEditor(p, e, stage, fresh) {
     delete p.dataset.keep; loadNodes(); }, true);
   button(box, "Close", () => { box.remove(); delete p.dataset.keep; });
   p.insertBefore(box, $("live")); ta.focus();
+}
+// The studio: paid AI clips under the owner's budget. "Price it" asks Higgsfield for the
+// price and puts the clip on screen; nothing is spent until the owner presses Confirm.
+function field(wrap, label, node) { const id = "st-" + label.toLowerCase().replace(/\W+/g, "-");
+  const l = el("label", null, label); l.htmlFor = id; node.id = id; wrap.appendChild(l); wrap.appendChild(node); return node; }
+function choice(opts, val) { const sel = el("select", "q"); for (const o of opts) { const op = el("option", null, o); op.value = o; sel.appendChild(op); } sel.value = val; return sel; }
+async function renderStudio(p) {
+  const wrap = el("div"); p.appendChild(wrap);
+  let d; try { d = await settle(await apiJson("/api/studio")); } catch (e) { wrap.appendChild(el("div", "issue", e.message)); return; }
+  const b = d.budget || {};
+  if (b.monthly_usd == null) { wrap.appendChild(el("div", null, "Set your video budget in the terminal first (you decide the amounts):"));
+    cmd(wrap, "bau video budget --monthly 40 --per-clip 3"); cmd(wrap, "bau set-status provider higgsfield APPROVED"); }
+  else kv(wrap, "This month", "$" + d.spent_this_month.toFixed(2) + " of $" + b.monthly_usd.toFixed(2) + " (max $" + b.per_clip_usd.toFixed(2) + " a clip)");
+  const form = el("div", "ep"); wrap.appendChild(form);
+  const prompt = field(form, "What should the clip show?", el("textarea", "edit")); prompt.style.minHeight = "90px";
+  prompt.addEventListener("focus", () => { p.dataset.keep = "1"; });
+  const model = field(form, "Model", choice(["kling-3-turbo", "kling-3-std", "kling-3-pro"], "kling-3-std"));
+  const dur = field(form, "Seconds (3-15)", el("input", "q")); dur.type = "number"; dur.min = 3; dur.max = 15; dur.value = 5;
+  const asp = field(form, "Shape", choice(["16:9", "9:16", "1:1"], "16:9"));
+  const snd = field(form, "Sound", choice(["off", "on"], "off"));
+  button(form, "Price it", async () => {
+    const r = await settle(await apiJson("/api/studio/stage", { prompt: prompt.value, model: model.value,
+      duration: parseInt(dur.value, 10), aspect_ratio: asp.value, sound: snd.value }));
+    if (r.error) { caption(r.error); return; }
+    delete p.dataset.keep; queueConfirms(r.pending); }, true);
+  button(wrap, "Check clips", async () => { delete p.dataset.keep; SEL && showDetail(SEL); });
+  for (const c of d.clips) {
+    const card = el("div", "card");
+    card.appendChild(el("span", "badge " + (c.status === "completed" ? "eligible" : c.status === "submitted" ? "needs" : "rejected"), c.status));
+    card.appendChild(el("b", null, c.id)); card.appendChild(el("div", null, "“" + (c.prompt || "") + "”"));
+    card.appendChild(el("div", null, c.model + " · " + c.duration + " s · " + c.aspect_ratio + " · $" + Number(c.usd).toFixed(2) + (c.note ? " · " + c.note : "")));
+    if (c.status === "completed") button(card, "Play", async () => {
+      const r = await api("/api/studio/clip/" + encodeURIComponent(c.id)); if (!r.ok) { caption("That clip file is missing."); return; }
+      const v = el("video"); v.controls = true; v.playsInline = true; v.style.width = "100%"; v.src = URL.createObjectURL(await r.blob());
+      card.appendChild(v); p.dataset.keep = "1"; v.play().catch(() => {}); });
+    wrap.appendChild(card);
+  }
 }
 // Repo Scout: search, the ranked candidates as cards, the report, a safe inspection.
 async function renderScout(p) {

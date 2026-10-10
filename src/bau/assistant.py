@@ -92,6 +92,7 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "brain_lookup": "memory", "brain_add": "memory", "remember": "memory",
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
+             "video_clips": "studio", "make_video": "studio",
              "hold_everything": "watchdog", "release_hold": "watchdog"}
 TOOL_WORDS = {"draft_stage": "Drafting the next step", "find_tools": "Searching GitHub",
               "brain_lookup": "Looking it up in the Second Brain",
@@ -243,6 +244,17 @@ class Assistant:
                  "capability (several phrasings), record them and rank them on evidence. "
                  "Nothing is installed or run; takes about half a minute.",
                  _schema({"request": {"type": "string"}}), self.t_find_tools, kind="act"),
+            Tool("make_video", "Put one paid AI video clip (Higgsfield, Kling 3.0) on the "
+                 "owner's screen with its price; it starts only when they confirm. Models: "
+                 "kling-3-turbo, kling-3-std, kling-3-pro. Duration 3-15 s; aspect_ratio "
+                 "16:9, 9:16 or 1:1; sound on or off.",
+                 _schema({"prompt": {"type": "string"}, "model": {"type": "string"},
+                          "duration": {"type": "integer"},
+                          "aspect_ratio": {"type": "string"}, "sound": {"type": "string"}}),
+                 self.t_make_video, kind="confirm", stage=self._video_card),
+            Tool("video_clips", "Clips the studio has made or is making: checks the ones in "
+                 "progress, saves finished ones, and reports this month's video spending.",
+                 _schema(), self.t_video_clips, kind="act"),
             Tool("workspaces", "Production workspaces (e.g. the kids channel): every "
                  "episode and where each stage stands - checked, drafted and waiting for the "
                  "owner's check, ready to draft, or the owner's own step.", _schema(),
@@ -419,6 +431,35 @@ class Assistant:
                                           for r in W.status(ws, ep)]
                                 for ep in W.episodes(ws)}
         return out or {"note": "no workspaces yet: bau ws create kids-channel"}
+
+    def studio(self):
+        from .studio import Studio
+        return Studio(self.home, self.audit, self.clients.get("higgsfield"))
+
+    def _video_card(self, prompt: str, model: str, duration: int, aspect_ratio: str,
+                    sound: str) -> dict[str, Any]:
+        q = self.studio().quote(prompt, model, int(duration), aspect_ratio, sound)
+        if not q["allowed"]:
+            raise ValueError(q["why"])
+        return {"summary": (f"Make a {duration} s {model} clip ({aspect_ratio}, sound "
+                            f"{sound}):\n\u201c{q['body']['prompt']}\u201d\n\n"
+                            f"Estimated cost ${q['usd']:.2f} ({q['credits']} credits). "
+                            f"${q['left_this_month'] - q['usd']:.2f} left this month "
+                            "after it.")}
+
+    def t_make_video(self, prompt: str, model: str, duration: int, aspect_ratio: str,
+                     sound: str) -> dict[str, Any]:
+        # Runs only from confirm(): the owner pressed Confirm on the priced card.
+        return self.studio().make(prompt, model, int(duration), aspect_ratio, sound,
+                                  self.owner)
+
+    def t_video_clips(self) -> dict[str, Any]:
+        st = self.studio()
+        jobs = st.refresh()
+        return {"spent_this_month": st.spent_this_month(),
+                "budget": {k: v for k, v in st.budget().items() if k.endswith("_usd")},
+                "clips": [{k: j.get(k) for k in ("id", "status", "model", "usd", "prompt",
+                                                  "file", "note")} for j in jobs[:10]]}
 
     def t_scout_results(self) -> list[dict[str, Any]]:
         from .scout import Scout, rank

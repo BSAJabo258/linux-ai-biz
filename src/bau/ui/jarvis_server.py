@@ -45,7 +45,8 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
     lock = threading.Lock()               # one conversation, one turn at a time
     # GitHub wants requests one at a time, so one search or inspection at a time; testing
     # a model has its own lane. Neither holds up the conversation.
-    lanes = {"scout": threading.Lock(), "models": threading.Lock()}
+    lanes = {"scout": threading.Lock(), "models": threading.Lock(),
+             "studio": threading.Lock()}
     jobs: dict[str, dict[str, Any]] = {}  # slow answers the page is checking back on
 
     def state() -> dict[str, Any]:
@@ -200,6 +201,22 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 except ValueError:
                     since = 0
                 self._json(200, assistant.activity.since(since))
+            elif path == "/api/studio":
+                self._json(*answer(lambda: screen.studio_summary(assistant), lanes["studio"]))
+            elif path.startswith("/api/studio/clip/"):
+                f = screen.studio_clip(assistant, path.rsplit("/", 1)[-1])
+                if f is None:
+                    self._send(404, b"not found", "text/plain")
+                    return
+                with f.open("rb") as fh:
+                    size = os.fstat(fh.fileno()).st_size
+                    self.send_response(200)
+                    self.send_header("Content-Type", "video/mp4")
+                    self.send_header("Content-Length", str(size))
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.end_headers()
+                    shutil.copyfileobj(fh, self.wfile, 1024 * 1024)
             elif path == "/api/scout":
                 self._json(200, screen.scout_summary(assistant))
             elif path == "/api/scout/report":
@@ -295,6 +312,10 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     self._json(200, {"pending": [p]})
                 except WorkspaceError as e:
                     self._json(200, {"error": str(e)[:400]})
+            elif self.path == "/api/studio/stage":
+                # Prices the clip and puts it on screen; only the owner's Confirm starts it.
+                self._json(*answer(lambda: screen.studio_stage(assistant, data),
+                                   lanes["studio"]))
             elif self.path == "/api/scout/find":
                 req = str(data.get("request", ""))
                 self._json(*answer(lambda: screen.scout_find(assistant, req), lanes["scout"]))
