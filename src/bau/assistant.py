@@ -96,6 +96,7 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "brain_lookup": "memory", "brain_add": "memory", "remember": "memory",
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
+             "clip_prompt": "producer", "plan_episode": "producer",
              "toolbox": "scout", "video_clips": "studio", "make_video": "studio",
              "usage_today": "usage",
              "hold_everything": "watchdog", "release_hold": "watchdog"}
@@ -272,6 +273,19 @@ class Assistant:
                  "episode and where each stage stands - checked, drafted and waiting for the "
                  "owner's check, ready to draft, or the owner's own step.", _schema(),
                  self.t_workspaces),
+            Tool("clip_prompt", "A video prompt for one scene of a kids series, with each "
+                 "character described exactly as their sheet says and the channel's style, so "
+                 "they look the same in every clip. Give the scene and the character ids.",
+                 _schema({"workspace": {"type": "string"}, "scene": {"type": "string"},
+                          "cast": {"type": "array", "items": {"type": "string"}}}),
+                 self.t_clip_prompt),
+            Tool("plan_episode", "Plan an episode's clips from a story format (e.g. "
+                 "problem-song-solution, count-along, question-reveal, call-and-response): "
+                 "clip-sized scenes with prompts, plus warnings if the channel is starting to "
+                 "repeat itself. Writes series-plan.md in the episode; makes no clip.",
+                 _schema({"workspace": {"type": "string"}, "episode": {"type": "string"},
+                          "format": {"type": "string"}, "seconds": {"type": "integer"}},
+                         ["workspace", "episode", "format"]), self.t_plan_episode, kind="act"),
             Tool("draft_stage", "Draft the next stage of one episode (only the files that "
                  "stage lists are read; only its output folder is written). The owner reads "
                  "and checks it afterwards.",
@@ -522,6 +536,20 @@ class Assistant:
                 "github_asked_to_wait_until": run["rate_limited_until"],
                 "top": run["ranked"][:5],
                 "report": "bau scout report"}
+
+    def t_clip_prompt(self, workspace: str, scene: str, cast: list[str]) -> dict[str, Any]:
+        from . import workspace as W
+        from .series import Series
+        text = Series(W.open_ws(workspace, self.home)).prompt(scene[:600], list(cast))
+        return {"prompt": text, "characters": len(text),
+                "next": "make_video with this prompt puts a priced clip on the owner's screen"}
+
+    def t_plan_episode(self, workspace: str, episode: str, format: str,
+                       seconds: int = 60) -> dict[str, Any]:
+        from . import workspace as W
+        from .series import Series
+        ws = W.open_ws(workspace, self.home)
+        return Series(ws).plan(W.find_episode(ws, episode), format, int(seconds))
 
     def t_draft_stage(self, workspace: str, episode: str) -> dict[str, Any]:
         from . import workspace as W

@@ -1,0 +1,35 @@
+# Story shapes for short children's episodes (bau series formats). Each beat gets a share
+# of the episode's length; long beats are split into clip-sized scenes (3-15 s). These are
+# common storytelling structures, not promises about views: check your own channel's
+# analytics and vary them - a channel that repeats one template looks mass-produced.
+# {lead}, {friend} and {idea} are filled in from the episode.
+problem-song-solution:
+  about: a small problem, a try that doesn't work, help from a friend, a happy fix, a short song
+  beats:
+    - {name: hook, share: 0.08, goal: "{lead} notices a small problem. Episode story: {idea}."}
+    - {name: try, share: 0.22, goal: "{lead} tries to fix it alone, and it doesn't quite work."}
+    - {name: help, share: 0.30, goal: "{friend} comes to help {lead}, and they learn something together."}
+    - {name: fix, share: 0.20, goal: "{lead} and {friend} fix the problem and smile."}
+    - {name: song, share: 0.20, goal: "{lead} and {friend} sing a short, gentle song about what they learned."}
+count-along:
+  about: counting things one by one with pauses for the child to count too
+  beats:
+    - {name: hook, share: 0.10, goal: "{lead} finds something to count. Episode story: {idea}."}
+    - {name: count, share: 0.60, goal: "{lead} counts slowly, one at a time, pausing so the viewer can count too."}
+    - {name: celebrate, share: 0.15, goal: "{lead} celebrates the total with a happy little dance."}
+    - {name: goodbye, share: 0.15, goal: "{lead} waves goodbye and says their catchphrase."}
+question-reveal:
+  about: a question, guesses, clues, the answer, a quick recap
+  beats:
+    - {name: question, share: 0.10, goal: "{lead} asks a big question. Episode story: {idea}."}
+    - {name: guesses, share: 0.30, goal: "{lead} and {friend} make funny, gentle guesses."}
+    - {name: clues, share: 0.25, goal: "{lead} and {friend} find clues, one by one."}
+    - {name: reveal, share: 0.20, goal: "The answer appears and {lead} is delighted."}
+    - {name: recap, share: 0.15, goal: "{lead} says what they learned today."}
+call-and-response:
+  about: the character says a line, pauses, and invites the child to say it back
+  beats:
+    - {name: hook, share: 0.10, goal: "{lead} invites the viewer to play along. Episode story: {idea}."}
+    - {name: call, share: 0.60, goal: "{lead} says a short line, pauses, and smiles so the viewer can say it back."}
+    - {name: recap, share: 0.15, goal: "{lead} and {friend} say all the lines together."}
+    - {name: goodbye, share: 0.15, goal: "{lead} waves goodbye and says their catchphrase."}

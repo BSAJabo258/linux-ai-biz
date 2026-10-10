@@ -1,0 +1,20 @@
+# One file per character. Fill in every {{...}} once; Jarvis and the clip prompts then
+# describe this character the same way, word for word, in every scene of every episode.
+# Copy this file (e.g. friend.yaml) for each other main character.
+id: "{{short id, lowercase, e.g. pip}}"
+role: main                  # main for the star of the show, friend for everyone else
+name: "{{name, e.g. Pip}}"
+kind: "{{what they are, e.g. a small round hedgehog}}"
+look:                       # at least three things a viewer would recognise them by
+  - "{{body shape and size, e.g. soft round body, knee-high to a child}}"
+  - "{{colours, e.g. warm brown spines and a cream face}}"
+  - "{{one distinctive feature, e.g. big dark eyes with a white sparkle}}"
+outfit: "{{what they always wear or carry, e.g. a yellow knitted scarf}}"
+colors: ["{{every colour named above, e.g. brown}}", "{{cream}}", "{{yellow}}"]
+personality: "{{e.g. curious, a little shy, kind}}"
+voice:                      # used when narration is made; one voice per character, always
+  tts: "{{e.g. kokoro}}"
+  voice: "{{voice name, e.g. af_bella}}"
+  pace: "{{slow, medium or quick}}"
+catchphrase: "{{e.g. Let's find out!}}"
+never: ["{{things this character is never shown doing or looking like, e.g. angry}}"]

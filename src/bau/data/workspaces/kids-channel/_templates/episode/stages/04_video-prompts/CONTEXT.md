@@ -10,7 +10,8 @@ One job: write a video-generator prompt for every scene.
 ## Process
 1. One prompt per scene, numbered like the storyboard.
 2. Describe every character exactly as the bible does, every time, so they look the same
-   in every clip.
+   in every clip: start from `bau series prompt` (or the episode's `series-plan.md`), which
+   puts each character's sheet in word for word. Keep those sentences unchanged.
 3. Gentle colours, soft light, slow camera moves. Nothing frightening.
 
 ## Outputs
@@ -18,6 +19,7 @@ One job: write a video-generator prompt for every scene.
 
 ## Checks
 - kids_text
+- series_lock
 
 ## Human check
 Do the characters look the same in every prompt? Is anything another company's character?
