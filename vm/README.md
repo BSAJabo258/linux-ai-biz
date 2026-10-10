@@ -1,5 +1,8 @@
 # Rehearse the laptop install in a virtual machine
 
+For the full readiness gates, image build commands, Claude setup, and acceptance checklist,
+see [docs/VM-USB-PLAN.md](../docs/VM-USB-PLAN.md).
+
 A virtual machine (VM) is a pretend laptop inside your computer. Here you run the real
 two-stick install in it, exactly as on the laptop, without wiping anything real.
 
@@ -69,7 +72,9 @@ are kept.
 2. Follow the installer (INSTALL.md, Phase 4): choose the disk encryption passphrase and
    create the administrator account. The VM needs internet during this step (it has it).
 3. When it restarts, unlock the disk with your passphrase and log in.
-4. Open a terminal. USB #2 shows up as the **BAU-PAYLOAD** disc. Run:
+4. Open a terminal. USB #2 shows up as the **BAU-PAYLOAD** disc. For this disposable VM
+   rehearsal, omit `--wipe-gate-record`; the install is expected to be marked `UNGATED` in
+   the VM's audit chain. Run:
    ```bash
    sudo bash /media/$USER/BAU-PAYLOAD/install.sh
    ```
@@ -81,6 +86,9 @@ are kept.
    ```
    Open Firefox in the VM at **http://localhost:8765** for Mission Control, or double-click
    **BAU Jarvis** in the app menu.
+6. To test Claude, configure `/etc/bau/models.env` inside the VM with your own
+   `ANTHROPIC_API_KEY`, then approve the model as described in `docs/INSTALL.md`. The key is
+   never part of either USB image.
 
 If all of that works in the VM, the real laptop will behave the same way. Afterwards the
 sticks can be put away: everything lives on the (virtual) disk.

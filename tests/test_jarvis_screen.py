@@ -133,3 +133,15 @@ def test_owner_choices_are_big_buttons_with_nothing_preselected():
     assert 'el("button", "opt", label)' in page and "picked = {}" in page
     assert "To confirm, first choose: " in page                      # says what's missing
     assert "queueConfirms(r.pending)" in page                        # drafts pop the check
+
+
+def test_confirm_is_never_focused_and_ignores_the_first_moment():
+    # Seen 2026-10-10 in a live run: a check was confirmed seconds after it appeared, with
+    # no click. The box focused Confirm, so any stray Enter/Space/"y" approved it unread.
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert '$("yes")).focus()' not in page and '$("yes").focus()' not in page
+    assert 'querySelector(".box")).focus()' in page and 'class="box" tabindex="-1"' in page
+    assert "const CONFIRM_SETTLE_MS = 900;" in page
+    assert "if (approve && performance.now() - shownAt < CONFIRM_SETTLE_MS) return;" in page

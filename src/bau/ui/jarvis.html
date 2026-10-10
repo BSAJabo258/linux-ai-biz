@@ -86,13 +86,14 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:cente
   text-shadow:0 0 30px rgba(63,214,255,.6)}
 #wake p{color:var(--dim);letter-spacing:.3em;text-transform:uppercase;font-size:12px;animation:blink 1.6s infinite}
 @keyframes blink{50%{opacity:.35}}
-#confirm{position:fixed;inset:0;display:none;place-items:center;background:rgba(1,4,8,.7);z-index:15}
+#confirm{position:fixed;inset:0;display:none;place-items:center;background:rgba(1,4,8,.7);z-index:25;padding:16px;overflow:auto}
 #confirm.show{display:grid}
 #confirm .box{width:min(520px,calc(100% - 32px));background:var(--solid);border:1px solid var(--amber);
-  box-shadow:0 0 40px rgba(255,179,64,.25);padding:18px}
+  box-shadow:0 0 40px rgba(255,179,64,.25);padding:18px;max-height:calc(100vh - 32px);overflow-y:auto}
 #confirm h2{margin:0 0 10px;font-size:12px;letter-spacing:.3em;color:var(--amber);text-transform:uppercase;font-weight:600}
 #confirm pre{white-space:pre-wrap;font:14px/1.5 inherit;font-family:inherit;margin:0 0 16px;color:var(--ink);max-height:50vh;overflow:auto}
-#confirm .btns{display:flex;gap:10px;justify-content:flex-end}
+#confirm .btns{position:sticky;bottom:-18px;display:flex;gap:10px;justify-content:flex-end;
+  background:var(--solid);padding:12px 0 0;z-index:1}
 #confirm button{font:inherit;letter-spacing:.2em;text-transform:uppercase;font-size:12px;padding:10px 16px;cursor:pointer;background:none}
 #yes{border:1px solid var(--green);color:var(--green)}#yes[disabled]{opacity:.35;cursor:not-allowed}
 #cvid{display:none;width:100%;max-height:34vh;background:#000;margin:0 0 12px}
@@ -103,6 +104,7 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:cente
 #confirm #cform .opt.on{border-color:var(--green);color:var(--green);background:rgba(70,242,164,.1)}
 #cneed{font-size:12px;color:var(--amber);margin:0 0 10px}
 #confirm .btns button{padding:12px 20px}
+#confirm .box:focus{outline:none}
 #cnote{font-size:12px;color:var(--dim);margin:0 0 14px}#no{border:1px solid var(--dim);color:var(--ink)}
 aside.r{display:none}body.showlog aside.r{display:block}
 #nodes{position:fixed;inset:0;pointer-events:none}
@@ -217,7 +219,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 </footer>
 <div class="hint" id="hint">Hold space to talk · Enter to send · Esc to stop speaking</div>
 <div id="wake"><div><h1>JARVIS</h1><p>Tap or press any key to wake</p></div></div>
-<div id="confirm"><div class="box"><h2>Waiting for your confirmation</h2><video id="cvid" controls playsinline></video><pre id="csum"></pre><div id="cform"></div><p id="cneed"></p><p id="cnote"></p>
+<div id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"><div class="box" tabindex="-1"><h2 id="confirm-title">Waiting for your confirmation</h2><video id="cvid" controls playsinline></video><pre id="csum"></pre><div id="cform"></div><p id="cneed"></p><p id="cnote"></p>
   <div class="btns"><button id="no" data-key="Esc" title="Not now (Esc)">Not now</button><button id="yes" data-key="Y" title="Confirm (Y)">Confirm</button></div></div></div>
 <div id="mcbox" class="overlay" role="dialog" aria-label="Mission Control"><div class="box">
   <button class="act" id="mc-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
@@ -276,6 +278,7 @@ async function apiJson(path, body, ctype) {
 // 2 s instead of holding one request open until a proxy cuts it off (504).
 async function settle(r) {
   for (let i = 0; r && r.job && i < 150; i++) {
+    if (r.pending && r.pending.length) queueConfirms(r.pending);   // show checks as soon as they exist
     if (i === 2) caption("Still thinking… the model is slow right now.");
     await new Promise((res) => setTimeout(res, 2000));
     r = await apiJson("/api/job/" + encodeURIComponent(r.job));
@@ -506,7 +509,7 @@ function logLine(role, text) {
 const TITLES = { briefing: "System", system_status: "Status", night_report: "While you were away",
   publish_queue: "Publishing queue", post_video: "Posted", deadlines: "Deadlines", money: "Money", missions: "Missions",
   brain_lookup: "Second Brain", brain_gaps: "Brain gaps", brain_add: "Added to brain",
-  remember: "Remembered", plan_mission: "Mission plan", hold_everything: "Hold", release_hold: "Hold" };
+  remember: "Remembered", recall: "Memory", plan_mission: "Mission plan", hold_everything: "Hold", release_hold: "Hold" };
 function fmt(v) { if (v == null) return "—"; if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(2);
   if (typeof v === "boolean") return v ? "yes" : "no"; if (Array.isArray(v)) return v.map(fmt).join(", ");
   if (typeof v === "object") return Object.entries(v).filter(([, x]) => x).map(([k, x]) => k.toLowerCase() + " " + fmt(x)).join(" · ") || "none";
@@ -566,7 +569,11 @@ function paintState(s) {
 }
 
 // ---------------------------------------------------------------- confirmations
-let confirmQ = [], showing = null, picked = {};
+let confirmQ = [], showing = null, picked = {}, shownAt = 0;
+// A confirmation is a deliberate act: Confirm never takes keyboard focus, and nothing counts
+// in the first moment after the box opens (an Enter, Space or "y" already on its way, or a
+// tap meant for something else, must not approve what the owner has not read).
+const CONFIRM_SETTLE_MS = 900;
 function queueConfirms(items) { for (const i of items) if (!confirmQ.some(x => x.id === i.id) && (!showing || showing.id !== i.id)) confirmQ.push(i); nextConfirm(); }
 let previewUrl = null;
 function nextConfirm() {
@@ -602,10 +609,13 @@ function nextConfirm() {
       previewUrl = URL.createObjectURL(b); vid.src = previewUrl; vid.style.display = "block"; }).catch(() => {});
   }
   $("confirm").classList.add("show");
-  setTimeout(() => (form.querySelector(".opt") || $("yes")).focus(), 50);
+  shownAt = performance.now();
+  setTimeout(() => (form.querySelector(".opt") || $("confirm").querySelector(".box")).focus(), 50);
 }
 async function answer(approve) {
-  if (!showing) return; const item = showing;
+  if (!showing) return;
+  if (approve && performance.now() - shownAt < CONFIRM_SETTLE_MS) return;
+  const item = showing;
   const choices = { ...picked };
   showing = null; $("confirm").classList.remove("show"); try { $("cvid").pause(); } catch (e) {}
   setState("thinking");

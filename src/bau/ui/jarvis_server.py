@@ -58,6 +58,11 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 "voice": voice.available, "listen": voice.can_listen,
                 "pending": [p.public() for p in assistant.pending.values()]}
 
+    def waiting() -> list[dict[str, Any]]:
+        """What already waits for the owner while a slow answer is still being written: a
+        drafted stage's check must not sit unseen until the model finishes talking."""
+        return [p.public() for p in list(assistant.pending.values())]
+
     def answer(work: Callable[[], dict[str, Any]], lane: threading.Lock | None = None
                ) -> tuple[int, dict[str, Any]]:
         """Run one piece of model work. A quick answer comes back at once; a slow one (a
@@ -85,7 +90,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
         for old in list(jobs)[:-MAX_JOBS]:        # a page that never came back
             jobs.pop(old, None)
         jobs[job] = box
-        return 202, {"job": job}
+        return 202, {"job": job, "pending": waiting()}
 
     class H(BaseHTTPRequestHandler):
         server_version = "BAU-Jarvis"
@@ -245,7 +250,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 elif "reply" in box:
                     self._json(200, jobs.pop(job)["reply"])
                 else:
-                    self._json(202, {"job": job})
+                    self._json(202, {"job": job, "pending": waiting()})
             else:
                 self._send(404, b"not found", "text/plain")
 
