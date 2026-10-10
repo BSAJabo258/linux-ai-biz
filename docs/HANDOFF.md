@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 343 tests pass; 49 regulations / 65 policies validate.
+State: 348 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -51,6 +51,13 @@ The video studio (2026-10-10, the first paid integration, tests written first in
 
 Never called against the real Higgsfield API yet: the owner's first `bau video quote` is the
 first real call.
+
+The repo page, round two (2026-10-10, tests in `tests/test_repo_look.py`): a real Jarvis
+GIF (`assets/jarvis-demo.gif`, recorded with Playwright, 960x540, 76 frames), an animated
+terminal SVG of real commands, a stats panel whose numbers `make_art.facts()` reads from
+the repo (a test fails if they go stale: rerun `python3 assets/make_art.py`), GitHub
+[!IMPORTANT]/[!TIP] notices. Jarvis answer cards for usage_today, toolbox, plan_episode
+and clip_prompt now use readable layouts instead of raw fields.
 
 The kids series engine (2026-10-10, tests first in `tests/test_series.py`): `series.py`
 reads `_shared/characters/*.yaml` + `_shared/style.yaml` (templates with placeholders in

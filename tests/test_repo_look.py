@@ -61,3 +61,55 @@ def test_mission_control_has_the_jarvis_look_and_stays_accessible():
     assert "--glow" in page and "--gold" in page              # the Jarvis palette
     assert "prefers-reduced-motion" in page and "prefers-color-scheme: light" in page
     assert "@import" not in page and "https://" not in page   # works offline on the laptop
+
+
+# ------------------------------------------------------------------ the page, round two
+
+def facts():
+    from bau.policy import PolicyEngine
+    from bau.regulations import Registry
+    from bau.series import Series
+    from bau.toolbox import Toolbox
+    reg = Registry.load()
+    return {"regulations": len(reg.regs), "policies": len(PolicyEngine.load(reg).policies),
+            "tools": len(Toolbox().entries), "formats": len(Series(ROOT).formats())}
+
+
+def test_stats_panel_shows_the_repo_as_it_really_is():
+    from importlib.util import module_from_spec, spec_from_file_location
+    spec = spec_from_file_location("make_art", ART / "make_art.py")
+    art = module_from_spec(spec)
+    spec.loader.exec_module(art)
+    assert art.facts() == facts()                        # computed from the repo, not typed
+    for theme in ("dark", "light"):
+        text = (ART / f"stats-{theme}.svg").read_text()
+        for value in facts().values():
+            assert f">{value}<" in text, f"stats-{theme}.svg is stale: run assets/make_art.py"
+
+
+def test_terminal_demo_types_real_commands():
+    for theme in ("dark", "light"):
+        text = (ART / f"terminal-{theme}.svg").read_text()
+        assert "@keyframes" in text and "prefers-reduced-motion" in text
+        for cmd in ("bau toolbox ask", "bau series plan", "bau usage"):
+            assert cmd in text, cmd
+
+
+def test_jarvis_demo_gif_is_a_real_animation_and_not_huge():
+    gif = ART / "jarvis-demo.gif"
+    data = gif.read_bytes()
+    assert data[:6] == b"GIF89a" and data.count(b"\x21\xf9\x04") >= 10   # 10+ frames
+    assert len(data) < 6_000_000
+    assert "assets/jarvis-demo.gif" in README
+
+
+def test_readme_uses_github_notice_boxes():
+    assert "> [!IMPORTANT]" in README and "> [!TIP]" in README
+
+
+def test_jarvis_answer_cards_read_like_the_panels():
+    """Tool answers on screen use the same readable layouts as the panels, not raw fields."""
+    page = (resources.files("bau.ui") / "jarvis.html").read_text()
+    for tool in ("usage_today", "toolbox", "plan_episode", "clip_prompt"):
+        assert f'c.tool === "{tool}"' in page, tool
+    assert "function usageView" in page and "function toolCard" in page
