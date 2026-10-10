@@ -183,6 +183,14 @@ def overview(asst: Any) -> dict[str, Any]:
                            st, "What's the system status?"))
 
     # ---------------------------------------------------------------- systems
+    seen = (getattr(asst, "_godseye", None) or {})
+    last = max(seen.values(), key=lambda v: v[0])[1] if seen else None
+    nodes.append(_node("godseye", "God's Eye", "system", "ok" if last else "idle",
+                       f"{last['count']} {last['layer']} on the world map" if last else
+                       "public world data: earthquakes, aircraft, satellites",
+                       {"layers": ["earthquakes", "aircraft", "satellites"]},
+                       "Any big earthquakes today?"))
+
     us, err = _safe(asst.t_usage)
     if err:
         nodes.append(_broken("usage", "Usage", "system", err))
