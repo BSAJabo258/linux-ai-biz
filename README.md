@@ -180,6 +180,7 @@ Then follow **[docs/INSTALL.md](docs/INSTALL.md)** in order: audit, backup and v
 | [docs/CLOUD-VM.md](docs/CLOUD-VM.md) | BAU and Jarvis on your own cloud server (DigitalOcean), reached through a private SSH tunnel |
 | [docs/TOOLBOX.md](docs/TOOLBOX.md) | Researched open-source tools Jarvis looks up before guessing; licences to watch |
 | [docs/GODS-EYE.md](docs/GODS-EYE.md) | God's Eye: earthquakes, aircraft and satellites on a world map in Jarvis; what it will never do |
+| [docs/RESULTS.md](docs/RESULTS.md) | See views, earnings and profit for every posted video, and which formats work |
 | [docs/USAGE.md](docs/USAGE.md) | See tokens and dollars per AI model, set your own daily limits |
 | [docs/STUDIO.md](docs/STUDIO.md) | Make AI video clips (Higgsfield) inside a budget you set; priced first, made only on your Confirm |
 | [docs/engineering/repo-intelligence.md](docs/engineering/repo-intelligence.md) | Repo Scout (`bau scout`): find and rank open-source tools on evidence; branch-protection steps |

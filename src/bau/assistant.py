@@ -99,7 +99,7 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "clip_prompt": "producer", "plan_episode": "producer",
              "toolbox": "scout", "world_watch": "godseye",
              "video_clips": "studio", "make_video": "studio",
-             "usage_today": "usage",
+             "usage_today": "usage", "results": "results",
              "hold_everything": "watchdog", "release_hold": "watchdog"}
 TOOL_WORDS = {"draft_stage": "Drafting the next step", "find_tools": "Searching GitHub",
               "brain_lookup": "Looking it up in the Second Brain",
@@ -275,6 +275,11 @@ class Assistant:
             Tool("usage_today", "How much the AI models have been used: tokens and dollars "
                  "today and this week, for each model, busy replies, the owner's daily limits "
                  "and any rate-limit warnings (GitHub's too).", _schema(), self.t_usage),
+            Tool("results", "How the posted videos are doing: views, watch time, likes, "
+                 "YouTube's estimated earnings, what each video's clips cost and the profit, "
+                 "and which story formats people watch most. refresh=true reads the latest "
+                 "numbers from YouTube and TikTok first (read only, at most once an hour).",
+                 _schema({"refresh": {"type": "boolean"}}), self.t_results),
             Tool("video_clips", "Clips the studio has made or is making: checks the ones in "
                  "progress, saves finished ones, and reports this month's video spending.",
                  _schema(), self.t_video_clips, kind="act"),
@@ -472,6 +477,19 @@ class Assistant:
         from .usage import Usage
         s = Usage(self.home).summary()
         return {**s, "by_model": s["by_model"][:8]}
+
+    def results(self):
+        from .results import Results
+        return Results(self.home, self.audit, self.clients)
+
+    def t_results(self, refresh: bool = False) -> dict[str, Any]:
+        r = self.results()
+        fetched = r.refresh(by="jarvis") if refresh else None
+        rep = r.report()
+        out = {**rep, "videos": rep["videos"][:10]}
+        if fetched:
+            out["refresh"] = fetched
+        return out
 
     def _price(self, mid: str) -> dict[str, Any]:
         """The registry record a model is priced by (the one Jarvis runs, or a backup)."""

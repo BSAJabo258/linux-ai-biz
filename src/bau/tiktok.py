@@ -17,6 +17,11 @@ API facts verified 2026-10-05 against developers.tiktok.com:
   Upload PUT upload_url, Content-Range, chunks 5-64 MB (last up to 128 MB), files under
          5 MB in one chunk, total_chunk_count = floor(size / chunk_size), sequential.
   Unaudited apps: every post is private (SELF_ONLY) until TikTok audits the app.
+
+Display API facts verified 2026-10-10 against developers.tiktok.com (read only; used by
+``bau.results``): POST /v2/video/query/?fields=id,title,view_count,like_count,
+comment_count,share_count with {"filters": {"video_ids": [...]}}, up to 20 IDs a request,
+scope video.list, the owner's own videos only. Earnings are not part of this API.
 """
 
 from __future__ import annotations
@@ -43,7 +48,8 @@ from .store import JsonlStore
 
 API = "https://open.tiktokapis.com"
 AUTH_URL = "https://www.tiktok.com/v2/auth/authorize/"
-SCOPES = "user.info.basic,video.publish,video.upload"
+SCOPES = "user.info.basic,video.publish,video.upload,video.list"
+VIDEO_FIELDS = "id,title,view_count,like_count,comment_count,share_count"
 VIDEO_TYPES = {".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm"}
 MB = 1024 * 1024
 CHUNK = 10 * MB
@@ -237,6 +243,18 @@ class TikTokClient:
 
     def status(self, publish_id: str) -> dict[str, Any]:
         return self._post("/v2/post/publish/status/fetch/", {"publish_id": publish_id})
+
+    # -------------------------------------------------------- Display API (read only)
+    def granted(self, scope: str) -> bool:
+        tok = self.tokens.load() or {}
+        return scope in tok.get("scope", "").split(",")
+
+    def videos(self, ids: list[str]) -> list[dict[str, Any]]:
+        """View, like, comment and share counts for up to 20 of the owner's videos."""
+        if len(ids) > 20:
+            raise TikTokError("TikTok answers for at most 20 videos at a time")
+        return self._post(f"/v2/video/query/?fields={VIDEO_FIELDS}",
+                          {"filters": {"video_ids": ids}}).get("videos") or []
 
 
 def login(client: TikTokClient, port: int = 3455, open_browser: Any = None,

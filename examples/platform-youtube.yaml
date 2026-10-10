@@ -23,6 +23,9 @@ api_policy: >-
   OAuth installed-app flow with PKCE (youtube.upload, youtube.readonly). videos.insert
   costs 1 unit of the Video Uploads quota bucket (100 per day). Uploads from unverified
   API projects created after 2020-07-28 are forced private until Google's audit passes.
+  Results tracker (read only, checked 2026-10-10): YouTube Analytics API reports.query with
+  yt-analytics.readonly and yt-analytics-monetary.readonly; estimatedRevenue is subject to
+  month-end adjustment.
 automation_policy: >-
   BAU uploads only after the owner reviews each video, chooses the audience (made for kids
   or not, no default) and privacy (no default), and confirms; kids videos also need the

@@ -189,6 +189,15 @@ def usage_summary(asst: Any) -> dict[str, Any]:
     return Usage(asst.home).summary()
 
 
+def results_summary(asst: Any, refresh: bool = False, force: bool = False
+                    ) -> dict[str, Any]:
+    """Posted videos with their numbers, cost and profit; reads the platforms only when
+    asked (read only, at most once an hour unless forced)."""
+    r = asst.results()
+    fetched = r.refresh(force=force, by="human:owner") if refresh else None
+    return {**r.report(), **({"refresh": fetched} if fetched else {})}
+
+
 def studio_summary(asst: Any, refresh: bool = True) -> dict[str, Any]:
     """Budget, this month's spending and the clips; checks clips in progress once."""
     st = asst.studio()

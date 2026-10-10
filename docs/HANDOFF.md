@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 360 tests pass; 49 regulations / 65 policies validate.
+State: 374 tests pass; 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -108,6 +108,20 @@ validate`. `Toolbox.ask` answers plain-words questions; Jarvis's `toolbox` tool 
 prompt make him look there before guessing; the Scout panel shows "Already known" first.
 `bau toolbox check NAME` -> `Scout.add` (one GitHub record) + `Scout.inspect`. Rebuilt from
 research because the owner's own transcript collection was lost with a codespace.
+
+The results tracker (2026-10-10, tests first in `tests/test_results.py`): `results.py`
+reads numbers back for every POSTED queue item, read only. YouTube uses Analytics
+`reports.query`, `dimensions=video`, batches of 200, with `estimatedRevenue` asked
+separately; a refusal means "no earnings" and views still count. TikTok uses
+`/v2/video/query/`, 20 per request. Both clients gained the read scopes, so owners log in
+once more. Other behaviour:
+- snapshots go to `results/snapshots.jsonl`, one refresh per platform an hour;
+- `bau results link` ties a video to its studio clips and episode; cost comes from the
+  ledger's `job_id`, and the format from the episode's `series.yaml`;
+- the report shows profit per video, unlinked clip spend, `by_format` and `what_works`;
+- it is reachable through the `results` tool, a Results node and panel, `/api/results`
+  and `/api/results/refresh`.
+Owner guide: `docs/RESULTS.md`.
 
 The usage meter (2026-10-10, tests first in `tests/test_usage.py`):
 - `usage.py`: `Metered` wraps the provider for Jarvis's turns, workspace drafts and Scout;
@@ -250,6 +264,10 @@ It needs about 24 GB RAM. Check `reply_ok` and `tool_calls` are true before appr
 - The `ghcr.io/bsajabo258/bau` image is private by default. Make it public in the package settings if the owner wants `docker pull` to work without logging in.
 - `vm/create-vm.*` has never run against real VirtualBox (see step 1).
 - The full 18 GB GLM-4.7-Flash has never been benchmarked (see step 2).
+- Jarvis camera (the owner asked for it later; USB webcam): a local frame read by a local
+  vision model only when the owner asks, on/off shown on screen, video never leaves the
+  machine, no face recognition. Meant for things like checking the VR tent is clear.
+- The results tracker has never run against the real YouTube Analytics or TikTok APIs.
 
 ## First message to paste into Claude Code
 
