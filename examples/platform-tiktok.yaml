@@ -18,7 +18,9 @@ commercial_content_policy: >-
 api_policy: >-
   Direct Post needs scope video.publish and app audit; unaudited apps post private
   (SELF_ONLY) only. Inbox drafts use video.upload. 6 init requests/min per token;
-  status fetch 30/min. mp4/mov/webm, up to 4 GB.
+  status fetch 30/min. mp4/mov/webm, up to 4 GB. Results tracker (read only, checked
+  2026-10-10): /v2/video/query/ with scope video.list, up to 20 video IDs a request;
+  no earnings in the API.
 automation_policy: >-
   Per-post express user consent is required before upload: show the account nickname,
   a preview, privacy chosen by the user with no default (from creator_info options),

@@ -413,6 +413,26 @@ def cmd_usage(a):
     return EXIT_OK
 
 
+def cmd_results(a):
+    from .results import Results
+    r = Results(audit=AuditLog())
+    if a.res_cmd == "link":
+        clips = [c.strip() for c in (a.clips or "").split(",") if c.strip()]
+        try:
+            _out(r.link(a.platform, a.item, f"cli:{getpass.getuser()}", clips=clips,
+                        episode=a.episode or ""))
+        except ValueError as e:
+            print(f"bau: {e}", file=sys.stderr)
+            return EXIT_ERROR
+        return EXIT_OK
+    if a.res_cmd == "refresh":
+        out = r.refresh(force=a.force, by=f"cli:{getpass.getuser()}")
+        _out({**r.report(), "refresh": out})
+        return EXIT_OK
+    _out(r.report())
+    return EXIT_OK
+
+
 def cmd_video(a):
     from .assistant import load_env_file
     from .media.higgsfield import HiggsfieldError
@@ -1346,6 +1366,17 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--daily-tokens", type=int)
     x.add_argument("--daily-usd", type=float)
     s.set_defaults(fn=cmd_usage)
+
+    s = sub.add_parser("results", help="how posted videos are doing: views, earnings, profit")
+    w = s.add_subparsers(dest="res_cmd")
+    x = w.add_parser("refresh", help="read the latest numbers from YouTube and TikTok")
+    x.add_argument("--force", action="store_true", help="even if read in the last hour")
+    x = w.add_parser("link", help="tie a posted video to the clips it used and its episode")
+    x.add_argument("platform", choices=["youtube", "tiktok"])
+    x.add_argument("item", help="the queue item id (bau results lists them)")
+    x.add_argument("--clips", help="studio clip ids, comma-separated (bau video clips)")
+    x.add_argument("--episode", help="workspace/episode, e.g. kids-channel/ep-001")
+    s.set_defaults(fn=cmd_results)
 
     s = sub.add_parser("factory", help="business factories")
     fs = s.add_subparsers(dest="fac_cmd", required=True)

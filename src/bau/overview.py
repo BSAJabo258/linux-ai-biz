@@ -171,6 +171,18 @@ def overview(asst: Any) -> dict[str, Any]:
                                             if sd["in_progress"] else ""),
                            sd, "What clips have we made?"))
 
+    rs, err = _safe(lambda: asst.results().report())
+    if err:
+        nodes.append(_broken("results", "Results", "team", err))
+    else:
+        t = rs["totals"]
+        earned = f", ${t['revenue_usd']:.2f} earned (est.)" if t["revenue_usd"] else ""
+        nodes.append(_node("results", "Results", "team", "ok" if t["views"] else "idle",
+                           f"{t['videos']} video(s), {t['views']:,} views{earned}"
+                           if t["videos"] else "nothing posted yet",
+                           {"totals": t, "what_works": rs["what_works"]},
+                           "How are our videos doing?"))
+
     st, err = _safe(asst.t_status)
     if err:
         nodes.append(_broken("watchdog", "Watchdog", "team", err))

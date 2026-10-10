@@ -173,6 +173,7 @@ aside.l{display:none}aside.l.open{display:block}
 .st{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:1px 0}
 .st .s-checked{color:var(--green)}.st .s-drafted{color:var(--amber)}.st .s-waiting{color:var(--off)}
 .issue{color:var(--red);font-size:12px}
+.note{color:var(--dim);font-size:12px;margin-top:4px}
 code.cmd{display:block;background:var(--field);border:1px solid var(--line);padding:6px 8px;margin:4px 0;
   font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);word-break:break-all;cursor:copy}
 @media (max-width:760px){
@@ -517,7 +518,8 @@ function logLine(role, text) {
 const TITLES = { briefing: "System", system_status: "Status", night_report: "While you were away",
   publish_queue: "Publishing queue", post_video: "Posted", deadlines: "Deadlines", money: "Money", missions: "Missions",
   brain_lookup: "Second Brain", brain_gaps: "Brain gaps", brain_add: "Added to brain",
-  remember: "Remembered", recall: "Memory", plan_mission: "Mission plan", hold_everything: "Hold", release_hold: "Hold" };
+  remember: "Remembered", recall: "Memory", plan_mission: "Mission plan", hold_everything: "Hold", release_hold: "Hold",
+  results: "Results" };
 function fmt(v) { if (v == null) return "—"; if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(2);
   if (typeof v === "boolean") return v ? "yes" : "no"; if (Array.isArray(v)) return v.map(fmt).join(", ");
   if (typeof v === "object") return Object.entries(v).filter(([, x]) => x).map(([k, x]) => k.toLowerCase() + " " + fmt(x)).join(" · ") || "none";
@@ -546,6 +548,8 @@ function renderCard(c) {
     p = panel(t, "bad"); p.appendChild(el("div", null, d.error));
   } else if (c.tool === "usage_today" && d && d.today) {
     p = panel("Usage", d.warnings && d.warnings.length ? "warn" : ""); usageView(p, d);
+  } else if (c.tool === "results" && d && d.totals) {
+    p = panel("Results · " + d.totals.videos + " video(s)"); resultsView(p, d);
   } else if (c.tool === "toolbox" && d && Array.isArray(d.answers)) {
     p = panel("Toolbox · " + d.answers.length);
     for (const h of d.answers.slice(0, 4)) p.appendChild(toolCard(h));
@@ -835,6 +839,7 @@ function showDetail(n) {
   else if (n.id === "scout") renderScout(p);
   else if (n.id === "studio") renderStudio(p);
   else if (n.id === "usage") renderUsage(p);
+  else if (n.id === "results") renderResults(p);
   else if (n.id === "godseye") renderGodsEye(p);
   else if (d && d.error) p.appendChild(el("div", "issue", d.error));
   else if (Array.isArray(d)) list(p, d.map(i => typeof i === "object" ? (i.title || i.objective || i.detail || Object.values(i).map(fmt).join(" · ")) : i));
@@ -1058,6 +1063,38 @@ function usageView(wrap, d) {
   } else wrap.appendChild(el("div", null, "No model calls recorded yet."));
   for (const [b, g] of Object.entries(d.github || {}))
     kv(wrap, "GitHub " + b, (g.remaining != null ? g.remaining + " left" : "no reading yet") + (g.waiting_until ? " · waiting until " + g.waiting_until : ""));
+}
+// Results: what each posted video did and whether it paid for its clips. Read only; the
+// numbers come from YouTube and TikTok at most once an hour. Earnings are estimates.
+async function renderResults(p) {
+  const wrap = el("div"); p.appendChild(wrap);
+  let d; try { d = await apiJson("/api/results"); } catch (e) { wrap.appendChild(el("div", "issue", e.message)); return; }
+  button(wrap, "Get the latest numbers", async () => {
+    let r; try { r = await settle(await apiJson("/api/results/refresh", { force: false })); } catch (e) { caption(e.message); return; }
+    const errs = Object.values((r.refresh || {}).errors || {}), skip = Object.values((r.refresh || {}).skipped || {});
+    caption(errs.length ? errs[0] : skip.length ? "Already up to date: " + skip[0] : "Numbers updated.");
+    wrap.remove(); renderResults(p); });
+  resultsView(wrap, d);
+}
+function resultsView(wrap, d) {
+  const money = v => v == null ? "—" : (v < 0 ? "−$" : "$") + Math.abs(v).toFixed(2);
+  const t = d.totals;
+  kv(wrap, "Views", t.views.toLocaleString() + " on " + t.videos + " video(s)");
+  kv(wrap, "Earned (estimate)", money(t.revenue_usd)); kv(wrap, "Clips used", money(t.cost_usd));
+  if (t.unlinked_clip_spend_usd) kv(wrap, "Clips not linked yet", money(t.unlinked_clip_spend_usd));
+  for (const w of d.what_works || []) wrap.appendChild(el("div", null, "▸ " + w));
+  for (const v of d.videos.slice(0, 10)) {
+    const card = el("div", "card"), cls = v.profit_usd == null ? "needs" : v.profit_usd >= 0 ? "eligible" : "rejected";
+    card.appendChild(el("span", "badge " + cls, v.profit_usd == null ? "profit —" : "profit " + money(v.profit_usd)));
+    card.appendChild(el("b", null, v.title));
+    card.appendChild(el("div", "note", (v.platform === "youtube" ? "YouTube" : "TikTok") + (v.made_for_kids ? " · made for kids" : "")));
+    card.appendChild(el("div", null, [v.views == null ? "no numbers yet" : v.views.toLocaleString() + " views",
+      v.avg_view_pct == null ? null : Math.round(v.avg_view_pct) + "% watched", "earned " + money(v.revenue_usd), "clips " + money(v.cost_usd)].filter(Boolean).join(" · ")));
+    if (v.notes.length) card.title = v.notes.join("\n");
+    wrap.appendChild(card);
+  }
+  for (const n of d.notes || []) wrap.appendChild(el("div", "note", n));
+  if (d.videos.some(v => v.cost_usd == null)) cmd(wrap, "bau results link youtube <item> --clips clip_… --episode kids-channel/ep-001");
 }
 // The toolbox: tools others already built for this problem (researched, with sources),
 // shown before Scout searches GitHub. A claim until Scout has inspected it.

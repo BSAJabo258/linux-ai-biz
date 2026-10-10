@@ -22,6 +22,18 @@ API facts verified 2026-10-05 against developers.google.com/youtube/v3:
   Quota   videos.insert: 1 unit of the Video Uploads bucket (100 per day).
   Unverified API projects (created after 2020-07-28): uploads are private until the
   project passes Google's audit.
+
+Analytics facts verified 2026-10-10 against developers.google.com/youtube/analytics
+(read only; used by ``bau.results``):
+  Report  GET https://youtubeanalytics.googleapis.com/v2/reports, ids=channel==MINE,
+          startDate/endDate YYYY-MM-DD, metrics, dimensions=video, filters=video==ID1,ID2
+          (up to 500 IDs); video reports need sort and maxResults <= 200. No rows -> the
+          rows element is left out.
+  Scopes  yt-analytics.readonly (views, watch time), yt-analytics-monetary.readonly
+          (estimatedRevenue; YouTube says it is subject to month-end adjustment), and the
+          method also needs youtube.readonly.
+  Metrics views, estimatedMinutesWatched, averageViewDuration, averageViewPercentage,
+          subscribersGained, likes, comments, shares, estimatedRevenue (USD by default).
 """
 
 from __future__ import annotations
@@ -51,8 +63,11 @@ AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 API = "https://www.googleapis.com/youtube/v3"
 UPLOAD = "https://www.googleapis.com/upload/youtube/v3/videos"
+ANALYTICS = "https://youtubeanalytics.googleapis.com/v2/reports"
 SCOPES = ("https://www.googleapis.com/auth/youtube.upload "
-          "https://www.googleapis.com/auth/youtube.readonly")
+          "https://www.googleapis.com/auth/youtube.readonly "
+          "https://www.googleapis.com/auth/yt-analytics.readonly "
+          "https://www.googleapis.com/auth/yt-analytics-monetary.readonly")
 VIDEO_TYPES = {".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
                ".mkv": "video/x-matroska", ".avi": "video/x-msvideo"}
 CHUNK = 32 * 256 * 1024                  # 8 MiB, a multiple of 256 KiB
@@ -177,6 +192,20 @@ class YouTubeClient:
         data = json.loads(raw or b"{}")
         if code != 200:
             raise YouTubeError(f"{path}: {(data.get('error') or {}).get('message') or code}")
+        return data
+
+    def granted(self, scope: str) -> bool:
+        """Did the owner allow this at login? (Google lets them untick a permission.)"""
+        tok = self.tokens.load() or {}
+        return scope in tok.get("scope", "").split()
+
+    # -------------------------------------------------------- Analytics API (read only)
+    def analytics(self, params: dict[str, str]) -> dict[str, Any]:
+        code, _, raw = self.http.request("GET", f"{ANALYTICS}?{urllib.parse.urlencode(params)}",
+                                         {"Authorization": f"Bearer {self.access_token()}"})
+        data = json.loads(raw or b"{}")
+        if code != 200:
+            raise YouTubeError(f"analytics: {(data.get('error') or {}).get('message') or code}")
         return data
 
     # -------------------------------------------------------- Data API
