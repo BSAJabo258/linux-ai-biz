@@ -11,6 +11,10 @@ id bau >/dev/null 2>&1 || useradd --system --gid bau --home-dir /var/lib/bau \
 
 python3 -m venv --system-site-packages /opt/bau/venv
 /opt/bau/venv/bin/pip install --quiet --no-index --no-deps /opt/bau/wheels/bau-*.whl
+# Claude's SDK, from the wheels build-live.sh downloaded (no network here). Without it
+# Jarvis can't use Claude even with a key and an approval.
+/opt/bau/venv/bin/pip install --quiet --no-index --find-links /opt/bau/wheels anthropic
+/opt/bau/venv/bin/python -c 'import anthropic'
 rm -rf /opt/bau/wheels
 ln -sf /opt/bau/venv/bin/bau /usr/local/bin/bau
 ln -sf /opt/bau/venv/bin/jarvis-storage /usr/local/bin/jarvis-storage
