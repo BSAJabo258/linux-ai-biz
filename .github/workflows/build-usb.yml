@@ -4,6 +4,7 @@ name: build-usb
 # (publication of this software project - within GitHub's Actions terms).
 #   USB #1  bau-debian-<ver>-amd64-netinst.iso  (official Debian ISO, signature-verified, remastered)
 #   USB #2  BAU-PAYLOAD-<ver>.tar.gz            (unpack onto any USB stick)
+#   ONE     bau-one-debian-<ver>-amd64-netinst.iso  (USB #1 with USB #2 inside: one stick)
 #           BAU-PAYLOAD-<ver>.iso               (the same payload as a disc image, for a VM)
 # Run it from Actions > build-usb > "Run workflow", or by pushing a tag v*.
 
@@ -36,7 +37,21 @@ jobs:
       - name: "USB #2: BAU payload (tests run first; Claude SDK bundled for offline install)"
         run: installer/make-payload.sh --with-claude --out dist
       - name: "USB #1: Debian image (official signature + checksum verified before remastering)"
-        run: installer/build-usb-image.sh --out dist
+        run: |
+          # Fetched once for both images; build-usb-image.sh verifies them each time.
+          base=https://cdimage.debian.org/debian-cd/current/amd64/iso-cd
+          mkdir -p debian-in
+          curl -fsSL --proto '=https' "${base}/SHA512SUMS" -o debian-in/SHA512SUMS
+          curl -fsSL --proto '=https' "${base}/SHA512SUMS.sign" -o debian-in/SHA512SUMS.sign
+          iso="$(awk '{print $2}' debian-in/SHA512SUMS | grep -E '^debian-[0-9.]+-amd64-netinst\.iso$' | head -n1)"
+          curl -fL --proto '=https' "${base}/${iso}" -o "debian-in/${iso}"
+          echo "DEBIAN_ISO=debian-in/${iso}" >> "$GITHUB_ENV"
+          installer/build-usb-image.sh --out dist --iso "debian-in/${iso}" \
+            --sums debian-in/SHA512SUMS --sig debian-in/SHA512SUMS.sign
+      - name: "One stick: the Debian image with the BAU payload inside"
+        run: |
+          installer/build-usb-image.sh --out dist --payload dist/BAU-PAYLOAD --iso "${DEBIAN_ISO}" \
+            --sums debian-in/SHA512SUMS --sig debian-in/SHA512SUMS.sign
       - name: "USB #2 as a disc image for virtual machines (vm/create-vm.*)"
         run: |
           ver="$(python -c 'import sys; sys.path.insert(0, "src"); import bau; print(bau.__version__)')"
@@ -45,13 +60,16 @@ jobs:
         id: meta
         run: |
           cd dist
-          sha256sum bau-debian-*.iso BAU-PAYLOAD-*.tar.gz BAU-PAYLOAD-*.iso > SHA256SUMS.txt
+          sha256sum bau-debian-*.iso bau-one-debian-*.iso BAU-PAYLOAD-*.tar.gz BAU-PAYLOAD-*.iso > SHA256SUMS.txt
           cat SHA256SUMS.txt
           ver="$(python -c 'import sys; sys.path.insert(0, "../src"); import bau; print(bau.__version__)')"
           tag="usb-v${ver}-${GITHUB_SHA::7}"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           {
             echo "Built from commit ${GITHUB_SHA} on $(date -u +%Y-%m-%d)."
+            echo
+            echo "## One stick - the operating system and BAU together"
+            echo "\`$(ls bau-one-debian-*.iso)\`: USB #1 below with the BAU payload inside. Write it to one stick (8 GB+), boot it, choose **BAU install**; after the first login run \`sudo bash /opt/bau-payload/install.sh\`. No second stick. See docs/INSTALL.md."
             echo
             echo "## USB #1 - the operating system"
             echo "\`$(ls bau-debian-*.iso)\`: official Debian netinst (signature and checksum verified by the build), remastered with the BAU preseed (encrypted disk, hardening)."
@@ -73,6 +91,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.meta.outputs.tag }}" \
-            dist/bau-debian-*.iso dist/BAU-PAYLOAD-*.tar.gz dist/BAU-PAYLOAD-*.iso dist/SHA256SUMS.txt \
+            dist/bau-debian-*.iso dist/bau-one-debian-*.iso dist/BAU-PAYLOAD-*.tar.gz dist/BAU-PAYLOAD-*.iso dist/SHA256SUMS.txt \
             --title "BAU USB images (${{ steps.meta.outputs.tag }})" \
             --notes-file dist/NOTES.md --target "${GITHUB_SHA}"

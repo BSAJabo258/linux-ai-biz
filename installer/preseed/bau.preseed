@@ -61,11 +61,18 @@ popularity-contest popularity-contest/participate boolean false
 d-i grub-installer/only_debian boolean true
 d-i grub-installer/bootdev string default
 
-### Hand-off: stage the first-boot notice and baseline firewall. No network access,
-### no BAU code - that comes from USB #2, verified by checksum.
+### Hand-off: stage the first-boot notice and baseline firewall. No network access.
+### BAU itself comes from USB #2, or on a one-stick image from /BAU-PAYLOAD on this
+### stick: copied to /opt/bau-payload and every file re-checked there. A copy that does
+### not match its checksums is deleted, never left for install.sh.
 d-i preseed/late_command string \
   mkdir -p /target/opt/bau-bootstrap; \
   cp -r /cdrom/bau/. /target/opt/bau-bootstrap/; \
+  if [ -d /cdrom/BAU-PAYLOAD ]; then \
+    cp -r /cdrom/BAU-PAYLOAD /target/opt/bau-payload; \
+    in-target /bin/sh -c 'cd /opt/bau-payload && sha256sum --quiet --strict -c SHA256SUMS' \
+      || rm -rf /target/opt/bau-payload; \
+  fi; \
   in-target /bin/sh /opt/bau-bootstrap/firstboot-setup.sh
 
 d-i finish-install/reboot_in_progress note
