@@ -10,7 +10,13 @@ user-setup
 # Desktop (light: 8 GB machines)
 xfce4
 xfce4-terminal
+# The X server and the login screen: only "recommended" by xfce4/lightdm, and recommends
+# are off, so they must be named or LightDM fails at boot. xserver-xorg brings every
+# video and input driver (xserver-xorg-video-all, -input-all).
+xserver-xorg
+xserver-xorg-core
 lightdm
+lightdm-gtk-greeter
 firefox-esr
 network-manager
 network-manager-gnome
