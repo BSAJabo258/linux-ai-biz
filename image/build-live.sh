@@ -73,7 +73,9 @@ if ((NATIVE)); then
 else
   need docker
   # shellcheck disable=SC2086  # DOCKER_ARGS: extra options, e.g. --network host
+  # HOST_UID/HOST_GID: the container runs as root; inside.sh gives out/ back to this user.
   docker run --rm --privileged ${DOCKER_ARGS:-} -v "${WORK}:/work" -e VERSION="${version}" \
+    -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
     -e http_proxy -e https_proxy -e no_proxy "${BASE}" bash /work/inside.sh /work
 fi
 
