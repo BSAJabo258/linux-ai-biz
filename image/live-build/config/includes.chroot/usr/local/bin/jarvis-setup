@@ -2,13 +2,16 @@
 # My Jarvis first-time setup, one question at a time. Safe to run again at any point:
 # it only does the steps that are still missing.
 #   1. encrypted private storage (on the USB)   -> restart
-#   2. the local model (download, checked)      -> start it
-#   3. measure it on this computer               -> you approve it (or not)
-#   4. start Jarvis
+#   2. Claude, optional: your API key            -> measure it, you approve it (or not)
+#   3. the local model (download, checked)      -> start it
+#   4. measure it on this computer               -> you approve it (or not)
+#   5. start Jarvis
 set -uo pipefail
 
 MODEL=qwen2.5-1.5b-instruct
 FILE=qwen2.5-1.5b-instruct-q4_k_m.gguf
+CLAUDE=claude-opus-5-5
+ETC=${BAU_ETC:-/etc/bau}          # BAU_ETC: tests only
 export BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
   BAU_ALLOWED_SIGNERS=/etc/bau/allowed_signers
 umask 007
@@ -16,6 +19,10 @@ umask 007
 say() { printf '\n== %s\n' "$*"; }
 ask() { local a; read -r -p "$1 [y/N] " a; [[ ${a} =~ ^[Yy] ]]; }
 pause() { read -r -p "Press Enter to close." _; }
+status_of() {
+  bau models list | python3 -c 'import json,sys
+print(next((m["status"] for m in json.load(sys.stdin) if m["model_id"]==sys.argv[1]),""))' "$1"
+}
 
 say "My Jarvis setup"
 if ! jarvis-storage status; then
@@ -38,43 +45,97 @@ if ! id -nG | tr ' ' '\n' | grep -qx bau; then
   pause; exit 1
 fi
 
+if ! grep -qs '^ANTHROPIC_API_KEY=.' "${ETC}/models.env"; then
+  say "Claude (optional)"
+  cat <<'EOF'
+Jarvis can use Claude, Anthropic's online model. It is much stronger than the local model,
+but it needs the internet and your own Anthropic API key, Anthropic bills your account for
+every conversation, and what you say to Jarvis is sent to Anthropic. The key is kept only
+in the encrypted storage on this USB.
+EOF
+  if ask "Use Claude?"; then
+    read -r -s -p "Paste your Anthropic API key (it is not shown), then press Enter: " key
+    echo
+    if [[ -z ${key} || ${key} =~ [[:space:]\"\'] ]]; then
+      echo "That doesn't look like a key; nothing was saved."
+    else
+      if [[ ! -f ${ETC}/models.env ]]; then
+        sudo touch "${ETC}/models.env"
+        sudo chown root:bau "${ETC}/models.env"
+        sudo chmod 0640 "${ETC}/models.env"
+      fi
+      # printf is built in, so the key never appears in a command line.
+      printf 'ANTHROPIC_API_KEY=%s\n' "${key}" | sudo tee -a "${ETC}/models.env" >/dev/null
+      echo "Saved in the encrypted storage."
+    fi
+    unset key
+  fi
+fi
+
+claude_ready=0
+if grep -qs '^ANTHROPIC_API_KEY=.' "${ETC}/models.env"; then
+  if [[ $(status_of "${CLAUDE}") == APPROVED ]]; then
+    claude_ready=1
+  else
+    say "Measure Claude"
+    echo "A short test conversation with Claude (connect to the internet first; it costs a"
+    echo "few cents on your Anthropic account)."
+    if bau models bench "${CLAUDE}"; then
+      echo
+      if ask "Approve ${CLAUDE} for Jarvis on this machine?"; then
+        bau set-status model "${CLAUDE}" APPROVED && claude_ready=1
+      else
+        echo "Not approved: Jarvis won't use Claude."
+      fi
+    else
+      echo "Claude did not answer properly, so it cannot be approved. Check the internet and"
+      echo "the key (sudoedit ${ETC}/models.env), then run jarvis-setup again."
+    fi
+  fi
+fi
+
+use_local=1
 if [[ ! -f ${BAU_HOME}/models/${FILE} ]]; then
   say "Local model"
-  echo "Jarvis needs a small AI model that runs on this computer (1.1 GB download,"
+  echo "A small AI model that runs on this computer, also without internet (1.1 GB download,"
   echo "Qwen2.5-1.5B-Instruct, Apache-2.0). It is checked against a pinned SHA-256."
-  ask "Download it now?" || { pause; exit 0; }
-  bau models fetch "${MODEL}" || { echo "Download failed: run jarvis-setup again to resume."; pause; exit 1; }
-fi
-
-if [[ ! -f /etc/bau/llm.env ]]; then
-  printf 'BAU_LLM_MODEL=%s\nBAU_LLM_ALIAS=%s\n' "${BAU_HOME}/models/${FILE}" "${MODEL}" \
-    | sudo tee /etc/bau/llm.env >/dev/null
-  sudo chown root:bau /etc/bau/llm.env && sudo chmod 0640 /etc/bau/llm.env
-fi
-if ! systemctl is-active --quiet bau-llm.service; then
-  echo "Starting the local model..."
-  sudo systemctl restart bau-llm.service
-fi
-for _ in $(seq 60); do
-  curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1 && break
-  sleep 2
-done
-curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1 \
-  || { echo "The model server did not start: journalctl -u bau-llm"; pause; exit 1; }
-
-status="$(bau models list | python3 -c 'import json,sys
-print(next((m["status"] for m in json.load(sys.stdin) if m["model_id"]==sys.argv[1]),""))' "${MODEL}")"
-if [[ ${status} != APPROVED ]]; then
-  say "Measure the model on this computer"
-  if ! bau models bench "${MODEL}"; then
-    echo "The model did not answer properly, so it cannot be approved."; pause; exit 1
+  if ! ask "Download it now?"; then
+    ((claude_ready)) || { pause; exit 0; }
+    use_local=0
+  elif ! bau models fetch "${MODEL}"; then
+    echo "Download failed: run jarvis-setup again to resume."; pause; exit 1
   fi
-  echo
-  echo "Above: how fast it is here and whether it answered and used a tool."
-  if ask "Approve ${MODEL} for Jarvis on this machine?"; then
-    bau set-status model "${MODEL}" APPROVED || { pause; exit 1; }
-  else
-    echo "Not approved: Jarvis stays in basic mode."
+fi
+
+if ((use_local)); then
+  if [[ ! -f ${ETC}/llm.env ]]; then
+    printf 'BAU_LLM_MODEL=%s\nBAU_LLM_ALIAS=%s\n' "${BAU_HOME}/models/${FILE}" "${MODEL}" \
+      | sudo tee "${ETC}/llm.env" >/dev/null
+    sudo chown root:bau "${ETC}/llm.env" && sudo chmod 0640 "${ETC}/llm.env"
+  fi
+  if ! systemctl is-active --quiet bau-llm.service; then
+    echo "Starting the local model..."
+    sudo systemctl restart bau-llm.service
+  fi
+  for _ in $(seq 60); do
+    curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1 && break
+    sleep 2
+  done
+  curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1 \
+    || { echo "The model server did not start: journalctl -u bau-llm"; pause; exit 1; }
+
+  if [[ $(status_of "${MODEL}") != APPROVED ]]; then
+    say "Measure the model on this computer"
+    if ! bau models bench "${MODEL}"; then
+      echo "The model did not answer properly, so it cannot be approved."; pause; exit 1
+    fi
+    echo
+    echo "Above: how fast it is here and whether it answered and used a tool."
+    if ask "Approve ${MODEL} for Jarvis on this machine?"; then
+      bau set-status model "${MODEL}" APPROVED || { pause; exit 1; }
+    else
+      echo "Not approved: Jarvis stays in basic mode."
+    fi
   fi
 fi
 

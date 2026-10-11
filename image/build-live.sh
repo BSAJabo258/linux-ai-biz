@@ -37,8 +37,9 @@ OUT="$(cd "${OUT}" && pwd)"
 WORK="${OUT}/live-work"
 mkdir -p "${WORK}"
 
-# 1. BAU wheel (tests and secret scan run first unless --skip-tests).
-args=(--out "${WORK}/payload")
+# 1. BAU wheel and the Claude SDK's wheels (tests and secret scan run first unless
+#    --skip-tests).
+args=(--out "${WORK}/payload" --with-claude)
 ((SKIP_TESTS)) && args+=(--skip-tests)
 bash "${ROOT}/installer/make-payload.sh" "${args[@]}"
 
@@ -51,7 +52,7 @@ mkdir -p "${WORK}/lb"
 cp -a "${HERE}/live-build/." "${WORK}/lb/"
 inc="${WORK}/lb/config/includes.chroot"
 install -d "${inc}/opt/bau/wheels" "${inc}/opt/bau/payload" "${inc}/opt/bau/docs"
-cp "${WORK}"/payload/BAU-PAYLOAD/wheels/bau-*.whl "${inc}/opt/bau/wheels/"
+cp "${WORK}"/payload/BAU-PAYLOAD/wheels/*.whl "${inc}/opt/bau/wheels/"
 cp -a "${ROOT}/installer/payload/systemd" "${ROOT}/installer/payload/hardening" \
   "${inc}/opt/bau/payload/"
 cp "${ROOT}"/docs/*.md "${inc}/opt/bau/docs/"

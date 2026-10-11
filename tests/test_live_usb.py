@@ -190,3 +190,82 @@ def test_live_image_keeps_the_safety_model():
     assert "Before=systemd-user-sessions.service" in unit     # groups exist before any login
     llm = (root / "config/includes.chroot/etc/systemd/system/bau-llm.service").read_text()
     assert "--host 127.0.0.1" in llm and "User=bau" in llm
+
+
+def test_live_image_installs_the_claude_sdk_offline():
+    from pathlib import Path
+    image = Path(__file__).resolve().parents[1] / "image"
+    build = (image / "build-live.sh").read_text()
+    assert "--with-claude" in build and "wheels/*.whl" in build
+    hook = (image / "live-build/config/hooks/live/0500-bau.hook.chroot").read_text()
+    assert "--no-index --find-links /opt/bau/wheels anthropic" in hook
+    assert hook.index("import anthropic") < hook.index("rm -rf /opt/bau/wheels")
+    assert "ANTHROPIC_API_KEY" not in hook                         # the key is never in the image
+
+
+# Fakes for jarvis-setup: storage unlocked, owner in the bau group, sudo without root
+# (chown skipped), and a `bau` that keeps model status in a file and logs every call.
+FAKES = {
+    "jarvis-storage": "exit 0",
+    "id": "echo owner bau bau-approvers",
+    "sudo": '[[ $1 == chown ]] && exit 0\necho "sudo $*" >> "$LOG"\nexec "$@"',
+    "bau": """echo "bau $*" >> "$LOG"
+case "$1 $2" in
+  "models list") printf '[{"model_id": "claude-opus-5-5", "status": "%s"}]' "$(cat "$STATE")" ;;
+  "models bench") exit "${BENCH_EXIT:-0}" ;;
+  "set-status model") echo "$4" > "$STATE" ;;
+esac""",
+}
+
+
+def run_setup(tmp_path, answers, bench_exit=0):
+    import os
+    import subprocess
+    from pathlib import Path
+    script = (Path(__file__).resolve().parents[1] / "image/live-build/config/includes.chroot"
+              / "usr/local/bin/jarvis-setup")
+    bin_dir, etc = tmp_path / "bin", tmp_path / "etc"
+    bin_dir.mkdir()
+    etc.mkdir()
+    for name, body in FAKES.items():
+        (bin_dir / name).write_text("#!/bin/bash\n" + body + "\n")
+        (bin_dir / name).chmod(0o755)
+    (tmp_path / "state").write_text("NOT_EVALUATED")
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "BAU_ETC": str(etc),
+           "LOG": str(tmp_path / "log"), "STATE": str(tmp_path / "state"),
+           "BENCH_EXIT": str(bench_exit)}
+    r = subprocess.run(["bash", str(script)], input=answers, env=env, capture_output=True,
+                       text=True, timeout=60)
+    log = (tmp_path / "log").read_text() if (tmp_path / "log").exists() else ""
+    return r, etc / "models.env", log, (tmp_path / "state").read_text().strip()
+
+
+@pytest.mark.skipif(not __import__("shutil").which("bash"), reason="needs bash")
+def test_live_setup_keeps_the_claude_key_private_and_waits_for_the_owner(tmp_path):
+    key = "sk-ant-test-0123456789"
+    # Use Claude? y / key / Approve? y / Download the local model? n / Talk now? n
+    r, env_file, log, state = run_setup(tmp_path, f"y\n{key}\ny\nn\nn\n")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert env_file.read_text() == f"ANTHROPIC_API_KEY={key}\n"
+    assert env_file.stat().st_mode & 0o777 == 0o640
+    assert key not in r.stdout + r.stderr and key not in log    # not shown, not in any argv
+    assert "bau models bench claude-opus-5-5" in log            # measured before approval
+    assert state == "APPROVED"                                  # by the owner's own y
+    assert "bau models fetch" not in log                        # local model is optional now
+
+    (tmp_path / "declined").mkdir()
+    r, env_file, log, _ = run_setup(tmp_path / "declined", "n\nn\n")   # no Claude, no model
+    assert r.returncode == 0 and not env_file.exists()
+    assert "bench" not in log and "set-status" not in log
+
+
+@pytest.mark.skipif(not __import__("shutil").which("bash"), reason="needs bash")
+def test_live_setup_never_approves_claude_without_the_owner_or_a_working_key(tmp_path):
+    (tmp_path / "a").mkdir()
+    r, _, log, state = run_setup(tmp_path / "a", "y\nsk-ant-test\nn\nn\n")    # owner says no
+    assert "set-status" not in log and state == "NOT_EVALUATED"
+    assert "Not approved" in r.stdout
+    (tmp_path / "b").mkdir()
+    r, _, log, state = run_setup(tmp_path / "b", "y\nsk-ant-test\n", bench_exit=1)
+    assert "set-status" not in log and state == "NOT_EVALUATED"
+    assert "cannot be approved" in r.stdout

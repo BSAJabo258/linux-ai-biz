@@ -53,8 +53,14 @@ The desktop opens and **My Jarvis Setup** starts by itself. It asks one thing at
 2. **Unlock.** After the restart, the screen asks for the passphrase (*Please unlock
    disk...*). Type it and press Enter. You do this every time you start My Jarvis.
 3. **Connect to the internet** (network icon, top right), then Setup continues:
+   - **Claude (optional):** answer `y` to let Jarvis use Claude, then paste your Anthropic
+     API key (from console.anthropic.com) and press Enter. The key is not shown on screen
+     and is kept only in your encrypted storage. Anthropic bills your account for every
+     conversation, and what you say to Jarvis goes to Anthropic. Setup runs one short test
+     conversation (a few cents) and then asks you to approve Claude: answer `y`. Answer `n`
+     to skip Claude; you can run Setup again later.
    - **Local model:** answer `y` to download it (1.1 GB, checked against a fixed
-     fingerprint).
+     fingerprint). It also works without internet. If you approved Claude you can skip it.
    - **Measure:** Setup runs a short test on this PC and shows the speed and whether
      the model answered.
    - **Approve:** you decide. Answer `y` to let Jarvis use it.
