@@ -75,4 +75,9 @@ json.dump({"image": name, "version": rel["MYJARVIS_OS_VERSION"],
            "packages": [p for p in pkgs if p]},
           open(pathlib.Path(work, "out", "manifest.json"), "w"), indent=1)
 EOF
+# Docker runs this as root: hand out/ back to the user who started the build, or
+# build-live.sh cannot move the image out of it.
+if [[ -n ${HOST_UID:-} ]]; then
+  chown -R "${HOST_UID}:${HOST_GID:-${HOST_UID}}" "${WORK}/out"
+fi
 echo "image: ${WORK}/out/${name}"
