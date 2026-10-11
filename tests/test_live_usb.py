@@ -192,6 +192,16 @@ def test_live_image_keeps_the_safety_model():
     assert "--host 127.0.0.1" in llm and "User=bau" in llm
 
 
+def test_live_image_has_a_display_server_for_the_desktop():
+    # --apt-recommends false: xfce4 and lightdm only *recommend* Xorg, so without these
+    # lines the image has no X server and LightDM fails at every boot.
+    from pathlib import Path
+    lst = Path(__file__).resolve().parents[1] / "image/live-build/config/package-lists"
+    pkgs = {line.split("#")[0].strip() for f in lst.glob("*.list.chroot")
+            for line in f.read_text().splitlines()}
+    assert {"xserver-xorg", "xserver-xorg-core", "lightdm", "lightdm-gtk-greeter"} <= pkgs
+
+
 def test_live_image_installs_the_claude_sdk_offline():
     from pathlib import Path
     image = Path(__file__).resolve().parents[1] / "image"
