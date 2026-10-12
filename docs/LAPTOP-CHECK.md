@@ -48,6 +48,23 @@ If something goes wrong, take a photo of the window and send it.
 | **READY, AFTER THESE STEPS** | Do each `DO FIRST` line before installing (for example: BitLocker is on, so write down the recovery key and back up first). |
 | **NOT READY** | A `BLOCKER` line says why: under 8 GB of memory, a 32-bit system, or no internal disk of 64 GB or more. |
 
+### If it says the disk is behind Intel RST (RAID On)
+
+Many Dell, HP and Lenovo laptops ship with the disk setting **SATA Operation: RAID On**
+(Intel RST). Linux usually cannot see the disk that way, so the installer finds nothing to
+install on. Switch it to **AHCI**. Switching it alone stops Windows from starting, so if
+you still need Windows (for example to finish a backup), do it in this order:
+
+1. In Windows, press Start, type **cmd**, right-click **Command Prompt**, choose **Run as
+   administrator**, and type: `bcdedit /set {current} safeboot minimal`
+2. Restart. At the maker's logo press the firmware key (Dell: **F2**). Find **SATA
+   Operation** (Dell: System Configuration), choose **AHCI**, then Apply and Exit.
+3. Windows starts in Safe Mode. Open Command Prompt as administrator again and type:
+   `bcdedit /deletevalue {current} safeboot` then restart. Windows now starts normally.
+
+If everything is backed up and Windows can go, just switch to AHCI in step 2 and start
+from the stick.
+
 The Windows check judges each device from its maker: Intel, Realtek, Qualcomm/Atheros and
 MediaTek Wi-Fi work from the stick; some Broadcom Wi-Fi does not (have Ethernet or a USB
 Wi-Fi adapter ready); NVIDIA graphics may need **safe graphics** in the stick's menu. It
