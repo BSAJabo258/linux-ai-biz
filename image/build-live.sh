@@ -65,7 +65,7 @@ cp -a "${WORK}/payload/BAU-PAYLOAD" "${bin}/BAU-PAYLOAD"
 (cd "${bin}/BAU-PAYLOAD" && sha256sum --quiet --strict -c SHA256SUMS) \
   || die "BAU payload does not match its SHA256SUMS - rebuild it"
 cp "${ROOT}/installer/firstboot/firstboot-setup.sh" "${HERE}/live-build/live-to-disk.sh" \
-  "${bin}/bau/"
+  "${ROOT}/installer/firstboot/finish-install.sh" "${bin}/bau/"
 cp -a "${ROOT}/installer/payload/hardening" "${bin}/bau/hardening"
 version="$(cat "${HERE}/VERSION")"
 commit="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"

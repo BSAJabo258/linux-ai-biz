@@ -229,6 +229,7 @@ EOF
 chmod 0644 /usr/share/applications/bau-jarvis.desktop
 
 sed -i '/BAU base OS installed/,/This notice is removed by install.sh./d' /etc/motd || true
+rm -f /etc/xdg/autostart/bau-finish-install.desktop   # finish-install.sh: done
 
 # ---------------------------------------------------------------- 9. self-test
 log "self-test:"
