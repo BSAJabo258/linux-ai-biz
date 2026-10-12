@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 405 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 417 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -108,6 +108,34 @@ validate`. `Toolbox.ask` answers plain-words questions; Jarvis's `toolbox` tool 
 prompt make him look there before guessing; the Scout panel shows "Already known" first.
 `bau toolbox check NAME` -> `Scout.add` (one GitHub record) + `Scout.inspect`. Rebuilt from
 research because the owner's own transcript collection was lost with a codespace.
+
+Agents as folders (2026-10-12, tests first in `tests/test_agent_folders.py`): the
+owner's point was that agents are folders (instructions + skills + tools/MCP + a brain),
+not models. `agentfolders.py` loads `BAU_HOME/agents/NAME/` or shipped `data/agents/NAME/`
+(the owner's wins):
+- `AGENT.md` frontmatter: name, description, brain, tools, mcp, skills, max_steps; the
+  body is the instructions;
+- `skills/*/SKILL.md` follows the Agent Skills spec, checked 2026-10-12 at
+  agentskills.io/specification: name up to 64 characters `[a-z0-9-]` matching the
+  folder, description up to 1024 characters;
+- shared skills live in `BAU_HOME/skills/`.
+
+`purpose()` lists only skill names and descriptions; the gateway tool `inspect.skill`
+opens one, and its text comes back wrapped as untrusted. `approve()` is human only and
+stores the folder's sha256 in `config/agent_approvals.yaml`; any change makes it
+"changed since approval" and `run()` refuses. `run()`:
+- resolves the brain via `brains.resolve`;
+- builds the gateway with `agent_tools[folder:NAME]` = AGENT.md tools + `inspect.skill`;
+- attaches approved MCP servers from `mcp:`;
+- has no tools for a content brain.
+
+`add_skill()` copies only .md/.txt files and lists the scripts it skipped. `new()` copies
+a starter agent. Shipped agents: `researcher` (strong; cite-sources, ask-before-guessing)
+and `producer` (small; plain-words, draft-for-review). `bau agents
+list|show|approve|run|new|add-skill`; Jarvis has `agents` (read) and `ask_agent` (act).
+The toolbox gained 9 more tools (100): Agent Skills standard, Awesome Agent Skills, skills
+CLI, Claude Agent SDK, Google ADK, Microsoft Agent Framework, Kestra, Windmill (AGPL) and
+Temporal SDK. The capability map's agents and workflows layers name them.
 
 Brains per stage (2026-10-12, tests first in `tests/test_brains.py`): the owner's idea
 was to let the files-and-folders workspaces replace a pile of agents and models. A stage's

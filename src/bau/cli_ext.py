@@ -422,6 +422,37 @@ def cmd_usage(a):
     return EXIT_OK
 
 
+def cmd_agents(a):
+    from . import agentfolders as AF
+    try:
+        if a.agents_cmd == "list":
+            _out([{k: v for k, v in AF.summary(AF.load(n, None), None).items()
+                   if k in ("name", "description", "brain", "approval")}
+                  for n in AF.names()])
+        elif a.agents_cmd == "show":
+            _out(AF.summary(AF.load(a.name, None), None))
+        elif a.agents_cmd == "approve":
+            _out(AF.approve(a.name, _human(), None, AuditLog()))
+        elif a.agents_cmd == "new":
+            dest = AF.new(a.name, None, a.start_from)
+            _out({"agent": a.name, "folder": str(dest),
+                  "next": f"edit {dest / 'AGENT.md'}, then: bau agents approve {a.name}"})
+        elif a.agents_cmd == "add-skill":
+            _out(AF.add_skill(Path(a.folder), None))
+        elif a.agents_cmd == "run":
+            from dataclasses import asdict
+
+            from .assistant import load_env_file, pick_model
+            load_env_file()
+            res = AF.run(a.name, a.task, None, AuditLog(), jarvis=pick_model())
+            _out(asdict(res))
+            return EXIT_OK if res.status == "COMPLETED" else EXIT_REVIEW
+    except (AF.AgentFolderError, PermissionError, ValueError) as e:
+        print(f"agents: {e}", file=sys.stderr)
+        return EXIT_BLOCKED
+    return EXIT_OK
+
+
 def cmd_results(a):
     from .results import Results
     r = Results(audit=AuditLog())
@@ -1402,6 +1433,23 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--daily-tokens", type=int)
     x.add_argument("--daily-usd", type=float)
     s.set_defaults(fn=cmd_usage)
+
+    s = sub.add_parser("agents", help="agents as folders: instructions, skills, tools, brain")
+    w = s.add_subparsers(dest="agents_cmd", required=True)
+    w.add_parser("list", help="every agent folder and whether you approved it")
+    x = w.add_parser("show", help="one agent: brain, tools, skills, problems")
+    x.add_argument("name")
+    x = w.add_parser("approve", help="you: approve an agent folder as it is now")
+    x.add_argument("name")
+    x = w.add_parser("run", help="give an approved agent one task")
+    x.add_argument("name")
+    x.add_argument("task")
+    x = w.add_parser("new", help="start a new agent by copying one (default: producer)")
+    x.add_argument("name")
+    x.add_argument("--from", dest="start_from", default="producer")
+    x = w.add_parser("add-skill", help="bring in a downloaded skill folder (text only)")
+    x.add_argument("folder")
+    s.set_defaults(fn=cmd_agents)
 
     s = sub.add_parser("results", help="how posted videos are doing: views, earnings, profit")
     w = s.add_subparsers(dest="res_cmd")

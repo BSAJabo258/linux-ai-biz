@@ -100,6 +100,7 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "toolbox": "scout", "capability_map": "scout", "world_watch": "godseye",
              "video_clips": "studio", "make_video": "studio",
              "usage_today": "usage", "results": "results",
+             "agents": "strategist", "ask_agent": "strategist",
              "hold_everything": "watchdog", "release_hold": "watchdog"}
 TOOL_WORDS = {"draft_stage": "Drafting the next step", "find_tools": "Searching GitHub",
               "brain_lookup": "Looking it up in the Second Brain",
@@ -281,6 +282,14 @@ class Assistant:
             Tool("usage_today", "How much the AI models have been used: tokens and dollars "
                  "today and this week, for each model, busy replies, the owner's daily limits "
                  "and any rate-limit warnings (GitHub's too).", _schema(), self.t_usage),
+            Tool("agents", "The owner's agents: each is a folder with instructions, skills, "
+                 "allowed tools and a brain (small = free local model, strong = Claude). "
+                 "Shows which are approved by the owner.", _schema(), self.t_agents),
+            Tool("ask_agent", "Give one task to an approved agent (see agents) and get its "
+                 "report. It works only through its own listed tools and saves drafts for "
+                 "the owner; it never posts, pays or sends.",
+                 _schema({"name": {"type": "string"}, "task": {"type": "string"}},
+                         ["name", "task"]), self.t_ask_agent, kind="act"),
             Tool("results", "How the posted videos are doing: views, watch time, likes, "
                  "YouTube's estimated earnings, what each video's clips cost and the profit, "
                  "and which story formats people watch most. refresh=true reads the latest "
@@ -486,6 +495,32 @@ class Assistant:
         from .usage import Usage
         s = Usage(self.home).summary()
         return {**s, "by_model": s["by_model"][:8]}
+
+    def t_agents(self) -> list[dict[str, Any]]:
+        from . import agentfolders as AF
+        out = []
+        for n in AF.names(self.home):
+            try:
+                s = AF.summary(AF.load(n, self.home), self.home)
+            except AF.AgentFolderError as e:
+                s = {"name": n, "problems": [str(e)], "approval": "unreadable"}
+            out.append({k: s.get(k) for k in ("name", "description", "brain", "approval",
+                                               "tools")} |
+                       {"skills": [x["name"] for x in s.get("skills") or []]})
+        return out
+
+    def t_ask_agent(self, name: str, task: str) -> dict[str, Any]:
+        from dataclasses import asdict
+
+        from . import agentfolders as AF
+        res = AF.run(name, task[:2000], self.home, self.audit,
+                     jarvis=(self.provider, self.model),
+                     factory=self.clients.get("model_factory"))
+        out = asdict(res)
+        return {"agent": name, "status": out["status"], "report": out["final_text"],
+                "tools_used": [c["capability"] for c in out["tool_calls"] if c.get("ok")],
+                "denied": [c for c in out["tool_calls"] if not c.get("ok")][:5],
+                "cost_usd": out["cost_usd"]}
 
     def results(self):
         from .results import Results

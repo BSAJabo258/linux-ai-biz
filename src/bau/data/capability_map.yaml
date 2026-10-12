@@ -86,9 +86,14 @@ layers:
       - {path: src/bau/workspace.py, does: numbered stage folders an agent walks, owner checks each stage}
       - {path: src/bau/factories.py, does: business factories that resume after a reboot}
       - {path: src/bau/jobs.py, does: jobs with checkpoints that survive a power cut}
+      - {path: src/bau/agentfolders.py, does: "skills as folders (SKILL.md), opened only when needed"}
     tools:
       - {name: workflow-use, plan: later, why: "Record once, replay with variables: the right idea, but AGPL and 'not for production' by its own README. BAU saves procedures itself first."}
-      - {name: Anthropic Agent Skills, plan: direct, why: "A plain folder format for saved procedures; BAU's workspaces already read Markdown the same way."}
+      - {name: Agent Skills standard, plan: direct, why: "BAU's agent folders and skills use this format, so community skills drop in (text only, owner-approved)."}
+      - {name: Anthropic Agent Skills, plan: direct, why: "Ready-made skills in the standard format; the document skills are source-available, so check their terms."}
+      - {name: Awesome Agent Skills, plan: direct, why: "Where to find more skills; each comes in with bau agents add-skill."}
+      - {name: Kestra, plan: later, why: "Apache-licensed scheduler with an MCP server; for the cloud server if BAU's own schedules aren't enough."}
+      - {name: Windmill, plan: skip, why: "AGPL, and its approvals are secret links; BAU's own signed approvals and workspaces cover this."}
       - {name: n8n, plan: later, why: "Hundreds of app connections; fair-code licence, so check the terms before any business use."}
       - {name: Activepieces, plan: later, why: "An n8n alternative with an MIT core; compare the two only if BAU needs many app connections."}
     risk: medium
@@ -143,9 +148,13 @@ layers:
     status: partial
     in_bau:
       - {path: src/bau/agents.py, does: agent runtime; every tool call goes through the gateway}
+      - {path: src/bau/agentfolders.py, does: "agents as folders: AGENT.md + skills, approved by the owner, a brain each"}
       - {path: src/bau/governor.py, does: watchdog that can hold or quarantine, never approve}
       - {path: src/bau/usage.py, does: per-model token and dollar meter with the owner's daily limits}
     tools:
+      - {name: Pydantic AI, plan: later, why: "Tools that wait for approval match BAU's stage-then-click rule; the first framework to try if BAU's own loop runs out of room."}
+      - {name: Claude Agent SDK (Python), plan: later, why: "Claude's own agent loop with skills; only with its shell and file tools locked down."}
+      - {name: Microsoft Agent Framework, plan: later, why: "Workflows with checkpoints, human steps and Agent Skills; Azure-leaning."}
       - {name: LangGraph, plan: later, why: "Graphs of steps with checkpoints; consider only if BAU's own runtime runs out of room."}
       - {name: OpenAI Agents SDK, plan: skip, why: "BAU's agents.py and gateway already hand work between agents with permissions."}
       - {name: CrewAI, plan: skip, why: "Role-based teams; BAU's agent records already define roles, tools and budgets."}
@@ -154,7 +163,7 @@ layers:
     rules:
       - Each agent has its own budget, tools and permissions; none can approve.
       - A simple job gets one agent; teams only when the job needs them.
-    next: "A coordinator that picks the smallest team per job and stays inside each agent's budget."
+    next: "A coordinator that hands each job to the smallest set of agent folders, inside each one's budget."
     build: 7
 
   - id: coding

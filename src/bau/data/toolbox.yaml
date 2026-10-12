@@ -1028,3 +1028,113 @@ entries:
     last_activity: "2026-01-23"
     sources: [https://github.com/GAIR-NLP/AgencyBench, https://github.com/GAIR-NLP/AgencyBench/commits.atom]
     caveats: Each scenario is about a million tokens - heavy API spend. Its docker command turns off seccomp; run it only in a throwaway sandbox. Scores are project-reported.
+  # ---------------------------------------------------------------- agents as folders (skills) and orchestration
+  # Researched 2026-10-12: agentskills.io/specification, each repo's GitHub page and commits feed.
+  - name: Agent Skills standard
+    repo: agentskills/agentskills
+    url: https://github.com/agentskills/agentskills
+    category: agents
+    checked: "2026-10-12"
+    problem: Agents need instructions and know-how packaged so any tool can load them - a folder with SKILL.md, loaded only when needed.
+    how_used: BAU's agent folders and skills follow this format (name up to 64 lowercase-hyphen characters matching the folder, description up to 1024); its skills-ref validator checks a skill.
+    licence: Apache-2.0 (code), CC-BY-4.0 (docs)
+    stars: "~26.1k (2026-10-12)"
+    last_activity: "2026-08-09"
+    sources: [https://agentskills.io/specification, https://github.com/agentskills/agentskills]
+    caveats: Started by Anthropic; about 45 tools list support (Claude Code, Codex, Copilot, Cursor, Gemini CLI and more). allowed-tools is experimental; BAU's gateway decides tools anyway.
+  - name: Awesome Agent Skills
+    repo: VoltAgent/awesome-agent-skills
+    url: https://github.com/VoltAgent/awesome-agent-skills
+    category: agents
+    checked: "2026-10-12"
+    problem: Finding good ready-made skills among thousands published by companies and the community.
+    how_used: A list to pick skills from; each one comes in with `bau agents add-skill` (text only) after a look at its licence.
+    licence: MIT (the list; each skill has its own)
+    stars: "~35.6k (2026-10-12)"
+    last_activity: "2026-10-12"
+    sources: [https://github.com/VoltAgent/awesome-agent-skills, https://github.com/VoltAgent/awesome-agent-skills/commits.atom]
+    caveats: Only a list - quality and licence vary skill by skill.
+  - name: skills CLI (skills.sh)
+    repo: vercel-labs/skills
+    url: https://github.com/vercel-labs/skills
+    category: agents
+    checked: "2026-10-12"
+    problem: Installing the same skill into many different coding agents and keeping it updated.
+    how_used: A reference for folder layout and a registry to find skills; BAU copies skills itself instead of running this Node tool.
+    licence: MIT
+    stars: "~34.0k (2026-10-12)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/vercel-labs/skills, https://github.com/vercel-labs/skills/commits.atom]
+    caveats: Node tool with telemetry; its README describes no security scanning of skills.
+  - name: Claude Agent SDK (Python)
+    repo: anthropics/claude-agent-sdk-python
+    url: https://github.com/anthropics/claude-agent-sdk-python
+    category: agents
+    checked: "2026-10-12"
+    problem: Running Claude's own agent loop (tools, skills, subagents, hooks) from Python code.
+    how_used: A library; its PreToolUse hook or can_use_tool can send every consequential call to the owner for approval.
+    licence: MIT
+    stars: "~8.3k (2026-10-12)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/anthropics/claude-agent-sdk-python, https://github.com/anthropics/claude-agent-sdk-python/commits.atom]
+    caveats: Claude only, needs an API key, starts a Claude Code process, and by default gives the agent shell and file tools - lock them down.
+  - name: Google ADK
+    repo: google/adk-python
+    url: https://github.com/google/adk-python
+    category: agents
+    checked: "2026-10-12"
+    problem: Building, testing and deploying agents in Python with MCP tools and a tool-confirmation step.
+    how_used: A library (pip install google-adk).
+    licence: Apache-2.0
+    stars: "~21.8k (2026-10-12)"
+    last_activity: "2026-10-12"
+    sources: [https://github.com/google/adk-python, https://github.com/google/adk-python/commits.atom]
+    caveats: Tuned for Gemini though described as model-agnostic; releases every two weeks, so the API moves fast.
+  - name: Microsoft Agent Framework
+    repo: microsoft/agent-framework
+    url: https://github.com/microsoft/agent-framework
+    category: agents
+    checked: "2026-10-12"
+    problem: Agents plus graph workflows with checkpoints, human-in-the-loop steps and Agent Skills, in Python and .NET.
+    how_used: A library; ships migration guides from Semantic Kernel and AutoGen.
+    licence: MIT
+    stars: "~14.1k (2026-10-12)"
+    last_activity: "2026-10-12"
+    sources: [https://github.com/microsoft/agent-framework, https://github.com/microsoft/agent-framework/commits.atom]
+    caveats: Leans towards Azure services.
+  - name: Kestra
+    repo: kestra-io/kestra
+    url: https://github.com/kestra-io/kestra
+    category: automation
+    checked: "2026-10-12"
+    problem: Scheduling and event-driven workflows written in YAML, with AI-agent tasks and a built-in MCP server.
+    how_used: A self-hosted service BAU would drive through its API or MCP.
+    licence: Apache-2.0
+    stars: "~29.5k (2026-10-12)"
+    last_activity: "2026-10-12"
+    sources: [https://github.com/kestra-io/kestra, https://github.com/kestra-io/kestra/commits.atom]
+    caveats: A Java service - heavy for an 8 GB laptop; better on the cloud server.
+  - name: Windmill
+    repo: windmill-labs/windmill
+    url: https://github.com/windmill-labs/windmill
+    category: automation
+    checked: "2026-10-12"
+    problem: Turning Python scripts into webhooks, scheduled flows and small apps, self-hosted.
+    how_used: A self-hosted service (Docker) BAU calls through its API.
+    licence: AGPL-3.0 core; official images also contain proprietary enterprise code
+    stars: "~18.2k (2026-10-12)"
+    last_activity: "2026-10-12"
+    sources: [https://github.com/windmill-labs/windmill, https://www.windmill.dev/docs/flows/flow_approval]
+    caveats: AGPL. Approval forms are an enterprise feature, and approvals are secret links - not BAU's signed approvals.
+  - name: Temporal Python SDK
+    repo: temporalio/sdk-python
+    url: https://github.com/temporalio/sdk-python
+    category: automation
+    checked: "2026-10-12"
+    problem: Long jobs that must survive crashes and wait days for an owner's decision.
+    how_used: A library plus a Temporal server you run yourself.
+    licence: MIT
+    stars: "~1.2k (2026-10-12)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/temporalio/sdk-python, https://github.com/temporalio/sdk-python/pull/1923]
+    caveats: Heavy to run on a laptop; BAU's own job checkpoints already survive reboots.
