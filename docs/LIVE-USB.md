@@ -8,8 +8,9 @@ Your work (Jarvis's memory, BAU's records and keys, your files, saved Wi-Fi) is 
 **encrypted storage on the same stick**, locked with a passphrase you choose. Without the
 passphrase nobody can read it, not even with the stick in their hands.
 
-This is the portable way to run BAU. The other way, installing BAU onto a laptop's own
-drive from the two install sticks, is in `INSTALL.md`.
+The same stick can also **install BAU onto a laptop's own drive** when you're ready: pick
+**Install BAU on this laptop** in the boot menu (see "Install BAU on this laptop" below).
+One stick does both.
 
 ## What you need
 
@@ -75,6 +76,7 @@ see the dashboard. Setup can be run again any time; it only does what is still m
 | Entry | What it does |
 |---|---|
 | My Jarvis | Normal start: asks for your passphrase, opens your encrypted storage |
+| Install BAU on this laptop | Installs BAU onto this PC's own drive, encrypted. **Erases the drive you choose.** See below |
 | limited mode | Starts without opening your storage. Nothing is saved; BAU stays off. For a quick look, or if you forgot the passphrase |
 | safe graphics | Same as normal, for screens that stay black |
 | recovery | Text console only, no desktop: for repairs |
@@ -82,6 +84,36 @@ see the dashboard. Setup can be run again any time; it only does what is still m
 
 This menu is what UEFI PCs (nearly every PC from the last ten years) show. Older BIOS-only
 PCs show a simpler menu: choose the first entry for a normal start.
+
+## Install BAU on this laptop
+
+When you want BAU on a laptop's own drive instead of running it from the stick:
+
+1. **Back up anything on that laptop you want to keep.** The drive you pick is erased.
+2. Start the laptop from this stick and choose **Install BAU on this laptop**.
+3. The installer asks you, and only you:
+   - **which drive** to install to, and to **confirm** erasing it (BAU never picks it);
+   - a **passphrase** for the encrypted drive (you type it at every start; there is no way
+     back in without it);
+   - the **password** for the `bauadmin` account;
+   - your **time zone**.
+
+   Everything else is set the BAU way: full-disk encryption, root login off, network time.
+4. It copies the same tested system you run from the stick (desktop, BAU, local-model
+   runner), so nothing large is downloaded. It also copies BAU's install files to
+   `/opt/bau-payload`, checking every file; a damaged copy is deleted, not used.
+5. Take the stick out when it says so and restart. Log in as `bauadmin`, open a terminal
+   and finish the install:
+
+   ```bash
+   sudo bash /opt/bau-payload/install.sh
+   ```
+
+   It sets up BAU's firewall, services, keys and checks, and asks for your approval-key
+   passphrase. When it's done, Jarvis is in the menu as on the stick.
+
+Your encrypted storage on the stick is not touched by the install: keep the stick as your
+portable Jarvis and recovery stick.
 
 ## Good to know
 

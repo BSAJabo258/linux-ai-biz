@@ -22,6 +22,13 @@ GitHub's *build-usb* release has it ready-made as `bau-one-debian-*.iso`. The st
 or more. **Installing erases the disk you pick.** On a laptop that still has Windows on it,
 pick an external SSD as the target, or back up and accept that Windows goes.
 
+**Or the full stick.** The My Jarvis live USB (`my-jarvis-*.iso`, from *build-live*) now also
+installs BAU: boot it and choose **Install BAU on this laptop**. It copies the tested live
+system (desktop, BAU, local-model runner) onto an encrypted disk with the same rules as USB
+#1 (you pick and confirm the disk, choose the passphrase and password) and puts the payload
+in `/opt/bau-payload`; then continue with Phase 5. See `LIVE-USB.md`, "Install BAU on this
+laptop".
+
 Build both on any Linux machine with `python3`, `xorriso`, `gpg`, `curl`. Stick sizes: USB #1 at least 2 GB; USB #2 at least 1 GB. A separate **backup drive** is also required (Phase 2).
 
 **Try it before the laptop.** Two safe rehearsals, nothing gets wiped:

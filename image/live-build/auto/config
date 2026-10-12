@@ -7,6 +7,10 @@ set -e
 #   persistence-encryption=lukslabel  only open a LUKS container labelled "persistence"
 #                                     (never other encrypted disks, never plain storage)
 #   username / hostname               the owner's account and the machine name
+# Installer: --debian-installer live puts Debian's installer on the same stick. It copies
+# this tested live system to the laptop's disk (live-installer) with BAU's answers from
+# config/includes.installer/preseed.cfg: the owner still picks and confirms the disk and
+# chooses the passphrase and password. The "Install BAU on this laptop" menu entry starts it.
 # Bootloaders: GRUB (with the My Jarvis menu) on UEFI PCs, syslinux on old BIOS-only PCs.
 # syslinux also makes xorriso use -partition_offset 16: partition 1 is then a mountable
 # copy of the system, so live-boot mounts that partition instead of the whole stick and
@@ -17,7 +21,9 @@ lb config noauto \
   --archive-areas "main contrib non-free non-free-firmware" \
   --binary-images iso-hybrid \
   --bootloaders "syslinux,grub-efi" \
-  --debian-installer none \
+  --debian-installer live \
+  --debian-installer-gui true \
+  --debian-installer-distribution trixie \
   --firmware-binary false \
   --firmware-chroot false \
   --security true \
