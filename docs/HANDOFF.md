@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 374 tests pass; 49 regulations / 65 policies validate.
+State: 394 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -108,6 +108,33 @@ validate`. `Toolbox.ask` answers plain-words questions; Jarvis's `toolbox` tool 
 prompt make him look there before guessing; the Scout panel shows "Already known" first.
 `bau toolbox check NAME` -> `Scout.add` (one GitHub record) + `Scout.inspect`. Rebuilt from
 research because the owner's own transcript collection was lost with a codespace.
+
+The capability map (2026-10-12, tests first in `tests/test_capability_map.py`):
+`data/capability_map.yaml` lists 13 layers. Each layer has a status (have/partial/gap),
+the BAU files that already do the job, and toolbox tools with a plan
+(direct/adapter/later/skip, plus why). It also carries rules, a next step and a build
+order: 1 web (four permissions read/fill/draft/submit; submit is the owner's), 2 connect,
+3 computer use, 4 workflows, 5 documents, 6 verification, 7 agents, 8 coding.
+`CapabilityMap` lives in `toolbox.py`: `problems()` checks the BAU paths, that every tool
+is in the toolbox, the plans, and that there are no claims. `bau toolbox map [--layer]`,
+the `capability_map` tool, and `bau toolbox validate` check the map too. The toolbox gained
+14 tools (browser, computer-use, documents categories, and AgencyBench), each with its own
+`checked: 2026-10-12`. Licence flags are recorded:
+- Skyvern and workflow-use are AGPL;
+- Marker's weights need a paid licence above $5M;
+- OmniParser's licence file and README disagree;
+- Cua has mixed licences;
+- Browserable has had no commits for about 14 months.
+
+Owner decisions (2026-10-12):
+- USB is both: the same 128 GB stick runs Jarvis live and installs BAU on the laptop.
+  The installer is already one stick (#50, `bau-one-debian-*.iso`). The plan to combine
+  it with the live image is lb_config `--debian-installer live` in the live image, so one
+  direct-written image keeps the encrypted storage. Ventoy persistence uses a backend file; Debian and
+  LUKS are not on its tested list (unverified).
+- Compute is hybrid.
+
+Next build: the browser lane (map layer 1), then the one-stick installer.
 
 The results tracker (2026-10-10, tests first in `tests/test_results.py`): `results.py`
 reads numbers back for every POSTED queue item, read only. YouTube uses Analytics

@@ -857,3 +857,174 @@ entries:
     last_activity: "2026-10-10"
     sources: [https://github.com/harry0703/MoneyPrinterTurbo]
     caveats: Its bundled background music comes from YouTube videos - never publish with it. Mass-produced content can break platform rules; kids content needs BAU's made-for-kids checks.
+  # ---------------------------------------------------------------- browsers, computer use, documents
+  # Researched 2026-10-12 for the capability map (data/capability_map.yaml): each project's
+  # GitHub page and its commits feed. Benchmark scores are the projects' own claims.
+  - name: Stagehand
+    repo: browserbase/stagehand
+    url: https://github.com/browserbase/stagehand
+    category: browser
+    checked: "2026-10-12"
+    problem: Browser automation that mixes plain code with plain-English steps (act, observe, extract) to fill forms and pull data from websites.
+    how_used: A library (TypeScript, Python, Go) run against a local Chrome with the owner's model key.
+    licence: MIT
+    stars: "~25.6k (2026-10-12)"
+    last_activity: "2026-10-10"
+    sources: [https://github.com/browserbase/stagehand, https://github.com/browserbase/stagehand/commits.atom]
+    caveats: Cloud features (proxies, recordings, its hosted MCP server) need a paid Browserbase key. "2x faster" is the vendor's claim.
+  - name: Skyvern
+    repo: Skyvern-AI/skyvern
+    url: https://github.com/Skyvern-AI/skyvern
+    category: browser
+    checked: "2026-10-12"
+    problem: Automates website workflows such as forms, logins and downloads using a model plus computer vision.
+    how_used: A self-hosted service (Docker Compose) with a Python/TypeScript SDK and a no-code workflow builder.
+    licence: AGPL-3.0
+    stars: "~23.2k (2026-10-12)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/Skyvern-AI/skyvern, https://github.com/Skyvern-AI/skyvern/commits.atom]
+    caveats: AGPL (sharing changes is required if offered as a service). Telemetry is on by default (SKYVERN_TELEMETRY=false). Its README warns that a browser tunnel without an API key gives anyone control. WebVoyager 85.8% is project-reported.
+  - name: Browserable
+    repo: browserable/browserable
+    url: https://github.com/browserable/browserable
+    category: browser
+    checked: "2026-10-12"
+    problem: A self-hostable service that lets agents navigate websites, click, fill forms and extract data.
+    how_used: Self-hosted with docker-compose (UI on localhost) plus a JavaScript SDK.
+    licence: MIT
+    stars: "~1.2k (2026-10-12)"
+    last_activity: "2025-08-27"
+    sources: [https://github.com/browserable/browserable, https://github.com/browserable/browserable/commits.atom]
+    caveats: No commits for about 14 months. Needs a model key and a remote-browser provider key (Hyperbrowser or Steel) and runs MongoDB, Redis and MinIO. Its 90.4% WebVoyager score is project-reported with no method given.
+  - name: Pie
+    repo: wiseria-ai-labs/pie-ai-agent
+    url: https://github.com/wiseria-ai-labs/pie-ai-agent
+    category: browser
+    checked: "2026-10-12"
+    problem: Browser chores done by hand again and again - reading pages and PDFs, filling forms, extracting to CSV - saved as reusable, schedulable skills.
+    how_used: A Chrome/Edge side-panel extension with the owner's own model key; an optional desktop app (Pie Link) hands work to Claude Code.
+    licence: Apache-2.0
+    stars: "~89 (2026-10-12)"
+    last_activity: "2026-10-11"
+    sources: [https://github.com/WiseriaAI/pie-ai-agent, https://github.com/WiseriaAI/pie-ai-agent/commits.atom]
+    caveats: Works inside the person's logged-in browser. Young project. The Pie Link Windows installer is unsigned and changes firewall rules; the paid plan routes chats through Pie's service.
+  - name: WebOperator
+    repo: KazKozDev/WebOperator
+    url: https://github.com/KazKozDev/WebOperator
+    category: browser
+    checked: "2026-10-12"
+    problem: A local-first agent that carries out a plain-English goal in an open Chrome tab, with a plan-act-verify loop.
+    how_used: A Chrome extension loaded unpacked, plus an optional local MCP bridge; local models (Ollama) or hosted ones.
+    licence: MIT
+    stars: "~3 (2026-10-12)"
+    last_activity: "2026-10-12"
+    sources: [https://github.com/KazKozDev/WebOperator, https://github.com/KazKozDev/WebOperator/commits.atom]
+    caveats: A tiny one-person project. Uses the logged-in browser profile with all-sites and debugger permissions; its MCP bridge accepts unauthenticated calls until a token is set. Its prompt-injection figures are project-reported.
+  - name: BrowserSkill
+    repo: Tencent/BrowserSkill
+    url: https://github.com/Tencent/BrowserSkill
+    category: browser
+    checked: "2026-10-12"
+    problem: Lets coding agents (Claude Code, Codex, Cursor) work in the Chrome or Edge profile the person is already signed into.
+    how_used: A CLI (bsk) with a background service and a browser extension; tasks run in a visible Agent Window.
+    licence: MIT
+    stars: "~8.7k (2026-10-12)"
+    last_activity: "2026-10-12"
+    sources: [https://github.com/Tencent/BrowserSkill, https://github.com/Tencent/BrowserSkill/commits.atom]
+    caveats: Its README says the Agent Window is not a separate account or sandbox, so the agent acts with the person's logins. Captured debug evidence may hold secrets. The service updates itself every 30 minutes unless BSK_AUTO_UPDATE=off. Operation audit is off by default.
+  - name: workflow-use
+    repo: browser-use/workflow-use
+    url: https://github.com/browser-use/workflow-use
+    category: browser
+    checked: "2026-10-12"
+    problem: Record a browser task once and replay it as a fixed workflow with variables, falling back to an agent when a step breaks.
+    how_used: A CLI and Python library with a recorder browser extension.
+    licence: AGPL-3.0
+    stars: "~4.2k (2026-10-12)"
+    last_activity: "2026-08-27"
+    sources: [https://github.com/browser-use/workflow-use, https://github.com/browser-use/workflow-use/commits.atom]
+    caveats: Its README says very early development, not for production. AGPL. Needs an OpenAI key.
+  - name: Cua
+    repo: trycua/cua
+    url: https://github.com/trycua/cua
+    category: computer-use
+    checked: "2026-10-12"
+    problem: Gives agents whole computers - sandboxed Linux, Windows or macOS desktops - to operate apps that have no API.
+    how_used: CLI and SDKs (Python, TypeScript) plus an MCP server, driving a sandbox or VM.
+    licence: MIT for most of the repo; Cua Spaces and Driver Bench FSL-1.1-MIT; cua-som AGPL-3.0
+    stars: "~29.5k (2026-10-12)"
+    last_activity: "2026-10-12"
+    sources: [https://github.com/trycua/cua, https://github.com/trycua/cua/commits.atom]
+    caveats: Mixed licences - use only the MIT parts. Its VM tool Lume needs Apple Silicon. The installer offers to add itself to Claude Code and other tools; choose parts explicitly.
+  - name: UI-TARS-desktop
+    repo: bytedance/UI-TARS-desktop
+    url: https://github.com/bytedance/UI-TARS-desktop
+    category: computer-use
+    checked: "2026-10-12"
+    problem: A vision-based agent that operates a computer and a browser from screenshots.
+    how_used: A CLI (Agent TARS, Node 22+) and a desktop app, pointed at a multimodal model endpoint.
+    licence: Apache-2.0
+    stars: "~39.2k (2026-10-12)"
+    last_activity: "2026-10-09"
+    sources: [https://github.com/bytedance/UI-TARS-desktop, https://github.com/bytedance/UI-TARS-desktop/commits.atom]
+    caveats: Needs a multimodal model (its examples use Volcengine Doubao or Anthropic). Changes often - pin versions. Too heavy for an 8 GB laptop to run its own model.
+  - name: OmniParser
+    repo: microsoft/OmniParser
+    url: https://github.com/microsoft/OmniParser
+    category: computer-use
+    checked: "2026-10-12"
+    problem: Turns a screenshot into a list of buttons, fields and icons a model can point at.
+    how_used: A Python library with model weights from Hugging Face.
+    licence: Repo LICENSE CC-BY-4.0 (a README badge says MIT); older icon detectors AGPL
+    stars: "~25.5k (2026-10-12)"
+    last_activity: "2026-07-20"
+    sources: [https://github.com/microsoft/OmniParser, https://github.com/microsoft/OmniParser/commits.atom, https://github.com/microsoft/OmniParser/blob/master/LICENSE]
+    caveats: The licence file and badge disagree; avoid the AGPL detectors. Its ScreenSpot score is project-reported.
+  - name: Docling
+    repo: docling-project/docling
+    url: https://github.com/docling-project/docling
+    category: documents
+    checked: "2026-10-12"
+    problem: Turns PDFs, Word, slides, spreadsheets and images into clean Markdown or JSON with tables and reading order.
+    how_used: A Python library and CLI (docling) that runs locally; also an MCP server.
+    licence: MIT (models keep their own licences)
+    stars: "~68.7k (2026-10-12)"
+    last_activity: "2026-10-12"
+    sources: [https://github.com/docling-project/docling, https://github.com/docling-project/docling/commits.atom]
+    caveats: Downloads its models on first use. Documents are untrusted input.
+  - name: OCRmyPDF
+    repo: ocrmypdf/OCRmyPDF
+    url: https://github.com/ocrmypdf/OCRmyPDF
+    category: documents
+    checked: "2026-10-12"
+    problem: Scanned PDFs have no text; this adds a searchable text layer (with deskew and rotation).
+    how_used: A command-line tool from Debian's own packages (apt install ocrmypdf).
+    licence: MPL-2.0
+    stars: "~35.0k (2026-10-12)"
+    last_activity: "2026-10-12"
+    sources: [https://github.com/ocrmypdf/OCRmyPDF, https://github.com/ocrmypdf/OCRmyPDF/commits.atom]
+    caveats: Needs Tesseract and Ghostscript. Treat PDFs from strangers as untrusted.
+  - name: Marker
+    repo: datalab-to/marker
+    url: https://github.com/datalab-to/marker
+    category: documents
+    checked: "2026-10-12"
+    problem: Converts PDFs and office files to Markdown or JSON, keeping tables, equations and code.
+    how_used: A Python library and CLI (pip install marker-pdf).
+    licence: Code Apache-2.0; model weights modified AI Pubs Open Rail-M (commercial use above $5M funding/revenue needs a paid licence)
+    stars: "~40.4k (2026-10-12)"
+    last_activity: "2026-10-02"
+    sources: [https://github.com/datalab-to/marker, https://github.com/datalab-to/marker/commits.atom]
+    caveats: The weights licence is the catch for a business; read it before use. Its benchmark comparisons are project-reported. The --use_llm mode sends content to a model.
+  - name: AgencyBench
+    repo: GAIR-NLP/AgencyBench
+    url: https://github.com/GAIR-NLP/AgencyBench
+    category: evals
+    checked: "2026-10-12"
+    problem: Measures whether an agent finishes long, realistic jobs (coding, research, frontend, games, MCP tool use), not just single answers.
+    how_used: A Python test harness with a Docker sandbox and model judges; the dataset is on Hugging Face.
+    licence: MIT
+    stars: "~102 (2026-10-12)"
+    last_activity: "2026-01-23"
+    sources: [https://github.com/GAIR-NLP/AgencyBench, https://github.com/GAIR-NLP/AgencyBench/commits.atom]
+    caveats: Each scenario is about a million tokens - heavy API spend. Its docker command turns off seccomp; run it only in a throwaway sandbox. Scores are project-reported.

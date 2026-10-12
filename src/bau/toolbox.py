@@ -23,10 +23,18 @@ from .home import bau_home, shipped_data
 CATEGORIES = ("connect", "claude-code", "docs-grounding", "gateway", "grounding",
               "structured-output", "guardrails", "evals", "context-engineering", "agents",
               "memory", "local-models", "automation", "speech-to-text", "text-to-speech",
-              "wake-word", "voice-assistant", "video-editing", "generation")
+              "wake-word", "voice-assistant", "video-editing", "generation", "browser",
+              "computer-use", "documents")
 FIELDS = ("name", "repo", "url", "category", "problem", "how_used", "licence", "stars",
           "last_activity", "sources", "caveats")
 REPO = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
+DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+STATUSES = ("have", "partial", "gap")
+# How a researched tool would join BAU: used as it is, wrapped behind a BAU adapter (so
+# BAU's permissions, audit and approvals stay in charge), later (worth it, not yet), or
+# skipped because BAU already does the job.
+PLANS = ("direct", "adapter", "later", "skip")
+LAYER_FIELDS = ("id", "name", "what", "status", "in_bau", "tools", "risk", "rules")
 CLAIMS = re.compile(r"\b(compliant|compliance-ready|guarantee[ds]?|risk-free)\b", re.I)
 STOP = set("a an and are as at be but by can do does for from get go how i in is it its "
            "me model models my of on or so that the them then this to up use what when "
@@ -92,6 +100,8 @@ class Toolbox:
                 out.append(f"{who}: needs https sources it was checked against")
             if any(CLAIMS.search(str(e[f])) for f in ("problem", "how_used", "caveats")):
                 out.append(f"{who}: no compliance or guarantee claims")
+            if "checked" in e and not DATE.match(str(e["checked"])):
+                out.append(f"{who}: checked must be a date like 2026-10-11")
         return out
 
     def find(self, name: str) -> dict[str, Any] | None:
@@ -134,7 +144,8 @@ class Toolbox:
             out["scout_decision"] = c.get("decision")
             out["next"] = f"bau scout report   (Scout's decision: {c.get('decision')})"
         else:
-            out["evidence"] = f"claimed: research checked {self.checked}, not inspected yet"
+            out["evidence"] = (f"claimed: research checked {e.get('checked', self.checked)}, "
+                               "not inspected yet")
             out["next"] = (f"bau toolbox check {shlex.quote(e['name'])}"
                            if e["url"].startswith("https://github.com/") else
                            "not on GitHub: read its page; models need `bau models bench`")
@@ -155,3 +166,70 @@ class Toolbox:
         sc = Scout(self.home, source, audit, actor, cloner)
         sc.add(e["repo"], keywords=_terms(e["problem"])[:8], origin="toolbox")
         return sc.inspect(e["repo"])
+
+
+class CapabilityMap:
+    """Jarvis's abilities as layers (``data/capability_map.yaml``): what BAU already has
+    for each, which toolbox tools could fill the gaps and how, and the build order."""
+
+    def __init__(self, data: Path | None = None, toolbox: Toolbox | None = None):
+        raw = yaml.safe_load((data or shipped_data() / "capability_map.yaml").read_text())
+        self.checked = str((raw or {}).get("checked", ""))
+        self.layers: list[dict[str, Any]] = list((raw or {}).get("layers") or [])
+        self.toolbox = toolbox or Toolbox()
+
+    def problems(self) -> list[str]:
+        out, ids = [], set()
+        for i, layer in enumerate(self.layers):
+            who = layer.get("id") or f"layer {i}"
+            missing = [f for f in LAYER_FIELDS if f not in layer]
+            if missing:
+                out.append(f"{who}: missing {', '.join(missing)}")
+                continue
+            if who in ids:
+                out.append(f"{who}: listed twice")
+            ids.add(who)
+            if layer["status"] not in STATUSES:
+                out.append(f"{who}: status must be one of {', '.join(STATUSES)}")
+            if layer["status"] != "have" and not layer.get("next"):
+                out.append(f"{who}: say what comes next")
+            for t in layer["tools"]:
+                if self.toolbox.find(str(t.get("name", ""))) is None:
+                    out.append(f"{who}: {t.get('name')!r} is not in the toolbox")
+                if t.get("plan") not in PLANS:
+                    out.append(f"{who}: {t.get('name')}: plan must be one of {', '.join(PLANS)}")
+                if not t.get("why"):
+                    out.append(f"{who}: {t.get('name')}: say why")
+            text = " ".join(str(layer.get(f, "")) for f in ("what", "next", "rules"))
+            if CLAIMS.search(text) or any(CLAIMS.search(str(t.get("why", "")))
+                                          for t in layer["tools"]):
+                out.append(f"{who}: no compliance or guarantee claims")
+        return out
+
+    def layer(self, lid: str) -> dict[str, Any]:
+        hit = next((x for x in self.layers if x["id"] == lid), None)
+        if hit is None:
+            raise KeyError(f"no layer {lid!r}; have {', '.join(x['id'] for x in self.layers)}")
+        return hit
+
+    def show(self, lid: str) -> dict[str, Any]:
+        """One layer, each tool with what BAU actually knows about it."""
+        layer = self.layer(lid)
+        cands = self.toolbox._scout()
+        tools = []
+        for t in layer["tools"]:
+            e = self.toolbox.find(t["name"])
+            pub = self.toolbox._public(e, cands)
+            tools.append({**t, **{k: pub[k] for k in ("repo", "licence", "caveats",
+                                                       "evidence", "next")}})
+        return {**layer, "tools": tools}
+
+    def summary(self) -> dict[str, Any]:
+        counts = {s: sum(1 for x in self.layers if x["status"] == s) for s in STATUSES}
+        order = sorted((x for x in self.layers if x.get("build")), key=lambda x: x["build"])
+        return {"checked": self.checked, "counts": counts,
+                "layers": [{k: x[k] for k in ("id", "name", "status", "risk")} |
+                           {"tools": len(x["tools"])} for x in self.layers],
+                "build_order": [{"build": x["build"], "id": x["id"], "name": x["name"],
+                                 "next": x.get("next", "")} for x in order],
+                "how_to_read": "bau toolbox map --layer ID shows one layer's tools"}
