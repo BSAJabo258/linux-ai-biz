@@ -103,15 +103,20 @@ When you want BAU on a laptop's own drive instead of running it from the stick:
 4. It copies the same tested system you run from the stick (desktop, BAU, local-model
    runner), so nothing large is downloaded. It also copies BAU's install files to
    `/opt/bau-payload`, checking every file; a damaged copy is deleted, not used.
-5. Take the stick out when it says so and restart. Log in as `bauadmin`, open a terminal
-   and finish the install:
+5. Take the stick out when it says so and restart. Type the disk passphrase, then log in
+   as `bauadmin`.
+6. A window **Finish installing BAU** opens by itself. Connect to Wi-Fi when it asks (the
+   network icon, top right): BAU needs the internet once, to add a few packages. Then
+   type your `bauadmin` password, and choose a passphrase for your approval key when BAU
+   asks (remember it: it signs your approvals). It takes about ten minutes.
+7. Log out and in again once. Jarvis is in the menu as on the stick.
+
+   If you close the window or something goes wrong, nothing is lost: it opens again at
+   the next login until BAU is installed. You can also run it yourself in a terminal:
 
    ```bash
    sudo bash /opt/bau-payload/install.sh
    ```
-
-   It sets up BAU's firewall, services, keys and checks, and asks for your approval-key
-   passphrase. When it's done, Jarvis is in the menu as on the stick.
 
 Your encrypted storage on the stick is not touched by the install: keep the stick as your
 portable Jarvis and recovery stick.

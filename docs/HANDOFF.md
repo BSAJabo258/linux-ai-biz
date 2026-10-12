@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 443 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 450 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -149,6 +149,15 @@ the payload (so on the stick in `/BAU-PAYLOAD`); see `docs/LAPTOP-CHECK.md`.
 - `installer/bau-laptop-check.sh` runs from the stick and shows `lspci -nnk` drivers
   (`NO DRIVER LOADED`), missing-firmware kernel lines and rfkill. MACs and IPs are
   scrubbed from its summary.
+
+Finishing the install by itself (2026-10-12, tests first in `tests/test_finish_install.py`):
+on a laptop installed from the full stick, `firstboot-setup.sh` writes an XDG autostart
+(`/etc/xdg/autostart/bau-finish-install.desktop`) that opens `finish-install.sh` in a
+terminal at login. It waits for the internet (install.sh adds podman, auditd, ffmpeg...),
+then runs `sudo bash /opt/bau-payload/install.sh`; the owner types the sudo password and
+the approval-key passphrase, the script never sees them. install.sh removes the autostart,
+so it comes back at each login until BAU is installed. The installer itself still asks
+only the owner's four answers (disk + confirm, passphrase, password, time zone).
 
 Agents as folders (2026-10-12, tests first in `tests/test_agent_folders.py`): the
 owner's point was that agents are folders (instructions + skills + tools/MCP + a brain),
