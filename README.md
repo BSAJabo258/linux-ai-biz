@@ -180,6 +180,7 @@ Then follow **[docs/INSTALL.md](docs/INSTALL.md)** in order: audit, backup and v
 | [docs/CLOUD-VM.md](docs/CLOUD-VM.md) | BAU and Jarvis on your own cloud server (DigitalOcean), reached through a private SSH tunnel |
 | [docs/TOOLBOX.md](docs/TOOLBOX.md) | Researched open-source tools Jarvis looks up before guessing; licences to watch |
 | [docs/GODS-EYE.md](docs/GODS-EYE.md) | God's Eye: earthquakes, aircraft and satellites on a world map in Jarvis; what it will never do |
+| [docs/AGENT-FOLDERS.md](docs/AGENT-FOLDERS.md) | Agents as folders: instructions, skills and tools you can read and edit; you approve each one |
 | [docs/CAPABILITY-MAP.md](docs/CAPABILITY-MAP.md) | What Jarvis can do, what's missing, which tools fill each gap, and the build order |
 | [docs/RESULTS.md](docs/RESULTS.md) | See views, earnings and profit for every posted video, and which formats work |
 | [docs/USAGE.md](docs/USAGE.md) | See tokens and dollars per AI model, set your own daily limits |
