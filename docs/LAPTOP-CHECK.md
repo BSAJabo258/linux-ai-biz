@@ -10,23 +10,35 @@ no drivers, settings, disks or BitLocker are changed. Each one writes two files:
 
 ## 1. On Windows (before you change anything)
 
-No Python and nothing to install. Get `bau-laptop-check.ps1` from the `BAU-PAYLOAD` folder
-on the stick, or download it:
-<https://raw.githubusercontent.com/BSAJabo258/linux-ai-biz/main/installer/bau-laptop-check.ps1>
+No Python and nothing to install. You need two files **in the same folder** (for example
+Downloads): `BAU-Laptop-Check.cmd` and `bau-laptop-check.ps1`. Both are in the
+`BAU-PAYLOAD` folder on the stick, or download them:
+<https://raw.githubusercontent.com/BSAJabo258/linux-ai-biz/main/installer/BAU-Laptop-Check.cmd>
+and <https://raw.githubusercontent.com/BSAJabo258/linux-ai-biz/main/installer/bau-laptop-check.ps1>
+(right-click the page, **Save as**, keep the name).
 
-1. Put the file in your **Downloads** folder.
-2. Press Start, type **PowerShell**, right-click **Windows PowerShell** and choose
-   **Run as administrator** (BitLocker, Secure Boot and the TPM can only be read that way).
-3. Type these two lines:
+**The easy way: double-click `BAU-Laptop-Check.cmd`.**
 
-   ```powershell
-   cd $HOME\Downloads
-   powershell -ExecutionPolicy Bypass -File .\bau-laptop-check.ps1
-   ```
+1. If a blue box says *Windows protected your PC*, click **More info**, then **Run anyway**
+   (Windows says this about every file from the internet).
+2. Click **Yes** when it asks for administrator rights (BitLocker, Secure Boot and the TPM
+   can only be read that way).
+3. A black window works for about a minute, then Notepad opens the summary. Send that
+   file: `BAU-LAPTOP-SUMMARY.txt`, in the `BAU-Laptop-Check` folder next to the two files.
 
-   `ExecutionPolicy Bypass` lets this one script run this one time; it changes no setting.
-4. After about a minute it shows the report and saves it in `Downloads\BAU-Laptop-Check`.
-   Send `BAU-LAPTOP-SUMMARY.txt`.
+Double-clicking `bau-laptop-check.ps1` itself only opens it in Notepad: that is normal,
+use the `.cmd`. The `.md` file is this guide; open it in Notepad to read it.
+
+**By hand, if the double-click does not work:** press Start, type **PowerShell**,
+right-click **Windows PowerShell**, choose **Run as administrator**, and paste this one
+line (change the folder if the file is somewhere else):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\bau-laptop-check.ps1" -Out "$env:USERPROFILE\Downloads\BAU-Laptop-Check"
+```
+
+`ExecutionPolicy Bypass` lets this one script run this one time; it changes no setting.
+If something goes wrong, take a photo of the window and send it.
 
 ### What the verdict means
 
