@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 429 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 438 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -136,6 +136,19 @@ Verified end to end in QEMU (TCG, no KVM) from a real image build (1.3 GB):
 The first run found bau-recover and bau-ui failing before install.sh; that was fixed and
 re-verified. Not yet done on real hardware, and `install.sh` was not run in the VM
 (no network there).
+
+The laptop check (2026-10-12, tests first in `tests/test_laptop_check.py`) answers "can
+BAU go on this laptop?" before anything is changed. Both scripts are read only and ship in
+the payload (so on the stick in `/BAU-PAYLOAD`); see `docs/LAPTOP-CHECK.md`.
+- `installer/bau-laptop-check.ps1` runs on Windows without Python. `Get-BauSummary` turns
+  the inventory into a verdict with blockers, warnings and notes. Blockers are under 8 GB
+  of memory, a 32-bit system, or no internal disk of 64 GB. Warnings are BitLocker (with the
+  recovery-key step), legacy BIOS and Broadcom Wi-Fi.
+- Each device is judged by its PCI vendor. The tests run that logic under pwsh on Linux.
+- The summary carries no host, user, MAC, IP or serial. Those stay in the private JSON.
+- `installer/bau-laptop-check.sh` runs from the stick and shows `lspci -nnk` drivers
+  (`NO DRIVER LOADED`), missing-firmware kernel lines and rfkill. MACs and IPs are
+  scrubbed from its summary.
 
 Agents as folders (2026-10-12, tests first in `tests/test_agent_folders.py`): the
 owner's point was that agents are folders (instructions + skills + tools/MCP + a brain),

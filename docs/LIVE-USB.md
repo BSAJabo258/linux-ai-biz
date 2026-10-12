@@ -90,6 +90,7 @@ PCs show a simpler menu: choose the first entry for a normal start.
 When you want BAU on a laptop's own drive instead of running it from the stick:
 
 1. **Back up anything on that laptop you want to keep.** The drive you pick is erased.
+   Not sure the laptop is suitable? Run the read-only check first: [LAPTOP-CHECK.md](LAPTOP-CHECK.md).
 2. Start the laptop from this stick and choose **Install BAU on this laptop**.
 3. The installer asks you, and only you:
    - **which drive** to install to, and to **confirm** erasing it (BAU never picks it);
