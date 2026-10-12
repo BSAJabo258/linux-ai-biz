@@ -157,7 +157,12 @@ function ConvertTo-BauText($s) {
 }
 
 function Get-BauInventory {
-    function Invoke-BauSafe($block) { try { & $block } catch { $null } }
+    # Anything this PC cannot answer (no BitLocker, no battery, not admin) becomes empty,
+    # quietly: no red error text in the owner's window.
+    function Invoke-BauSafe($block) {
+        $ErrorActionPreference = "Stop"
+        try { & $block 2>$null } catch { $null }
+    }
     $inv = [ordered]@{ collected_at = (Get-Date).ToUniversalTime().ToString("o"); read_only = $true }
     $inv.os = Invoke-BauSafe { Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, OSArchitecture, CSName }
     $inv.user = $env:USERNAME
@@ -198,8 +203,10 @@ function Get-BauInventory {
 }
 
 if ($MyInvocation.InvocationName -ne ".") {
-    $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-        [Security.Principal.WindowsBuiltInRole]::Administrator)
+    $admin = try {
+        ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch { $false }
     if (-not $admin) {
         Write-Host "Note: not running as administrator - BitLocker, Secure Boot and TPM may show as unknown." -ForegroundColor Yellow
     }

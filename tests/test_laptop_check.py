@@ -162,3 +162,32 @@ def test_both_checks_ship_on_the_stick_and_are_explained():
     doc = (ROOT / "docs" / "LAPTOP-CHECK.md").read_text()
     assert "bau-laptop-check.ps1" in doc and "BAU-LAPTOP-SUMMARY" in doc
     assert "ExecutionPolicy Bypass" in doc
+
+
+# ------------------------------------------------------------------ double-click on Windows
+# The owner's first try "nothing worked": a .ps1 opens in Notepad on double-click, and a
+# window that closes at once shows nothing. The launcher asks for administrator rights,
+# runs the check, keeps the window open and opens the summary.
+
+CMD = ROOT / "installer" / "BAU-Laptop-Check.cmd"
+
+
+def test_double_click_launcher_runs_the_check_as_administrator_and_waits():
+    raw = CMD.read_bytes()
+    assert b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b"")    # batch needs CRLF
+    text = raw.decode("ascii")
+    assert "-Verb RunAs" in text and "net session" in text           # asks for admin
+    assert "-ExecutionPolicy Bypass" in text and "%~dp0bau-laptop-check.ps1" in text
+    assert "notepad" in text and "pause" in text                     # window stays open
+
+
+def test_windows_errors_stay_quiet():
+    # Non-terminating errors (no BitLocker, no battery) must not fill the window with red.
+    text = PS1.read_text()
+    assert "$ErrorActionPreference = \"Stop\"" in text.split("function Invoke-BauSafe", 1)[1][:200]
+
+
+def test_launcher_ships_and_is_explained():
+    assert "BAU-Laptop-Check.cmd" in (ROOT / "installer" / "make-payload.sh").read_text()
+    doc = (ROOT / "docs" / "LAPTOP-CHECK.md").read_text()
+    assert "BAU-Laptop-Check.cmd" in doc and "Run anyway" in doc
