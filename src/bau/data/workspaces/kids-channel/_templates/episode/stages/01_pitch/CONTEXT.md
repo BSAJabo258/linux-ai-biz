@@ -17,6 +17,9 @@ One job: turn the owner's idea into a one-paragraph episode pitch.
 ## Outputs
 - pitch.md → output/
 
+## Brain
+small (the free local model: a routine step)
+
 ## Human check
 Is this a new story, not an earlier one with new names? Is there exactly one learning goal?
 Edit the pitch in place; the script is written from whatever is there.

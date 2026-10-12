@@ -19,5 +19,8 @@ One job: write the full script from the pitch.
 ## Checks
 - kids_text
 
+## Brain
+strong (Claude: this step needs judgement)
+
 ## Human check
 Read it aloud. Is it calm and right for the age band? Fix anything the kids check found.

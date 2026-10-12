@@ -19,5 +19,8 @@ One job: write what YouTube shows next to the video.
 ## Checks
 - kids_metadata
 
+## Brain
+small (the free local model: a routine step)
+
 ## Human check
 Would a parent find the title honest and calm? Fix anything the kids check found.

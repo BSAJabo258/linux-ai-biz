@@ -307,9 +307,12 @@ class Assistant:
                           "format": {"type": "string"}, "seconds": {"type": "integer"}},
                          ["workspace", "episode", "format"]), self.t_plan_episode, kind="act"),
             Tool("draft_stage", "Draft the next stage of one episode (only the files that "
-                 "stage lists are read; only its output folder is written). The owner reads "
-                 "and checks it afterwards.",
-                 _schema({"workspace": {"type": "string"}, "episode": {"type": "string"}}),
+                 "stage lists are read; only its output folder is written). The stage folder "
+                 "says which brain drafts it: small (free local model), strong (Claude) or "
+                 "content (sealed lane). brain='strong' redoes a weak small-model draft. The "
+                 "owner reads and checks it afterwards.",
+                 _schema({"workspace": {"type": "string"}, "episode": {"type": "string"},
+                          "brain": {"type": "string"}}, ["workspace", "episode"]),
                  self.t_draft_stage, kind="act"),
             Tool("hold_everything", "Put BAU on HOLD: only read-only actions run until the "
                  "owner releases it. Use when the owner asks to stop or pause everything.",
@@ -600,16 +603,28 @@ class Assistant:
         ws = W.open_ws(workspace, self.home)
         return Series(ws).plan(W.find_episode(ws, episode), format, int(seconds))
 
-    def t_draft_stage(self, workspace: str, episode: str) -> dict[str, Any]:
+    def t_draft_stage(self, workspace: str, episode: str, brain: str = "") -> dict[str, Any]:
+        from . import brains
         from . import workspace as W
-        if self.provider is None:
-            raise W.WorkspaceError("no approved model to draft with")
+        from .usage import Metered, Usage
         ws = W.open_ws(workspace, self.home)
         ep = W.find_episode(ws, episode)
-        c, out = W.draft(ws, ep, self.metered("producer"), self.model, self.audit)
+        nxt = W.next_stage(ep) or (W.awaiting_check(ep) if brain else None)
+        if nxt is None:
+            raise W.WorkspaceError("nothing to draft: the last output needs your check first")
+        if brain and brain not in ("small", "strong"):
+            raise W.WorkspaceError("only 'small' or 'strong' can be asked for; the content "
+                                   "brain comes only from the stage folder")
+        b = brains.resolve(brain or nxt.brain, self.home, ws, (self.provider, self.model),
+                           self.clients.get("model_factory"), nxt.content_kind)
+        mid = b["model"].get("id") or ""
+        model = Metered(b["provider"], Usage(self.home, self.audit), self._price, mid,
+                        "producer")
+        c, out = W.draft(ws, ep, model, b["model"], self.audit, b["brain"], nxt)
         issues = [i["detail"] for i in W.run_checks(ws, ep, c)]
-        res = {"stage": c.stage, "draft": out.name, "issues": issues,
-               "owner_checks": c.human_check}
+        res = {"stage": c.stage, "draft": out.name, "issues": issues, "brain": b["brain"],
+               "model": mid, "owner_checks": c.human_check,
+               **({"note": b["note"]} if b["note"] else {})}
         if issues:
             return {**res, "status": "drafted, but these must be fixed before the owner can "
                                      "check it: " + "; ".join(issues)}

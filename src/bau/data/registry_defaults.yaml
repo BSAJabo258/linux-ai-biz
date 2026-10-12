@@ -221,6 +221,104 @@ model:
     cost_in_per_mtok: 0
     cost_out_per_mtok: 0
     status: REGISTERED
+  qwen3.5-4b:
+    model_id: qwen3.5-4b
+    name: Qwen3.5-4B - best small brain for 8 GB CPU machines, with tool calling (llama.cpp)
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-12 (HF API tree + model card): Qwen/Qwen3.5-4B, Apache-2.0, released
+    # 2026-02-27, tool calling, 262K native context (capped here for 8 GB). The official
+    # Qwen GGUF repo was not public, so the pinned file is unsloth's quantisation.
+    # Thinking is on by default; benchmarks on the card are project-reported.
+    source: huggingface.co/Qwen/Qwen3.5-4B (GGUF by unsloth/Qwen3.5-4B-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.5-4b
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf
+      file: Qwen3.5-4B-Q4_K_M.gguf
+      size: 2740937888
+      sha256: 00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.65
+    latency_ms: 6000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    notes: Needs a llama.cpp with the qwen35 architecture (bench it first). Run with
+      --ctx-size 8192 to 16384 on 8 GB; turn thinking off for routine steps.
+  qwen3.5-0.8b:
+    model_id: qwen3.5-0.8b
+    name: Qwen3.5-0.8B - ultra-tiny local model (half a gigabyte) for the simplest steps
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-12: Qwen/Qwen3.5-0.8B, Apache-2.0, released 2026-02-28. Tool calling
+    # is documented but weak (project-reported BFCL-V4 25.3). GGUF by unsloth.
+    source: huggingface.co/Qwen/Qwen3.5-0.8B (GGUF by unsloth/Qwen3.5-0.8B-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.5-0.8b
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf
+      file: Qwen3.5-0.8B-Q4_K_M.gguf
+      size: 532517120
+      sha256: bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: false
+    input_types: [text]
+    quality: 0.35
+    latency_ms: 2500
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    notes: Text drafting only (its tool calling is weak). Same llama.cpp as qwen3.5-4b.
+  qwen3-4b-heretic-content:
+    model_id: qwen3-4b-heretic-content
+    name: Qwen3-4B-Instruct-2507 heretic - uncensored small model, sealed content lane
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-12: p-e-w/Qwen3-4B-Instruct-2507-heretic, made by the author of the
+    # Heretic tool, Apache-2.0 (inherits Qwen3-4B-Instruct-2507). Project-reported: refusals
+    # 21/100 (base 99/100), KL divergence 0.43 (noticeable drift from the base). GGUF by
+    # mradermacher. No safety tuning: content lane only, never tools, never kids.
+    source: huggingface.co/p-e-w/Qwen3-4B-Instruct-2507-heretic (GGUF by mradermacher)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8082
+    api_model: qwen3-4b-heretic-content
+    download:
+      url: https://huggingface.co/mradermacher/Qwen3-4B-Instruct-2507-heretic-GGUF/resolve/main/Qwen3-4B-Instruct-2507-heretic.Q4_K_M.gguf
+      file: Qwen3-4B-Instruct-2507-heretic.Q4_K_M.gguf
+      size: 2497279584
+      sha256: 5d38e532cf33a5b56760bc7803aaabffb240d0604f1e389e4db148830c2bb747
+    trust_level: ABLITERATED
+    lane: content_only
+    use_for: [creative_writing, script, lyrics, comedy, ad_copy]
+    privacy: local
+    context: 16384
+    tools: false
+    input_types: [text]
+    quality: 0.5
+    latency_ms: 6000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    notes: Served on its own port (8082) so it never answers as Jarvis. The owner benches,
+      approves and names it as the content brain (bau ws brains --content ...) themselves.
   k3:
     model_id: k3
     name: K3 local intelligence reserve (spec §6)
