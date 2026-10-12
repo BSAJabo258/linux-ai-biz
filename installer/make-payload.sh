@@ -64,11 +64,12 @@ fi
 cp "${HERE}/payload/install.sh" "${P}/install.sh"
 cp -r "${HERE}/payload/systemd" "${HERE}/payload/hardening" "${P}/"
 cp "${HERE}/hw-audit.sh" "${HERE}/hw-audit-windows.ps1" "${P}/"
+cp "${HERE}/bau-laptop-check.sh" "${HERE}/bau-laptop-check.ps1" "${P}/"   # docs/LAPTOP-CHECK.md
 cp -r "${ROOT}/src" "${P}/bau-src"         # lets hw-audit/backup/wipe-gate run before install
 find "${P}/bau-src" -name '__pycache__' -prune -exec rm -rf {} +
 cp -r "${ROOT}/docs" "${P}/docs"
 cp "${ROOT}/LICENSE" "${P}/"
-chmod 0755 "${P}/install.sh" "${P}/hw-audit.sh"
+chmod 0755 "${P}/install.sh" "${P}/hw-audit.sh" "${P}/bau-laptop-check.sh"
 
 commit="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
 # Not a git checkout, or git refuses to read it ("dubious ownership" on a mounted folder):
