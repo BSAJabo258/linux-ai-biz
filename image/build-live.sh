@@ -56,6 +56,17 @@ cp "${WORK}"/payload/BAU-PAYLOAD/wheels/*.whl "${inc}/opt/bau/wheels/"
 cp -a "${ROOT}/installer/payload/systemd" "${ROOT}/installer/payload/hardening" \
   "${inc}/opt/bau/payload/"
 cp "${ROOT}"/docs/*.md "${inc}/opt/bau/docs/"
+# The full stick: the installer (config/includes.installer/preseed.cfg) copies the BAU
+# payload from /BAU-PAYLOAD on the stick to the new system, and runs live-to-disk.sh and
+# the first-boot setup from /bau. Never put a payload on the stick that fails its sums.
+bin="${WORK}/lb/config/includes.binary"
+install -d "${bin}/bau"
+cp -a "${WORK}/payload/BAU-PAYLOAD" "${bin}/BAU-PAYLOAD"
+(cd "${bin}/BAU-PAYLOAD" && sha256sum --quiet --strict -c SHA256SUMS) \
+  || die "BAU payload does not match its SHA256SUMS - rebuild it"
+cp "${ROOT}/installer/firstboot/firstboot-setup.sh" "${HERE}/live-build/live-to-disk.sh" \
+  "${bin}/bau/"
+cp -a "${ROOT}/installer/payload/hardening" "${bin}/bau/hardening"
 version="$(cat "${HERE}/VERSION")"
 commit="$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
 dirty="$(git -C "${ROOT}" status --porcelain 2>/dev/null | grep -q . && echo true || echo false)"

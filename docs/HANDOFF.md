@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 417 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 429 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -108,6 +108,34 @@ validate`. `Toolbox.ask` answers plain-words questions; Jarvis's `toolbox` tool 
 prompt make him look there before guessing; the Scout panel shows "Already known" first.
 `bau toolbox check NAME` -> `Scout.add` (one GitHub record) + `Scout.inspect`. Rebuilt from
 research because the owner's own transcript collection was lost with a codespace.
+
+The full stick (2026-10-12, tests first in `tests/test_full_stick.py`): the owner chose
+"both" on one 128 GB stick. `image/live-build/auto/config` now has `--debian-installer
+live`. The installer copies the live squashfs (live-installer) and its answers are in
+`config/includes.installer/preseed.cfg`, repacked into its initrd:
+- partitioning, accounts, clock and grub match `installer/preseed/bau.preseed`, and a
+  test keeps them identical;
+- the disk, confirmations, passphrase, password and time zone are never preseeded;
+- no tasksel desktop is installed and pkgsel upgrade is none.
+
+The grub menu has "Install BAU on this laptop" (@KERNEL_GI@); syslinux keeps live-build's
+install entries. `build-live.sh` stages `/BAU-PAYLOAD` (sums verified) and `/bau`
+(firstboot-setup.sh, live-to-disk.sh, hardening) on the stick. `late_command`:
+- copies the bootstrap;
+- runs `live-to-disk.sh /target`, which removes bau-live-init, the live.conf drop-ins,
+  the setup autostart and the enable links of BAU's services (install.sh enables them);
+- copies and re-checks the payload;
+- runs firstboot-setup.sh.
+
+Verified end to end in QEMU (TCG, no KVM) from a real image build (1.3 GB):
+- an unattended install (test-only answers on the kernel line) took ~43 min;
+- the installed system boots, asks for the LUKS passphrase, and `bauadmin` logs in;
+- `/opt/bau-payload` sums OK, the live packages are gone, nftables has policy drop, BAU
+  0.3.0 and llama.cpp are present, and the motd points to install.sh.
+
+The first run found bau-recover and bau-ui failing before install.sh; that was fixed and
+re-verified. Not yet done on real hardware, and `install.sh` was not run in the VM
+(no network there).
 
 Agents as folders (2026-10-12, tests first in `tests/test_agent_folders.py`): the
 owner's point was that agents are folders (instructions + skills + tools/MCP + a brain),
