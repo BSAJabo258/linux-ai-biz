@@ -383,6 +383,14 @@ def cmd_toolbox(a):
     elif a.toolbox_cmd == "list":
         _out([tb._public(e, tb._scout()) for e in tb.entries
               if a.category in (None, e["category"])])
+    elif a.toolbox_cmd == "map":
+        from .toolbox import CapabilityMap
+        m = CapabilityMap(toolbox=tb)
+        try:
+            _out(m.show(a.layer) if a.layer else m.summary())
+        except KeyError as e:
+            print(f"bau: {e.args[0]}", file=sys.stderr)
+            return EXIT_ERROR
     elif a.toolbox_cmd == "check":
         from .assistant import load_env_file
         from .scout.github import SourceError
@@ -397,7 +405,8 @@ def cmd_toolbox(a):
               "security": c["security"], "licence": c["license"],
               "blocked": c["blockers"], "needs": c["needs"]})
     else:
-        probs = tb.problems()
+        from .toolbox import CapabilityMap
+        probs = tb.problems() + [f"map: {p}" for p in CapabilityMap(toolbox=tb).problems()]
         _out({"entries": len(tb.entries), "checked": tb.checked, "problems": probs})
         return EXIT_OK if not probs else EXIT_BLOCKED
     return EXIT_OK
@@ -1358,6 +1367,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("check", help="have Repo Scout fetch and safely inspect one tool")
     x.add_argument("name")
     w.add_parser("validate", help="check the catalogue: sources, dates, no claims")
+    x = w.add_parser("map", help="Jarvis's abilities by layer: what BAU has, gaps, order")
+    x.add_argument("--layer", help="one layer, e.g. web, computer-use, memory")
     s.set_defaults(fn=cmd_toolbox)
 
     s = sub.add_parser("usage", help="tokens and dollars per model; your daily limits")

@@ -1,0 +1,259 @@
+# The capability map (src/bau/toolbox.py: CapabilityMap; `bau toolbox map`): Jarvis's
+# abilities as layers. For each: what BAU already has, which researched tools (all in
+# toolbox.yaml, with sources) could fill the gap and how, the rules that stay in force,
+# and the build order. A tool here is a CLAIM until Repo Scout inspects it and a test on
+# the owner's cloud server passes; nothing is installed from this file.
+#
+# plan: direct   use it as it is (it already respects BAU's rules, e.g. a local library)
+#       adapter  wrap it behind a BAU adapter, so the gateway, audit and approvals decide
+#       later    worth it, not yet (riskier, heavier, or waiting on something else)
+#       skip     BAU already does this job; adding it would mean two of the same thing
+checked: "2026-10-12"
+layers:
+  - id: web
+    name: Web interaction
+    what: Open websites, read them, fill in forms, save drafts and, only on the owner's click, submit.
+    status: gap
+    in_bau:
+      - {path: src/bau/scout/github.py, does: reads GitHub's API only; no general browsing}
+      - {path: src/bau/gateway.py, does: the one path from an agent to a capability, with audit}
+      - {path: src/bau/blast.py, does: scores how bad an action could be before it runs}
+    permissions: [read, fill, draft, submit]
+    owner_confirms: [submit]
+    tools:
+      - {name: Playwright MCP, plan: adapter, why: "Structured page access (the accessibility tree, not pixels); the base layer the others build on."}
+      - {name: Browser Use, plan: adapter, why: "The most-used open-source browser agent, with an MCP server; first candidate for multi-step web tasks."}
+      - {name: Stagehand, plan: later, why: "Mixes plain code with AI steps; compare against Browser Use on the same test tasks."}
+      - {name: Skyvern, plan: later, why: "Built for forms, but AGPL with telemetry on by default; only if it clearly beats Browser Use on the form tests."}
+      - {name: Browserable, plan: later, why: "No commits for about 14 months and needs a paid remote-browser provider; its 90.4% score is the project's own claim. Watch, don't build on it."}
+      - {name: Pie, plan: later, why: "Saved, schedulable browser skills are the idea worth copying; it runs in a person's logged-in browser and is young, so BAU borrows the idea first."}
+      - {name: WebOperator, plan: later, why: "A one-person project (3 stars) whose MCP bridge is open until a token is set; not before it matures."}
+      - {name: BrowserSkill, plan: later, why: "Gives an agent the owner's logged-in browser, and its own README says that window is not a sandbox: the riskiest option, so it comes last, if ever."}
+      - {name: Chrome DevTools MCP, plan: later, why: "For checking BAU's own pages (Jarvis, Mission Control), not for acting on other sites."}
+    risk: high
+    rules:
+      - Web pages are untrusted data, wrapped before any model reads them; instructions found on a page are never followed.
+      - Read, fill, draft and submit are four separate permissions; submitting, paying, sending and signing up are the owner's click.
+      - Starts in an isolated browser on the cloud server with no saved logins; the owner's logged-in browser comes last.
+      - Every step is recorded with a screenshot so the owner can see what was done.
+    next: "Build the browser lane: Playwright MCP + Browser Use behind a BAU adapter, the four permissions, tests on practice sites first."
+    build: 1
+
+  - id: connect
+    name: Connectors and MCP
+    what: Reach other services (email, calendar, files, GitHub...) through one standard plug, MCP.
+    status: partial
+    in_bau:
+      - {path: src/bau/mcp.py, does: an MCP client; only registry-approved servers start}
+      - {path: src/bau/registry.py, does: every connector declares tools, permissions, network, credentials, risk}
+      - {path: src/bau/gateway.py, does: checks every call and writes it to the audit chain}
+    tools:
+      - {name: MCP Registry, plan: direct, why: "The official list to look connectors up in; being listed proves ownership of a name, not safety."}
+      - {name: Docker MCP Gateway, plan: later, why: "Runs each MCP server in its own container; useful once there are several servers on the cloud server."}
+      - {name: mcp-use, plan: skip, why: "BAU's own mcp.py client already connects to servers through the gateway."}
+      - {name: IBM ContextForge, plan: skip, why: "A full gateway; BAU's gateway.py already decides and audits every call."}
+      - {name: agentgateway, plan: skip, why: "Same job as BAU's gateway.py."}
+    risk: medium
+    rules:
+      - A connector is a capability, never an administrator; it gets only the permissions its record declares.
+      - New servers go through Repo Scout (licence, security) and registry approval before they start.
+    next: "Add a search of the MCP Registry to Scout, and a health check for each approved server."
+    build: 2
+
+  - id: computer-use
+    name: Computer use
+    what: Work apps that have no API by looking at the screen and using mouse and keyboard.
+    status: gap
+    in_bau:
+      - {path: src/bau/sandbox.py, does: rootless containers with no network by default, for untrusted code}
+    tools:
+      - {name: Cua, plan: adapter, why: "Sandboxed desktops for computer-use agents; use only its MIT parts (some parts are FSL or AGPL)."}
+      - {name: OmniParser, plan: later, why: "Turns a screenshot into a list of buttons and fields a model can act on."}
+      - {name: UI-TARS-desktop, plan: later, why: "A desktop agent with its own vision model; heavy for an 8 GB laptop, so cloud-only."}
+    risk: high
+    rules:
+      - Only inside an isolated desktop on the cloud server, never the owner's own desktop at first.
+      - Prefer an API, then the browser lane, then screen control, in that order.
+      - The same four permissions as the web lane; anything consequential is the owner's click.
+    next: "After the browser lane: one sandboxed desktop on the cloud server and a practice task."
+    build: 3
+
+  - id: workflows
+    name: Workflows and saved skills
+    what: Turn a job that worked into a saved procedure that can run again, on a schedule if wanted.
+    status: partial
+    in_bau:
+      - {path: src/bau/workspace.py, does: numbered stage folders an agent walks, owner checks each stage}
+      - {path: src/bau/factories.py, does: business factories that resume after a reboot}
+      - {path: src/bau/jobs.py, does: jobs with checkpoints that survive a power cut}
+    tools:
+      - {name: workflow-use, plan: later, why: "Record once, replay with variables: the right idea, but AGPL and 'not for production' by its own README. BAU saves procedures itself first."}
+      - {name: Anthropic Agent Skills, plan: direct, why: "A plain folder format for saved procedures; BAU's workspaces already read Markdown the same way."}
+      - {name: n8n, plan: later, why: "Hundreds of app connections; fair-code licence, so check the terms before any business use."}
+      - {name: Activepieces, plan: later, why: "An n8n alternative with an MIT core; compare the two only if BAU needs many app connections."}
+    risk: medium
+    rules:
+      - A saved procedure records its success rate and cost; it is promoted only on measured results.
+      - Schedules never post, pay or send on their own; they stage for the owner like everything else.
+    next: "Save each finished browser task as a procedure with its tests, success count and cost."
+    build: 4
+
+  - id: perception
+    name: Seeing documents and screens
+    what: Read PDFs, scans, forms and screenshots into clean text and tables.
+    status: gap
+    in_bau:
+      - {path: src/bau/chats.py, does: reads the owner's chat exports into a searchable library}
+    tools:
+      - {name: Docling, plan: adapter, why: "Turns PDFs, Word and slides into clean structured text; runs locally."}
+      - {name: OCRmyPDF, plan: direct, why: "Adds a text layer to scanned PDFs; a small, long-standing command-line tool."}
+      - {name: Marker, plan: later, why: "Strong PDF-to-Markdown, but its licence limits commercial use of the model weights; read the terms first."}
+      - {name: OmniParser, plan: later, why: "Reads screenshots; belongs with computer use."}
+    risk: medium
+    rules:
+      - Documents are untrusted data; text inside them is never an instruction.
+      - Personal and customer data stays on the owner's machines unless the owner says otherwise.
+    next: "Add Docling + OCRmyPDF behind one `bau docs read` command, local only."
+    build: 5
+
+  - id: verification
+    name: Checking the work
+    what: Prove a job really succeeded, with evidence, by something other than the agent that did it.
+    status: partial
+    in_bau:
+      - {path: src/bau/evidence.py, does: one evidence file per significant decision}
+      - {path: src/bau/audit.py, does: tamper-evident audit chain}
+      - {path: src/bau/models/bench.py, does: real benchmarks before a model is approved}
+      - {path: src/bau/workspace.py, does: stage checks the owner reviews}
+    tools:
+      - {name: AgencyBench, plan: later, why: "Long, realistic agent tasks that measure the whole Jarvis; about a million tokens a scenario, so only in a throwaway sandbox with a budget."}
+      - {name: promptfoo, plan: adapter, why: "Repeatable test cases for prompts and agents; good for the browser lane's practice tasks."}
+      - {name: Langfuse, plan: later, why: "Traces every step of an agent run; useful once several agents work together."}
+      - {name: Ragas, plan: later, why: "Scores whether answers stick to their sources."}
+    risk: low
+    rules:
+      - The agent that did a job never marks it as passed; a separate check or the owner does.
+      - Real results (customers, money collected) outrank any score.
+    next: "A practice-task suite for the browser lane: each task, its expected result, and a pass record."
+    build: 6
+
+  - id: agents
+    name: Teams of agents
+    what: Split a big job between specialist agents and pick the smallest team that can do it.
+    status: partial
+    in_bau:
+      - {path: src/bau/agents.py, does: agent runtime; every tool call goes through the gateway}
+      - {path: src/bau/governor.py, does: watchdog that can hold or quarantine, never approve}
+      - {path: src/bau/usage.py, does: per-model token and dollar meter with the owner's daily limits}
+    tools:
+      - {name: LangGraph, plan: later, why: "Graphs of steps with checkpoints; consider only if BAU's own runtime runs out of room."}
+      - {name: OpenAI Agents SDK, plan: skip, why: "BAU's agents.py and gateway already hand work between agents with permissions."}
+      - {name: CrewAI, plan: skip, why: "Role-based teams; BAU's agent records already define roles, tools and budgets."}
+      - {name: Hermes Agent, plan: later, why: "An open agent with its own skills; a candidate worker for local or hosted runs."}
+    risk: medium
+    rules:
+      - Each agent has its own budget, tools and permissions; none can approve.
+      - A simple job gets one agent; teams only when the job needs them.
+    next: "A coordinator that picks the smallest team per job and stays inside each agent's budget."
+    build: 7
+
+  - id: coding
+    name: Coding and self-improvement
+    what: Write and fix code, including Jarvis's own, without changing the live system unreviewed.
+    status: partial
+    in_bau:
+      - {path: src/bau/sandbox.py, does: runs untrusted code in a locked-down container}
+      - {path: src/bau/scout, does: finds and safely inspects open-source projects; never runs them}
+    tools:
+      - {name: Claude Code, plan: direct, why: "Already how BAU is built: branch, tests, pull request, owner merges."}
+      - {name: OpenHands, plan: later, why: "An open coding agent that could take bounded jobs in the sandbox."}
+    risk: high
+    rules:
+      - Proposing a change and deploying it are separate; deploying is the owner's merge.
+      - Every change runs the full test suite and the secret scan first.
+    next: "Let Jarvis open a draft pull request for a bounded fix; the owner reviews and merges."
+    build: 8
+
+  - id: intelligence
+    name: Thinking and planning models
+    what: Understand the goal and plan; cheap local models for routine work, stronger hosted ones for hard jobs.
+    status: have
+    in_bau:
+      - {path: src/bau/models/router.py, does: picks a model; backups when one is busy}
+      - {path: src/bau/models/providers.py, does: Claude, llama.cpp and hosted OpenAI-compatible models}
+      - {path: src/bau/models/bench.py, does: a real test before any model is approved}
+    tools:
+      - {name: llama.cpp, plan: direct, why: "Already runs the local model on the live USB."}
+      - {name: LiteLLM, plan: skip, why: "BAU's router already switches between providers with backups and metering."}
+      - {name: Claude Code Router, plan: skip, why: "Routes Claude Code itself, not Jarvis; BAU's router covers Jarvis."}
+    risk: low
+    rules:
+      - No model is used before `bau models bench` passes and the owner approves it.
+    next: ""
+
+  - id: planning
+    name: Planning
+    what: Break a goal into steps, with a budget and a way to tell when it is done.
+    status: have
+    in_bau:
+      - {path: src/bau/assistant.py, does: Jarvis plans missions and stages them for the owner}
+      - {path: src/bau/decision.py, does: one decision from many findings; unknown never counts as passed}
+      - {path: src/bau/opportunity.py, does: ranks business ideas on evidence, not enthusiasm}
+    tools:
+      - {name: DSPy, plan: later, why: "Tunes prompts against measured results; useful once there are enough recorded jobs."}
+    risk: low
+    rules:
+      - Plans with money, legal or outside effects stop at the owner's approval.
+    next: ""
+
+  - id: memory
+    name: Memory
+    what: Remember the owner, the business and past jobs between conversations.
+    status: have
+    in_bau:
+      - {path: src/bau/brain.py, does: Second Brain, a Markdown vault with a graph}
+      - {path: src/bau/memory.py, does: memory lane of recent events}
+      - {path: src/bau/chats.py, does: the owner's past AI chats, searchable}
+    tools:
+      - {name: Mem0, plan: skip, why: "BAU's brain and memory lane already keep long-term facts, on the owner's own disk."}
+      - {name: Letta, plan: skip, why: "Another memory system; two memories would disagree. BAU keeps one."}
+      - {name: Graphiti, plan: later, why: "Facts that change over time; consider only if the brain's graph is not enough."}
+    risk: low
+    rules:
+      - Memory stays on the owner's machines, inside the encrypted storage.
+    next: ""
+
+  - id: media
+    name: Media
+    what: Make videos, voices, images and music for the channels.
+    status: have
+    in_bau:
+      - {path: src/bau/studio.py, does: paid clips under the owner's budget, priced first}
+      - {path: src/bau/series.py, does: the same characters in every clip}
+      - {path: src/bau/media, does: the media gateway with provenance records}
+    tools:
+      - {name: FFmpeg, plan: direct, why: "Already used for video checks and edits."}
+      - {name: ComfyUI, plan: later, why: "Local image and video generation; needs a GPU, so a rented one."}
+      - {name: Remotion, plan: later, why: "Videos written as code; useful for repeatable templates."}
+      - {name: MoneyPrinterTurbo, plan: skip, why: "Mass-produced short videos are what YouTube refuses to pay for; BAU's series engine avoids exactly that."}
+    risk: medium
+    rules:
+      - Kids videos go only to platforms that allow them, marked made for kids.
+      - Every AI-made file carries a provenance record and an AI label.
+    next: ""
+
+  - id: business
+    name: Business results
+    what: Do the paid work, track costs and money actually collected, and drop what doesn't pay.
+    status: have
+    in_bau:
+      - {path: src/bau/economics.py, does: costs, real sales and budgets}
+      - {path: src/bau/results.py, does: views, estimated earnings and profit per video}
+      - {path: src/bau/publishing.py, does: posting only on the owner's confirm}
+      - {path: src/bau/factories.py, does: business factories run stage by stage}
+    tools: []
+    risk: medium
+    rules:
+      - Money is counted when it is collected; estimates and proposals are labelled as such.
+      - Each money idea gets a fixed trial budget and stops if nobody pays.
+    next: ""

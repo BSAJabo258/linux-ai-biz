@@ -2,7 +2,7 @@
      viewBox="0 0 1280 210" width="1280" height="210" role="img" aria-labelledby="t d">
 <title id="t">BAU in numbers</title>
 <desc id="d">49 regulations tracked, 65 policy rules,
-77 researched tools, 4 story formats, 0 approvals by AI.</desc>
+91 researched tools, 4 story formats, 0 approvals by AI.</desc>
 <style>
 .tile { animation: glow 4s ease-in-out infinite; }
 @keyframes glow { 50% { opacity: .82; } }
@@ -52,7 +52,7 @@
         fill-opacity="0.85" stroke="#0a78a8" stroke-opacity=".4"/>
   <path d="M538.0 28h54" stroke="#0a78a8" stroke-width="3" stroke-linecap="round"/>
   <text x="640.0" y="104" text-anchor="middle" font-size="58" font-weight="700"
-        fill="#0a78a8" class="num">77</text>
+        fill="#0a78a8" class="num">91</text>
   <text x="640.0" y="138" text-anchor="middle" font-size="14" font-weight="700"
         letter-spacing="1.6" fill="#08263a">RESEARCHED TOOLS</text>
   <text x="640.0" y="162" text-anchor="middle" font-size="14"

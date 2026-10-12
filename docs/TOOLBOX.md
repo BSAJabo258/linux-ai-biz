@@ -5,7 +5,7 @@ apps, stopping it making things up, giving it a memory, a voice, video editing, 
 free model on your own computer. The toolbox is BAU's list of the best-known open-source
 tools for those jobs, so Jarvis looks them up instead of guessing.
 
-There are 77 tools in it, researched on 2026-10-10. Each one records:
+There are 91 tools in it: 77 researched on 2026-10-10, and 14 browser, computer-use, document and benchmark tools added on 2026-10-12 (each records its own check date). The capability map (`bau toolbox map`, see [CAPABILITY-MAP.md](CAPABILITY-MAP.md)) shows where each one fits. Each one records:
 - what problem it solves, in plain words;
 - its GitHub project;
 - its licence (whether you may use it in a business);

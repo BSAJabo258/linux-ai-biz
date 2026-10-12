@@ -97,7 +97,7 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
              "clip_prompt": "producer", "plan_episode": "producer",
-             "toolbox": "scout", "world_watch": "godseye",
+             "toolbox": "scout", "capability_map": "scout", "world_watch": "godseye",
              "video_clips": "studio", "make_video": "studio",
              "usage_today": "usage", "results": "results",
              "hold_everything": "watchdog", "release_hold": "watchdog"}
@@ -260,6 +260,12 @@ class Assistant:
                  "Gmail'): what each solves, licence, sources, and whether Repo Scout has "
                  "inspected it. Ask this before guessing how to do something.",
                  _schema({"question": {"type": "string"}}), self.t_toolbox),
+            Tool("capability_map", "Jarvis's abilities by layer (thinking, seeing documents, "
+                 "computer use, websites, connectors, coding, memory, planning, agent teams, "
+                 "workflows, checking, media, business): what BAU already has, the gaps, "
+                 "which researched tools would fill them and how, and the build order. "
+                 "Give a layer id for its detail.", _schema({"layer": {"type": "string"}}),
+                 self.t_capability_map),
             Tool("find_tools", "Search GitHub for open-source projects that provide a "
                  "capability (several phrasings), record them and rank them on evidence. "
                  "Nothing is installed or run; takes about half a minute.",
@@ -563,6 +569,11 @@ class Assistant:
                                                "how_used", "licence", "caveats", "evidence",
                                                "next", "sources")} for h in hits],
                 "if_nothing_fits": "find_tools searches GitHub for more (owner's go-ahead)"}
+
+    def t_capability_map(self, layer: str = "") -> dict[str, Any]:
+        from .toolbox import CapabilityMap, Toolbox
+        m = CapabilityMap(toolbox=Toolbox(self.home))
+        return m.show(layer.strip()) if layer.strip() else m.summary()
 
     def t_find_tools(self, request: str) -> dict[str, Any]:
         from .scout import Scout
