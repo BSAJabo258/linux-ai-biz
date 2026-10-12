@@ -21,5 +21,8 @@ One job: write a video-generator prompt for every scene.
 - kids_text
 - series_lock
 
+## Brain
+strong (Claude: this step needs judgement)
+
 ## Human check
 Do the characters look the same in every prompt? Is anything another company's character?

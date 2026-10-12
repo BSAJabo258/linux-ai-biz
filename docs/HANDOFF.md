@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 394 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 405 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -108,6 +108,30 @@ validate`. `Toolbox.ask` answers plain-words questions; Jarvis's `toolbox` tool 
 prompt make him look there before guessing; the Scout panel shows "Already known" first.
 `bau toolbox check NAME` -> `Scout.add` (one GitHub record) + `Scout.inspect`. Rebuilt from
 research because the owner's own transcript collection was lost with a codespace.
+
+Brains per stage (2026-10-12, tests first in `tests/test_brains.py`): the owner's idea
+was to let the files-and-folders workspaces replace a pile of agents and models. A stage's
+`CONTEXT.md` `## Brain` names its brain:
+- `small`: a free local model;
+- `strong`: Jarvis's model or the owner's choice, and the default;
+- `content KIND`: the content-lane model, only for a KIND in its `use_for`.
+
+`brains.py` handles `config`/`choose`/`resolve`:
+- only a person chooses (`bau ws brains`); this is audited as `brains.chosen`;
+- small falls back to strong and says so;
+- content is never defaulted, is refused in a workspace that `for_kids()`, and a content
+  model can't be small or strong (nor the reverse).
+
+Jarvis's `draft_stage`:
+- uses the stage's brain, metered under that model;
+- takes `brain=small|strong` to redo an unchecked draft (`W.awaiting_check`).
+
+`bau ws run --brain`. The kids template uses small for pitch/storyboard/metadata and
+strong for script/video prompts. The registry gained `qwen3.5-4b`, `qwen3.5-0.8b` and
+`qwen3-4b-heretic-content` (content lane, port 8082). Their pinned downloads and sizes
+were checked 2026-10-12 from the HF API, GGUFs are by unsloth/mradermacher, and all are
+REGISTERED, so the owner benches and approves them. Not yet run on real hardware; whether
+the live image's llama.cpp supports qwen35 is unverified (the bench will say).
 
 The capability map (2026-10-12, tests first in `tests/test_capability_map.py`):
 `data/capability_map.yaml` lists 13 layers. Each layer has a status (have/partial/gap),

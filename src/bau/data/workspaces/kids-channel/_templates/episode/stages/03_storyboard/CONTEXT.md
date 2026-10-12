@@ -14,5 +14,8 @@ One job: turn the script into a numbered list of scenes.
 ## Outputs
 - storyboard.md → output/
 
+## Brain
+small (the free local model: a routine step)
+
 ## Human check
 Does every line of the script have a scene? Are the timings close to the episode length?

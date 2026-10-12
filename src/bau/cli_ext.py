@@ -496,18 +496,37 @@ def cmd_ws(a):
             ws = W.open_ws(a.name)
             eps = [W.find_episode(ws, a.episode)] if a.episode else W.episodes(ws)
             _out({ep.name: W.status(ws, ep) for ep in eps})
+        elif a.ws_cmd == "brains":
+            from . import brains
+            ids = {"small": a.small, "strong": a.strong, "content": a.content}
+            if any(ids.values()):
+                try:
+                    _out(brains.choose(None, _human(), AuditLog(), **ids))
+                except (ValueError, PermissionError) as e:
+                    print(f"ws: {e}", file=sys.stderr)
+                    return EXIT_BLOCKED
+            else:
+                _out({"brains": brains.config(), "what": brains.WHAT,
+                      "set": "bau ws brains --small MODEL --strong MODEL --content MODEL"})
         elif a.ws_cmd == "run":
+            from . import brains
             from .assistant import load_env_file, pick_model
             ws = W.open_ws(a.name)
             ep = W.find_episode(ws, a.episode)
+            nxt = W.next_stage(ep) or (W.awaiting_check(ep) if a.brain else None)
+            if nxt is None:
+                raise W.WorkspaceError("nothing to draft: the last output needs your check")
             load_env_file()
-            provider, rec = pick_model()
-            if provider is None:
-                print("no approved model: bench and approve one first (bau models bench ...)",
-                      file=sys.stderr)
+            try:
+                b = brains.resolve(a.brain or nxt.brain, None, ws, pick_model(),
+                                   kind=nxt.content_kind)
+            except (ValueError, KeyError, PermissionError) as e:
+                print(f"ws: {e}", file=sys.stderr)
                 return EXIT_BLOCKED
-            c, out = W.draft(ws, ep, provider, rec, AuditLog())
-            _out({"stage": c.stage, "draft": str(out), "model": rec["id"],
+            rec = b["model"]
+            c, out = W.draft(ws, ep, b["provider"], rec, AuditLog(), b["brain"], nxt)
+            _out({"stage": c.stage, "draft": str(out), "brain": b["brain"],
+                  "model": rec["id"], "note": b["note"] or None,
                   "issues": [i["detail"] for i in W.run_checks(ws, ep, c)],
                   "your_check": c.human_check,
                   "next": f"read and edit it, then: bau ws check {ws.name} {ep.name} "
@@ -1288,9 +1307,15 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("status", help="every stage: checked, drafted, ready, waiting")
     x.add_argument("name")
     x.add_argument("episode", nargs="?")
-    x = w.add_parser("run", help="draft the next stage with the approved model")
+    x = w.add_parser("brains", help="which model is each brain (small, strong, content)")
+    x.add_argument("--small", help="you: the free local model for routine steps")
+    x.add_argument("--strong", help="you: the model for steps that need judgement")
+    x.add_argument("--content", help="you: a content-lane model (text only, never kids)")
+    x = w.add_parser("run", help="draft the next stage with the brain its folder names")
     x.add_argument("name")
     x.add_argument("episode")
+    x.add_argument("--brain", choices=["small", "strong"],
+                   help="redo with another brain (content comes only from the stage folder)")
     x = w.add_parser("check", help="owner: I read (and edited) this stage's output")
     x.add_argument("name")
     x.add_argument("episode")
