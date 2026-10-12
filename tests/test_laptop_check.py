@@ -191,3 +191,55 @@ def test_launcher_ships_and_is_explained():
     assert "BAU-Laptop-Check.cmd" in (ROOT / "installer" / "make-payload.sh").read_text()
     doc = (ROOT / "docs" / "LAPTOP-CHECK.md").read_text()
     assert "BAU-Laptop-Check.cmd" in doc and "Run anyway" in doc
+
+
+# ------------------------------------------------------------------ the owner's real laptop
+# First real run (2026-10-12, Dell XPS 13 9380) said READY, but its NVMe disk sits behind
+# Intel RST ("RAID On"), which the Linux installer usually cannot see; the device list was
+# full of VPN, Hyper-V and Bluetooth-profile entries that are software, not hardware.
+
+XPS = {**GOOD,
+       "computer": {**GOOD["computer"], "Manufacturer": "Dell Inc.", "Model": "XPS 13 9380",
+                    "TotalPhysicalMemory": 8385855488},
+       "disks": [{"FriendlyName": "SanDisk Cruzer Glide", "BusType": "USB",
+                  "MediaType": "Unspecified", "Size": 123010547712, "PartitionStyle": "MBR"},
+                 {"FriendlyName": "SSDPEKKF512G8 NVMe INTEL 512GB", "BusType": "RAID",
+                  "MediaType": "SSD", "Size": 512110190592, "PartitionStyle": "GPT"}],
+       "pci": [{"Class": "Display", "FriendlyName": "Intel(R) UHD Graphics 620",
+                "InstanceId": "PCI\\VEN_8086&DEV_3EA0&SUBSYS_08E1"},
+               {"Class": "Net", "FriendlyName": "Killer Wireless-n/a/ac 1435 Wireless",
+                "InstanceId": "PCI\\VEN_168C&DEV_003E&SUBSYS_14351A56"},
+               {"Class": "Net", "FriendlyName": "WAN Miniport (IP)",
+                "InstanceId": "SWD\\MSRRAS\\MS_NDISWANIP"},
+               {"Class": "Net", "FriendlyName": "TAP-ProtonVPN Windows Adapter V9",
+                "InstanceId": "ROOT\\NET\\0000"},
+               {"Class": "Bluetooth", "FriendlyName": "Soundcore Icon+",
+                "InstanceId": "BTHENUM\\DEV_0C2E3D"},
+               {"Class": "Bluetooth", "FriendlyName": "Qualcomm QCA61x4A Bluetooth",
+                "InstanceId": "USB\\VID_0489&PID_E0A2\\5&1"},
+               {"Class": "Camera", "FriendlyName": "Integrated Webcam",
+                "InstanceId": "USB\\VID_0C45&PID_6723&MI_00\\6&1"},
+               {"Class": "Biometric", "FriendlyName": "Goodix fingerprint",
+                "InstanceId": "USB\\VID_27C6&PID_5385\\UID0"}]}
+
+
+@needs_pwsh
+def test_disk_behind_intel_rst_must_be_switched_to_ahci_first():
+    s = verdict(XPS)
+    assert s["verdict"] == "READY, AFTER THESE STEPS"
+    w = next(w for w in s["warnings"] if "AHCI" in w)
+    assert "RAID" in w and "Safe Mode" in w                 # or Windows stops starting
+
+
+@needs_pwsh
+def test_only_real_hardware_is_listed_and_judged():
+    s = verdict(XPS)
+    names = [d["name"] for d in s["devices"]]
+    assert not any(n.startswith(("WAN Miniport", "TAP-", "Soundcore")) for n in names)
+    by = {d["name"]: d["linux"] for d in s["devices"]}
+    assert by["Qualcomm QCA61x4A Bluetooth"].startswith("works")
+    assert by["Integrated Webcam"].startswith("usually works")
+    assert "fingerprint" in by["Goodix fingerprint"] and "not needed" in by["Goodix fingerprint"]
+    assert any("8 GB" in n and "small" in n for n in s["notes"])     # local models: small only
+    usb = next(d for d in s["disks"] if d["bus"] == "USB")
+    assert "not this one" in usb["note"]                             # never install on the stick

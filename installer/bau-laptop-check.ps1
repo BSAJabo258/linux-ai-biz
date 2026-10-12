@@ -30,7 +30,7 @@ function Get-BauDeviceId([string]$InstanceId) {
     return ""
 }
 
-function Get-BauLinuxSupport([string]$Class, [string]$Vendor) {
+function Get-BauLinuxSupport([string]$Class, [string]$Vendor, [string]$Name = "") {
     switch ($Class) {
         "Net" {
             switch ($Vendor) {
@@ -49,6 +49,14 @@ function Get-BauLinuxSupport([string]$Class, [string]$Vendor) {
                 "NVIDIA" { return "works with the open driver; if the screen stays black, choose 'safe graphics'" }
             }
         }
+        "Bluetooth" {
+            if ($Vendor -in @("Intel", "Realtek", "MediaTek") -or $Name -match "Intel|Qualcomm|Atheros|Realtek|MediaTek") {
+                return "works (Bluetooth firmware is on the stick)"
+            }
+        }
+        "Camera" { return "usually works (standard USB camera driver)" }
+        "Image" { return "usually works (standard USB camera driver)" }
+        "Biometric" { return "fingerprint readers often do not work on Linux; not needed by BAU" }
     }
     return "check on the stick: run bau-laptop-check.sh in limited mode"
 }
@@ -60,6 +68,9 @@ function Get-BauSummary($inv) {
         $notes += "Memory size could not be read: check it in Settings > System > About."
     } elseif ([double]$inv.computer.TotalPhysicalMemory / 1GB -lt 7.5) {
         $blockers += "Only $ramGb GB of memory: BAU needs 8 GB or more."
+    }
+    elseif ($ramGb -lt 12) {
+        $notes += "$ramGb GB of memory is enough for BAU with Claude; local models: only the small ones (about 4B)."
     }
     if ($inv.os.OSArchitecture -and $inv.os.OSArchitecture -notmatch "64") {
         $blockers += "This is a 32-bit system: BAU needs a 64-bit PC."
@@ -92,8 +103,12 @@ function Get-BauSummary($inv) {
     foreach ($d in @($inv.disks)) {
         if (-not $d) { continue }
         $gb = [math]::Round([double]$d.Size / 1GB)
+        $note = if ("$($d.BusType)" -eq "USB") { "USB stick or drive: not this one" } else { "" }
         $disks += [ordered]@{ name = "$($d.FriendlyName)"; bus = "$($d.BusType)"; type = "$($d.MediaType)"
-                              size_gb = $gb; partition_style = "$($d.PartitionStyle)" }
+                              size_gb = $gb; partition_style = "$($d.PartitionStyle)"; note = $note }
+        if ("$($d.BusType)" -eq "RAID") {
+            $warnings += "The internal disk ($($d.FriendlyName)) is behind Intel RST (firmware setting 'SATA Operation: RAID On'); the installer usually cannot see it. Switch that setting to AHCI before installing. If Windows must still start afterwards, set Windows to start in Safe Mode once before switching (docs/LAPTOP-CHECK.md has the steps)."
+        }
     }
     $internal = @($disks | Where-Object { $_.bus -ne "USB" })
     if ($internal.Count -and -not @($internal | Where-Object { $_.size_gb -ge 64 }).Count) {
@@ -104,9 +119,10 @@ function Get-BauSummary($inv) {
     foreach ($p in @($inv.pci)) {
         if (-not $p -or "$($p.Class)" -notin @("Net", "Display", "Media", "Bluetooth", "Camera", "Image", "Biometric")) { continue }
         $id = Get-BauDeviceId "$($p.InstanceId)"
+        if (-not $id) { continue }      # VPN, WAN Miniport, Bluetooth profiles: software, not hardware
         $vendor = ""
         if ($id -match "(VEN|VID)_([0-9A-F]{4})") { $vendor = $BauVendors[$Matches[2]] }
-        $linux = Get-BauLinuxSupport "$($p.Class)" "$vendor"
+        $linux = Get-BauLinuxSupport "$($p.Class)" "$vendor" "$($p.FriendlyName)"
         if ($linux -like "check: some Broadcom*") {
             $warnings += "Broadcom Wi-Fi ($($p.FriendlyName)): it may not work from the stick. Have a USB Wi-Fi adapter or an Ethernet cable ready for the install."
         }
@@ -150,7 +166,10 @@ function ConvertTo-BauText($s) {
           "Memory:   $($s.ram_gb) GB", "Firmware: $($s.firmware), Secure Boot $($s.secure_boot), TPM $($s.tpm)"
     if ($null -ne $s.battery_health_percent) { $l += "Battery:  $($s.battery_health_percent)% of its original capacity" }
     $l += "", "Disks:"
-    foreach ($d in $s.disks) { $l += "  $($d.name): $($d.size_gb) GB $($d.type) on $($d.bus), $($d.partition_style)" }
+    foreach ($d in $s.disks) {
+        $extra = if ($d.note) { " ($($d.note))" } else { "" }
+        $l += "  $($d.name): $($d.size_gb) GB $($d.type) on $($d.bus), $($d.partition_style)$extra"
+    }
     $l += "", "Devices and Linux:"
     foreach ($d in $s.devices) { $l += "  [$($d.class)] $($d.name) $($d.id): $($d.linux)" }
     return ($l -join [Environment]::NewLine)
