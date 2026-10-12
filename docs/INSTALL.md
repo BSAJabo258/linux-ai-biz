@@ -7,6 +7,21 @@ Two sticks, used in this order:
 | **USB #1: base OS** | `installer/build-usb-image.sh` | Official Debian stable installer, signature-verified, plus a "BAU install" menu entry. It installs an encrypted system with the BAU package set and a default-deny firewall. **It never chooses or erases a disk by itself.** |
 | **USB #2: BAU-PAYLOAD** | `installer/make-payload.sh` | The BAU control plane, checksummed (optionally GPG-signed). It also carries the pre-wipe tools (hardware audit, backup verify, wipe gate). |
 
+**Or one stick.** The two can be combined: USB #1 with the payload inside, so the same stick
+installs the OS and then BAU. The phases below are the same; where they say "plug in USB #2",
+use the `BAU-PAYLOAD` folder on the one stick instead (Phases 1-3; Windows may not show
+that folder, so on Windows use the release's `BAU-PAYLOAD-*.tar.gz`), and in Phase 5 the
+payload is already on the new system. Build it:
+
+```bash
+installer/make-payload.sh --with-claude --out dist                  # the payload first
+installer/build-usb-image.sh --payload dist/BAU-PAYLOAD --out dist  # -> dist/bau-one-debian-*.iso
+```
+
+GitHub's *build-usb* release has it ready-made as `bau-one-debian-*.iso`. The stick needs 8 GB
+or more. **Installing erases the disk you pick.** On a laptop that still has Windows on it,
+pick an external SSD as the target, or back up and accept that Windows goes.
+
 Build both on any Linux machine with `python3`, `xorriso`, `gpg`, `curl`. Stick sizes: USB #1 at least 2 GB; USB #2 at least 1 GB. A separate **backup drive** is also required (Phase 2).
 
 **Try it before the laptop.** Two safe rehearsals, nothing gets wiped:
@@ -123,6 +138,16 @@ sudo ./install.sh --wipe-gate-record /media/bauadmin/<backup>/bau-baselines/BAU-
 6. Enables `bau-recover` (every boot) and `bau-regwatch` (daily).
 7. Imports the wipe-gate record into the new audit chain. Without one, the install is recorded as **UNGATED**.
 8. Runs `bau selftest`.
+
+**One stick:** BAU is already on the new system, copied and checked by the installer. Plug in
+only the backup drive and run:
+
+```bash
+sudo bash /opt/bau-payload/install.sh --wipe-gate-record /media/bauadmin/<backup>/bau-baselines/BAU-WIPE-GATE.json
+```
+
+If `/opt/bau-payload` is missing, the copy failed its checksums and was deleted on purpose:
+use the payload stick (or the `BAU-PAYLOAD` folder on the one stick) as above.
 
 Log out and back in (group membership), then run `bau status`.
 

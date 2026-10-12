@@ -6,6 +6,9 @@
 # ISO's hash, then remasters it with:
 #   * a "BAU install" boot entry that loads preseed/bau.preseed
 #   * /bau/ on the ISO (first-boot notice + baseline hardening)
+#   * with --payload DIR: the BAU payload (USB #2) at /BAU-PAYLOAD, so ONE stick installs
+#     the OS and carries BAU. The installer copies it to /opt/bau-payload on the new
+#     system and re-checks every file there; the owner then runs its install.sh.
 # Boot records are replayed unchanged, so UEFI Secure Boot (shim) still works.
 #
 # The preseed NEVER selects or confirms the target disk: the Debian
@@ -27,14 +30,16 @@ KEYSERVER="hkps://keyring.debian.org"
 
 usage() {
   cat <<EOF
-usage: $0 [--arch amd64] [--out DIR] [--iso LOCAL_NETINST.iso --sums SHA512SUMS --sig SHA512SUMS.sign]
+usage: $0 [--arch amd64] [--out DIR] [--payload DIR] [--iso LOCAL_NETINST.iso --sums SHA512SUMS --sig SHA512SUMS.sign]
 
   --iso/--sums/--sig  use files you already downloaded (offline build); all three required
   --mirror URL        default ${MIRROR}
+  --payload DIR       one stick: build the payload first (make-payload.sh), pass its
+                      BAU-PAYLOAD folder; the image is then named bau-one-debian-*.iso
 EOF
 }
 
-SUMS_IN="" SIG_IN=""
+SUMS_IN="" SIG_IN="" PAYLOAD=""
 while (($#)); do
   case $1 in
     --arch) ARCH=$2; shift 2 ;;
@@ -43,12 +48,22 @@ while (($#)); do
     --iso) ISO_IN=$2; shift 2 ;;
     --sums) SUMS_IN=$2; shift 2 ;;
     --sig) SIG_IN=$2; shift 2 ;;
+    --payload) PAYLOAD=$2; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) usage; die "unknown argument $1" ;;
   esac
 done
 
 need xorriso gpg sha512sum sha256sum
+if [[ -n "${PAYLOAD}" ]]; then
+  [[ -f "${PAYLOAD}/SHA256SUMS" && -f "${PAYLOAD}/install.sh" ]] \
+    || die "--payload ${PAYLOAD} is not a BAU-PAYLOAD folder (run installer/make-payload.sh)"
+  PAYLOAD="$(cd "${PAYLOAD}" && pwd)"
+  # Never put a payload on a stick that does not match its own checksums.
+  (cd "${PAYLOAD}" && sha256sum --quiet --strict -c SHA256SUMS) \
+    || die "payload does not match its SHA256SUMS - rebuild it"
+  log "payload verified: ${PAYLOAD}"
+fi
 mkdir -p "${OUT_DIR}"
 OUT_DIR="$(cd "${OUT_DIR}" && pwd)"
 WORK="$(mktemp -d)"
@@ -119,6 +134,7 @@ mv "${STAGE}/grub.cfg.new" "${STAGE}/grub.cfg"
 
 maps=(-map "${STAGE}/preseed" /preseed -map "${STAGE}/bau" /bau
       -map "${STAGE}/grub.cfg" /boot/grub/grub.cfg)
+[[ -n "${PAYLOAD}" ]] && maps+=(-map "${PAYLOAD}" /BAU-PAYLOAD)
 # Legacy BIOS menu, when present.
 if xorriso -osirrox on -indev "${WORK}/${iso_name}" -extract /isolinux/txt.cfg \
      "${STAGE}/txt.cfg" 2>/dev/null; then
@@ -134,12 +150,14 @@ if xorriso -osirrox on -indev "${WORK}/${iso_name}" -extract /isolinux/txt.cfg \
 fi
 
 out="${OUT_DIR}/bau-${iso_name}"
+[[ -n "${PAYLOAD}" ]] && out="${OUT_DIR}/bau-one-${iso_name}"
 rm -f "${out}"
 xorriso -indev "${WORK}/${iso_name}" -outdev "${out}" "${maps[@]}" -boot_image any replay \
   >/dev/null 2>&1 || die "xorriso remaster failed"
 sha256sum "${out}" > "${out}.sha256"
 cat > "${out}.json" <<EOF
 {"image": "$(basename "${out}")", "base_iso": "${iso_name}", "base_iso_signer": "${signer}",
+ "payload": $([[ -n "${PAYLOAD}" ]] && cat "${PAYLOAD}/MANIFEST.json" || echo null),
  "sha256": "$(cut -d' ' -f1 "${out}.sha256")", "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
 EOF
 log "built ${out}"
