@@ -175,3 +175,21 @@ def test_scripts_pass_shellcheck():
 def test_owner_guide_explains_both_choices():
     doc = (ROOT / "docs" / "LIVE-USB.md").read_text()
     assert "Install BAU on this laptop" in doc and "/opt/bau-payload/install.sh" in doc
+
+
+def test_the_stick_carries_every_package_install_sh_needs():
+    """So the laptop is finished with no network (install.sh --offline); found on the
+    owner's XPS 13, whose Wi-Fi was not working after the install (2026-10-13)."""
+    sh = (ROOT / "installer" / "payload" / "install.sh").read_text()
+    needed = re.search(r"pkgs=\(([^)]*)\)", sh).group(1).split()
+    listed = set()
+    for f in (LB / "config" / "package-lists").glob("*.list.chroot"):
+        listed |= {ln.strip() for ln in f.read_text().splitlines()
+                   if ln.strip() and not ln.startswith("#")}
+    missing = [p for p in needed if p not in listed and p != "python3"]
+    assert not missing, f"not on the stick: {missing}"
+
+
+def test_owner_guide_explains_a_phone_as_the_network():
+    doc = (ROOT / "docs" / "LIVE-USB.md").read_text()
+    assert "USB tethering" in doc

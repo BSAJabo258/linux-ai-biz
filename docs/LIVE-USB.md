@@ -105,10 +105,11 @@ When you want BAU on a laptop's own drive instead of running it from the stick:
    `/opt/bau-payload`, checking every file; a damaged copy is deleted, not used.
 5. Take the stick out when it says so and restart. Type the disk passphrase, then log in
    as `bauadmin`.
-6. A window **Finish installing BAU** opens by itself. Connect to Wi-Fi when it asks (the
-   network icon, top right): BAU needs the internet once, to add a few packages. Then
-   type your `bauadmin` password, and choose a passphrase for your approval key when BAU
-   asks (remember it: it signs your approvals). It takes about ten minutes.
+6. A window **Finish installing BAU** opens by itself. No internet is needed: everything
+   BAU uses is on the stick. Type your `bauadmin` password, and choose a passphrase for
+   your approval key when BAU asks (remember it: it signs your approvals). It takes about
+   ten minutes. (A stick built before 2026-10-13 still needs the internet here: connect
+   to Wi-Fi, or use your phone, see "No Wi-Fi?" below.)
 7. Log out and in again once. Jarvis is in the menu as on the stick.
 
    If you close the window or something goes wrong, nothing is lost: it opens again at
@@ -122,6 +123,13 @@ Your encrypted storage on the stick is not touched by the install: keep the stic
 portable Jarvis and recovery stick.
 
 ## Good to know
+
+- **No Wi-Fi? Use your phone.** Plug your phone into the laptop with its USB cable, then
+  turn on **USB tethering** (Android: Settings > Network > Hotspot & tethering > USB
+  tethering; iPhone: Settings > Personal Hotspot > Allow Others to Join, then trust the
+  computer). Linux uses it at once, no driver needed, and the network icon shows a wired
+  connection. Then run the laptop check (`docs/LAPTOP-CHECK.md`, part 2) and send the
+  summary: it shows why the Wi-Fi is not working.
 
 - **Wrong passphrase:** the screen asks *Retry? [Y/n]*. Press Enter to type it again, or
   `n` to start without your storage (limited mode: nothing is opened or saved).

@@ -1,8 +1,9 @@
 """Finishing the install by itself: on a laptop installed from the full stick, BAU's own
 setup (install.sh) opens in a window at the first login, instead of the owner typing a
 command in a terminal. It still asks the owner for what is theirs (the bauadmin password
-for sudo, the approval-key passphrase), waits for the internet it needs, and comes back at
-the next login until BAU is installed. Written before the code it tests."""
+for sudo, the approval-key passphrase) and comes back at the next login until BAU is
+installed. The stick carries every package install.sh needs, so it first installs with no
+network at all; only if that fails does it ask for Wi-Fi. Written before the code it tests."""
 
 import shutil
 import subprocess
@@ -20,7 +21,10 @@ def fake_bin(tmp_path: Path, online_after: int = 0) -> Path:
     """sudo records what it was asked to run; getent fails `online_after` times first."""
     b = tmp_path / "bin"
     b.mkdir()
-    (b / "sudo").write_text(f'#!/bin/sh\necho "$@" >> {tmp_path}/sudo.log\n')
+    # sudo records what it runs; --offline fails when OFFLINE_FAILS is set (older image).
+    (b / "sudo").write_text(f'#!/bin/sh\necho "$@" >> {tmp_path}/sudo.log\n'
+                            '[ -n "$OFFLINE_FAILS" ] && [ "$3" = --offline ] && exit 1\n'
+                            'exit 0\n')
     (b / "getent").write_text(
         f'#!/bin/sh\nn=$(cat {tmp_path}/tries 2>/dev/null || echo 0)\n'
         f'echo $((n+1)) > {tmp_path}/tries\n[ "$n" -ge {online_after} ]\n')
@@ -29,14 +33,15 @@ def fake_bin(tmp_path: Path, online_after: int = 0) -> Path:
     return b
 
 
-def run(tmp_path, payload: bool, stdin: str, online_after: int = 0):
+def run(tmp_path, payload: bool, stdin: str, online_after: int = 0, offline_fails=False):
     p = tmp_path / "bau-payload"
     if payload:
         p.mkdir()
         (p / "install.sh").write_text("#!/bin/sh\n")
     b = fake_bin(tmp_path, online_after)
     return subprocess.run(["bash", str(FINISH)], input=stdin, capture_output=True, text=True,
-                          env={"PATH": f"{b}:/usr/bin:/bin", "BAU_PAYLOAD": str(p)},
+                          env={"PATH": f"{b}:/usr/bin:/bin", "BAU_PAYLOAD": str(p),
+                               **({"OFFLINE_FAILS": "1"} if offline_fails else {})},
                           timeout=30)
 
 
@@ -44,23 +49,27 @@ needs_bash = pytest.mark.skipif(not shutil.which("bash"), reason="needs bash")
 
 
 @needs_bash
-def test_runs_bau_setup_with_sudo_so_the_owner_types_the_password(tmp_path):
-    r = run(tmp_path, payload=True, stdin="\n")
+def test_installs_with_no_network_first(tmp_path):
+    r = run(tmp_path, payload=True, stdin="\n", online_after=99)     # never online
     assert r.returncode == 0, r.stderr
-    assert (tmp_path / "sudo.log").read_text().split() == [
-        "bash", str(tmp_path / "bau-payload" / "install.sh")]
+    install = str(tmp_path / "bau-payload" / "install.sh")
+    assert (tmp_path / "sudo.log").read_text().split() == ["bash", install, "--offline"]
     assert "password" in r.stdout and "log out" in r.stdout.lower()
+    assert "Wi-Fi" not in r.stdout                        # no network needed, none asked
 
 
 @needs_bash
-def test_waits_for_the_internet_and_can_be_left_for_later(tmp_path):
-    r = run(tmp_path, payload=True, stdin="\n\n\n", online_after=2)
-    assert "Wi-Fi" in r.stdout and (tmp_path / "sudo.log").exists()
+def test_falls_back_to_the_internet_when_the_stick_lacks_a_package(tmp_path):
+    r = run(tmp_path, payload=True, stdin="\n\n\n", online_after=2, offline_fails=True)
+    install = str(tmp_path / "bau-payload" / "install.sh")
+    runs = (tmp_path / "sudo.log").read_text().splitlines()
+    assert runs == [f"bash {install} --offline", f"bash {install}"]
+    assert "Wi-Fi" in r.stdout
     later = tmp_path / "later"
     later.mkdir()
-    r = run(later, payload=True, stdin="q\n", online_after=99)
-    assert r.returncode == 0 and not (later / "sudo.log").exists()
-    assert "next" in r.stdout.lower()                 # it says it will come back
+    r = run(later, payload=True, stdin="q\n", online_after=99, offline_fails=True)
+    assert r.returncode == 0 and "next" in r.stdout.lower()    # it says it will come back
+    assert len((later / "sudo.log").read_text().splitlines()) == 1
 
 
 @needs_bash
