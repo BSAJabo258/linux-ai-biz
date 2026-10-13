@@ -97,7 +97,8 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
              "clip_prompt": "producer", "plan_episode": "producer",
-             "toolbox": "scout", "capability_map": "scout", "world_watch": "godseye",
+             "toolbox": "scout", "capability_map": "scout", "open_source_watch": "scout",
+             "world_watch": "godseye",
              "video_clips": "studio", "make_video": "studio",
              "usage_today": "usage", "results": "results",
              "agents": "strategist", "ask_agent": "strategist",
@@ -261,6 +262,13 @@ class Assistant:
                  "Gmail'): what each solves, licence, sources, and whether Repo Scout has "
                  "inspected it. Ask this before guessing how to do something.",
                  _schema({"question": {"type": "string"}}), self.t_toolbox),
+            Tool("open_source_watch", "This week's open-source watch: projects found across "
+                 "the nine tracked categories (agents, compression, context and tokens, "
+                 "inference, memory, computer use, coding, open models, observability), "
+                 "ranked into test next / watch / already have / ignore with the reasons "
+                 "and trends. "
+                 "Descriptions are the projects' own claims; nothing is installed.",
+                 _schema(), self.t_open_source_watch),
             Tool("capability_map", "Jarvis's abilities by layer (thinking, seeing documents, "
                  "computer use, websites, connectors, coding, memory, planning, agent teams, "
                  "workflows, checking, media, business): what BAU already has, the gaps, "
@@ -607,6 +615,14 @@ class Assistant:
                                                "how_used", "licence", "caveats", "evidence",
                                                "next", "sources")} for h in hits],
                 "if_nothing_fits": "find_tools searches GitHub for more (owner's go-ahead)"}
+
+    def t_open_source_watch(self) -> dict[str, Any]:
+        from .scout import Scout
+        from .scout import watch as W
+        sl = W.shortlist(Scout(self.home))
+        return {"report": W.report(sl), "test_next": sl["test_next"][:5],
+                "watch": sl["watch"][:5],
+                "if_empty": "the weekly watch has not run yet: `bau scout watch`"}
 
     def t_capability_map(self, layer: str = "") -> dict[str, Any]:
         from .toolbox import CapabilityMap, Toolbox

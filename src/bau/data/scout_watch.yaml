@@ -1,0 +1,70 @@
+# The open-source watch (`bau scout watch`, weekly timer; docs/engineering/repo-intelligence.md).
+# Nine categories the owner asked BAU to track (2026-10-13; observability added the same
+# day). Each run sends the first `searches` queries of every category (GitHub's limits: see the doc) and refreshes the
+# seeds, then `bau scout shortlist` ranks what it found. Nothing is installed or run.
+#
+# priority: how much this category matters to the business right now, 1 (low) to 3 (high).
+# A starting point the owner changes here; it moves a project up or down the shortlist,
+# never past the licence and security gates.
+checked: "2026-10-13"
+searches: 2
+
+# What BAU already runs (the shortlist says "running in BAU", not "new").
+integrated:
+  - ggml-org/llama.cpp
+
+categories:
+  agents:
+    title: AI agents and orchestration
+    why: Multi-agent systems, agent harnesses, task delegation and persistent workers - the digital workforce.
+    priority: 3
+    queries: ["multi agent orchestration framework", "persistent ai agent skills", "agent task delegation"]
+    seeds: [NousResearch/hermes-agent, OpenHands/OpenHands]
+  compression:
+    title: Model compression and quantization
+    why: GGUF, AWQ, GPTQ, low-bit inference and distillation make capable models fit the 8 GB laptop.
+    priority: 2
+    queries: ["llm quantization gguf", "low bit llm inference", "llm distillation small model"]
+    seeds: []
+  context:
+    title: Token and context reduction
+    why: Prompt compression, context pruning, tool-output filtering and caching lower what every model call costs.
+    priority: 3
+    queries: ["prompt compression llm", "llm context pruning tokens", "llm router cheap strong model"]
+    seeds: [microsoft/LLMLingua, lm-sys/RouteLLM]
+  inference:
+    title: Inference infrastructure
+    why: Local model servers, inference engines and CPU optimisation get more work out of the hardware there is.
+    priority: 2
+    queries: ["local llm inference server cpu", "llm inference engine"]
+    seeds: [ggml-org/llama.cpp, ollama/ollama, vllm-project/vllm]
+  memory:
+    title: Memory and knowledge
+    why: Persistent memory, document retrieval, knowledge graphs and session compression give Jarvis continuity.
+    priority: 2
+    queries: ["llm agent long term memory", "knowledge graph rag agent"]
+    seeds: [mem0ai/mem0, getzep/graphiti]
+  computer_use:
+    title: Computer and browser use
+    why: Browser automation, GUI control and screen understanding let Jarvis work in real applications (owner confirms anything consequential).
+    priority: 3
+    queries: ["browser automation ai agent", "computer use agent gui"]
+    seeds: [browser-use/browser-use, microsoft/playwright-mcp]
+  self_improvement:
+    title: Development and self-improvement
+    why: Coding agents, automated tests, repository analysis and repair loops help Jarvis maintain software under supervision.
+    priority: 2
+    queries: ["ai coding agent open source", "automated program repair llm"]
+    seeds: [Aider-AI/aider]
+  open_models:
+    title: Open-weight and less-restricted models
+    why: More model choice and control. Each model is judged on its actual licence, capabilities, limits and safety; "uncensored" is not a standard and does not mean smarter. Abliterated models stay in the content lane.
+    priority: 1
+    queries: ["open weight llm small", "llm fine tuning local"]
+    seeds: [huggingface/transformers]
+  observability:
+    title: Observability and evaluation
+    why: Traces of each agent run (which tool, how long, what it cost, where it failed) and repeatable evaluations, beyond BAU's audit chain, usage meter and activity feed.
+    priority: 2
+    queries: ["llm observability tracing agents", "llm evaluation framework open source"]
+    seeds: [langfuse/langfuse, Arize-ai/phoenix]
