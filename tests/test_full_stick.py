@@ -59,6 +59,29 @@ def test_installer_sets_up_the_disk_and_accounts_exactly_like_the_bau_stick():
         assert lines(LIVE_PRESEED, prefix) == lines(STICK_PRESEED, prefix), prefix
 
 
+def test_installer_asks_where_the_boot_loader_goes():
+    """'bootdev default' means the first disk. On a laptop installing onto a USB disk the
+    first disk can be the install stick itself: GRUB then fails ("grub-install /dev/sda
+    failed", seen on the owner's XPS 13). The owner picks it, like the install disk."""
+    for preseed in (LIVE_PRESEED, STICK_PRESEED):
+        assert "grub-installer/bootdev" not in preseed.read_text(), preseed
+
+
+def test_boot_loader_also_goes_where_any_uefi_pc_finds_it():
+    # The fallback path EFI/BOOT/BOOTX64.EFI: a USB disk starts from F12 on any UEFI PC,
+    # even when the firmware forgets or refuses the boot entry.
+    for preseed in (LIVE_PRESEED, STICK_PRESEED):
+        assert "d-i grub-installer/force-efi-extra-removable boolean true" in \
+            preseed.read_text(), preseed
+
+
+def test_docs_say_which_disk_gets_the_boot_loader_and_how_to_recover():
+    doc = (ROOT / "docs" / "LIVE-USB.md").read_text()
+    assert "Install the GRUB boot loader" in doc
+    assert "lsblk -o NAME,SIZE,MODEL" in doc                # how to tell the disks apart
+    assert "grub-install" in doc and "Continue without boot loader" in doc
+
+
 def test_installer_copies_the_tested_live_system_instead_of_downloading_a_desktop():
     text = LIVE_PRESEED.read_text()
     assert "gnome-desktop" not in text

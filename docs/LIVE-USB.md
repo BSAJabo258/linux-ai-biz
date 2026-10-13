@@ -100,6 +100,21 @@ When you want BAU on a laptop's own drive instead of running it from the stick:
    - your **time zone**.
 
    Everything else is set the BAU way: full-disk encryption, root login off, network time.
+
+   **Where the boot loader goes.** Near the end the installer asks **Install the GRUB boot
+   loader to your primary drive?** Answer **No** unless BAU goes on the laptop's own
+   drive, then pick the **same drive you installed to** (for a USB disk, the one named
+   after it, e.g. SanDisk; never the stick you started from). Not sure which is which?
+   Press **Alt+F2**, then Enter, type `lsblk -o NAME,SIZE,MODEL` and compare the sizes;
+   **Alt+F1** brings you back.
+
+   **"grub-install ... failed. This is a fatal error."** Nothing is lost. Press Enter,
+   choose **Install the GRUB boot loader** in the menu and pick the right drive as above.
+   Don't choose **Continue without boot loader**: the laptop could not start BAU. Still
+   failing? **Alt+F4** shows the installer's log; a photo of the last lines tells us why.
+
+   Other screens (console encoding, character set, font, keyboard): keep what is
+   highlighted (UTF-8, "Guess optimal character set", English (US)) and press Enter.
 4. It copies the same tested system you run from the stick (desktop, BAU, local-model
    runner), so nothing large is downloaded. It also copies BAU's install files to
    `/opt/bau-payload`, checking every file; a damaged copy is deleted, not used.
