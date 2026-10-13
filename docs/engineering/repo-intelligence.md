@@ -26,10 +26,10 @@ raises the limit; nothing a candidate repository runs ever sees it.
 
 ## The weekly open-source watch
 
-Scout also runs on its own, every Monday morning (`bau-scout-watch.timer`), across eight
+Scout also runs on its own, every Monday morning (`bau-scout-watch.timer`), across nine
 categories the owner chose: AI agents, model compression, token and context reduction,
-inference, memory, computer and browser use, coding and self-improvement, and open-weight
-models. The categories, their searches, the projects to follow ("seeds"), what BAU already
+inference, memory, computer and browser use, coding and self-improvement, open-weight
+models, and observability and evaluation (traces of each agent run, repeatable tests). The categories, their searches, the projects to follow ("seeds"), what BAU already
 runs, and how much each category matters right now (priority 1 to 3) are in
 `src/bau/data/scout_watch.yaml`: change them there.
 

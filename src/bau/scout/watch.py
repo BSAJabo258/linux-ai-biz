@@ -1,4 +1,4 @@
-"""The open-source watch: Repo Scout on its own, weekly, across the eight technology
+"""The open-source watch: Repo Scout on its own, weekly, across the nine technology
 categories in data/scout_watch.yaml (`bau scout watch`, `bau scout shortlist`).
 
 Each run sends a few searches per category and refreshes the seeds, under GitHub's rate

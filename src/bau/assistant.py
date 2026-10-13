@@ -263,9 +263,10 @@ class Assistant:
                  "inspected it. Ask this before guessing how to do something.",
                  _schema({"question": {"type": "string"}}), self.t_toolbox),
             Tool("open_source_watch", "This week's open-source watch: projects found across "
-                 "the eight tracked categories (agents, compression, context and tokens, "
-                 "inference, memory, computer use, coding, open models), ranked into test "
-                 "next / watch / already have / ignore with the reasons and trends. "
+                 "the nine tracked categories (agents, compression, context and tokens, "
+                 "inference, memory, computer use, coding, open models, observability), "
+                 "ranked into test next / watch / already have / ignore with the reasons "
+                 "and trends. "
                  "Descriptions are the projects' own claims; nothing is installed.",
                  _schema(), self.t_open_source_watch),
             Tool("capability_map", "Jarvis's abilities by layer (thinking, seeing documents, "

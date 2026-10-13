@@ -1,6 +1,6 @@
 # The open-source watch (`bau scout watch`, weekly timer; docs/engineering/repo-intelligence.md).
-# Eight categories the owner asked BAU to track (2026-10-13). Each run sends the first
-# `searches` queries of every category (GitHub's limits: see the doc) and refreshes the
+# Nine categories the owner asked BAU to track (2026-10-13; observability added the same
+# day). Each run sends the first `searches` queries of every category (GitHub's limits: see the doc) and refreshes the
 # seeds, then `bau scout shortlist` ranks what it found. Nothing is installed or run.
 #
 # priority: how much this category matters to the business right now, 1 (low) to 3 (high).
@@ -62,3 +62,9 @@ categories:
     priority: 1
     queries: ["open weight llm small", "llm fine tuning local"]
     seeds: [huggingface/transformers]
+  observability:
+    title: Observability and evaluation
+    why: Traces of each agent run (which tool, how long, what it cost, where it failed) and repeatable evaluations, beyond BAU's audit chain, usage meter and activity feed.
+    priority: 2
+    queries: ["llm observability tracing agents", "llm evaluation framework open source"]
+    seeds: [langfuse/langfuse, Arize-ai/phoenix]

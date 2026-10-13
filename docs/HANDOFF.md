@@ -178,7 +178,7 @@ owner's XPS 13 had no Wi-Fi after installing. LIVE-USB.md explains phone USB tet
 Open-source watch (2026-10-13, tests first in `tests/test_scout_watch.py`): the owner's
 "Repo Intelligence & Optimization Engine". Repo Scout already did discovery, claims vs
 evidence, licence/security gates and quarantine inspection; this adds the standing watch.
-`scout/watch.py` runs `data/scout_watch.yaml` (8 categories, 2 searches each, seeds,
+`scout/watch.py` runs `data/scout_watch.yaml` (9 categories incl. observability, 2 searches each, seeds,
 `integrated`, owner priority 1-3) weekly via `bau-scout-watch.timer` (as bau, optional
 GITHUB_TOKEN), tags candidates with categories and dated star/push snapshots (`KEEP` keeps
 them across runs), and `shortlist` ranks new projects (test next / watch) apart from what

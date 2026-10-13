@@ -95,11 +95,11 @@ def toolbox_repos():
 
 # ------------------------------------------------------------------ the catalog
 
-def test_the_shipped_catalog_tracks_the_owners_eight_categories():
+def test_the_shipped_catalog_tracks_the_owners_nine_categories():
     cat = W.load()
     assert set(cat["categories"]) == {"agents", "compression", "context", "inference",
                                       "memory", "computer_use", "self_improvement",
-                                      "open_models"}
+                                      "open_models", "observability"}
     for key, c in cat["categories"].items():
         assert c["title"] and c["why"] and c["queries"], key
         assert c["priority"] in (1, 2, 3), key
@@ -252,7 +252,7 @@ def test_docs_explain_it():
     doc = (ROOT / "docs" / "engineering" / "repo-intelligence.md").read_text()
     assert "bau scout watch" in doc and "bau scout shortlist" in doc
     cat = yaml.safe_load((ROOT / "src" / "bau" / "data" / "scout_watch.yaml").read_text())
-    assert len(cat["categories"]) == 8
+    assert len(cat["categories"]) == 9
 
 
 @pytest.fixture(autouse=True)
