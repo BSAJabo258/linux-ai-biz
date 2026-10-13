@@ -422,6 +422,23 @@ def cmd_usage(a):
     return EXIT_OK
 
 
+def cmd_keys(a):
+    from . import keys as K
+    etc = Path(a.etc) if a.etc else K.ETC
+    try:
+        if a.keys_cmd == "list":
+            _out(K.names(etc))
+            return 0
+        if not a.etc and os.geteuid() != 0:
+            raise SystemExit("run with sudo: sudo bau keys import " + a.file)
+        passphrase = getpass.getpass(f"Passphrase for {Path(a.file).name}: ")
+        who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
+        _out(K.import_file(Path(a.file), passphrase, etc, AuditLog(), who))
+    except (K.KeyFileError, OSError) as e:
+        raise SystemExit(f"bau keys: {e}") from None
+    return 0
+
+
 def cmd_agents(a):
     from . import agentfolders as AF
     try:
@@ -1450,6 +1467,15 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("add-skill", help="bring in a downloaded skill folder (text only)")
     x.add_argument("folder")
     s.set_defaults(fn=cmd_agents)
+
+    s = sub.add_parser("keys", help="bring your API keys from another computer (names only shown)")
+    w = s.add_subparsers(dest="keys_cmd", required=True)
+    x = w.add_parser("import", help="sudo: open BAU-KEYS.enc and put each key where BAU reads it")
+    x.add_argument("file")
+    x.add_argument("--etc", help=argparse.SUPPRESS)
+    x = w.add_parser("list", help="which key names BAU has (never the values)")
+    x.add_argument("--etc", help=argparse.SUPPRESS)
+    s.set_defaults(fn=cmd_keys)
 
     s = sub.add_parser("results", help="how posted videos are doing: views, earnings, profit")
     w = s.add_subparsers(dest="res_cmd")
