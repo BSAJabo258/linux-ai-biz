@@ -37,6 +37,15 @@ curl
 ca-certificates
 openssl
 
+# Everything BAU's install.sh needs, so a laptop installed from this stick is finished
+# with no network (install.sh --offline; tests/test_full_stick.py keeps this complete).
+podman
+uidmap
+auditd
+unattended-upgrades
+bind9-dnsutils
+ffmpeg
+
 # Encrypted storage setup (jarvis-storage)
 fdisk
 util-linux

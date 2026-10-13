@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 460 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 462 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -168,6 +168,12 @@ files, show names only, and write `BAU-KEYS.enc` in openssl's `enc -aes-256-cbc 
 openssl). `sudo bau keys import` (`keys.py`) routes platform app keys to platforms.env and
 the rest to models.env (0640, root:bau), replacing same names and keeping other lines, and
 audits names only. openssl is now in the live image and install.sh's packages.
+
+Offline stick (2026-10-13, tests in `tests/test_full_stick.py`, `test_finish_install.py`):
+every package install.sh needs (podman, uidmap, auditd, unattended-upgrades, bind9-dnsutils,
+ffmpeg, openssl) is in the live image, so `finish-install.sh` runs `install.sh --offline`
+first and only waits for the internet if that fails (an older stick). Found when the
+owner's XPS 13 had no Wi-Fi after installing. LIVE-USB.md explains phone USB tethering.
 
 Agents as folders (2026-10-12, tests first in `tests/test_agent_folders.py`): the
 owner's point was that agents are folders (instructions + skills + tools/MCP + a brain),
