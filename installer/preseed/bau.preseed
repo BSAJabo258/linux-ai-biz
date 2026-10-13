@@ -5,6 +5,7 @@
 #   * the disk-encryption passphrase
 #   * the administrator password (no secret ever lives in this file - spec §1.4)
 #   * the time zone
+#   * which disk gets the boot loader (GRUB)
 # Everything else is fixed so every BAU machine is built the same way.
 
 ### Localisation
@@ -57,9 +58,12 @@ d-i pkgsel/include string sudo apparmor apparmor-utils apparmor-profiles apparmo
 d-i pkgsel/upgrade select full-upgrade
 popularity-contest popularity-contest/participate boolean false
 
-### Boot loader
+### Boot loader. Where it goes is asked, never preseeded: "default" means the first disk,
+### and when BAU is installed onto a USB disk the first disk can be the install stick
+### (GRUB then fails). It also goes to the fallback path EFI/BOOT/BOOTX64.EFI, so a USB
+### disk starts from the F12 menu on any UEFI PC.
 d-i grub-installer/only_debian boolean true
-d-i grub-installer/bootdev string default
+d-i grub-installer/force-efi-extra-removable boolean true
 
 ### Hand-off: stage the first-boot notice and baseline firewall. No network access.
 ### BAU itself comes from USB #2, or on a one-stick image from /BAU-PAYLOAD on this
