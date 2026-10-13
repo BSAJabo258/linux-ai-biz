@@ -24,6 +24,36 @@ To raise the limit, put a GitHub token with no scopes in `GITHUB_TOKEN`: as a Co
 secret, in `.env` for Docker, or in `/etc/bau/models.env` on the laptop. The token only
 raises the limit; nothing a candidate repository runs ever sees it.
 
+## The weekly open-source watch
+
+Scout also runs on its own, every Monday morning (`bau-scout-watch.timer`), across eight
+categories the owner chose: AI agents, model compression, token and context reduction,
+inference, memory, computer and browser use, coding and self-improvement, and open-weight
+models. The categories, their searches, the projects to follow ("seeds"), what BAU already
+runs, and how much each category matters right now (priority 1 to 3) are in
+`src/bau/data/scout_watch.yaml`: change them there.
+
+```bash
+bau scout watch                  # run it now (the timer does it weekly)
+bau scout watch --category context
+bau scout shortlist              # test next / watch / already have / ignore, with reasons
+bau scout shortlist --json
+```
+
+Or ask Jarvis: "what's new in open source this week?" (the `open_source_watch` tool).
+
+- Each run sends the first two searches of every category and refreshes the seeds, under
+  GitHub's limits below. If GitHub says wait, the run stops and lists what was not sent.
+- Every project found gets its categories and a dated snapshot (stars, last push). Two
+  snapshots make a trend: **rising** (25 stars or 5% more, whichever is larger), steady
+  or falling.
+- The shortlist says whether BAU **already runs** it, the Toolbox **already researched** it,
+  or it is **new**. Its opportunity is Scout's evidence-based score, weighted by the
+  category's priority, plus a bonus when rising. Licence and security gates still decide
+  first: a blocked licence lands in *Ignored* whatever its stars.
+- **Test next** means "worth `bau scout inspect`, a sandbox test and a benchmark" - never
+  "adopt". Cost is always *unknown until benchmarked*. You decide what is integrated.
+
 ## GitHub's rate limits
 
 Checked 2026-10-09 against GitHub's *Rate limits* and *Best practices* pages for the REST

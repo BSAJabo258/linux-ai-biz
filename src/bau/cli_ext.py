@@ -335,6 +335,21 @@ def cmd_scout(a):
                   "sentinel": c["inspected"]["verdict"], "reasons": c["inspected"]["reasons"],
                   "licence": c["license"], "decision": c["decision"],
                   "still_needed": c["needs"], "blocked": c["blockers"]})
+        elif a.scout_cmd == "watch":
+            from .scout import watch as W
+            run = W.watch(sc, searches=a.searches, only=a.category)
+            _out({**run, "next": "bau scout shortlist"})
+            if not run["reached_github"]:
+                print("GitHub answered nothing this run (refused, offline or asked to wait):"
+                      " see the errors above. This is not 'nothing new'.", file=sys.stderr)
+                return EXIT_BLOCKED
+        elif a.scout_cmd == "shortlist":
+            from .scout import watch as W
+            sl = W.shortlist(sc)
+            if a.json:
+                _out({g: items[:a.top] for g, items in sl.items()})
+            else:
+                print(W.report(sl, a.top))
         elif a.scout_cmd == "report":
             text = S.report(sc, a.run, a.top)
             if a.out:
@@ -1385,6 +1400,14 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("repo", help="OWNER/NAME")
     x = w.add_parser("inspect", help="download one into quarantine and scan it statically")
     x.add_argument("repo", help="OWNER/NAME")
+    x = w.add_parser("watch", help="the weekly open-source watch across the tracked "
+                     "categories (searches and records; installs nothing)")
+    x.add_argument("--category", help="only this category (see data/scout_watch.yaml)")
+    x.add_argument("--searches", type=int, help="searches per category (default in the file)")
+    x = w.add_parser("shortlist", help="what the watch found: test next, watch, already "
+                     "have, ignore - with the reasons")
+    x.add_argument("--top", type=int, default=10)
+    x.add_argument("--json", action="store_true")
     x = w.add_parser("report", help="a plain-words report of a run (latest by default)")
     x.add_argument("--run")
     x.add_argument("--top", type=int, default=10)

@@ -29,7 +29,8 @@ from .plan import plan
 NAME = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 HEAVY = re.compile(r"(?im)^\s*[\"']?(torch|tensorflow|jax|onnxruntime-gpu|vllm|xformers|"
                    r"bitsandbytes|cupy|nvidia-[a-z0-9-]+|diffusers)\b")
-KEEP = ("license", "security", "validation", "inspected", "business_value", "first_seen")
+KEEP = ("license", "security", "validation", "inspected", "business_value", "first_seen",
+        "categories", "history")
 
 
 def config() -> dict[str, Any]:

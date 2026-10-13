@@ -1,0 +1,21 @@
+[Unit]
+Description=BAU open-source watch (Repo Scout across the tracked categories; installs nothing)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bau
+Group=bau
+Environment=BAU_HOME=/var/lib/bau
+Environment=BAU_AUDIT_KEY=/etc/bau/audit.key
+# An optional GITHUB_TOKEN (no scopes) only raises GitHub's rate limit.
+EnvironmentFile=-/etc/bau/models.env
+ExecStart=/usr/local/bin/bau scout watch
+UMask=0007
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/bau
+CapabilityBoundingSet=

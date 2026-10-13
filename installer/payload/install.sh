@@ -172,8 +172,9 @@ if ((CLOUD)); then
   chmod 0644 /etc/systemd/system/bau-jarvis.service
 fi
 systemctl daemon-reload
-systemctl enable bau-recover.service bau-regwatch.timer bau-governor.timer bau-ui.service >/dev/null
-systemctl start bau-regwatch.timer bau-governor.timer
+systemctl enable bau-recover.service bau-regwatch.timer bau-governor.timer bau-scout-watch.timer \
+  bau-ui.service >/dev/null
+systemctl start bau-regwatch.timer bau-governor.timer bau-scout-watch.timer
 # restart, not start: on an upgrade the dashboard must load the new code now,
 # not at the next reboot (timer jobs pick up new code on their next run).
 systemctl restart bau-ui.service
