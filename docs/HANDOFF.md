@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 450 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 460 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -158,6 +158,16 @@ then runs `sudo bash /opt/bau-payload/install.sh`; the owner types the sudo pass
 the approval-key passphrase, the script never sees them. install.sh removes the autostart,
 so it comes back at each login until BAU is installed. The installer itself still asks
 only the owner's four answers (disk + confirm, passphrase, password, time zone).
+
+Keys transfer (2026-10-13, tests first in `tests/test_keys_transfer.py`): the owner's API
+keys come from their other computer in one locked file. `bau-keys-export.ps1` (Windows,
+double-click `BAU-Keys-Export.cmd`, drop .env files on it) and `bau-keys-export.sh`
+(Mac/Linux, bash 3.2-safe) collect credential-shaped names from the environment and .env
+files, show names only, and write `BAU-KEYS.enc` in openssl's `enc -aes-256-cbc -pbkdf2
+-iter 600000 -md sha256` format (the PS1 does it in .NET; a test opens its output with
+openssl). `sudo bau keys import` (`keys.py`) routes platform app keys to platforms.env and
+the rest to models.env (0640, root:bau), replacing same names and keeping other lines, and
+audits names only. openssl is now in the live image and install.sh's packages.
 
 Agents as folders (2026-10-12, tests first in `tests/test_agent_folders.py`): the
 owner's point was that agents are folders (instructions + skills + tools/MCP + a brain),

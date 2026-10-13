@@ -57,7 +57,7 @@ fi
 if [[ "${ID}" != debian || "${VERSION_ID%%.*}" -lt 13 ]] && ((ALLOW_OS == 0)); then
   die "expected Debian 13+, found ${PRETTY_NAME} (use --allow-other-os at your own risk)"
 fi
-pkgs=(python3 python3-venv python3-yaml nftables podman uidmap apparmor apparmor-utils chrony
+pkgs=(python3 python3-venv python3-yaml nftables podman uidmap apparmor apparmor-utils chrony openssl
       auditd unattended-upgrades bind9-dnsutils openssh-client ffmpeg)
 missing=()
 for p in "${pkgs[@]}"; do dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p"); done
@@ -81,6 +81,10 @@ fi
 # ---------------------------------------------------------------- 4. directories + keys
 install -d -m 2770 -o bau -g bau /var/lib/bau
 install -d -m 0750 -o root -g bau /etc/bau
+# Keys imported before this ran (bau keys import) belong to root: let BAU's services read them.
+for f in /etc/bau/models.env /etc/bau/platforms.env; do
+  if [[ -f $f ]]; then chown root:bau "$f"; chmod 0640 "$f"; fi
+done
 install -d -m 0755 /opt/bau
 umask 077
 mk_key() {  # mk_key FILE GROUP - generated on this machine, never shipped, never logged
