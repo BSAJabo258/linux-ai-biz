@@ -19,6 +19,7 @@ One stick does both.
 - A 64-bit PC with **8 GB RAM** or more. No graphics card needed.
 - The image file `my-jarvis-<version>-amd64.iso` and its `.sha256` file, from the
   repository's GitHub **Releases** or **Actions > build-live > Run workflow**.
+  To build it yourself, step by step: [BUILD-ISO.md](BUILD-ISO.md).
 
 ## 1. Put the image on the stick
 
