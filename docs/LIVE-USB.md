@@ -114,6 +114,13 @@ When you want BAU on a laptop's own drive instead of running it from the stick:
    Don't choose **Continue without boot loader**: the laptop could not start BAU. Still
    failing? **Alt+F4** shows the installer's log; a photo of the last lines tells us why.
 
+   **"Debootstrap Error: Failed to determine the codename for the release."** A stick built
+   before 2026-10-14 needs the internet at this step (newer sticks don't). Nothing is lost:
+   plug your phone in with a USB cable and turn on **USB tethering** (Settings > Network >
+   Hotspot & tethering). Press Enter on the error, then in the installer's menu choose
+   **Configure the network** (it finds the phone by itself), then **Choose a mirror of the
+   Debian archive** (keep deb.debian.org), then **Install the system** again.
+
    Other screens (console encoding, character set, font, keyboard): keep what is
    highlighted (UTF-8, "Guess optimal character set", English (US)) and press Enter.
 4. It copies the same tested system you run from the stick (desktop, BAU, local-model
