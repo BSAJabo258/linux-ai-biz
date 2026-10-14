@@ -82,6 +82,23 @@ def test_docs_say_which_disk_gets_the_boot_loader_and_how_to_recover():
     assert "grub-install" in doc and "Continue without boot loader" in doc
 
 
+def test_installer_knows_the_release_without_a_network():
+    """Debian's live installer reads the release name from the mirror it contacted. With no
+    network it never contacts one, and "Install the system" stops with "Debootstrap Error:
+    Failed to determine the codename for the release" (seen on the owner's XPS 13). The
+    preseed names the release the image is built from, so installing works offline."""
+    dist = re.search(r"--distribution (\S+)", (LB / "auto" / "config").read_text()).group(1)
+    text = LIVE_PRESEED.read_text()
+    assert f"d-i mirror/codename string {dist}" in text
+    assert f"d-i mirror/suite string {dist}" in text
+
+
+def test_docs_say_what_to_do_when_the_installer_wants_a_network():
+    doc = (ROOT / "docs" / "LIVE-USB.md").read_text()
+    assert "Failed to determine the codename" in doc
+    assert "USB tethering" in doc and "Configure the network" in doc
+
+
 def test_installer_copies_the_tested_live_system_instead_of_downloading_a_desktop():
     text = LIVE_PRESEED.read_text()
     assert "gnome-desktop" not in text
