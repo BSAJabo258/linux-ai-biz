@@ -454,6 +454,21 @@ def cmd_keys(a):
     return 0
 
 
+def cmd_team(a):
+    from . import team as T
+    try:
+        if a.team_cmd == "set":
+            _out(T.set_team(None, _human(), AuditLog(), boss=a.boss, thinker=a.thinker,
+                            specialist=a.specialist, takeover=a.takeover))
+        elif a.team_cmd == "score":
+            _out(T.scores())
+        else:
+            _out(T.show())
+    except (ValueError, PermissionError) as e:
+        raise SystemExit(f"bau team: {e}") from None
+    return 0
+
+
 def cmd_agents(a):
     from . import agentfolders as AF
     try:
@@ -1499,6 +1514,19 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("list", help="which key names BAU has (never the values)")
     x.add_argument("--etc", help=argparse.SUPPRESS)
     s.set_defaults(fn=cmd_keys)
+
+    s = sub.add_parser("team", help="who runs the show: boss, thinker, specialist (docs/TEAM.md)")
+    w = s.add_subparsers(dest="team_cmd")
+    w.add_parser("show", help="the team and whether the specialist may take over by itself")
+    x = w.add_parser("set", help="you: name the team (registered, approved models)")
+    x.add_argument("--boss", help="runs Jarvis and the agents; uses tools (e.g. qwen3.5-4b)")
+    x.add_argument("--thinker", help="your local uncensored model: ideas only, never tools")
+    x.add_argument("--specialist", help="on call when the boss is stuck (e.g. claude-opus-5-5)")
+    x.add_argument("--takeover", choices=["auto", "ask"],
+                   help="auto: the specialist takes over by itself within your daily limit; "
+                        "ask: the job stops and waits for you")
+    w.add_parser("score", help="the score sheet: jobs, loops, handovers, unchecked facts, cost")
+    s.set_defaults(fn=cmd_team)
 
     s = sub.add_parser("results", help="how posted videos are doing: views, earnings, profit")
     w = s.add_subparsers(dest="res_cmd")

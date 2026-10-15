@@ -33,10 +33,12 @@ TRUST_LEVELS = ["UNKNOWN", "THIRD_PARTY", "ABLITERATED", "MODIFIED", "MERGED", "
                 "VERIFIED", "OFFICIAL"]
 ROUTABLE = {"APPROVED", "ACTIVE"}
 # Content lane: an ABLITERATED model may be approved for these jobs ONLY - the
-# creative work where a stock model's refusals get in the way of legitimate content.
-# It drafts text; it never gets tools, personal data, or any say in a decision.
+# creative work where a stock model's refusals get in the way of legitimate content, and
+# "ideas": the team's thinker (team.think), unfiltered ideas on material it is handed.
+# It writes text; it never gets tools or personal data, and what it says is advice for
+# the owner and the boss model, never an instruction or a decision.
 CONTENT_KINDS = {"creative_writing", "script", "lyrics", "comedy", "ad_copy",
-                 "image_prompt", "storyboard", "video_prompt"}
+                 "image_prompt", "storyboard", "video_prompt", "ideas"}
 CONTENT_LANE = "content_only"
 
 
