@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -63,14 +64,21 @@ class AgentSpec:
                    tool_specs=tool_specs)
 
 
+# The same tool call with the same input this many times means the model is going round
+# in circles: stop there instead of spending the rest of its steps.
+LOOP_LIMIT = 3
+
+
 @dataclass
 class RunResult:
-    status: str                  # COMPLETED | PAUSED | REFUSED | STEP_LIMIT | FAILED
+    status: str        # COMPLETED | PAUSED | REFUSED | STEP_LIMIT | LOOPING | FAILED | NEEDS_OWNER
     final_text: str
     steps: int
     tool_calls: list[dict[str, Any]]
     cost_usd: float
     injection_flags: int
+    evidence: list[str] = field(default_factory=list)       # what the tools returned
+    supervision: dict[str, Any] = field(default_factory=dict)   # see supervisor.py
 
 
 def _tool_name(capability: str) -> str:
@@ -107,6 +115,8 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
     cost = 0.0
     flags = 0
     final = ""
+    evidence: list[str] = []
+    seen: Counter[str] = Counter()
     for step in range(1, spec.max_steps + 1):
         est = estimate_usd(spec.model, 4000, 1000)
         ok, why = gateway.budgets.check(gateway.ledger, spec.agent_id, est, job.job_id,
@@ -115,7 +125,7 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
             job.status = "PAUSED"
             job.next_action = f"{why}: optimize, change model, or request approval"
             jobs.checkpoint(job)
-            return RunResult("PAUSED", why, step - 1, log, cost, flags)
+            return RunResult("PAUSED", why, step - 1, log, cost, flags, evidence)
         resp: ModelResponse = provider.complete(system, messages, tools, spec.max_tokens)
         step_cost = estimate_usd(spec.model, resp.tokens_in, resp.tokens_out)
         cost += step_cost
@@ -128,7 +138,7 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
             job.status = "FAILED"
             job.errors.append(f"model refusal ({resp.refusal_category})")
             jobs.checkpoint(job)
-            return RunResult("REFUSED", "", step, log, cost, flags)
+            return RunResult("REFUSED", "", step, log, cost, flags, evidence)
         # Append the assistant turn exactly as returned (append-only history).
         if isinstance(resp.raw_assistant, dict):
             messages.append(resp.raw_assistant)
@@ -138,6 +148,18 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
         if not resp.tool_calls:
             final = resp.text
             break
+        sigs = [f"{c.name}:{json.dumps(c.input, sort_keys=True, default=str)}"
+                for c in resp.tool_calls]
+        seen.update(sigs)
+        if any(seen[s] >= LOOP_LIMIT for s in sigs):
+            job.status = "PAUSED"
+            job.next_action = (f"looping: the same tool call {LOOP_LIMIT} times; "
+                               "hand it to a stronger model or rephrase the task")
+            jobs.checkpoint(job)
+            gateway.audit.append("agent.looping", spec.agent_id,
+                                 {"job_id": job.job_id, "step": step,
+                                  "call": sigs[0][:200]})
+            return RunResult("LOOPING", resp.text, step, log, cost, flags, evidence)
         results: list[tuple[ToolCall, str, bool]] = []
         for call in resp.tool_calls:
             cap = _capability(call.name)
@@ -149,6 +171,7 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
                 text = out if isinstance(out, str) else json.dumps(out, default=str)[:20000]
                 wrapped, flagged = untrusted(cap, text)
                 flags += flagged
+                evidence.append(text[:4000])
                 entry.update(ok=True, injection_suspected=flagged)
                 results.append((call, wrapped, False))
             except GatewayDenied as e:
@@ -170,7 +193,7 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
         job.status = "PAUSED"
         job.next_action = "step limit reached; review the transcript before continuing"
         jobs.checkpoint(job)
-        return RunResult("STEP_LIMIT", final, spec.max_steps, log, cost, flags)
+        return RunResult("STEP_LIMIT", final, spec.max_steps, log, cost, flags, evidence)
     job.remaining_steps = []
     job.status = "COMPLETED"
     job.cost_usd = cost
@@ -178,4 +201,5 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
     if flags:
         gateway.audit.append("agent.injection_suspected", spec.agent_id,
                              {"job_id": job.job_id, "count": flags})
-    return RunResult("COMPLETED", final, len(job.completed_steps) + 1, log, cost, flags)
+    return RunResult("COMPLETED", final, len(job.completed_steps) + 1, log, cost, flags,
+                     evidence)

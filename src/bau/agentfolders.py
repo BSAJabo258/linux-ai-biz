@@ -252,14 +252,10 @@ def summary(a: Agent, home: Path | None) -> dict[str, Any]:
 def run(name: str, task: str, home: Path | None, audit: Any = None,
         jarvis: tuple[Any, dict[str, Any]] | None = None, factory: Any = None,
         brains: tuple[Any, dict[str, Any]] | None = None, mission_id: str = "",
-        trust: Any = None) -> Any:
-    """Run an approved agent folder on one task. ``brains`` forces a (provider, model)."""
-    from . import agents
+        trust: Any = None, double_check: bool = False) -> Any:
+    """Run an approved agent folder on one task. ``brains`` forces a (provider, model);
+    otherwise an agent on the small brain runs under the team's supervisor."""
     from .audit import AuditLog
-    from .gateway import Handler
-    from .jobs import JobStore
-    from .models.providers import ToolSpec
-    from .runtime import TOOL_SPECS, build_gateway
     home = home or bau_home()
     a = load(name, home)
     probs = problems(a)
@@ -269,14 +265,80 @@ def run(name: str, task: str, home: Path | None, audit: Any = None,
     if state != "approved":
         raise PermissionError(f"agent {name} is {state}: the owner runs `bau agents approve "
                               f"{name}` after reading its folder")
+    audit = audit or AuditLog(home / "audit" / "chain.jsonl")
     if brains is None:
         from .brains import resolve
         b = resolve(a.brain, home, a.path, jarvis or (None, {}), factory,
                     kind="creative_writing" if a.brain == "content" else "")
+        if b["brain"] == "small":
+            return _supervised(a, task, home, audit, b, jarvis, factory, mission_id, trust,
+                               double_check)
         brains = (b["provider"], b["model"])
+    return _run_once(a, task, home, audit, brains, mission_id, trust)
+
+
+def _supervised(a: Agent, task: str, home: Path, audit: Any, boss: dict[str, Any],
+                jarvis: Any, factory: Any, mission_id: str, trust: Any,
+                double_check: bool) -> Any:
+    """The team's boss runs the agent; the supervisor hands a stuck job to the specialist
+    (docs/TEAM.md) and the run goes on the score sheet."""
+    from . import supervisor, team
+    from .brains import resolve
+    from .usage import Usage
+    chosen = team.show(home)
+    mode = chosen["takeover"]
+    spec_brain: dict[str, Any] = {}
+
+    def specialist_brain() -> dict[str, Any]:
+        if not spec_brain:
+            spec_brain.update(resolve("strong", home, a.path, jarvis or (None, {}), factory))
+        return spec_brain
+
+    def specialist(t: str) -> Any:
+        try:
+            s = specialist_brain()
+        except (KeyError, PermissionError, ImportError, ValueError) as e:
+            from .agents import RunResult
+            return RunResult("FAILED", f"the specialist could not start: {e}", 0, [], 0.0, 0)
+        audit.append("team.takeover", f"folder:{a.name}",
+                     {"from": boss["model"].get("id"), "to": s["model"].get("id"),
+                      "task": task[:200]})
+        return _run_once(a, t, home, audit, (s["provider"], s["model"]), mission_id, trust)
+
+    def verify(answer: str, evidence: list[str]) -> str:
+        s = specialist_brain()
+        from .agents import untrusted
+        msg = (f"Answer to check:\n{answer}\n\n"
+               + untrusted("evidence", "\n---\n".join(evidence)[:20000])[0])
+        r = s["provider"].complete(
+            "Check the answer against the evidence only. Reply OK if every fact in it is "
+            "backed by the evidence; otherwise list each fact that is not, in one line each.",
+            [{"role": "user", "content": msg}], [], 1000)
+        return (r.text or "").strip() or "no reply"
+
+    res = supervisor.supervise(
+        task, lambda t: _run_once(a, t, home, audit, (boss["provider"], boss["model"]),
+                                  mission_id, trust),
+        specialist if chosen["specialist"] else None, mode=mode,
+        over_limit=Usage(home, audit).over_limit,
+        verify=verify if double_check and chosen["specialist"] else None)
+    team.record(home, team.runs(home, res, boss["model"].get("id") or "",
+                                (spec_brain.get("model") or {}).get("id") or "",
+                                f"folder:{a.name}"))
+    return res
+
+
+def _run_once(a: Agent, task: str, home: Path, audit: Any,
+              brains: tuple[Any, dict[str, Any]], mission_id: str, trust: Any) -> Any:
+    from . import agents
+    from .gateway import Handler
+    from .jobs import JobStore
+    from .models.providers import ToolSpec
+    from .runtime import TOOL_SPECS, build_gateway
+    name = a.name
     provider, model = brains
     gw = build_gateway(home, trust=trust)
-    gw.audit = audit or AuditLog(home / "audit" / "chain.jsonl")
+    gw.audit = audit
     agent_id = f"folder:{name}"
     specs = dict(TOOL_SPECS)
     specs[SKILL_TOOL] = ToolSpec(SKILL_TOOL, "Open one of your skills by name (file= for a "
