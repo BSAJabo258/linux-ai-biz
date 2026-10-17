@@ -12,6 +12,14 @@ FULL="${OUT}/BAU-LAPTOP-FULL-LINUX.txt"
 SUM="${OUT}/BAU-LAPTOP-SUMMARY-LINUX.txt"
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# The verdict and the "what BAU would find in place" evidence live in lib/, so this file
+# stays a short readable check. Without that file the check still runs, minus the verdict.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+evidence_verdict() { echo "VERDICT: unknown - installer/lib/laptop-evidence.sh is missing next to this script"; }
+evidence_summary() { :; }
+evidence_full() { echo "  (installer/lib/laptop-evidence.sh is missing next to this script)"; }
+if [ -r "${HERE}/lib/laptop-evidence.sh" ]; then . "${HERE}/lib/laptop-evidence.sh"; fi
+
 # Every command may be missing or refused; the check carries on either way.
 run() {
   echo "### $*"
@@ -51,6 +59,7 @@ scrub() {
   run nmcli device status
   run nmcli radio all
   run upower -d
+  evidence_full
   echo "### kernel messages about firmware or drivers"
   kernel_log | grep -iE "firmware|failed|error" | tail -n 200
 } > "${FULL}" 2>&1
@@ -106,12 +115,15 @@ disks() {
 {
   echo "BAU LAPTOP CHECK (Linux) - safe to share (no names, network addresses or serial numbers)"
   echo
+  evidence_verdict
+  echo
   echo "Memory:"; memory; echo
   echo "Firmware and processor:"; firmware; echo
   echo "Disks:"; disks; echo
   echo "Devices and their drivers:"; devices; echo
   echo "Missing firmware:"; missing_firmware; echo
   echo "Radios (Wi-Fi / Bluetooth, blocked or not):"; radios; echo
+  evidence_summary
   echo "A device with NO DRIVER LOADED, or a line under Missing firmware, is what to ask about."
 } 2>&1 | scrub > "${SUM}"
 
