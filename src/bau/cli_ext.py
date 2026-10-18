@@ -454,6 +454,43 @@ def cmd_keys(a):
     return 0
 
 
+def cmd_pack(a):
+    from . import pack as P
+    from .home import bau_home
+    try:
+        found = [Path(a.path)] if a.path else P.find()
+        if not found:
+            raise P.PackError("no BAU Pack found on a mounted stick; plug it in, open it in "
+                              "the file manager once, then try again (or give its path)")
+        if len(found) > 1:
+            raise P.PackError("more than one BAU Pack: give the path of the one to use")
+        pack = P.root(found[0])
+        if a.pack_cmd == "check":
+            _out(P.scan(pack, P.records(bau_home())))
+            return 0
+        if a.pack_cmd == "report":
+            (pack / P.REPORT).write_text(P.laptop_report(P.run_cmd))
+            print(f"written: {pack / P.REPORT}")
+            return 0
+        if os.geteuid() != 0:
+            raise SystemExit("run with sudo: sudo bau pack install")
+        if not sys.stdin.isatty():
+            raise PermissionError("bau pack install asks you questions: run it at a terminal")
+
+        def ask(q: str) -> bool:
+            return input(f"{q} [y/N] ").strip().lower().startswith("y")
+
+        home = bau_home()
+        who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
+        out = P.install(pack, home, Path(a.etc) if a.etc else Path("/etc/bau"), ask,
+                        P.run_cmd, who, AuditLog(),
+                        read_pass=lambda: getpass.getpass("Passphrase for BAU-KEYS.enc: "))
+        _out(out)
+    except (P.PackError, OSError) as e:
+        raise SystemExit(f"bau pack: {e}") from None
+    return 0
+
+
 def cmd_team(a):
     from . import team as T
     try:
@@ -1514,6 +1551,19 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("list", help="which key names BAU has (never the values)")
     x.add_argument("--etc", help=argparse.SUPPRESS)
     s.set_defaults(fn=cmd_keys)
+
+    s = sub.add_parser("pack", help="the BAU Pack: models and keys from a USB stick "
+                                    "(docs/PACK.md)")
+    w = s.add_subparsers(dest="pack_cmd", required=True)
+    x = w.add_parser("install", help="sudo: check, copy and set up what is on the stick; "
+                                     "asks yes or no before each change")
+    x.add_argument("path", nargs="?", help="the stick or its BAU-PACK folder (found if left out)")
+    x.add_argument("--etc", help=argparse.SUPPRESS)
+    x = w.add_parser("check", help="check every model on the stick against its pinned hash")
+    x.add_argument("path", nargs="?")
+    x = w.add_parser("report", help="write the laptop report (network card, firmware) to it")
+    x.add_argument("path", nargs="?")
+    s.set_defaults(fn=cmd_pack)
 
     s = sub.add_parser("team", help="who runs the show: boss, thinker, specialist (docs/TEAM.md)")
     w = s.add_subparsers(dest="team_cmd")
