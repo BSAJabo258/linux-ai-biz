@@ -5,7 +5,7 @@ no drivers, settings, disks or BitLocker are changed. Each one writes two files:
 
 | File | What it holds | Share it? |
 |---|---|---|
-| `BAU-LAPTOP-SUMMARY.txt` (Windows) / `BAU-LAPTOP-SUMMARY-LINUX.txt` (stick) | a short report with a verdict: model, memory, firmware, disks, every network/graphics device and what Linux does with it | **Yes**: no computer name, user name, network addresses or serial numbers |
+| `BAU-LAPTOP-SUMMARY.txt` (Windows) / `BAU-LAPTOP-SUMMARY-LINUX.txt` (stick) | a short report with a verdict: model, memory, firmware, disks, every network/graphics device and what Linux does with it, plus the tools already installed | **Yes**: no computer name, user name, network addresses or serial numbers |
 | `BAU-LAPTOP-FULL.json` / `BAU-LAPTOP-FULL-LINUX.txt` | everything, including those private details | No, keep it |
 
 ## 1. On Windows (before you change anything)
@@ -79,16 +79,43 @@ open a terminal and run:
 bash /run/live/medium/BAU-PAYLOAD/bau-laptop-check.sh ~/BAU-Laptop-Check
 ```
 
-With `sudo` in front it can also read the kernel's messages. It shows:
+With `sudo` in front it can also read the kernel's messages. Like the Windows check, it
+ends with a plain verdict (`READY`, `READY, AFTER THESE STEPS` or `NOT READY`) and says why,
+one line each:
+
+- `BLOCKER:` under 8 GB of memory, a 32-bit system, or no internal disk of 64 GB or more;
+- `DO FIRST:` something to do before installing: legacy BIOS instead of UEFI, missing
+  firmware, a device with no driver, a disk set to RAID On (Intel RST), a blocked radio;
+- `NOTE:` worth knowing, not a blocker.
+
+It shows:
 
 - **Memory** and **Firmware** (UEFI or legacy BIOS, Secure Boot);
 - **Devices and their drivers**: each network, graphics and sound device with the driver
   Linux loaded, or `NO DRIVER LOADED`;
 - **Missing firmware**: files the kernel asked for and did not find;
-- **Radios**: whether Wi-Fi or Bluetooth is switched off or blocked.
+- **Radios**: whether Wi-Fi or Bluetooth is switched off or blocked;
+- **Tools already present**: python, git, docker and the rest, one short line each, because
+  a missing tool is much easier to fix before an install than during one;
+- **BAU on this machine**: those tools with their versions, the listening port numbers, and
+  whether any `bau-*.service` units are running. Port numbers only; the addresses stay in the
+  private file.
+
+The verdict comes first, and each `BLOCKER` / `DO FIRST` line names one reason, so the summary
+can be read top to bottom. It is worked out by `installer/lib/laptop-evidence.sh`, which ships
+next to the check in `BAU-PAYLOAD/lib/`; if only the script is copied somewhere else, it says
+`VERDICT: unknown` rather than guessing.
 
 A device with `NO DRIVER LOADED` or a line under **Missing firmware** is the thing to ask
 about before installing. Copy `BAU-LAPTOP-SUMMARY-LINUX.txt` to another USB stick to send it.
+
+The private `BAU-LAPTOP-FULL-LINUX.txt` adds the details the summary must not carry: the
+checkout it was run from (branch, commit, working tree, last five commit names), the running
+process names, the BAU service states, the listening addresses, and which secret files exist
+with their permissions. Secret files are never opened, only noted as present with their mode,
+and process command lines are never read or printed, because they carry tokens and keys. It also runs no repository script: it reads the checkout and nothing more. The BAU checkout is
+looked for in `$BAU_DIR`, `/opt/bau`, `/srv/bau` and `~/linux-ai-biz`, and secret files in
+`/etc/bau/*.env`.
 
 ## What next
 
