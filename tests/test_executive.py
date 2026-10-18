@@ -273,3 +273,44 @@ def test_an_injected_job_store_is_used_for_durable_checkpoints(tmp_path):
     assert reloaded.status == "COMPLETED"
     assert reloaded.model == "qwen"
     assert reloaded.artifacts == ["drafts/post.md"]
+
+
+class CancelThenExplodeAdapter(AdapterBase):
+    adapter_id = "cancel-explode"
+    capabilities = ()
+
+    def __init__(self, controller):
+        self.controller = controller
+
+    def run(self, contract, context):
+        self.controller.cancel(context.task_id)
+        raise RuntimeError("stopped mid-way")
+
+
+def test_a_cancel_during_a_run_still_wins_when_the_adapter_then_raises():
+    c = ExecutiveController()
+    c.register(CancelThenExplodeAdapter(c))
+    task_id = c.create_task(contract())
+
+    out = c.dispatch(task_id, "cancel-explode")
+
+    assert out.status == "FAILED"                       # what the call returned
+    job = c.get_status(task_id)
+    assert job.status == "CANCELLED"                    # the owner's cancel stands
+    assert "RuntimeError: stopped mid-way" in job.errors[0]
+
+
+def test_the_in_memory_store_refuses_an_unknown_status():
+    store = InMemoryJobStore()
+    job = store.create("msn_1", "Draft a post", "agent:writer", [])
+    job.status = "DONE-ISH"
+    with pytest.raises(ValueError, match="bad job status"):
+        store.checkpoint(job)
+
+
+def test_the_contract_is_rebuilt_from_the_persisted_job():
+    original = contract(model="qwen", tools=["memory.search"], budget_usd=1.25, risk="MEDIUM")
+    c = ExecutiveController()
+    task_id = c.create_task(original)
+
+    assert TaskContract.from_job(c.get_status(task_id)) == original

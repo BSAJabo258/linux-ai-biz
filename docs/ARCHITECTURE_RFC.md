@@ -11,8 +11,8 @@ Gateway, the sandbox, the policy engine or the model registry.
 ## Scope
 
 - Additive only. No existing module changes behaviour.
-- Synchronous, like every other component in the control plane. There is no
-  event loop, scheduler, worker pool, retry or hidden background thread.
+- Synchronous: `dispatch` runs the adapter in the caller's thread. The controller
+  adds no event loop, scheduler, worker pool, retry or background thread.
 - Adapters are trusted in-process callables in this prototype. They are not
   sandboxed by the controller and are not a substitute for the Gateway.
 - No real adapter ships in this change. The package contains the interface,
@@ -57,10 +57,11 @@ does not check them, grant them or spend against them.
 The controller never constructs `jobs.JobStore` itself, because its constructor
 creates directories and is not side-effect free.
 
-- The default is `InMemoryJobStore`, a `JobStore` subclass that overrides only
-  `checkpoint`, `load` and `all` and writes nothing. `create` and the status
-  validation are inherited, so the prototype cannot drift from the real job
-  semantics.
+- The default is `InMemoryJobStore`, a `JobStore` subclass that writes nothing.
+  It overrides `__init__` (no directory is created), `checkpoint`, `load` and
+  `all`; it inherits `create` and `step_done`. Its `checkpoint` repeats
+  `JobStore`'s check against `jobs.STATES`, so an unknown status is refused in
+  memory as it is on disk. Jobs live only as long as the controller object.
 - A durable store is injected explicitly:
   `ExecutiveController(store=JobStore(home), ...)`.
 - The controller relies on only three methods: `create`, `checkpoint` and
@@ -82,7 +83,8 @@ and `COMPLETED` / `FAILED` / `CANCELLED` afterwards, always through
 3. `dispatch(task_id, adapter_id, approval_ref=None) -> ExecutionResult`:
    - refuses a terminal task;
    - for `WAITING_FOR_APPROVAL`, refuses without an `approval_ref`; with one, it
-     records the reference and runs;
+     records the reference (unverified, see below) and runs. The reference is
+     saved only once the run starts: a HOLD or an unknown adapter discards it;
    - refuses `PAUSED`, `RUNNING` and other non-dispatchable states;
    - asks an injected `hold()` (pass `governor.hold_reason`) before running and
      refuses while BAU is on HOLD;
@@ -94,8 +96,9 @@ and `COMPLETED` / `FAILED` / `CANCELLED` afterwards, always through
    interrupted; it observes `should_cancel` and is expected to stop.
 
 An adapter exception (or a return value that is not an `ExecutionResult`) is
-recorded as `FAILED` with the error text; `dispatch` returns a failed result
-rather than crashing.
+recorded as `FAILED` with the error text, unless the task was cancelled during
+the run (it then stays `CANCELLED`, with the error recorded); `dispatch` returns
+a failed result rather than crashing.
 
 ## Approvals, permissions and security
 
@@ -125,7 +128,9 @@ budgets, tool allow-lists or sandboxing, and it makes no claim to.
 Cancellation is cooperative and single-process. `cancel()` records the state;
 the next `context.cancelled()` call returns true. A cancel recorded while the
 adapter runs wins over the adapter's own result: the job stays `CANCELLED` and
-any partial artifacts are kept. There is no preemption and no timeout.
+any partial artifacts are kept. It also wins if the adapter then raises; the
+error is recorded on the job. There is no preemption and no timeout: an adapter
+that never checks `cancelled()` runs to its end.
 
 ## CI and tests
 
@@ -140,7 +145,9 @@ failures with `|| true`.
 (no filesystem writes), durable injection, dispatch success/failure/adapter
 faults, unknown adapters, registry duplicates and capability lookup, approval
 waiting and the recorded reference, HOLD refusal, cancellation before and
-during a run, terminal tasks, and contract reconstruction from the job.
+during a run (including an adapter that raises after the cancel), terminal
+tasks, the in-memory store's status check, and contract reconstruction from the
+job.
 
 ## Limitations and next steps
 

@@ -218,8 +218,12 @@ class ExecutiveController:
             error = f"{type(exc).__name__}: {exc}"
             failed = self.store.load(task_id)
             failed.errors.append(error)
-            failed.status = "FAILED"
-            failed.next_action = "investigate the adapter failure before retrying"
+            if failed.status == "CANCELLED":
+                # A cancel recorded during the run stands, as on the normal path.
+                failed.next_action = "cancelled; the adapter then raised an error"
+            else:
+                failed.status = "FAILED"
+                failed.next_action = "investigate the adapter failure before retrying"
             self.store.checkpoint(failed)
             return ExecutionResult(status="FAILED", errors=[error])
 
