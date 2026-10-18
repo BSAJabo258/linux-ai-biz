@@ -20,6 +20,11 @@ lightdm-gtk-greeter
 firefox-esr
 network-manager
 network-manager-gnome
+# Wi-Fi: network-manager only recommends these, and auto/config turns recommends off.
+# Without wpasupplicant NetworkManager cannot use Wi-Fi at all.
+wpasupplicant
+wireless-regdb
+iw
 fonts-dejavu
 dbus-x11
 

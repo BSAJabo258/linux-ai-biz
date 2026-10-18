@@ -15,8 +15,16 @@ the laptop.
 | `qwen3-4b-heretic-content` | 2.5 GB | the thinker: uncensored ideas, sealed (no tools, never kids) |
 | `qwen2.5-1.5b-instruct` | 1.1 GB | the backup: small and fast |
 
-Each file is checked against the SHA-256 fingerprint BAU has on record when it is
-downloaded, and again on the laptop. A file that does not match is deleted, never used.
+It also carries:
+- **the Wi-Fi programs** (`wifi` folder, about 2 MB): `wpasupplicant` and its helpers. The
+  first stick images were built without them, so a laptop installed from one cannot join
+  any Wi-Fi network, even though the drivers and firmware for its Wi-Fi card are there;
+- **the latest BAU** (`bau-main.zip`), so a laptop installed from an older stick gets the
+  `bau pack` command.
+
+Each model and Wi-Fi file is checked against the SHA-256 fingerprint BAU has on record when
+it is downloaded, and again on the laptop. A file that does not match is deleted, never
+used.
 
 ## 1. On the Windows computer: fill the stick
 
@@ -43,7 +51,27 @@ You need a USB stick of 8 GB or more (the 64 GB one is fine).
 The stick now has a `BAU-PACK` folder with `models`, `README.txt` and (if you added it)
 `BAU-KEYS.enc`.
 
-## 2. On the laptop: install it
+## 2. On the laptop: Wi-Fi first (laptops installed before 18 October 2026)
+
+If the laptop shows no Wi-Fi networks, plug in the stick, open it once in the file
+manager, then open a terminal and type these four lines (none of them has the letter j):
+
+```bash
+cd /media/$USER/*/BAU-PACK/wifi
+sha256sum -c SHA256SUMS
+sudo apt install ./*.deb
+sudo systemctl restart NetworkManager
+```
+
+The second line must say `OK` for every file; if one says `FAILED`, stop and make the pack
+again. After the last line, click the network icon at the top of the screen and pick your
+Wi-Fi. Once it is connected, bring BAU up to date from the stick:
+
+```bash
+sudo /opt/bau/venv/bin/pip install --no-deps --upgrade /media/$USER/*/BAU-PACK/bau-main.zip
+```
+
+## 3. On the laptop: install the pack
 
 Nothing on the stick runs by itself when you plug it in. That is on purpose: a stick
 anyone could have written to must never start anything on its own. You start it.
@@ -59,6 +87,8 @@ anyone could have written to must never start anything on its own. You start it.
    example `sudo bau pack install /media/bauadmin/STICK/BAU-PACK`.)
 3. It checks each model again while copying it into place, then asks you **yes or no**
    before each change:
+   - **Install the Wi-Fi programs?** Only if they are not installed yet (step 2 does the
+     same by hand).
    - **Use qwen3.5-4b as the local model?** Yes starts it.
    - It measures the model on this laptop (does it answer, can it use a tool, how fast)
      and shows you the result. Only a model that answered properly can be approved.

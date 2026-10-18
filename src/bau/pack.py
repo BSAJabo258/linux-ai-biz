@@ -40,6 +40,33 @@ BOSS_ORDER = ("qwen3.5-4b", "qwen2.5-1.5b-instruct")
 PACK_MODELS = ("qwen3.5-4b", THINKER, "qwen2.5-1.5b-instruct")
 SEARCH = ("/media/*/*/BAU-PACK", "/media/*/BAU-PACK", "/mnt/*/BAU-PACK")
 REPORT = "laptop-report.txt"
+WIFI = "wifi"
+# What Wi-Fi needs beyond the first stick image (built without recommended packages, so
+# network-manager came without wpasupplicant): Debian trixie amd64, from its Packages
+# index on 2026-10-18. Same list as installer/bau-pack-make.ps1 (a test checks).
+WIFI_DEBS = (
+    {"name": "iw", "file": "iw_6.9-1_amd64.deb", "size": 106300,
+     "pool": "pool/main/i/iw/iw_6.9-1_amd64.deb",
+     "sha256": "61c0848fe4c98718f1f1ad7526ae4858d91f85e3139f0e723bed4bc2aa729422"},
+    {"name": "libnl-3-200", "file": "libnl-3-200_3.7.0-2_amd64.deb", "size": 59432,
+     "pool": "pool/main/libn/libnl3/libnl-3-200_3.7.0-2_amd64.deb",
+     "sha256": "ce5c153953016be42def7b105f37d55eae07a9608d1dfe6bcb03cc017fc384cb"},
+    {"name": "libnl-genl-3-200", "file": "libnl-genl-3-200_3.7.0-2_amd64.deb", "size": 18136,
+     "pool": "pool/main/libn/libnl3/libnl-genl-3-200_3.7.0-2_amd64.deb",
+     "sha256": "8f2f81ef4c6f8636f0b0cb2ff40b3c54a497d121f49c485620ae43c94782cd94"},
+    {"name": "libnl-route-3-200", "file": "libnl-route-3-200_3.7.0-2_amd64.deb", "size": 181704,
+     "pool": "pool/main/libn/libnl3/libnl-route-3-200_3.7.0-2_amd64.deb",
+     "sha256": "1c8c95542688996cff8e954583642b10a3bd78b69954f565fda62144c2bc3897"},
+    {"name": "libpcsclite1", "file": "libpcsclite1_2.3.3-1_amd64.deb", "size": 55248,
+     "pool": "pool/main/p/pcsc-lite/libpcsclite1_2.3.3-1_amd64.deb",
+     "sha256": "a8bc4725549060d1e696d358e32a3699d947d5381871553a290389830bebccbd"},
+    {"name": "wireless-regdb", "file": "wireless-regdb_2026.05.30-1~deb13u1_all.deb", "size": 12400,
+     "pool": "pool/main/w/wireless-regdb/wireless-regdb_2026.05.30-1~deb13u1_all.deb",
+     "sha256": "72048ee2f369a8c2df8b5f99f79489d3812d869282038cfe55e23a4748231399"},
+    {"name": "wpasupplicant", "file": "wpasupplicant_2.10-24_amd64.deb", "size": 1426452,
+     "pool": "pool/main/w/wpa/wpasupplicant_2.10-24_amd64.deb",
+     "sha256": "99f50410baddebd421497703ad9b6d0e05deb3dfda99a96b2814f630d9b84498"},
+)
 CHUNK = 1 << 20
 BENCH_TRIES = 30
 
@@ -178,6 +205,10 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
     if audit is not None:
         audit.append("pack.copied", by, {"copied": out["copied"], "skipped": out["skipped"]})
 
+    out["wifi"] = _wifi(pack, ask, run, say)
+    if audit is not None and out["wifi"]:
+        audit.append("pack.wifi", by, {"result": out["wifi"]})
+
     have = set(out["copied"]) | set(out["already"])
     boss = next((m for m in BOSS_ORDER if m in have), None)
     if boss and ask(f"Use {boss} as the local model Jarvis runs on (starts it now)?"):
@@ -215,6 +246,22 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
 
 
 _pack_records = records
+
+
+def _wifi(pack: Path, ask: Ask, run: Run, say: Callable[..., None]) -> str | None:
+    """Install the Wi-Fi programs from the stick, each checked against its pinned hash."""
+    folder = pack / WIFI
+    if not folder.is_dir():
+        return None
+    bad = [d["name"] for d in WIFI_DEBS if _status(folder / d["file"], d, True) != "ok"]
+    if bad:
+        return f"not installed: {', '.join(bad)} missing or damaged on the stick"
+    if not ask("Install the Wi-Fi programs from the stick (wpasupplicant and helpers)?"):
+        return "skipped"
+    say("Installing the Wi-Fi programs...")
+    run(["apt-get", "install", "-y", *[str(folder / d["file"]) for d in WIFI_DEBS]])
+    run(["systemctl", "restart", "NetworkManager"])
+    return "installed"
 
 
 def _register(home: Path, mid: str, rec: dict[str, Any]) -> None:
