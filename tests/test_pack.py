@@ -353,27 +353,109 @@ def test_windows_make_downloads_verifies_and_deletes_bad_files(tmp_path):
     good, bad = src / "good.gguf", src / "bad.gguf"
     good.write_bytes(b"good model")
     bad.write_bytes(b"not what was pinned")
+    deb = src / "wpa.deb"
+    deb.write_bytes(b"deb bytes")
+    zipfile = src / "main.zip"
+    zipfile.write_bytes(b"PK zip")
+    good_model = {"Id": "good", "File": "good.gguf", "Url": good.as_uri(), "Size": 10,
+                  "Sha256": sha(b"good model")}
+    wifi = {"Name": "wpasupplicant", "File": "wpa.deb", "Size": 9, "Sha256": sha(b"deb bytes"),
+            "Urls": [(src / "gone.deb").as_uri(), deb.as_uri()]}   # the second link works
     manifest = tmp_path / "m.json"
-    manifest.write_text(json.dumps([
-        {"Id": "good", "File": "good.gguf", "Url": good.as_uri(), "Size": 10,
-         "Sha256": sha(b"good model")},
-        {"Id": "bad", "File": "bad.gguf", "Url": bad.as_uri(), "Size": 19,
-         "Sha256": sha(b"something else")}]))
+    manifest.write_text(json.dumps({
+        "Models": [good_model,
+                   {"Id": "bad", "File": "bad.gguf", "Url": bad.as_uri(), "Size": 19,
+                    "Sha256": sha(b"something else")}],
+        "Debs": [wifi], "BauZip": zipfile.as_uri()}))
     stick = tmp_path / "stick"
     stick.mkdir()
     cmd = ["pwsh", "-NoProfile", "-NonInteractive", "-File", str(PS1), "-Target", str(stick),
            "-Manifest", str(manifest), "-Yes"]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    models = stick / "BAU-PACK" / "models"
+    pack = stick / "BAU-PACK"
+    models = pack / "models"
     assert r.returncode == 1, r.stdout + r.stderr
     assert (models / "good.gguf").read_bytes() == b"good model"
     assert not (models / "bad.gguf").exists() and not list(models.glob("*.part"))
-    assert "sudo bau pack install" in (stick / "BAU-PACK" / "README.txt").read_text()
+    assert (pack / "wifi" / "wpa.deb").read_bytes() == b"deb bytes"
+    assert (pack / "wifi" / "SHA256SUMS").read_text() == f"{sha(b'deb bytes')}  wpa.deb\n"
+    assert (pack / "bau-main.zip").read_bytes() == b"PK zip"
+    readme = (pack / "README.txt").read_text()
+    assert "sudo bau pack install" in readme and "sudo apt install ./*.deb" in readme
 
-    manifest.write_text(json.dumps([json.loads(manifest.read_text())[0]]))
+    manifest.write_text(json.dumps({"Models": [good_model], "Debs": [wifi],
+                                    "BauZip": zipfile.as_uri()}))
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "already" in r.stdout
+
+
+def ps_debs() -> dict[str, dict]:
+    out = {}
+    for m in re.finditer(r'Name\s*=\s*"([^"]+)";\s*File\s*=\s*"([^"]+)";\s*Pool\s*=\s*"([^"]+)";'
+                         r'\s*Size\s*=\s*(\d+);\s*Sha256\s*=\s*"([0-9a-f]{64})"', PS1.read_text()):
+        out[m.group(1)] = {"file": m.group(2), "pool": m.group(3), "size": int(m.group(4)),
+                           "sha256": m.group(5)}
+    return out
+
+
+def test_windows_wifi_list_matches_the_laptop_side():
+    got = ps_debs()
+    assert sorted(got) == sorted(d["name"] for d in P.WIFI_DEBS)
+    for d in P.WIFI_DEBS:
+        assert got[d["name"]] == {k: d[k] for k in ("file", "pool", "size", "sha256")}
+        assert d["pool"].endswith("/" + d["file"]) and d["pool"].startswith("pool/main/")
+    assert "wpasupplicant" in got
+
+
+def test_the_image_has_what_wifi_needs():
+    # auto/config turns recommended packages off, so network-manager's Wi-Fi helpers
+    # (it only recommends them) must be listed by name or the laptop has no Wi-Fi.
+    config = (ROOT / "image" / "live-build" / "auto" / "config").read_text()
+    assert "--apt-recommends false" in config
+    listed = set((ROOT / "image" / "live-build" / "config" / "package-lists" /
+                  "my-jarvis.list.chroot").read_text().split())
+    assert {"network-manager", "wpasupplicant", "wireless-regdb", "iw"} <= listed
+
+
+# ------------------------------------------------------------------ Wi-Fi programs from the stick
+
+def make_wifi(pack: Path, bad: bool = False) -> list[dict]:
+    debs = []
+    (pack / "wifi").mkdir()
+    for name, blob in (("wpasupplicant", b"wpa"), ("libpcsclite1", b"pcsc")):
+        f = f"{name}_1_amd64.deb"
+        (pack / "wifi" / f).write_bytes(blob + (b"x" if bad and name == "wpasupplicant" else b""))
+        debs.append({"name": name, "file": f, "pool": f"pool/main/x/{f}", "size": len(blob),
+                     "sha256": sha(blob)})
+    return debs
+
+
+def test_wifi_programs_are_installed_only_on_yes_and_only_when_checked(tmp_path, monkeypatch):
+    pack = make_pack(tmp_path)
+    monkeypatch.setattr(P, "WIFI_DEBS", make_wifi(pack))
+    run = Runner()
+    do_install(tmp_path, pack, Owner(), run=run)
+    assert not any(c[0] == "apt-get" for c in run.calls)
+
+    shutil.rmtree(tmp_path / "home")
+    run = Runner()
+    _, _, out = do_install(tmp_path, pack, Owner("Wi-Fi"), run=run)
+    apt = next(c for c in run.calls if c[0] == "apt-get")
+    assert apt[:3] == ["apt-get", "install", "-y"]
+    assert sorted(Path(a).name for a in apt[3:]) == ["libpcsclite1_1_amd64.deb",
+                                                      "wpasupplicant_1_amd64.deb"]
+    assert ["systemctl", "restart", "NetworkManager"] in run.calls
+    assert out["wifi"] == "installed"
+
+
+def test_a_damaged_wifi_file_stops_the_wifi_step(tmp_path, monkeypatch):
+    pack = make_pack(tmp_path)
+    monkeypatch.setattr(P, "WIFI_DEBS", make_wifi(pack, bad=True))
+    run = Runner()
+    _, _, out = do_install(tmp_path, pack, Owner("Wi-Fi"), run=run)
+    assert not any(c[0] == "apt-get" for c in run.calls)
+    assert "wpasupplicant" in out["wifi"]
 
 
 # ------------------------------------------------------------------ docs
