@@ -14,7 +14,14 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 531 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 554 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+
+The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
+from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
+and no Wi-Fi yet (Killer 1435 / QCA6174, ath10k). `BAU-Pack-Make.cmd` fills a stick on
+Windows with the three pinned models and `BAU-KEYS.enc`; `sudo bau pack install` on the
+laptop copies, starts, benchmarks and (on yes) approves the boss, and writes a redacted
+`laptop-report.txt` to the stick. That report is the next input for the Wi-Fi fix.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
