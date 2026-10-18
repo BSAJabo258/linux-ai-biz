@@ -16,7 +16,7 @@ layers:
     status: gap
     in_bau:
       - {path: src/bau/scout/github.py, does: reads GitHub's API only; no general browsing}
-      - {path: src/bau/gateway.py, does: the one path from an agent to a capability, with audit}
+      - {path: src/bau/gateway.py, does: "the one path from an agent to a capability, with audit"}
       - {path: src/bau/blast.py, does: scores how bad an action could be before it runs}
     permissions: [read, fill, draft, submit]
     owner_confirms: [submit]
@@ -45,7 +45,7 @@ layers:
     status: partial
     in_bau:
       - {path: src/bau/mcp.py, does: an MCP client; only registry-approved servers start}
-      - {path: src/bau/registry.py, does: every connector declares tools, permissions, network, credentials, risk}
+      - {path: src/bau/registry.py, does: "every connector declares tools, permissions, network, credentials, risk"}
       - {path: src/bau/gateway.py, does: checks every call and writes it to the audit chain}
     tools:
       - {name: MCP Registry, plan: direct, why: "The official list to look connectors up in; being listed proves ownership of a name, not safety."}
@@ -65,7 +65,7 @@ layers:
     what: Work apps that have no API by looking at the screen and using mouse and keyboard.
     status: gap
     in_bau:
-      - {path: src/bau/sandbox.py, does: rootless containers with no network by default, for untrusted code}
+      - {path: src/bau/sandbox.py, does: "rootless containers with no network by default, for untrusted code"}
     tools:
       - {name: Cua, plan: adapter, why: "Sandboxed desktops for computer-use agents; use only its MIT parts (some parts are FSL or AGPL)."}
       - {name: OmniParser, plan: later, why: "Turns a screenshot into a list of buttons and fields a model can act on."}
@@ -83,7 +83,7 @@ layers:
     what: Turn a job that worked into a saved procedure that can run again, on a schedule if wanted.
     status: partial
     in_bau:
-      - {path: src/bau/workspace.py, does: numbered stage folders an agent walks, owner checks each stage}
+      - {path: src/bau/workspace.py, does: "numbered stage folders an agent walks, owner checks each stage"}
       - {path: src/bau/factories.py, does: business factories that resume after a reboot}
       - {path: src/bau/jobs.py, does: jobs with checkpoints that survive a power cut}
       - {path: src/bau/agentfolders.py, does: "skills as folders (SKILL.md), opened only when needed"}
@@ -149,7 +149,7 @@ layers:
     in_bau:
       - {path: src/bau/agents.py, does: agent runtime; every tool call goes through the gateway}
       - {path: src/bau/agentfolders.py, does: "agents as folders: AGENT.md + skills, approved by the owner, a brain each"}
-      - {path: src/bau/governor.py, does: watchdog that can hold or quarantine, never approve}
+      - {path: src/bau/governor.py, does: "watchdog that can hold or quarantine, never approve"}
       - {path: src/bau/usage.py, does: per-model token and dollar meter with the owner's daily limits}
     tools:
       - {name: Pydantic AI, plan: later, why: "Tools that wait for approval match BAU's stage-then-click rule; the first framework to try if BAU's own loop runs out of room."}
@@ -189,7 +189,7 @@ layers:
     status: have
     in_bau:
       - {path: src/bau/models/router.py, does: picks a model; backups when one is busy}
-      - {path: src/bau/models/providers.py, does: Claude, llama.cpp and hosted OpenAI-compatible models}
+      - {path: src/bau/models/providers.py, does: "Claude, llama.cpp and hosted OpenAI-compatible models"}
       - {path: src/bau/models/bench.py, does: a real test before any model is approved}
     tools:
       - {name: llama.cpp, plan: direct, why: "Already runs the local model on the live USB."}
@@ -207,7 +207,7 @@ layers:
     in_bau:
       - {path: src/bau/assistant.py, does: Jarvis plans missions and stages them for the owner}
       - {path: src/bau/decision.py, does: one decision from many findings; unknown never counts as passed}
-      - {path: src/bau/opportunity.py, does: ranks business ideas on evidence, not enthusiasm}
+      - {path: src/bau/opportunity.py, does: "ranks business ideas on evidence, not enthusiasm"}
     tools:
       - {name: DSPy, plan: later, why: "Tunes prompts against measured results; useful once there are enough recorded jobs."}
     risk: low
@@ -220,9 +220,9 @@ layers:
     what: Remember the owner, the business and past jobs between conversations.
     status: have
     in_bau:
-      - {path: src/bau/brain.py, does: Second Brain, a Markdown vault with a graph}
+      - {path: src/bau/brain.py, does: "Second Brain, a Markdown vault with a graph"}
       - {path: src/bau/memory.py, does: memory lane of recent events}
-      - {path: src/bau/chats.py, does: the owner's past AI chats, searchable}
+      - {path: src/bau/chats.py, does: "the owner's past AI chats, searchable"}
     tools:
       - {name: Mem0, plan: skip, why: "BAU's brain and memory lane already keep long-term facts, on the owner's own disk."}
       - {name: Letta, plan: skip, why: "Another memory system; two memories would disagree. BAU keeps one."}
@@ -237,7 +237,7 @@ layers:
     what: Make videos, voices, images and music for the channels.
     status: have
     in_bau:
-      - {path: src/bau/studio.py, does: paid clips under the owner's budget, priced first}
+      - {path: src/bau/studio.py, does: "paid clips under the owner's budget, priced first"}
       - {path: src/bau/series.py, does: the same characters in every clip}
       - {path: src/bau/media, does: the media gateway with provenance records}
     tools:
@@ -256,8 +256,8 @@ layers:
     what: Do the paid work, track costs and money actually collected, and drop what doesn't pay.
     status: have
     in_bau:
-      - {path: src/bau/economics.py, does: costs, real sales and budgets}
-      - {path: src/bau/results.py, does: views, estimated earnings and profit per video}
+      - {path: src/bau/economics.py, does: "costs, real sales and budgets"}
+      - {path: src/bau/results.py, does: "views, estimated earnings and profit per video"}
       - {path: src/bau/publishing.py, does: posting only on the owner's confirm}
       - {path: src/bau/factories.py, does: business factories run stage by stage}
     tools: []

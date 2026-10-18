@@ -2,6 +2,7 @@
 
 import io
 import json
+import re
 import subprocess
 import urllib.error
 
@@ -86,6 +87,22 @@ def test_find_dedupes_forks_records_run_and_never_calls_anything_eligible(tmp_pa
     assert cands["acme/sim"]["claimed"]["readme"]["install"] == ["pip"]
     assert sc.runs()[0]["id"] == run["id"]
     assert [r["event"] for r in AuditLog(tmp_path / "audit.jsonl").records()] == ["scout.run"]
+
+
+def test_latest_search_restricts_github_to_recently_created_repositories(tmp_path):
+    src = FakeGitHub({"*": [item("acme/sim")]})
+    run = scout(tmp_path, src).find(REQ, max_queries=2, newest=True)
+    assert len(src.queries) == 2
+    for sent in src.queries:
+        assert re.search(r" created:>=\d{4}-\d{2}-\d{2}$", sent)
+    assert [s["sent"] for s in run["searches"]] == src.queries
+    assert run["found"] == 1
+
+
+def test_a_normal_search_has_no_creation_filter(tmp_path):
+    src = FakeGitHub({"*": [item("acme/sim")]})
+    scout(tmp_path, src).find(REQ, max_queries=1)
+    assert "created:>=" not in src.queries[0]
 
 
 def test_failed_searches_are_reported_never_read_as_nothing_found(tmp_path):
@@ -251,6 +268,17 @@ def test_jarvis_can_search_and_report_but_nothing_is_installed(tmp_path):
     assert not (tmp_path / "scout" / "quarantine").exists()
 
 
+def test_jarvis_can_ask_for_only_the_newest_projects(tmp_path):
+    from bau.assistant import Assistant
+    src = FakeGitHub({"*": [item("acme/sim")]})
+    a = Assistant(tmp_path, None, {}, "human:owner",
+                  AuditLog(tmp_path / "audit" / "chain.jsonl", key=b""),
+                  clients={"github": src})
+    out, err = a._run_tool("find_tools", {"request": REQ, "latest": True})
+    assert not err and out["found"] == 1
+    assert src.queries and all("created:>=" in q for q in src.queries)
+
+
 def test_core_startup_does_not_load_the_scout():
     import sys
     code = ("import sys, bau.cli, bau.cli_ext, bau.assistant, bau.overview, bau.ui.jarvis_server;"
@@ -271,6 +299,9 @@ def test_cli_find_list_report_and_all_searches_failing(tmp_path, monkeypatch, ca
     assert main(["scout", "report", "--out", str(out)]) == 0
     assert "# Repo Scout: simulate customers" in out.read_text()
     assert main(["scout", "show", "nobody/x"]) == 4
+    src.queries.clear()
+    assert main(["scout", "find", REQ, "--max-queries", "1", "--latest"]) == 0
+    assert src.queries and all("created:>=" in q for q in src.queries)
     src.fail = {"*"}
     assert main(["scout", "find", "video editing", "--max-queries", "2"]) == 3
 

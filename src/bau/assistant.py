@@ -56,9 +56,11 @@ holds the owner's imported video transcripts: for what those videos said or what
 learn from them, use recall (brain_lookup "transcript research" has a summary), and say
 the transcripts are automatic and unverified.
 Before working out how to do something new (connect a tool, stop made-up answers, add
-memory, voice, video, a local model), ask the toolbox: others have usually solved it
-already. Say what is only claimed and what Repo Scout has inspected; if nothing fits,
-offer find_tools.
+memory, voice, video, a local model), call capability_brief with the owner's task: it
+reads the toolbox, BAU's capability map and the week's newest repos. It says what BAU
+already has, the gap and build order, the researched tools and the newest candidates.
+Say what is only claimed and what Repo Scout has inspected; if nothing fits, offer
+find_tools. Never install, run or approve anything yourself.
 
 How you act:
 - Read tools: use freely.
@@ -97,7 +99,8 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
              "clip_prompt": "producer", "plan_episode": "producer",
-             "toolbox": "scout", "capability_map": "scout", "open_source_watch": "scout",
+             "toolbox": "scout", "capability_map": "scout", "capability_brief": "scout",
+             "open_source_watch": "scout",
              "world_watch": "godseye",
              "video_clips": "studio", "make_video": "studio",
              "usage_today": "usage", "results": "results",
@@ -275,10 +278,19 @@ class Assistant:
                  "which researched tools would fill them and how, and the build order. "
                  "Give a layer id for its detail.", _schema({"layer": {"type": "string"}}),
                  self.t_capability_map),
+            Tool("capability_brief", "For one task the owner asks for: what BAU already "
+                 "has (the matching capability layer and its code), the gap and build "
+                 "order, the researched open-source tools, and this week's newest "
+                 "candidates marked new. Use it before explaining how to do something new. "
+                 "Read-only; find_tools searches GitHub when nothing fits.",
+                 _schema({"task": {"type": "string"}}), self.t_capability_brief),
             Tool("find_tools", "Search GitHub for open-source projects that provide a "
                  "capability (several phrasings), record them and rank them on evidence. "
-                 "Nothing is installed or run; takes about half a minute.",
-                 _schema({"request": {"type": "string"}}), self.t_find_tools, kind="act"),
+                 "Set latest true when the owner asks for the newest or just-released "
+                 "projects (last 90 days). Nothing is installed or run; takes about half a "
+                 "minute.",
+                 _schema({"request": {"type": "string"},
+                          "latest": {"type": "boolean"}}), self.t_find_tools, kind="act"),
             Tool("make_video", "Put one paid AI video clip (Higgsfield, Kling 3.0) on the "
                  "owner's screen with its price; it starts only when they confirm. Models: "
                  "kling-3-turbo, kling-3-std, kling-3-pro. Duration 3-15 s; aspect_ratio "
@@ -642,11 +654,15 @@ class Assistant:
         m = CapabilityMap(toolbox=Toolbox(self.home))
         return m.show(layer.strip()) if layer.strip() else m.summary()
 
-    def t_find_tools(self, request: str) -> dict[str, Any]:
+    def t_capability_brief(self, task: str) -> dict[str, Any]:
+        from .toolbox import brief
+        return brief(task[:300], self.home)
+
+    def t_find_tools(self, request: str, latest: bool = False) -> dict[str, Any]:
         from .scout import Scout
         run = Scout(self.home, self.clients.get("github"), self.audit, "jarvis").find(
             request[:300], max_queries=4, readmes=3, provider=self.metered("scout"),
-            progress=lambda t: self.activity.emit("scout", "progress", t))
+            progress=lambda t: self.activity.emit("scout", "progress", t), newest=latest)
         return {"run": run["id"], "found": run["found"],
                 "failed_searches": run["failed_searches"],
                 "github_asked_to_wait_until": run["rate_limited_until"],

@@ -25,6 +25,7 @@ from .plan import keywords
 GROUPS = ("test_next", "watch", "already_have", "ignore")
 COST = "unknown until benchmarked"
 TEST_NEXT_AT = 40          # opportunity at or above this, and new: worth inspecting now
+NEW_DAYS = 90              # created this recently: say so, even before the evidence builds
 
 
 def load() -> dict[str, Any]:
@@ -127,12 +128,23 @@ def shortlist(sc: Any, cat: dict[str, Any] | None = None,
         have = ("running in BAU" if cid in running else
                 f"researched in the Toolbox ({tb[cid]})" if cid in tb else "new")
         tr = trend(c, today)
+        created = (c.get("metadata") or {}).get("created_at")
+        is_new = False
+        if created:
+            try:
+                age = ((today or dt.date.today())
+                       - dt.date.fromisoformat(str(created)[:10])).days
+                is_new = 0 <= age <= NEW_DAYS
+            except ValueError:
+                pass
         prio = max(cat["categories"].get(k, {}).get("priority", 1) for k in c["categories"])
         opp = round(c["score"] * (0.7 + 0.15 * prio) + (10 if tr["trend"] == "rising" else 0),
                     1)
         why = list(c.get("blockers", [])) + list(c.get("needs", []))
         if tr["trend"] == "rising":
             why.insert(0, f"rising: +{tr['gained']} stars in {tr['days']} days")
+        if is_new:
+            why.insert(0, f"new: created {str(created)[:10]}")
         if c.get("unknowns"):
             why.append("not yet known: " + ", ".join(c["unknowns"]))
         if c["decision"] == "rejected":
@@ -149,7 +161,9 @@ def shortlist(sc: Any, cat: dict[str, Any] | None = None,
         out[group].append({
             "repo": c["full_name"], "url": c.get("url"), "categories": c["categories"],
             "claims": c["claimed"]["description"], "have": have, "trend": tr["trend"],
-            "gained": tr["gained"], "score": c["score"], "coverage": c["evidence_coverage"],
+            "gained": tr["gained"], "new": is_new,
+            "created": str(created)[:10] if created else None,
+            "score": c["score"], "coverage": c["evidence_coverage"],
             "opportunity": opp, "licence": c["license"].get("status"),
             "security": c["security"]["status"], "why": why, "next": nxt, "cost": COST})
     for g in out.values():

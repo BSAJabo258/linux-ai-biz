@@ -3,7 +3,7 @@
 Facts checked on 2026-10-09 against docs.github.com/en/rest/search/search:
 - ``GET /search/repositories?q=...&per_page=...`` (per_page max 100; at most 1,000 results
   per search). Items carry full_name, html_url, description, fork, license (spdx_id),
-  archived, pushed_at, stargazers_count, topics, language, size (KB).
+  archived, created_at, pushed_at, stargazers_count, topics, language, size (KB).
 - Search rate limit: 10 requests/minute without a token, 30 with one. BAU paces itself
   below that and reports a 403/429 as a failed search, never as "nothing found".
 - Headers: ``Accept: application/vnd.github+json``, ``X-GitHub-Api-Version: 2026-03-10``,
@@ -214,7 +214,8 @@ def normalise(i: dict[str, Any]) -> dict[str, Any]:
             "description": (i.get("description") or "")[:400],
             "topics": [str(t) for t in (i.get("topics") or [])][:20],
             "language": i.get("language"), "fork": bool(i.get("fork")),
-            "archived": bool(i.get("archived")), "pushed_at": i.get("pushed_at"),
+            "archived": bool(i.get("archived")), "created_at": i.get("created_at"),
+            "pushed_at": i.get("pushed_at"),
             "stars": i.get("stargazers_count"), "size_kb": i.get("size"),
             "homepage": i.get("homepage") or None,
             # GitHub says NOASSERTION when it can't tell: that is unknown, not a licence.

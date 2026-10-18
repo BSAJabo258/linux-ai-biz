@@ -308,7 +308,7 @@ def cmd_scout(a):
     sc = S.Scout(audit=AuditLog(), actor=who)
     try:
         if a.scout_cmd == "find":
-            run = sc.find(a.request, a.max_queries, a.per_query, a.readmes)
+            run = sc.find(a.request, a.max_queries, a.per_query, a.readmes, newest=a.latest)
             _out({"run": run["id"], "found": run["found"],
                   "failed_searches": [s for s in run["searches"] if "error" in s],
                   "github_asked_to_wait_until": run["rate_limited_until"],
@@ -406,6 +406,9 @@ def cmd_toolbox(a):
         except KeyError as e:
             print(f"bau: {e.args[0]}", file=sys.stderr)
             return EXIT_ERROR
+    elif a.toolbox_cmd == "brief":
+        from .toolbox import brief
+        _out(brief(a.task, toolbox=tb))
     elif a.toolbox_cmd == "check":
         from .assistant import load_env_file
         from .scout.github import SourceError
@@ -1408,6 +1411,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--max-queries", type=int, default=6)
     x.add_argument("--per-query", type=int, default=10)
     x.add_argument("--readmes", type=int, default=5, help="READMEs read for the leaders")
+    x.add_argument("--latest", action="store_true",
+                   help="only projects created in the last 90 days")
     x.add_argument("--top", type=int, default=8)
     x = w.add_parser("list", help="every candidate so far, best first")
     x.add_argument("--top", type=int, default=20)
@@ -1475,6 +1480,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--top", type=int, default=5)
     x = w.add_parser("list", help="every tool (optionally one category)")
     x.add_argument("--category")
+    x = w.add_parser("brief", help="one task: what BAU has, the gap, tools and newest repos")
+    x.add_argument("task")
     x = w.add_parser("check", help="have Repo Scout fetch and safely inspect one tool")
     x.add_argument("name")
     w.add_parser("validate", help="check the catalogue: sources, dates, no claims")

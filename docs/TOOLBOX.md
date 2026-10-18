@@ -16,6 +16,11 @@ There are 100 tools in it: 77 researched on 2026-10-10, then 23 added on 2026-10
 
 - **Ask Jarvis:** "How do I stop the model making things up?" or "What could give you a
   better memory?" He answers from the toolbox and says what is only claimed.
+- **For one task, one answer:** `bau toolbox brief "connect to Gmail"` puts four things
+  together: what BAU already has for it (with the file that does it), the capability
+  layer and its next step, the researched tools, and this week's newest open-source
+  candidates, marked **new** when they were created in the last 90 days. Jarvis uses the
+  same brief before explaining how to do something new. Nothing is installed.
 - **On the Jarvis screen:** click **Scout** and type what you need. "Already known" cards
   from the toolbox appear first, then Scout searches GitHub for more.
 - **In the terminal:**

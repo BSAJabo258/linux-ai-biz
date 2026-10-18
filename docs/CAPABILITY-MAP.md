@@ -17,6 +17,17 @@ bau toolbox map --layer web        # one layer: its tools, licences, caveats, ev
 
 Or ask Jarvis: "What can you do, and what's missing?"
 
+For one task, in one answer:
+
+```bash
+bau toolbox brief "browse websites and fill in forms"
+```
+
+It names the closest layer, what BAU already has for it, the next build step, the
+researched tools and this week's newest open-source candidates. Jarvis has the same answer
+as the `capability_brief` tool, so "can you do this?" is answered from BAU's own map and
+the toolbox instead of a guess.
+
 ## How a tool joins BAU
 
 | Plan | Meaning |

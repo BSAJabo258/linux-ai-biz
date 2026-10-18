@@ -193,6 +193,11 @@ class CapabilityMap:
                 out.append(f"{who}: status must be one of {', '.join(STATUSES)}")
             if layer["status"] != "have" and not layer.get("next"):
                 out.append(f"{who}: say what comes next")
+            for have in layer["in_bau"]:
+                extra = set(have) - {"path", "does"}
+                if extra or not have.get("does"):
+                    out.append(f"{who}: in_bau entries are {{path, does}}; quote a value "
+                               f"that contains a comma (extra keys: {sorted(extra)})")
             for t in layer["tools"]:
                 if self.toolbox.find(str(t.get("name", ""))) is None:
                     out.append(f"{who}: {t.get('name')!r} is not in the toolbox")
@@ -211,6 +216,27 @@ class CapabilityMap:
         if hit is None:
             raise KeyError(f"no layer {lid!r}; have {', '.join(x['id'] for x in self.layers)}")
         return hit
+
+    def match(self, task: str) -> dict[str, Any] | None:
+        """The layer that best fits a plain-words task, or None when nothing does.
+
+        Matching uses the same stemming and plain-word aliases as the toolbox, so
+        "connect to Gmail" reaches the connectors layer and "fill in a form"
+        reaches web interaction. It is a hint for the owner, never a permission.
+        """
+        if not task.strip():
+            return None
+        words = set(_terms(task + " " + " ".join(v for s, v in SAY.items()
+                                                  if s in task.lower())))
+        best, best_hits = None, 0
+        for layer in self.layers:
+            hay = " ".join([layer["id"], layer["name"], layer["what"], layer.get("next", ""),
+                            *layer.get("rules", []),
+                            *[t.get("name", "") for t in layer.get("tools", [])]])
+            hits = len(words & set(_terms(hay)))
+            if hits > best_hits:
+                best, best_hits = layer, hits
+        return best
 
     def show(self, lid: str) -> dict[str, Any]:
         """One layer, each tool with what BAU actually knows about it."""
@@ -233,3 +259,58 @@ class CapabilityMap:
                 "build_order": [{"build": x["build"], "id": x["id"], "name": x["name"],
                                  "next": x.get("next", "")} for x in order],
                 "how_to_read": "bau toolbox map --layer ID shows one layer's tools"}
+
+
+def brief(task: str, home: Path | None = None, toolbox: Toolbox | None = None,
+          cmap: CapabilityMap | None = None,
+          watch: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, Any]:
+    """One task, answered in one place: what BAU has, the gap, researched tools and the
+    newest open-source candidates.
+
+    Read-only and offline. It never searches GitHub, installs anything or decides: for a
+    live search Jarvis offers ``find_tools``, and the owner still chooses what is added.
+    """
+    task = (task or "").strip()[:300]
+    tb = toolbox or Toolbox(home)
+    cm = cmap or CapabilityMap(toolbox=tb)
+    layer = cm.match(task) if task else None
+    if watch is None:
+        from .scout import Scout
+        from .scout.watch import shortlist
+        watch = shortlist(Scout(home or bau_home()))
+    words = set(_terms(task + " " + " ".join(v for s, v in SAY.items()
+                                              if s in task.lower())))
+    pool = watch.get("test_next", []) + watch.get("watch", [])
+    relevant = [i for i in pool if not words or words & set(
+        _terms(" ".join([i.get("repo", ""), i.get("claims", ""),
+                         " ".join(i.get("categories", []))])))]
+    latest = (relevant or pool)[:5]
+    plans = {t["name"]: t for t in layer.get("tools", [])} if layer else {}
+    researched = []
+    for e in tb.ask(task, k=5) if task else []:
+        p = plans.get(e["name"])
+        researched.append({**e, **({"map_plan": p["plan"], "map_why": p["why"]} if p else {})})
+    if layer is None:
+        nxt = ("No capability layer matches this task yet: try other words, then search "
+               "GitHub with find_tools.")
+    elif layer["status"] == "have":
+        nxt = (f"BAU already has this ({layer['name']}): use what already_have lists; do "
+               "not add a second tool for the same job.")
+    else:
+        nxt = (layer.get("next")
+               or f"{layer['name']} is {layer['status']}: inspect a candidate first.")
+    return {
+        "task": task,
+        "layer": ({k: layer.get(k) for k in ("id", "name", "status", "risk", "build")}
+                  if layer else None),
+        "already_have": list(layer.get("in_bau", [])) if layer else [],
+        "researched": researched,
+        "latest": [{k: i.get(k) for k in ("repo", "url", "categories", "claims", "have",
+                                          "trend", "new", "created", "opportunity", "next")}
+                   for i in latest],
+        "latest_note": ("the weekly watch has not run yet: bau scout watch" if not pool
+                        else "new = created in the last 90 days"),
+        "next": nxt,
+        "search": ("find_tools searches GitHub now (latest=true for projects created in "
+                   "the last 90 days); nothing is installed or run without the owner."),
+    }

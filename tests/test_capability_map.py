@@ -48,6 +48,8 @@ def test_shipped_map_is_complete_and_valid():
 def test_what_bau_already_has_really_exists():
     for layer in shipped().layers:
         for have in layer["in_bau"]:
+            assert set(have) == {"path", "does"}, (layer["id"], have)
+            assert have["does"].strip(), (layer["id"], have["path"])
             assert (ROOT / have["path"]).exists(), (layer["id"], have["path"])
 
 

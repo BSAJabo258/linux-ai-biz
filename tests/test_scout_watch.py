@@ -22,10 +22,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DAY1, DAY2 = dt.date(2026, 10, 1), dt.date(2026, 10, 15)
 
 
-def repo(name, desc, stars=100, spdx="MIT", pushed="2026-09-20", topics=("agents",)):
+def repo(name, desc, stars=100, spdx="MIT", pushed="2026-09-20", topics=("agents",),
+         created="2025-01-01"):
     return {"full_name": name, "html_url": f"https://github.com/{name}", "description": desc,
             "topics": list(topics), "language": "Python", "fork": False, "archived": False,
-            "pushed_at": pushed, "stargazers_count": stars, "size": 900,
+            "created_at": created, "pushed_at": pushed, "stargazers_count": stars, "size": 900,
             "license": {"spdx_id": spdx}}
 
 
@@ -175,13 +176,32 @@ def test_the_shortlist_separates_new_researched_running_and_ignored(tmp_path):
     by = {i["repo"]: i for group in sl.values() for i in group}
     assert by["ggml-org/llama.cpp"]["have"] == "running in BAU"
     assert by["NousResearch/hermes-agent"]["have"] == "researched in the Toolbox (Hermes Agent)"
-    assert by["acme/swarm"]["have"] == "new"
+    assert by["acme/swarm"]["have"] == "new" and by["acme/swarm"]["new"] is False
     assert "bad/nc-agents" in [i["repo"] for i in sl["ignore"]]          # licence blocks it
     assert any("licence" in r for r in by["bad/nc-agents"]["why"])
     assert set(sl) == {"test_next", "watch", "already_have", "ignore"}
     for item in by.values():
         assert item["cost"] == "unknown until benchmarked"
         assert item["next"] != "adopt"                      # never decided by the machine
+
+
+def test_a_recently_created_project_is_flagged_as_new(tmp_path):
+    fresh = repo("fresh/browser", "browser automation for agents", 15,
+                 created="2026-09-20")
+    cat = {"checked": "2026-10-13", "integrated": [], "categories": {
+        "computer_use": {"title": "Computer and browser use", "why": "browser work",
+                         "priority": 3, "queries": ["browser automation"], "seeds": []}}}
+    sc = scout(tmp_path, FakeGitHub({"browser": [fresh]}, {"fresh/browser": fresh}))
+    W.watch(sc, cat, today=DAY2)
+    sl = W.shortlist(sc, cat, toolbox={}, today=DAY2)
+    item = {i["repo"]: i for g in sl.values() for i in g}["fresh/browser"]
+    assert item["new"] is True and item["created"] == "2026-09-20"
+    assert any(w.startswith("new: created") for w in item["why"])
+
+
+def test_normalise_keeps_the_creation_date():
+    assert normalise({"full_name": "a/b", "created_at": "2026-10-01"})["created_at"] == \
+        "2026-10-01"
 
 
 def test_rising_new_projects_rank_first_and_the_owners_priorities_count(tmp_path):

@@ -83,10 +83,13 @@ class Scout:
     # ---------------------------------------------------------------- discovery
     def find(self, request: str, max_queries: int = 8, per_query: int = 10,
              readmes: int = 5, provider: Any = None,
-             progress: Any = None) -> dict[str, Any]:
+             progress: Any = None, newest: bool = False) -> dict[str, Any]:
+        """Search GitHub for a capability. ``newest`` adds GitHub's ``created:>=``
+        qualifier (90 days), so only just-released projects are returned."""
         say = progress or (lambda text: None)    # live progress for the Jarvis screen
         p = plan(request, max_queries, provider)
         n = len(p.queries)
+        cutoff = (dt.date.today() - dt.timedelta(days=90)).isoformat()
         store = self.candidates()
         found: dict[str, dict[str, Any]] = {}
         searches: list[dict[str, Any]] = []
@@ -97,9 +100,11 @@ class Scout:
                                  "skipped": f"waiting for GitHub until {self.stopped.when}"})
                 say(f"Search {i} of {n}: '{q.q}' not sent (GitHub asked to wait)")
                 continue
+            sent = f"{q.q} created:>={cutoff}" if newest else q.q
             try:
-                items = self.source.search(q.q, per_query)
-                searches.append({"q": q.q, "origin": q.origin, "found": len(items)})
+                items = self.source.search(sent, per_query)
+                searches.append({"q": q.q, "origin": q.origin, "found": len(items),
+                                 **({"sent": sent} if newest else {})})
                 say(f"Search {i} of {n}: '{q.q}' found {len(items)}")
             except RateLimited as e:
                 self.stopped = e
@@ -199,8 +204,9 @@ class Scout:
                 "last_reviewed_at": _now(), "queries": [],
                 "claimed": {"description": it["description"], "topics": it["topics"],
                             "homepage": it["homepage"], "readme": None},
-                "metadata": {k: it[k] for k in ("language", "fork", "archived", "pushed_at",
-                                                "stars", "size_kb")},
+                "metadata": {k: it.get(k) for k in ("language", "fork", "archived",
+                                                    "created_at", "pushed_at", "stars",
+                                                    "size_kb")},
                 "license": {"declared": it["license_spdx"], "source": "GitHub metadata"},
                 "security": {"status": "not reviewed"},
                 "validation": {"status": "not tested"}}

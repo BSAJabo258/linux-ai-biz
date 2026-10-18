@@ -14,7 +14,12 @@ bau scout report                       # plain-words report of the latest search
 bau scout list                         # every candidate so far, best first
 bau scout show OWNER/NAME              # everything recorded about one
 bau scout inspect OWNER/NAME           # download it into quarantine and scan it (runs nothing)
+bau scout find "local voice cloning" --latest   # only projects created in the last 90 days
 ```
+
+`--latest` adds GitHub's `created:>=` qualifier, so only just-released repositories come
+back; Jarvis uses the same switch as `latest: true` on `find_tools`. It is a narrower
+search, not a different ranking: the licence and security gates still decide first.
 
 Or ask Jarvis: "find open-source tools for customer simulation". The **Scout** dot on the
 Jarvis screen shows the latest search and the best candidates.
@@ -46,7 +51,9 @@ Or ask Jarvis: "what's new in open source this week?" (the `open_source_watch` t
   GitHub's limits below. If GitHub says wait, the run stops and lists what was not sent.
 - Every project found gets its categories and a dated snapshot (stars, last push). Two
   snapshots make a trend: **rising** (25 stars or 5% more, whichever is larger), steady
-  or falling.
+  or falling. GitHub's creation date is kept too: a project created in the last 90 days is
+  marked **new** in the shortlist, even before it has enough evidence to score. New is a
+  label, never a reason to skip the licence and security gates.
 - The shortlist says whether BAU **already runs** it, the Toolbox **already researched** it,
   or it is **new**. Its opportunity is Scout's evidence-based score, weighted by the
   category's priority, plus a bonus when rising. Licence and security gates still decide
@@ -90,7 +97,7 @@ request ──> plan (several phrasings) ──> GitHub search, paced, failures 
 | Licence and security gates | `evaluate.py` | These are gates, not points. A licence that forbids commercial use (NC, BUSL, SSPL, Elastic, PolyForm NC), a Sentinel rejection, an archived upstream or a failed test **rejects** a candidate whatever its score. Nothing is *eligible* until its licence has been reviewed, its security inspected and its tests passed. Discovery alone never makes anything eligible. A README that says "non-commercial" or "research only" overrides a permissive licence declared to GitHub and sends it to review |
 | E. Isolated validation | existing `security/sentinel.py` + `sandbox.py`; new `bau scout inspect` | `inspect` makes a shallow clone into `BAU_HOME/scout/quarantine/`. The clone allows no hooks, LFS filters, submodules, credential prompts or inherited secrets, and HTTPS only. Sentinel then scans it statically and heavy dependencies (torch, CUDA and the like) are read from its requirement files. Running its tests is the existing sandbox stage (`bau sandbox`), which needs Podman and an approval |
 | G. Learning record | `BAU_HOME/scout/runs.jsonl`, audit events `scout.run`, `scout.inspected` | Every run records its plan, each search and its result or failure, notes, and the ranking. These are the data for tuning queries and weights later |
-| Jarvis | `assistant.py` tools `find_tools` (act) and `scout_results` (read); `overview.py` Scout node | Jarvis can search and report. It has no tool to inspect, approve or install |
+| Jarvis | `assistant.py` tools `find_tools` (act), `scout_results` and `capability_brief` (read); `overview.py` Scout node | Jarvis can search, report and answer one task from BAU's map, the toolbox and the watch. It has no tool to inspect, approve or install |
 
 ### Core versus optional
 
@@ -149,3 +156,8 @@ GitHub REST search API, checked 2026-10-09 at docs.github.com/en/rest/search/sea
 The details are recorded in `scout/github.py`. GitHub is a research source here, not a
 publishing platform, so there is no `examples/platform-*.yaml` record: BAU never posts to
 GitHub through the scout.
+
+Repository search date filtering (`created:>=YYYY-MM-DD`) checked 2026-10-18 at
+docs.github.com/en/search-github/searching-on-github/searching-for-repositories: the
+`created` qualifier takes an ISO date and supports greater-than, less-than and range
+filters.
