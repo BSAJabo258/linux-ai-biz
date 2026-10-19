@@ -89,6 +89,37 @@ What ICM doesn't replace in BAU: the signed approvals, the tamper-evident audit 
 the locked core (no agent edits `_shared/`, policies or regulations), and `untrusted()`
 wrapping of anything from outside.
 
+## Jarvis on a small local model (lean mode)
+
+Measured on 2026-10-19 with the laptop's backup model (Qwen2.5-1.5B) and the stick's own
+llama.cpp, on a 4-core CPU like the laptop's:
+
+| | Before | After |
+|---|---|---|
+| Read before every answer | ~4,400 tokens (34 tools in full) | ~2,100 (7 tools + a menu) |
+| First answer | about a minute; one question timed out after 5 minutes | 4 to 15 seconds |
+| "What did the models cost today?" | "I don't have access to that" | the real numbers |
+| "What tools do we have for ...?" | searched GitHub, failed, said "none" | the toolbox's real answer |
+
+What Jarvis does differently when its model runs on the laptop (a "local" model):
+
+- **A short menu.** It sees seven everyday tools in full (status, memory, notes, toolbox,
+  missions, usage, hold) and the others as one line each (`tool_menu`), run with
+  `use_tool`. Every tool still works the same way: actions that need you are still only
+  put on your screen for your click.
+- **Facts first.** For the common questions (cost, status, tools, memory) Jarvis looks
+  the facts up itself, with plain code, and hands them to the model with your question;
+  the model only has to say them.
+- **The same instructions all session**, so the model does not re-read them every time.
+- **Short answers**: at most about 300 words, so it cannot talk itself into a loop.
+- **No "let me check" without checking**: if it says it will look something up and does
+  not, Jarvis tells it once to do it now.
+- **Only your earlier questions** carry over between sessions, not its own answers (a
+  small model copies its own mistakes).
+
+A hosted model (Claude) keeps every tool in full. To force either way for a model, add
+`lean: true` or `lean: false` to its record in the registry.
+
 ## Build order from here (spec §87)
 
 Each phase is one pull request with tests, and is boot-tested where it touches the image.
