@@ -18,7 +18,8 @@ from typing import Any
 from .home import bau_home
 from .store import YamlStore
 
-SHIPPED = {"moon": "moon.jpg", "light": "light.jpg"}
+SHIPPED = {"moon": "moon.jpg", "light": "light.jpg", "watercolor": "watercolor.jpg",
+           "gold": "gold.jpg", "earth": "earth.jpg"}
 DEFAULT = "moon"
 MAX_BYTES = 15 * 1024 * 1024
 TYPES = {b"\xff\xd8\xff": (".jpg", "image/jpeg"), b"\x89PNG\r\n\x1a\n": (".png", "image/png")}

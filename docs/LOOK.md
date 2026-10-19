@@ -14,6 +14,9 @@ If your computer is set to reduce motion, the animation stops and the picture st
 bau look                 # what is in use, and the choices
 bau look set moon        # the moonlit one (the default)
 bau look set light       # the white BAU one
+bau look set watercolor  # the watercolour BAU one
+bau look set gold        # the dark gold one
+bau look set earth       # the earth and moss one
 bau look set none        # no art: the plain blue sky
 bau look alive off       # keep the picture, stop the animation (on to restart it)
 ```

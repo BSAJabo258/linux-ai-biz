@@ -29,7 +29,7 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 
 def test_shipped_art_and_wallpapers():
     art = resources.files("bau.ui") / "art"
-    for name in ("moon.jpg", "light.jpg", "wall-moon.jpg", "wall-light.jpg"):
+    for name in [f"{n}.jpg" for n in L.SHIPPED] + [f"wall-{n}.jpg" for n in L.SHIPPED]:
         assert (art / name).read_bytes()[:3] == b"\xff\xd8\xff", name
     pil = pytest.importorskip("PIL.Image")
     with pil.open(str(art / "wall-moon.jpg")) as im:
@@ -39,7 +39,7 @@ def test_shipped_art_and_wallpapers():
 def test_default_is_the_moon_and_alive(tmp_path):
     got = L.show(tmp_path)
     assert got["art"] == "moon" and got["alive"] is True
-    assert {"moon", "light", "none"} <= set(got["choices"])
+    assert {"moon", "light", "watercolor", "gold", "earth", "none"} <= set(got["choices"])
 
 
 def test_owner_picks_the_art_and_can_switch_it_off(tmp_path):
@@ -154,7 +154,7 @@ DESKTOP = CONF / "includes.chroot" / "usr" / "local" / "bin" / "bau-look-desktop
 
 def test_stick_puts_the_art_on_the_desktop_and_login_screen():
     hook = (CONF / "hooks" / "live" / "0500-bau.hook.chroot").read_text()
-    assert "/usr/share/backgrounds/bau" in hook and "wall-moon.jpg" in hook
+    assert "/usr/share/backgrounds/bau" in hook and '"${art}"/wall-*.jpg' in hook
     greeter = (CONF / "includes.chroot" / "etc" / "lightdm" / "lightdm-gtk-greeter.conf.d" /
                "50-bau.conf").read_text()
     assert "background=/usr/share/backgrounds/bau/wall-moon.jpg" in greeter

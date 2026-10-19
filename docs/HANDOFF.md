@@ -47,6 +47,8 @@ BAU) ship in `bau/ui/art` (plus 1920x1080 wallpapers); `bau look` chooses or add
 Jarvis and Mission Control show it behind the page, alive by CSS only. The orange artwork
 was left out: its AI lettering is scrambled. The white one reads "pi = 3.33" (pi is 3.14);
 the owner was told and decides whether to fix it.
+Added 2026-10-19: three more owner artworks (watercolor, gold, earth) as choices and
+wallpapers; gold and earth have scrambled small lettering, all read "pi = 3.33" (owner told).
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
