@@ -1,0 +1,30 @@
+#!/bin/bash
+# The BAU look on the desktop (docs/LOOK.md). At your first login only: BAU's art on the
+# desktop (it changes every 10 minutes between the pictures in /usr/share/backgrounds/bau)
+# and the dark theme. After that it never touches your choices: change them in Settings.
+set -u
+mark="${XDG_CONFIG_HOME:-${HOME}/.config}/bau/look-applied"
+[[ -e ${mark} ]] && exit 0
+command -v xfconf-query >/dev/null || exit 0
+art=/usr/share/backgrounds/bau/wall-moon.jpg
+[[ -f ${art} ]] || exit 0
+
+xfconf-query -c xsettings -p /Net/ThemeName -n -t string -s Adwaita-dark
+
+# The desktop names its screens only once it is running: wait for it (up to 30 s).
+images=()
+for _ in $(seq 30); do
+  mapfile -t images < <(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep '/last-image$')
+  ((${#images[@]})) && break
+  sleep 1
+done
+((${#images[@]})) || exit 0          # try again at the next login
+for p in "${images[@]}"; do
+  base=${p%/last-image}
+  xfconf-query -c xfce4-desktop -p "${p}" -s "${art}"
+  xfconf-query -c xfce4-desktop -p "${base}/image-style" -n -t int -s 5
+  xfconf-query -c xfce4-desktop -p "${base}/backdrop-cycle-enable" -n -t bool -s true
+  xfconf-query -c xfce4-desktop -p "${base}/backdrop-cycle-period" -n -t int -s 1
+  xfconf-query -c xfce4-desktop -p "${base}/backdrop-cycle-timer" -n -t uint -s 10
+done
+mkdir -p "${mark%/*}" && date -u +%FT%TZ > "${mark}"

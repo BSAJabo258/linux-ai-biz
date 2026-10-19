@@ -52,7 +52,8 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
     jobs: dict[str, dict[str, Any]] = {}  # slow answers the page is checking back on
 
     def state() -> dict[str, Any]:
-        return {"call_me": assistant.cfg["call_me"],
+        from ..look import brief
+        return {"call_me": assistant.cfg["call_me"], "look": brief(assistant.home),
                 "mode": "model" if assistant.provider else "plain",
                 "model": assistant.model.get("id") or assistant.model.get("api_model"),
                 "backups": list(assistant.model.get("fallbacks") or []),
@@ -117,7 +118,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
             self.send_header("Content-Security-Policy",
                              "default-src 'none'; script-src 'unsafe-inline'; "
                              "style-src 'unsafe-inline'; connect-src 'self'; "
-                             "media-src 'self' blob:; frame-ancestors 'none'")
+                             "media-src 'self' blob:; img-src 'self'; frame-ancestors 'none'")
             self.end_headers()
             self.wfile.write(body)
 
@@ -164,6 +165,16 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                                "text/plain")
                     return
                 self._send(200, page, "text/html; charset=utf-8")
+                return
+            if path == "/art":                  # the owner's art behind the page (bau look)
+                if not self._guard(api=False):
+                    return
+                from ..look import art_file
+                got = art_file(assistant.home)
+                if got is None:
+                    self._send(404, b"no art chosen", "text/plain")
+                else:
+                    self._send(200, got[0].read_bytes(), got[1])
                 return
             if not path.startswith("/api/"):
                 self._send(404, b"not found", "text/plain")

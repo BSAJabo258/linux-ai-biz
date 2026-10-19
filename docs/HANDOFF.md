@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 568 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 580 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
 from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
@@ -41,6 +41,12 @@ and Windows drives open by themselves; xfce4-power-manager. `bau pack install` (
 opens unopened exFAT/vfat/NTFS partitions read-only under /run/bau-pack to find a pack,
 matches the folder name in any case, and writes the report to /var/lib/bau/reports when
 the pack is read-only.
+
+The BAU look (2026-10-19, `docs/LOOK.md`): the owner's two clean artworks (moonlit, white
+BAU) ship in `bau/ui/art` (plus 1920x1080 wallpapers); `bau look` chooses or adds art;
+Jarvis and Mission Control show it behind the page, alive by CSS only. The orange artwork
+was left out: its AI lettering is scrambled. The white one reads "pi = 3.33" (pi is 3.14);
+the owner was told and decides whether to fix it.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is

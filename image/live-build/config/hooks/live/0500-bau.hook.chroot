@@ -16,6 +16,11 @@ python3 -m venv --system-site-packages /opt/bau/venv
 /opt/bau/venv/bin/pip install --quiet --no-index --find-links /opt/bau/wheels anthropic
 /opt/bau/venv/bin/python -c 'import anthropic'
 rm -rf /opt/bau/wheels
+# The BAU look: the art that ships in the package goes on the desktop and login screen.
+art="$(/opt/bau/venv/bin/python -c 'from importlib import resources; print(resources.files("bau.ui") / "art")')"
+install -d /usr/share/backgrounds/bau
+install -m 0644 "${art}/wall-moon.jpg" "${art}/wall-light.jpg" /usr/share/backgrounds/bau/
+chmod 0755 /usr/local/bin/bau-look-desktop
 ln -sf /opt/bau/venv/bin/bau /usr/local/bin/bau
 ln -sf /opt/bau/venv/bin/jarvis-storage /usr/local/bin/jarvis-storage
 cat > /etc/profile.d/bau.sh <<'EOF'

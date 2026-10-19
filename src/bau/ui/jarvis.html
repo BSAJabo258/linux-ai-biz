@@ -22,6 +22,30 @@ body{background:var(--sky)}
 :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 canvas#core{position:fixed;inset:0;width:100%;height:100%;display:block}
+/* The owner's art (bau look): a still image, gently alive - a slow breathing glow, a pulse
+   rising along the centre line, embers drifting up; quicker while Jarvis thinks. */
+#art{position:fixed;inset:0;pointer-events:none;background:center/contain no-repeat;opacity:0;
+  transition:opacity 1.2s;mask-image:radial-gradient(ellipse 48% 52% at center,#000 55%,transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 48% 52% at center,#000 55%,transparent 100%)}
+#art.on{opacity:.6}
+:root[data-theme="light"] #art.on{opacity:.22}
+#art .spine,#art .embers{position:absolute;opacity:0;mix-blend-mode:screen;pointer-events:none}
+#art .spine{left:50%;top:12%;bottom:6%;width:4px;transform:translateX(-50%);filter:blur(1.5px);
+  background:linear-gradient(transparent,var(--gold),#fff6d8,var(--gold),transparent) no-repeat;
+  background-size:100% 30%}
+#art .embers{inset:0;background-image:radial-gradient(2px 2px at 20% 80%,var(--gold),transparent),
+  radial-gradient(1.5px 1.5px at 70% 90%,#ff8a3d,transparent),radial-gradient(2px 2px at 40% 95%,var(--cyan),transparent),
+  radial-gradient(1.5px 1.5px at 85% 70%,var(--gold),transparent),radial-gradient(2px 2px at 10% 60%,#ff8a3d,transparent);
+  background-size:100% 100%}
+body.alive #art.on{animation:breathe 9s ease-in-out infinite}
+body.alive #art.on .spine{opacity:.75;animation:rise 4.5s linear infinite}
+body.alive #art.on .embers{opacity:.7;animation:drift 14s linear infinite}
+body[data-state="thinking"] #art.on{animation-duration:3s}
+body[data-state="thinking"] #art.on .spine{animation-duration:1.4s;opacity:1}
+@keyframes breathe{0%,100%{filter:brightness(.88) saturate(1)}50%{filter:brightness(1.15) saturate(1.2)}}
+@keyframes rise{from{background-position:0 130%}to{background-position:0 -30%}}
+@keyframes drift{from{transform:translateY(0)}to{transform:translateY(-12%)}}
+@media (prefers-reduced-motion: reduce){#art,#art *{animation:none!important}}
 .grid{position:fixed;inset:0;pointer-events:none;opacity:.16;
   background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
   background-size:48px 48px;mask-image:radial-gradient(ellipse at center,#000 30%,transparent 75%);
@@ -188,6 +212,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 </head>
 <body>
 <a class="skip" href="#text">Skip to talking to Jarvis</a>
+<div id="art" aria-hidden="true"><div class="spine"></div><div class="embers"></div></div>
 <canvas id="core" aria-hidden="true"></canvas>
 <div class="grid"></div>
 <header>
@@ -303,6 +328,7 @@ let analyser = null, actx = null, buf = null;
 const LABEL = { idle: "STANDBY", listening: "LISTENING", thinking: "PROCESSING", speaking: "SPEAKING" };
 const HUE = { idle: [63, 214, 255], listening: [255, 179, 64], thinking: [169, 139, 255], speaking: [63, 214, 255] };
 function setState(s) { STATE = s; $("statelabel").textContent = LABEL[s];
+  document.body.dataset.state = s;
   const pill = document.getElementById("speakpill"); if (pill) pill.hidden = s !== "speaking"; }
 
 const cv = $("core"), cx = cv.getContext("2d");
@@ -581,7 +607,15 @@ function renderCard(c) {
   while (box.children.length > 6) box.lastChild.remove();
 }
 function holdChip(h) { const c = $("c-hold"); c.hidden = !h; c.className = "chip bad"; if (h) c.title = h; }
+// The owner's art behind everything (bau look); none chosen leaves the plain sky.
+function applyLook(l) {
+  const el = $("art"); if (!el) return;
+  if (!l || !l.art) { el.classList.remove("on"); return; }
+  el.style.backgroundImage = "url(/art?v=" + encodeURIComponent(l.art) + ")";
+  el.classList.add("on"); document.body.classList.toggle("alive", !!l.alive);
+}
 function paintState(s) {
+  applyLook(s.look);
   if (!s) return;
   const backups = s.backups || [];
   $("c-mode").textContent = s.mode === "model"

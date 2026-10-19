@@ -64,6 +64,9 @@ def _api(path: str, home: Path) -> Any:
         d = g.digest(72)
         return {"hold": d["hold"], "needs_you": d["needs_you"], "fixed": d["fixed"][-50:],
                 "counts": d["counts"]}
+    if path == "/api/look":
+        from ..look import brief
+        return brief(home)
     if path == "/api/incidents":
         from ..incidents import Incidents
         return Incidents(home).open_items()
@@ -104,7 +107,7 @@ def make_handler(home: Path) -> type[BaseHTTPRequestHandler]:
             self.send_header("Content-Security-Policy",
                              "default-src 'none'; script-src 'unsafe-inline'; "
                              "style-src 'unsafe-inline'; connect-src 'self'; "
-                             "frame-ancestors 'none'")
+                             "img-src 'self'; frame-ancestors 'none'")
             self.end_headers()
             self.wfile.write(body)
 
@@ -115,6 +118,14 @@ def make_handler(home: Path) -> type[BaseHTTPRequestHandler]:
                 return
             if self.path in ("/", "/index.html"):
                 self._send(200, page, "text/html; charset=utf-8")
+                return
+            if self.path.partition("?")[0] == "/art":    # the owner's art (bau look)
+                from ..look import art_file
+                got = art_file(home)
+                if got is None:
+                    self._send(404, b"no art chosen", "text/plain")
+                else:
+                    self._send(200, got[0].read_bytes(), got[1])
                 return
             if not self.path.startswith("/api/"):
                 self._send(404, b"not found", "text/plain")
