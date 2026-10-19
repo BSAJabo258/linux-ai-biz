@@ -99,7 +99,9 @@ def test_jarvis_serves_the_art_and_tells_the_page(jarvis):
     req = urllib.request.Request(url + "/api/state", headers={"X-Jarvis-Key": "k123"})
     with urllib.request.urlopen(req) as r:
         assert "img-src 'self'" in r.headers["Content-Security-Policy"]
-        assert json.loads(r.read())["look"] == {"art": "moon", "alive": True}
+        look = json.loads(r.read())["look"]
+        assert look["art"] == "moon" and look["alive"] is True
+        assert look["flow"][0] == "moon" and len(look["flow"]) == len(L.SHIPPED)
     L.set_look(home, art="none")
     with pytest.raises(urllib.error.HTTPError) as e:
         urllib.request.urlopen(url + "/art")
@@ -116,11 +118,75 @@ def test_the_page_brings_the_art_to_life_calmly():
     assert lint_html(page) == []
 
 
+# ------------------------------------------------------------------ liquid: the art melts
+
+def test_the_flow_starts_with_the_chosen_art_and_holds_the_rest(tmp_path):
+    assert L.brief(tmp_path)["flow"] == ["moon", "light", "watercolor", "gold", "earth"]
+    L.set_look(tmp_path, art="gold")
+    assert L.brief(tmp_path)["flow"][0] == "gold"
+    L.set_look(tmp_path, flow=["earth", "moon"])
+    assert L.brief(tmp_path)["flow"] == ["gold", "earth", "moon"]   # the chosen one leads
+    assert L.show(tmp_path)["flow"] == ["earth", "moon"]
+    with pytest.raises(ValueError):
+        L.set_look(tmp_path, flow=["moon", "nope"])
+    L.set_look(tmp_path, flow=[])                                       # empty = all of them
+    assert len(L.show(tmp_path)["flow"]) == len(L.SHIPPED)
+    L.set_look(tmp_path, art="none")
+    assert L.brief(tmp_path) == {"art": None, "alive": True, "flow": []}
+
+
+def test_owner_art_joins_the_flow(tmp_path):
+    src = tmp_path / "phoenix.jpg"
+    src.write_bytes(JPEG)
+    L.add(tmp_path, src)
+    assert L.brief(tmp_path)["flow"][0] == "phoenix"
+    assert "phoenix" in L.show(tmp_path)["flow"]
+    f, ctype = L.art_named(tmp_path, "phoenix")
+    assert ctype == "image/jpeg" and f.read_bytes() == JPEG
+    assert L.art_named(tmp_path, "none") is None
+    assert L.art_named(tmp_path, "../../etc/passwd") is None
+
+
+def test_jarvis_serves_each_picture_of_the_flow(jarvis):
+    _, url = jarvis
+    for name in L.SHIPPED:
+        with urllib.request.urlopen(f"{url}/art/{name}") as r:
+            assert r.headers["Content-Type"] == "image/jpeg"
+            assert r.read()[:3] == b"\xff\xd8\xff"
+    for bad in ("nope", "..%2F..%2Fetc%2Fpasswd", "none"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            urllib.request.urlopen(f"{url}/art/{bad}")
+        assert e.value.code == 404
+
+
+def test_the_page_melts_the_pictures_into_each_other_cheaply():
+    page = (resources.files("bau.ui") / "jarvis.html").read_text()
+    assert '<canvas id="liquid"' in page
+    assert 'getContext("webgl"' in page                     # the GPU does the melting
+    assert "/art/" in page and "look.flow" in page          # every picture of the flow
+    assert "visibilitychange" in page                       # stops when not on screen
+    assert "LIQUID_SCALE" in page                           # drawn at part resolution
+    assert "LIQUID_FPS" in page                             # and at a capped frame rate
+    assert "uEnergy" in page and "uLevel" in page           # moves with Jarvis's state and voice
+    m = re.search(r"if \(REDUCED \|\| !gl\)", page)      # still picture without GPU or motion
+    assert m, "needs the still fallback"
+    assert "webglcontextlost" in page
+
+
+def test_cli_look_flow(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("BAU_HOME", str(tmp_path))
+    assert cli.main(["look", "flow", "gold", "earth"]) == 0
+    assert json.loads(capsys.readouterr().out)["flow"] == ["gold", "earth"]
+    assert cli.main(["look", "flow", "all"]) == 0
+    assert len(json.loads(capsys.readouterr().out)["flow"]) == len(L.SHIPPED)
+
+
 # ------------------------------------------------------------------ Mission Control too
 
 def test_mission_control_serves_the_art_and_its_choice(tmp_path):
     from bau.ui.server import _api, serve
-    assert _api("/api/look", tmp_path) == {"art": "moon", "alive": True}
+    got = _api("/api/look", tmp_path)
+    assert got["art"] == "moon" and got["alive"] is True
     srv = serve(0, tmp_path)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:

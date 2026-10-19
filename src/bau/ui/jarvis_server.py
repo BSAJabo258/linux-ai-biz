@@ -166,11 +166,12 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     return
                 self._send(200, page, "text/html; charset=utf-8")
                 return
-            if path == "/art":                  # the owner's art behind the page (bau look)
+            if path == "/art" or path.startswith("/art/"):   # the owner's art (bau look)
                 if not self._guard(api=False):
                     return
-                from ..look import art_file
-                got = art_file(assistant.home)
+                from ..look import art_file, art_named
+                got = art_file(assistant.home) if path == "/art" \
+                    else art_named(assistant.home, path[5:])
                 if got is None:
                     self._send(404, b"no art chosen", "text/plain")
                 else:

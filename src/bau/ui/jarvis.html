@@ -28,6 +28,11 @@ canvas#core{position:fixed;inset:0;width:100%;height:100%;display:block}
   transition:opacity 1.2s;mask-image:radial-gradient(ellipse 48% 52% at center,#000 55%,transparent 100%);
   -webkit-mask-image:radial-gradient(ellipse 48% 52% at center,#000 55%,transparent 100%)}
 #art.on{opacity:.6}
+/* Liquid art (bau look flow): the pictures melt into each other; drawn at half size and
+   stretched, which also softens it. */
+canvas#liquid{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none;
+  opacity:0;transition:opacity 2.5s}
+canvas#liquid.on{opacity:1}
 :root[data-theme="light"] #art.on{opacity:.22}
 #art .spine,#art .embers{position:absolute;opacity:0;mix-blend-mode:screen;pointer-events:none}
 #art .spine{left:50%;top:12%;bottom:6%;width:4px;transform:translateX(-50%);filter:blur(1.5px);
@@ -212,6 +217,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 </head>
 <body>
 <a class="skip" href="#text">Skip to talking to Jarvis</a>
+<canvas id="liquid" aria-hidden="true"></canvas>
 <div id="art" aria-hidden="true"><div class="spine"></div><div class="embers"></div></div>
 <canvas id="core" aria-hidden="true"></canvas>
 <div class="grid"></div>
@@ -607,12 +613,182 @@ function renderCard(c) {
   while (box.children.length > 6) box.lastChild.remove();
 }
 function holdChip(h) { const c = $("c-hold"); c.hidden = !h; c.className = "chip bad"; if (h) c.title = h; }
-// The owner's art behind everything (bau look); none chosen leaves the plain sky.
-function applyLook(l) {
-  const el = $("art"); if (!el) return;
-  if (!l || !l.art) { el.classList.remove("on"); return; }
-  el.style.backgroundImage = "url(/art?v=" + encodeURIComponent(l.art) + ")";
-  el.classList.add("on"); document.body.classList.toggle("alive", !!l.alive);
+// ---------------------------------------------------------------- liquid art (bau look flow)
+// The owner's pictures melt into one another like ink in water. Each picture is drawn
+// twice: sharp in the middle, and as a soft glow of its own colours filling the screen,
+// both carried by a slow flowing current (domain-warped noise) that rises like heat.
+// Every HOLD_MS a liquid front opens from the centre and the next picture pours through it,
+// edged with Jarvis's colour. The current quickens while Jarvis listens or thinks, and his
+// voice sends ripples out from the core. Cheap on purpose: one small WebGL shader drawn at
+// part resolution, capped frame rate, nothing drawn while the page is hidden.
+const LIQUID_SCALE = 0.5, LIQUID_FPS = 30, HOLD_MS = 14000, MELT_MS = 6500, TEX = 1024;
+const ENERGY = { idle: 0.2, listening: 0.55, thinking: 1, speaking: 0.7 };
+const LIQUID_FS = `precision mediump float;
+uniform sampler2D uA, uB; uniform vec2 uRes, uPoint; uniform vec3 uHue;
+uniform float uAspA, uAspB, uTime, uMix, uEnergy, uLevel, uAlpha, uKey;
+varying vec2 vUv;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) { vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y); }
+float fbm(vec2 p) { float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return v; }
+vec2 contain(vec2 p, float ia, float ca) { vec2 s = ia > ca * 0.9 ? vec2(ca * 0.9, ca * 0.9 / ia) : vec2(0.9 * ia, 0.9);
+  return p / s + 0.5; }
+vec2 cover(vec2 p, float ia, float ca) { vec2 s = ia > ca ? vec2(ia, 1.0) : vec2(ca, ca / ia); return p / (s * 1.15) + 0.5; }
+float frame(vec2 q) { return smoothstep(0.0, 0.12, q.x) * smoothstep(1.0, 0.88, q.x) * smoothstep(0.0, 0.12, q.y) * smoothstep(1.0, 0.88, q.y); }
+float ink(vec3 c) {                                           // white paper melts away, ink stays
+  float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+  return 1.0 - uKey * 0.95 * smoothstep(0.72, 0.95, dot(c, vec3(0.299, 0.587, 0.114))) * smoothstep(0.2, 0.05, sat);
+}
+vec4 picture(sampler2D t, float ia, vec2 p, vec2 w, float ca, float split) {
+  vec3 fog = texture2D(t, cover(p + w * 2.5, ia, ca), 4.5).rgb;
+  vec2 q = contain(p + w, ia, ca), d = w * split;
+  vec3 sharp = vec3(texture2D(t, q + d).r, texture2D(t, q).g, texture2D(t, q - d).b);
+  float m = frame(q) * smoothstep(0.62, 0.3, length(q - 0.5));
+  return mix(vec4(fog * 0.62, 0.8 * ink(fog)), vec4(sharp, ink(sharp)), m);
+}
+void main() {
+  float ca = uRes.x / uRes.y, t = uTime;
+  vec2 p = (vUv - 0.5) * vec2(ca, 1.0);
+  vec2 s = p * 1.6 + vec2(0.0, -t * 0.035);                  // the current rises slowly
+  vec2 q = vec2(fbm(s + t * 0.02), fbm(s + vec2(5.2, 1.3) - t * 0.02));
+  vec2 w = vec2(fbm(s + 3.5 * q + vec2(1.7, 9.2) + t * 0.04), fbm(s + 3.5 * q + vec2(8.3, 2.8) - t * 0.03)) - 0.5;
+  float melt = sin(3.14159 * uMix);
+  w *= 0.012 + 0.02 * uEnergy + 0.06 * melt;
+  float d = length(p);                                        // his voice: ripples from the core
+  w += (p / max(d, 0.001)) * sin(d * 38.0 - t * 9.0) * exp(-d * 2.6) * uLevel * 0.012;
+  vec2 pp = p - (uPoint - 0.5) * vec2(ca, 1.0);                // the pointer bends the light near it
+  w -= pp * exp(-dot(pp, pp) * 18.0) * 0.05;
+  float field = 0.62 * fbm(p * 2.4 + q * 1.5 + t * 0.02) + 0.38 * d;
+  float k = smoothstep(field - 0.06, field + 0.06, uMix * 1.35 - 0.12);
+  float split = 0.25 + 0.6 * uEnergy;
+  vec4 a = picture(uA, uAspA, p, w * (1.0 + 2.5 * k), ca, split);
+  vec4 b = picture(uB, uAspB, p, w * (1.0 + 2.5 * (1.0 - k)), ca, split);
+  vec4 pic = mix(a, b, k);
+  vec3 col = pic.rgb;
+  float edge = pow(1.0 - abs(k * 2.0 - 1.0), 4.0) * melt;    // the liquid front glows
+  col += uHue * edge * 0.9;
+  pic.a = max(pic.a, edge * 0.8);
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  float scan = exp(-pow((vUv.y - fract(t * 0.05)) * 14.0, 2.0));
+  col += uHue * scan * lum * 0.35 * uEnergy;                  // a scan line passes while he thinks
+  col = mix(col, col * (0.6 + uHue * 0.8), 0.18 * uEnergy);
+  col *= 1.0 - 0.32 * uKey * exp(-d * d * 7.0);               // shade round the core: words stay readable
+  col /= 1.0 + 0.6 * uKey * dot(col, vec3(0.333));            // soft highlights, never glaring
+  col += (hash(vUv * uRes + fract(t)) - 0.5) * 0.035;         // a little grain
+  float alpha = pic.a * uAlpha * smoothstep(1.0, 0.3, length((vUv - 0.5) * vec2(1.3, 1.5)));
+  gl_FragColor = vec4(col * alpha, alpha);
+}`;
+const liquid = (() => {
+  const c = $("liquid"); let gl = null;
+  try { gl = c && c.getContext("webgl", { premultipliedAlpha: true, antialias: false, depth: false,
+    powerPreference: "low-power" }); } catch (e) { gl = null; }
+  if (REDUCED || !gl) return null;          // the still picture (#art) is used instead
+  function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+  let prog;
+  try {
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, "attribute vec2 a; varying vec2 vUv;" +
+      "void main() { vUv = a * 0.5 + 0.5; vUv.y = 1.0 - vUv.y; gl_Position = vec4(a, 0.0, 1.0); }"));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, LIQUID_FS));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  } catch (e) { console.warn("liquid art off:", e); return null; }
+  gl.useProgram(prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const aLoc = gl.getAttribLocation(prog, "a");
+  gl.enableVertexAttribArray(aLoc); gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
+  const U = {}; ["uA", "uB", "uRes", "uPoint", "uHue", "uAspA", "uAspB", "uTime", "uMix", "uEnergy", "uLevel", "uAlpha", "uKey"]
+    .forEach((n) => { U[n] = gl.getUniformLocation(prog, n); });
+  gl.uniform1i(U.uA, 0); gl.uniform1i(U.uB, 1);
+  const cache = new Map();                  // name -> {tex, asp} (or a promise while loading)
+  function load(name) {
+    if (cache.has(name)) return cache.get(name);
+    const p = new Promise((ok) => {
+      const img = new Image();
+      img.onload = () => {                  // square power-of-two copy, so soft mipmaps work
+        const cv2 = document.createElement("canvas"); cv2.width = cv2.height = TEX;
+        cv2.getContext("2d").drawImage(img, 0, 0, TEX, TEX);
+        const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, cv2);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+        const got = { tex, asp: img.naturalWidth / img.naturalHeight }; cache.set(name, got); ok(got);
+      };
+      img.onerror = () => { cache.delete(name); ok(null); };
+      img.src = "/art/" + encodeURIComponent(name);
+    });
+    cache.set(name, p); return p;
+  }
+  let flow = [], at = 0, A = null, B = null, since = 0, raf = 0, last = 0, clock = 0, lost = false;
+  let E = 0.2, ptr = [0.5, 0.5], ptrTo = [0.5, 0.5], hue = [0.25, 0.84, 1];
+  addEventListener("pointermove", (e) => { ptrTo = [e.clientX / innerWidth, e.clientY / innerHeight]; });
+  function size() { c.width = Math.max(2, Math.round(innerWidth * LIQUID_SCALE));
+    c.height = Math.max(2, Math.round(innerHeight * LIQUID_SCALE)); gl.viewport(0, 0, c.width, c.height); }
+  addEventListener("resize", size); size();
+  async function next() {                   // line up the following picture
+    if (flow.length < 2) { B = null; return; }
+    const got = await load(flow[(at + 1) % flow.length]); B = got && got.tex ? got : null;
+  }
+  function draw(now) {
+    raf = requestAnimationFrame(draw);
+    if (now - last < 1000 / LIQUID_FPS) return;
+    const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
+    if (!A) return;
+    const want = (ENERGY[STATE] || 0.2) + level * 0.4;
+    E += (want - E) * Math.min(1, dt * 2);
+    clock += dt * (0.6 + E * 1.4);
+    ptr = [ptr[0] + (ptrTo[0] - ptr[0]) * dt * 2, ptr[1] + (ptrTo[1] - ptr[1]) * dt * 2];
+    const h = HUE[STATE] || HUE.idle; hue = hue.map((v, i) => v + (h[i] / 255 - v) * Math.min(1, dt * 2));
+    let m = 0; const held = now - since;
+    if (B && held > HOLD_MS) { m = Math.min(1, (held - HOLD_MS) / MELT_MS); m = m * m * (3 - 2 * m); }
+    if (m >= 1) { A = B; at = (at + 1) % flow.length; since = now; m = 0; B = null; next(); }
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, A.tex);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, (B || A).tex);
+    gl.uniform2f(U.uRes, c.width, c.height); gl.uniform2f(U.uPoint, ptr[0], ptr[1]);
+    gl.uniform3f(U.uHue, hue[0], hue[1], hue[2]);
+    gl.uniform1f(U.uAspA, A.asp); gl.uniform1f(U.uAspB, (B || A).asp);
+    gl.uniform1f(U.uTime, clock); gl.uniform1f(U.uMix, m); gl.uniform1f(U.uEnergy, E);
+    gl.uniform1f(U.uLevel, level); gl.uniform1f(U.uAlpha, themeLight() ? 0.32 : 0.85);
+    gl.uniform1f(U.uKey, themeLight() ? 0 : 1);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  function run() { if (!raf && !lost && !document.hidden && flow.length) { last = 0; raf = requestAnimationFrame(draw); } }
+  function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
+  document.addEventListener("visibilitychange", () => (document.hidden ? stop() : run()));
+  c.addEventListener("webglcontextlost", (e) => { e.preventDefault(); lost = true; stop();
+    c.classList.remove("on"); applyLook(LOOK); });
+  return {
+    ok: () => !lost,
+    show(names) {
+      const key = names.join("|");
+      if (key !== flow.join("|")) {
+        flow = names; at = 0; A = null; B = null;
+        load(flow[0]).then((got) => { if (got && got.tex && flow[0] === names[0]) { A = got; since = performance.now(); next(); } });
+      }
+      c.classList.add("on"); run();
+    },
+    hide() { c.classList.remove("on"); stop(); flow = []; },
+  };
+})();
+// The owner's art behind everything (bau look): liquid when it can be, otherwise the still
+// picture; none chosen leaves the plain sky.
+let LOOK = null;
+function applyLook(look) {
+  LOOK = look; const el = $("art"); if (!el) return;
+  if (!look || !look.art) { el.classList.remove("on"); if (liquid) liquid.hide(); return; }
+  document.body.classList.toggle("alive", !!look.alive);
+  if (liquid && liquid.ok() && look.alive && (look.flow || []).length) {
+    el.classList.remove("on"); liquid.show(look.flow); return;
+  }
+  if (liquid) liquid.hide();
+  el.style.backgroundImage = "url(/art?v=" + encodeURIComponent(look.art) + ")";
+  el.classList.add("on");
 }
 function paintState(s) {
   applyLook(s.look);

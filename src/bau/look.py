@@ -5,6 +5,10 @@ The art is still images: the stick's own (``moon``, ``light``) and any the owner
 ``bau look add``. "Alive" is light CSS animation in the page (a slow breathing glow, a
 pulse rising along the art's centre line, faster while Jarvis thinks), not a video, so it
 costs almost nothing on an 8 GB laptop and stops for reduced-motion users.
+
+The flow: in Jarvis the pictures melt into one another like liquid (a small WebGL shader
+drawn at part resolution and a capped frame rate), starting with the chosen art. The owner
+picks which pictures take part with ``bau look flow``; none picked means all of them.
 """
 
 from __future__ import annotations
@@ -38,18 +42,24 @@ def _own(home: Path) -> dict[str, Path]:
 def show(home: Path | None = None) -> dict[str, Any]:
     home = home or bau_home()
     saved = _store(home).load() or {}
+    pictures = [*SHIPPED, *_own(home)]
+    flow = [n for n in saved.get("flow") or [] if n in pictures] or pictures
     return {"art": saved.get("art", DEFAULT), "alive": saved.get("alive", True),
-            "choices": [*SHIPPED, *_own(home), "none"]}
+            "flow": flow, "choices": [*pictures, "none"]}
 
 
 def brief(home: Path | None = None) -> dict[str, Any]:
-    """What a page needs: the art's name (None when off) and whether it is alive."""
+    """What a page needs: the art's name (None when off), whether it is alive, and the
+    pictures it melts between (the chosen art first)."""
     s = show(home)
-    return {"art": None if s["art"] == "none" else s["art"], "alive": s["alive"]}
+    if s["art"] == "none":
+        return {"art": None, "alive": s["alive"], "flow": []}
+    return {"art": s["art"], "alive": s["alive"],
+            "flow": [s["art"], *(n for n in s["flow"] if n != s["art"])]}
 
 
 def set_look(home: Path | None = None, art: str | None = None,
-             alive: bool | None = None) -> dict[str, Any]:
+             alive: bool | None = None, flow: list[str] | None = None) -> dict[str, Any]:
     home = home or bau_home()
     saved = _store(home).load() or {}
     if art is not None:
@@ -58,6 +68,12 @@ def set_look(home: Path | None = None, art: str | None = None,
         saved["art"] = art
     if alive is not None:
         saved["alive"] = bool(alive)
+    if flow is not None:
+        pictures = [n for n in show(home)["choices"] if n != "none"]
+        bad = [n for n in flow if n not in pictures]
+        if bad:
+            raise ValueError(f"no picture called {bad[0]!r}; have {', '.join(pictures)}")
+        saved["flow"] = list(dict.fromkeys(flow))
     _store(home).save(saved)
     return show(home)
 
@@ -92,7 +108,12 @@ def add(home: Path | None, path: Path | str, name: str | None = None) -> str:
 def art_file(home: Path | None = None) -> tuple[Any, str] | None:
     """The current art (a readable file) and its content type; None when switched off."""
     home = home or bau_home()
-    art = show(home)["art"]
+    return art_named(home, show(home)["art"])
+
+
+def art_named(home: Path | None, art: str) -> tuple[Any, str] | None:
+    """One picture by its name (shipped or the owner's); None for anything else."""
+    home = home or bau_home()
     if art in SHIPPED:
         return resources.files("bau.ui") / "art" / SHIPPED[art], "image/jpeg"
     own = _own(home).get(art)
