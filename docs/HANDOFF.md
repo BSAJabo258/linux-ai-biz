@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 581 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 597 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
 from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
@@ -49,6 +49,19 @@ was left out: its AI lettering is scrambled. The white one reads "pi = 3.33" (pi
 the owner was told and decides whether to fix it.
 Added 2026-10-19: three more owner artworks (watercolor, gold, earth) as choices and
 wallpapers; gold and earth have scrambled small lettering, all read "pi = 3.33" (owner told).
+
+Jarvis lean mode (2026-10-19, docs/MY-JARVIS.md): ran real Jarvis on Qwen2.5-1.5B with the
+stick's llama.cpp (v0.6.0, d812350) in a scratch sandbox. Found: 34 tool specs = 3,155
+tokens, ~52 s reading per question; the system prompt changed every turn (recent
+conversation inside) so the prompt cache never helped; answers ran past 1,400 tokens; it
+announced lookups without doing them, ignored the toolbox, misread nested JSON, copied its
+own earlier wrong answers. Lean mode (deployment: local) fixes each: 7 core tools +
+tool_menu/use_tool, facts-first grounding (GROUND), stable prompt, 400-token cap, one nudge,
+owner-only continuity, short toolbox answers, usage "say" line; toolbox synonyms for plain
+words. After: 4-15 s, grounded answers. The 1.5B still lists in numbers and pads; the boss
+(Qwen3.5-4B) not yet measured this way. Decision lock test: llama.cpp grammar keeps answers
+in the list (<1 s each) but the 1.5B is order-biased and confidently wrong (quote request ->
+billing at 0.98), so bau decide must ask in shuffled orders and calibrate on owner answers.
 
 Laptop features (2026-10-19, owner's Dell XPS 13 9380 from its laptop check): the image
 (recommends off) had no sound server, no Bluetooth stack, no thermald and no Intel VA-API
