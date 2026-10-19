@@ -27,6 +27,14 @@ body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index
                    linear-gradient(90deg,var(--line) 1px,transparent 1px);
   background-size:40px 40px; opacity:.28;
   mask-image:radial-gradient(ellipse at 50% 0%,#000 30%,transparent 80%); }
+/* The owner's art (bau look), still and faint behind the panels; gently breathing. */
+#art { position:fixed; inset:0; z-index:-2; pointer-events:none; background:center/contain no-repeat;
+  opacity:0; transition:opacity 1.2s;
+  mask-image:radial-gradient(ellipse 48% 52% at center,#000 55%,transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 48% 52% at center,#000 55%,transparent 100%); }
+#art.on { opacity:.28; }
+#art.on.alive { animation:breathe 10s ease-in-out infinite; }
+@keyframes breathe { 0%,100% { filter:brightness(.85); } 50% { filter:brightness(1.15) saturate(1.2); } }
 .skip { position:absolute; left:-999px; top:0; background:var(--fg); color:var(--bg); padding:8px 12px; }
 .skip:focus { left:8px; top:8px; z-index:10; }
 header, main { max-width:1180px; margin:0 auto; padding:18px 20px; }
@@ -84,6 +92,7 @@ svg.brain text { fill:var(--muted); font-size:10px; }
 </style>
 </head>
 <body>
+<div id="art" aria-hidden="true"></div>
 <a class="skip" href="#content">Skip to content</a>
 <header>
   <div class="brand">
@@ -243,6 +252,10 @@ document.addEventListener("keydown", e => {
   if (dlg.open || e.target.tagName === "INPUT") return;
   const n = Number(e.key); if (n >= 1 && n <= VIEWS.length) show(n - 1); });
 show(0);
+fetch("/api/look", { headers: { "X-BAU": "1" } }).then(r => r.json()).then(l => {
+  if (!l.art) return; const a = document.getElementById("art");
+  a.style.backgroundImage = "url(/art?v=" + encodeURIComponent(l.art) + ")";
+  a.classList.add("on"); a.classList.toggle("alive", !!l.alive); }).catch(() => {});
 </script>
 </body>
 </html>
