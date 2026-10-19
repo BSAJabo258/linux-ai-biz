@@ -102,6 +102,14 @@ When you want BAU on a laptop's own drive instead of running it from the stick:
 
    Everything else is set the BAU way: full-disk encryption, root login off, network time.
 
+   **"Use entire disk" is right.** BAU encrypts the whole drive it installs to, and the
+   Debian installer can only do that on a whole drive, so "use the largest continuous free
+   space" does not work here. "Entire disk" means **only the drive you pick**: the other
+   drives (Windows, the stick you started from) are not touched. That drive is also your
+   storage: the system takes about 15 GB, the rest holds your files, BAU's data and the
+   AI models (about 6.5 GB). A 128 GB SanDisk is plenty. Pick it by its **name and size**
+   in the list; never the one that holds Windows, never the stick you started from.
+
    **Where the boot loader goes.** Near the end the installer asks **Install the GRUB boot
    loader to your primary drive?** Answer **No** unless BAU goes on the laptop's own
    drive, then pick the **same drive you installed to** (for a USB disk, the one named
