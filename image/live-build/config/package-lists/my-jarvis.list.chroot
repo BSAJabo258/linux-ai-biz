@@ -25,6 +25,15 @@ network-manager-gnome
 wpasupplicant
 wireless-regdb
 iw
+# Sticks and Windows drives open by themselves when plugged in (Thunar), exFAT and NTFS
+# included; screen and power handled (without it the screen blanks after 10 minutes).
+thunar-volman
+gvfs-backends
+exfatprogs
+ntfs-3g
+xfce4-power-manager
+# Compressed swap in memory instead of on disk (/etc/systemd/zram-generator.conf).
+systemd-zram-generator
 fonts-dejavu
 dbus-x11
 

@@ -20,6 +20,7 @@ from __future__ import annotations
 import datetime as dt
 import glob
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -38,7 +39,11 @@ PACK_DIR = "BAU-PACK"
 THINKER = "qwen3-4b-heretic-content"
 BOSS_ORDER = ("qwen3.5-4b", "qwen2.5-1.5b-instruct")
 PACK_MODELS = ("qwen3.5-4b", THINKER, "qwen2.5-1.5b-instruct")
-SEARCH = ("/media/*/*/BAU-PACK", "/media/*/BAU-PACK", "/mnt/*/BAU-PACK")
+# Where drives show up (a pack folder sits at the top of one): sticks the desktop opened,
+# drives opened by hand, and the ones `locate` opens read-only itself.
+SEARCH = ("/media/*/*", "/media/*", "/run/media/*/*", "/mnt", "/mnt/*", "/run/bau-pack/*")
+MOUNT_DIR = Path("/run/bau-pack")
+MOUNTABLE = {"exfat": None, "vfat": None, "ntfs": "ntfs3"}
 REPORT = "laptop-report.txt"
 WIFI = "wifi"
 # What Wi-Fi needs beyond the first stick image (built without recommended packages, so
@@ -79,22 +84,64 @@ class PackError(RuntimeError):
 
 
 # ------------------------------------------------------------------ the stick
+def _pack_in(folder: Path) -> Path | None:
+    """The pack folder inside a drive, whatever its capitals (Windows keeps them as typed)."""
+    try:
+        kids = [c for c in folder.iterdir() if c.name.lower() == PACK_DIR.lower()]
+    except OSError:
+        return None
+    return next((c for c in sorted(kids) if (c / "models").is_dir()), None)
+
+
 def root(path: Path | str) -> Path:
-    """The BAU-PACK folder, given it or the stick it is on."""
+    """The BAU-PACK folder, given it or the drive it is on."""
     p = Path(path)
-    for cand in (p, p / PACK_DIR):
-        if (cand / "models").is_dir():
-            return cand
+    if (p / "models").is_dir():
+        return p
+    found = _pack_in(p) if p.is_dir() else None
+    if found:
+        return found
     raise PackError(f"no BAU Pack at {p} (expected a {PACK_DIR} folder with models in it)")
 
 
-def find(patterns: tuple[str, ...] | list[str] = SEARCH) -> list[Path]:
+def find(bases: tuple[str, ...] | list[str] = SEARCH) -> list[Path]:
     out: list[Path] = []
-    for pat in patterns:
+    for pat in bases:
         for hit in sorted(glob.glob(pat)):
-            if (Path(hit) / "models").is_dir() and Path(hit) not in out:
-                out.append(Path(hit))
+            pack = _pack_in(Path(hit))
+            if pack and pack not in out:
+                out.append(pack)
     return out
+
+
+def mount_drives(run: Run, mount_dir: Path = MOUNT_DIR) -> list[str]:
+    """Open every unopened stick or Windows drive read-only, so a pack on it can be found
+    (Linux does not open them by itself without a desktop). Never writes to them."""
+    try:
+        devs = json.loads(run(["lsblk", "-J", "-o", "PATH,FSTYPE,MOUNTPOINT,TYPE"]) or "{}")
+    except ValueError:
+        return []
+    opened = []
+    for d in devs.get("blockdevices") or []:
+        fs = d.get("fstype")
+        if d.get("type") != "part" or d.get("mountpoint") or fs not in MOUNTABLE:
+            continue
+        where = mount_dir / Path(d["path"]).name
+        where.mkdir(parents=True, exist_ok=True)
+        kind = ["-t", MOUNTABLE[fs]] if MOUNTABLE[fs] else []
+        run(["mount", *kind, "-o", "ro", d["path"], str(where)])
+        opened.append(d["path"])
+    return opened
+
+
+def locate(run: Run, bases: tuple[str, ...] | list[str] = SEARCH,
+           mount_dir: Path = MOUNT_DIR) -> list[Path]:
+    """Packs on drives already open; if none, open the others read-only and look again."""
+    hits = find(bases)
+    if hits:
+        return hits
+    mount_drives(run, mount_dir)
+    return find(bases)
 
 
 def records(home: Path | None = None) -> dict[str, dict[str, Any]]:
@@ -236,12 +283,17 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
             raise PackError("no way to ask for the passphrase")
         out["keys"] = keys.import_file(enc, read_pass(), etc, audit, by)
 
+    text = laptop_report(run)
     try:
-        (pack / REPORT).write_text(laptop_report(run))
+        (pack / REPORT).write_text(text)
         out["report"] = str(pack / REPORT)
         say(f"Laptop report written to the stick: {REPORT}")
-    except OSError as e:
-        out["problems"].append(f"could not write {REPORT} on the stick: {e}")
+    except OSError:                         # a drive opened read-only, e.g. Windows' own
+        here = home / "reports" / REPORT
+        here.parent.mkdir(parents=True, exist_ok=True)
+        here.write_text(text)
+        out["report"] = str(here)
+        say(f"The pack is read-only here, so the laptop report is in {here}")
     return out
 
 
