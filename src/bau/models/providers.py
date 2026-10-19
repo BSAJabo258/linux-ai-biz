@@ -347,7 +347,7 @@ class ScriptedProvider(Provider):
 
     def complete(self, system, messages, tools=None, max_tokens=16000):
         self.calls.append({"system": system, "messages": list(messages),
-                           "tools": [t.name for t in tools or []]})
+                           "tools": [t.name for t in tools or []], "max_tokens": max_tokens})
         if not self.script:
             return ModelResponse("done", [], "end_turn", "scripted",
                                  raw_assistant=[{"type": "text", "text": "done"}])
