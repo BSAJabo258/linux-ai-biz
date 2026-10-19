@@ -153,6 +153,29 @@ When you want BAU on a laptop's own drive instead of running it from the stick:
 Your encrypted storage on the stick is not touched by the install: keep the stick as your
 portable Jarvis and recovery stick.
 
+## Your laptop: Dell XPS 13 9380
+
+From your laptop check (October 2026):
+
+| Part | On BAU |
+|---|---|
+| Wi-Fi (Killer 1435 / Qualcomm QCA6174) | works: firmware and the Wi-Fi login program are on the stick |
+| Bluetooth (Qualcomm QCA61x4A) | works: pair speakers and controllers with the Bluetooth icon at the top |
+| Sound (speakers, headphones, Jarvis's voice) | works: volume in the sound icon, or `pavucontrol` |
+| Screen (Intel UHD 620), brightness keys | work |
+| Webcam | works (standard USB camera driver) |
+| Fingerprint reader (Goodix 27c6:5385) | not supported by Linux's fingerprint software as far as we know: use your password |
+| Heat | Intel's thermal service (`thermald`) keeps the CPU from overheating and throttling |
+| Internal SSD (Intel 512 GB) | **hidden from Linux** while the firmware's storage mode is "RAID On" |
+
+**The internal SSD.** Dell ships this laptop with the storage mode set to "RAID On", and
+in that mode Linux cannot see the internal drive at all, which is why the installer only
+offers the USB stick. To ever install BAU on the internal drive next to Windows, the mode
+must be "AHCI" (F2 at start > System Configuration > SATA Operation). **Do not switch it
+straight away**: Windows set up in RAID mode may then not start. Windows must be prepared
+first (start it once in Safe Mode, switch to AHCI, start Windows again). This is your
+choice; running BAU from the SanDisk does not need it.
+
 ## Good to know
 
 - **BAU installed onto a USB stick:** it works, but ordinary sticks are not made for an

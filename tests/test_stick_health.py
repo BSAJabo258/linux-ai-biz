@@ -97,3 +97,14 @@ def test_sticks_and_windows_drives_open_by_themselves():
 def test_shellcheck():
     r = subprocess.run(["shellcheck", str(GUARD)], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
+
+
+def test_the_owners_laptop_gets_sound_bluetooth_and_cooling():
+    # Dell XPS 13 9380 (owner's laptop check, 2026-10): the image is built without
+    # recommended packages, so these were missing - no sound server (Jarvis's voice), no
+    # Bluetooth (the owner's speaker and controller), no Intel thermal daemon, no Intel
+    # video decoding. Firmware for its Killer/QCA6174 Wi-Fi and Bluetooth is firmware-atheros.
+    need = {"pipewire", "pipewire-pulse", "wireplumber", "pipewire-alsa", "alsa-utils",
+            "pavucontrol", "bluez", "blueman", "thermald", "intel-media-va-driver",
+            "firmware-atheros", "firmware-sof-signed", "firmware-intel-graphics"}
+    assert need <= LISTED, need - LISTED

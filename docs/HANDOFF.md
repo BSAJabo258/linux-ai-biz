@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 596 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 597 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
 from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
@@ -62,6 +62,14 @@ words. After: 4-15 s, grounded answers. The 1.5B still lists in numbers and pads
 (Qwen3.5-4B) not yet measured this way. Decision lock test: llama.cpp grammar keeps answers
 in the list (<1 s each) but the 1.5B is order-biased and confidently wrong (quote request ->
 billing at 0.98), so bau decide must ask in shuffled orders and calibrate on owner answers.
+
+Laptop features (2026-10-19, owner's Dell XPS 13 9380 from its laptop check): the image
+(recommends off) had no sound server, no Bluetooth stack, no thermald and no Intel VA-API
+driver. Now listed: pipewire(-pulse/-alsa), wireplumber, alsa-utils, pavucontrol, bluez,
+blueman, thermald, intel-media-va-driver (43 packages, ~18.5 MB). Fingerprint (Goodix
+27c6:5385) left out (not supported as far as known). The internal NVMe is in Intel RST
+"RAID On" mode, invisible to Linux; docs/LIVE-USB.md explains the AHCI switch (owner's
+choice, Windows must be prepared first).
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is

@@ -34,6 +34,20 @@ ntfs-3g
 xfce4-power-manager
 # Compressed swap in memory instead of on disk (/etc/systemd/zram-generator.conf).
 systemd-zram-generator
+# Sound, Bluetooth, cooling, video (named because recommends are off; checked against the
+# owner's Dell XPS 13 9380): a sound server for Jarvis's voice and the browser, Bluetooth
+# for speakers and controllers, Intel's thermal daemon against overheating and throttling,
+# and Intel video decoding for playback and ffmpeg.
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+alsa-utils
+pavucontrol
+bluez
+blueman
+thermald
+intel-media-va-driver
 fonts-dejavu
 dbus-x11
 
