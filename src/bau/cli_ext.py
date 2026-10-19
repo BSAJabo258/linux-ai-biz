@@ -458,10 +458,14 @@ def cmd_pack(a):
     from . import pack as P
     from .home import bau_home
     try:
-        found = [Path(a.path)] if a.path else P.find()
+        if a.path:
+            found = [Path(a.path)]
+        else:                       # as root, also opens sticks and Windows drives read-only
+            found = P.locate(P.run_cmd) if os.geteuid() == 0 else P.find()
         if not found:
-            raise P.PackError("no BAU Pack found on a mounted stick; plug it in, open it in "
-                              "the file manager once, then try again (or give its path)")
+            raise P.PackError("no BAU Pack found. Plug in the stick and run it with sudo "
+                              "(it opens sticks and Windows drives read-only to look), or "
+                              "give the pack's path")
         if len(found) > 1:
             raise P.PackError("more than one BAU Pack: give the path of the one to use")
         pack = P.root(found[0])
@@ -469,8 +473,14 @@ def cmd_pack(a):
             _out(P.scan(pack, P.records(bau_home())))
             return 0
         if a.pack_cmd == "report":
-            (pack / P.REPORT).write_text(P.laptop_report(P.run_cmd))
-            print(f"written: {pack / P.REPORT}")
+            text, dest = P.laptop_report(P.run_cmd), pack / P.REPORT
+            try:
+                dest.write_text(text)
+            except OSError:                 # the pack's drive is open read-only
+                dest = bau_home() / "reports" / P.REPORT
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(text)
+            print(f"written: {dest}")
             return 0
         if os.geteuid() != 0:
             raise SystemExit("run with sudo: sudo bau pack install")

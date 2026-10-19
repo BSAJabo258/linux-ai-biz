@@ -1,0 +1,28 @@
+#!/bin/sh
+# Runs at every boot. When the system itself lives on a USB stick (BAU installed onto a
+# stick instead of the laptop's own drive), it eases the stick's load: sticks are not
+# made for an operating system's constant writes, and a stick that overheats or drops out
+# makes Linux switch the disk to read-only - programs then fail and the desktop dies.
+#   * root is remounted noatime with fewer, larger flushes (commit=60);
+#   * swap on that stick is turned off (zram, compressed swap in memory, takes over);
+#   * the kernel holds written data a little longer before flushing it.
+# On the laptop's own drive, or on the live stick (an overlay), it changes nothing.
+set -u
+SWAPS=${BAU_PROC_SWAPS:-/proc/swaps}
+
+disk_of() { lsblk -nrso NAME,TYPE "$1" 2>/dev/null | awk '$2 == "disk" { print $1; exit }'; }
+
+src=$(findmnt -no SOURCE /) || exit 0
+disk=$(disk_of "${src}")
+[ -n "${disk}" ] || exit 0
+[ "$(lsblk -dno TRAN "/dev/${disk}" 2>/dev/null)" = usb ] || exit 0
+
+echo "bau-usb-guard: the system runs from a USB stick (/dev/${disk}): fewer writes, no swap on it"
+mount -o remount,noatime,commit=60 / || true
+sysctl -q vm.dirty_writeback_centisecs=1500 vm.dirty_expire_centisecs=6000 || true
+tail -n +2 "${SWAPS}" | while read -r dev _; do
+  if [ "$(disk_of "${dev}")" = "${disk}" ]; then
+    swapoff "${dev}" || true
+  fi
+done
+exit 0

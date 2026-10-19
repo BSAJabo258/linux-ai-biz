@@ -123,8 +123,67 @@ def test_root_accepts_the_stick_or_the_pack_folder(tmp_path):
 
 def test_find_looks_on_mounted_sticks(tmp_path):
     pack = make_pack(tmp_path)
-    assert P.find([str(tmp_path / "*" / "BAU-PACK")]) == [pack]
+    assert P.find([str(tmp_path / "*")]) == [pack]
     assert P.find([str(tmp_path / "none" / "*")]) == []
+
+
+def test_find_ignores_capitals_in_the_folder_name(tmp_path):
+    pack = make_pack(tmp_path)
+    renamed = pack.with_name("BAU-pack")
+    pack.rename(renamed)
+    assert P.find([str(tmp_path / "*")]) == [renamed]
+    assert P.root(renamed.parent) == renamed
+
+
+LSBLK = {"blockdevices": [
+    {"path": "/dev/nvme0n1p3", "fstype": "ntfs", "mountpoint": None, "type": "part"},
+    {"path": "/dev/sdb1", "fstype": "exfat", "mountpoint": None, "type": "part"},
+    {"path": "/dev/sda2", "fstype": "ext4", "mountpoint": "/", "type": "part"},
+    {"path": "/dev/sdc1", "fstype": "vfat", "mountpoint": "/media/x/STICK", "type": "part"}]}
+
+
+def test_locate_opens_windows_and_stick_drives_read_only(tmp_path):
+    mounts = tmp_path / "run"
+    calls = []
+
+    def run(cmd):
+        calls.append(cmd)
+        if cmd[0] == "lsblk":
+            return json.dumps(LSBLK)
+        if cmd[0] == "mount" and cmd[-2] == "/dev/sdb1":     # the stick holds the pack
+            pack = Path(cmd[-1]) / "BAU-Pack" / "models"
+            pack.mkdir(parents=True)
+        return ""
+
+    found = P.locate(run, bases=[str(mounts / "*")], mount_dir=mounts)
+    assert found == [mounts / "sdb1" / "BAU-Pack"]
+    mounted = [c for c in calls if c[0] == "mount"]
+    assert all("ro" in c[c.index("-o") + 1].split(",") for c in mounted)
+    assert {c[-2] for c in mounted} == {"/dev/nvme0n1p3", "/dev/sdb1"}   # never / or mounted
+    assert ["mount", "-t", "ntfs3", "-o", "ro", "/dev/nvme0n1p3",
+            str(mounts / "nvme0n1p3")] in mounted
+
+
+def test_locate_does_not_mount_when_a_pack_is_already_there(tmp_path):
+    pack = make_pack(tmp_path)
+    run = Runner()
+    assert P.locate(run, bases=[str(tmp_path / "*")], mount_dir=tmp_path / "run") == [pack]
+    assert run.calls == []
+
+
+def test_report_goes_to_the_laptop_when_the_pack_is_read_only(tmp_path, monkeypatch):
+    pack = make_pack(tmp_path)
+    real = Path.write_text
+
+    def ro(self, *a, **k):
+        if self.parent == pack:
+            raise OSError("Read-only file system")
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(Path, "write_text", ro)
+    home, _, out = do_install(tmp_path, pack, Owner(), run=Runner({"lspci": LSPCI}))
+    assert out["report"] == str(home / "reports" / "laptop-report.txt")
+    assert "QCA6174" in (home / "reports" / "laptop-report.txt").read_text()
 
 
 def test_scan_checks_every_model_against_its_pinned_hash(tmp_path):

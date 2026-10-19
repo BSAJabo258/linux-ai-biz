@@ -76,15 +76,17 @@ sudo /opt/bau/venv/bin/pip install --no-deps --upgrade /media/$USER/*/BAU-PACK/b
 Nothing on the stick runs by itself when you plug it in. That is on purpose: a stick
 anyone could have written to must never start anything on its own. You start it.
 
-1. Plug in the stick and open it once in the file manager (this mounts it).
+1. Plug in the stick (or skip the stick: see *No stick needed* below).
 2. Open a terminal and type:
 
    ```bash
    sudo bau pack install
    ```
 
-   It finds the stick by itself. (If you have two packs plugged in, add the path, for
-   example `sudo bau pack install /media/bauadmin/STICK/BAU-PACK`.)
+   It finds the pack by itself, whatever the capitals in the folder name (`BAU-PACK`,
+   `BAU-pack`). If the desktop did not open the stick, it opens it itself, **read-only**,
+   and Windows' own drives too. (Two packs found: add the path, for example
+   `sudo bau pack install /media/bauadmin/STICK/BAU-PACK`.)
 3. It checks each model again while copying it into place, then asks you **yes or no**
    before each change:
    - **Install the Wi-Fi programs?** Only if they are not installed yet (step 2 does the
@@ -111,6 +113,17 @@ Other commands:
 bau pack check           # check every model on the stick, change nothing
 sudo bau pack report     # only write laptop-report.txt onto the stick
 ```
+
+## No stick needed: make the pack on Windows' own drive
+
+If this laptop also starts Windows, make the pack on one of its drives (for example
+`-Target D:\` in the Windows step). Back in Linux, `sudo bau pack install` opens that
+drive **read-only** (it never writes to Windows) and installs from it. The laptop report
+then goes to `/var/lib/bau/reports/laptop-report.txt`, since the drive is read-only.
+
+If it says no pack was found: Windows may have been put to sleep instead of shut down
+("Fast startup"), which keeps its drives locked. Start Windows, hold **Shift** while you
+click **Shut down**, then start Linux and try again.
 
 ## The thinker
 

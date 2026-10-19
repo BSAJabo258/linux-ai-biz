@@ -147,6 +147,17 @@ portable Jarvis and recovery stick.
 
 ## Good to know
 
+- **BAU installed onto a USB stick:** it works, but ordinary sticks are not made for an
+  operating system's constant writes. A stick that overheats or drops out makes Linux
+  switch it to read-only: programs fail and the screen goes black. The stick image
+  therefore eases the load by itself when it finds it is running from a USB stick (fewer
+  writes, swap in memory instead of on the stick). For daily use, the laptop's own drive
+  (next to Windows) or a USB **SSD** (built for constant writes) are much more reliable.
+  To check whether the stick dropped out, run `sudo dmesg -T | grep -iE "i/o error|read-only|usb.*reset"`
+  after it happens: any lines mean the stick.
+- **Sticks open by themselves** when plugged in (they show in the file manager), exFAT and
+  Windows (NTFS) drives included.
+
 - **No Wi-Fi? Use your phone.** Plug your phone into the laptop with its USB cable, then
   turn on **USB tethering** (Android: Settings > Network > Hotspot & tethering > USB
   tethering; iPhone: Settings > Personal Hotspot > Allow Others to Join, then trust the

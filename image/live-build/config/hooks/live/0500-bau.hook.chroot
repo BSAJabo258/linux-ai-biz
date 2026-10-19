@@ -48,5 +48,10 @@ done
 systemctl enable bau-live-init.service bau-recover.service bau-ui.service bau-llm.service \
   bau-governor.timer bau-regwatch.timer
 
+# A system that runs from a USB stick writes less and never swaps onto it (bau-usb-guard,
+# zram); it stays enabled on the installed laptop (live-to-disk.sh leaves it).
+chmod 0755 /usr/local/sbin/bau-usb-guard
+systemctl enable bau-usb-guard.service
+
 chmod 0755 /usr/local/sbin/bau-live-init /usr/local/bin/jarvis-setup /opt/llama.cpp/llama-server
 LD_LIBRARY_PATH=/opt/llama.cpp /opt/llama.cpp/llama-server --version

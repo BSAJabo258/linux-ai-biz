@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 558 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 568 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
 from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
@@ -29,6 +29,18 @@ at all (the firmware, firmware-atheros, was there). The package list now names
 `wpasupplicant`, `wireless-regdb` and `iw`; the pack carries the same seven .debs (pinned
 SHA-256, deb.debian.org then snapshot.debian.org) for the laptop already installed, plus
 `bau-main.zip` so that laptop gets `bau pack`. Not yet confirmed on the laptop itself.
+
+Freezes after ~15 minutes (2026-10-19): BAU runs installed onto a USB stick; files stop
+working and the screen goes black. Nothing in BAU stops or locks the system (firewall,
+sysctl, auditd, Governor all read-only/harmless; checked). Most likely the stick drops out
+and Linux remounts / read-only - not yet confirmed (asked for `dmesg` lines). The image
+now: `bau-usb-guard.service` (noatime, commit=60, no swap on the stick, longer dirty
+writeback) when / is on a USB disk; zram swap (systemd-zram-generator); journald capped at
+100 MB; Firefox disk cache off; thunar-volman, gvfs-backends, exfatprogs, ntfs-3g so sticks
+and Windows drives open by themselves; xfce4-power-manager. `bau pack install` (as root)
+opens unopened exFAT/vfat/NTFS partitions read-only under /run/bau-pack to find a pack,
+matches the folder name in any case, and writes the report to /var/lib/bau/reports when
+the pack is read-only.
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
