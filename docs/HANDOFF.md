@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 602 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 603 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
 from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
@@ -70,7 +70,13 @@ edge in the state colour, white paper keyed out in the dark theme, voice ripples
 lens, scan line while thinking. Half resolution, 30 fps cap, stops when hidden; still CSS
 picture without WebGL, on context loss or with reduced motion. `bau look flow` picks the
 pictures (`/art/<name>` serves each). Tested in headless Chromium (SwiftShader); not yet
-seen on the UHD 620.
+seen on the UHD 620. Then "glass mind" (owner: "you could do better"): the core is
+a refracting glass drop in the shader at the 2D orb's place (CORE from frame(); the 2D
+orb skips its fill when LIQ), ball-lens inversion, dispersion, fresnel rim, shine,
+voice ripples, inner stir while thinking; transitions are a vortex (old picture spirals
+into the core, the next unfurls out); bloom from the ink; parallax between glow and
+picture; up to 2,600 embers (point sprites, colours fetched in the vertex shader, only if
+MAX_VERTEX_TEXTURE_IMAGE_UNITS >= 2, off in the light theme).
 
 Laptop features (2026-10-19, owner's Dell XPS 13 9380 from its laptop check): the image
 (recommends off) had no sound server, no Bluetooth stack, no thermald and no Intel VA-API

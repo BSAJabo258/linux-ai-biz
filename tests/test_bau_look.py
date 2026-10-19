@@ -173,6 +173,16 @@ def test_the_page_melts_the_pictures_into_each_other_cheaply():
     assert "webglcontextlost" in page
 
 
+def test_the_core_is_a_glass_drop_that_breathes_the_pictures():
+    page = (resources.files("bau.ui") / "jarvis.html").read_text()
+    assert "uCore" in page and "CORE = [X, Y, R]" in page     # the glass sits where the orb is
+    assert "fres" in page and "rot(uMix" in page              # rim light; the vortex in and out
+    assert "if (!LIQ)" in page                                # the 2D orb lets the glass show
+    assert "texture2DLod" in page and "gl.POINTS" in page     # embers from the picture's colours
+    assert "MAX_VERTEX_TEXTURE_IMAGE_UNITS" in page           # and only where the GPU can
+    assert "EMBERS = " in page and "% 3600" in page           # few of them; time kept small
+
+
 def test_cli_look_flow(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("BAU_HOME", str(tmp_path))
     assert cli.main(["look", "flow", "gold", "earth"]) == 0
