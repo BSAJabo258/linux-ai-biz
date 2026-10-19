@@ -508,6 +508,8 @@ def cmd_look(a):
             _out(L.set_look(None, art=a.name))
         elif a.look_cmd == "alive":
             _out(L.set_look(None, alive=a.state == "on"))
+        elif a.look_cmd == "flow":
+            _out(L.set_look(None, flow=[] if a.names == ["all"] else a.names))
         elif a.look_cmd == "add":
             L.add(None, Path(a.file), a.name)
             _out(L.show())
@@ -1599,6 +1601,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("name")
     x = w.add_parser("alive", help="the gentle animation on or off")
     x.add_argument("state", choices=["on", "off"])
+    x = w.add_parser("flow", help="which pictures melt into each other in Jarvis (or: all)")
+    x.add_argument("names", nargs="+")
     x = w.add_parser("add", help="bring in your own image (JPEG or PNG) and use it")
     x.add_argument("file")
     x.add_argument("--name", help="what to call it (default: the file's name)")
