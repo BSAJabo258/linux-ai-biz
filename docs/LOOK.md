@@ -8,24 +8,32 @@ AI model keeps the memory and the battery lasts.
 
 If your computer is set to reduce motion, the animation stops and the picture stays still.
 
-## Liquid: the pictures melt into each other (Jarvis)
+## Liquid: a glass mind in a living painting (Jarvis)
 
 In Jarvis your pictures are alive like ink in water. A slow current flows through them
-and rises like heat; the picture's own colours glow softly across the whole screen; every
-quarter of a minute a liquid edge opens from the centre and the next picture pours
-through it, edged with Jarvis's colour. White paper behind a picture melts away, so only
-the ink floats on the dark sky.
+and rises like heat; the picture's own colours glow softly across the whole screen, and
+light bleeds from its bright ink. White paper behind a picture melts away, so only the
+ink floats on the dark sky.
+
+Jarvis's core is a drop of liquid glass sitting in the painting. Like a real lens it
+shows the picture behind it upside down, with rainbow edges, a rim of light in his
+colour and a shine on top. Embers in the painting's own colours rise from its ink.
+
+Every quarter of a minute Jarvis breathes the pictures: the old one spirals down into the
+glass core and the next one unfurls out of it, with veins of his colour running through
+the change.
 
 It follows Jarvis:
 
 | Jarvis is | The art |
 |---|---|
-| standing by | drifts slowly, cyan edge |
-| listening | flows faster, amber edge |
-| thinking | flows fastest, violet edge, a scan line passes over it |
-| speaking | his voice sends ripples out from the core |
+| standing by | drifts slowly, cyan light |
+| listening | flows faster, amber light |
+| thinking | flows fastest, violet light, the glass stirs inside, a scan line passes |
+| speaking | his voice ripples the glass and sends rings out from the core |
 
-Your mouse bends the light a little where it points.
+Your mouse bends the light a little where it points, and the picture and its glow
+part slightly as it moves, like looking through a window.
 
 ```bash
 bau look flow gold earth moon   # only these pictures, in this order
@@ -35,6 +43,7 @@ bau look alive off              # one still picture instead
 
 The picture you chose with `bau look set` always comes first. It costs little on the 8 GB
 laptop: the laptop's graphics chip draws it at half size and at most 30 times a second,
+with a few thousand embers at most,
 and it stops while Jarvis's window is hidden. Without a graphics chip that can do it, or
 with "reduce motion" on, you get the still picture.
 
