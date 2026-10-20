@@ -596,3 +596,40 @@ def test_install_never_follows_a_planted_link(tmp_path):
     report.symlink_to(victim)
     assert P._safe_write(report, "report") is None or True
     assert victim.read_text() == "root stuff" and not report.is_symlink()
+
+
+# ------------------------------------------------------------------ room to copy
+# Found 2026-10-20 on the owner's own stick image in a VM: the live system's "disk" is a
+# 3.7 GB slice of RAM. Without the encrypted storage open, /var/lib/bau lives there, and
+# copying 6.5 GB of models fills the laptop's memory until programs are killed.
+
+def test_install_stops_before_copying_when_there_is_no_room(tmp_path):
+    pack = make_pack(tmp_path)
+    with pytest.raises(P.PackError) as e:
+        do_install(tmp_path, pack, Owner(), space=lambda p: (10, False))
+    assert "room" in str(e.value)
+    assert not list((tmp_path / "home" / "models").glob("*.gguf"))      # nothing half-copied
+
+
+def test_install_never_copies_models_into_live_memory(tmp_path):
+    pack = make_pack(tmp_path)
+    with pytest.raises(P.PackError) as e:
+        do_install(tmp_path, pack, Owner(), space=lambda p: (10**12, True))
+    msg = str(e.value)
+    assert "memory" in msg and "encrypted storage" in msg and "install" in msg.lower()
+
+
+def test_models_already_in_place_need_no_room(tmp_path):
+    pack = make_pack(tmp_path)
+    home, _, first = do_install(tmp_path, pack, Owner())
+    assert first["copied"]
+    kw = dict(ask=Owner(), run=Runner(), by="human:owner", records=records(),
+              say=lambda *_: None, sleep=lambda _: None)
+    again = P.install(pack, home, tmp_path / "etc", space=lambda p: (0, False), **kw)
+    assert again["copied"] == [] and len(again["already"]) == len(BLOBS)
+
+
+def test_room_is_measured_even_before_the_folder_exists(tmp_path):
+    # In the owner's live VM /var/lib/bau did not exist yet (no storage unlocked).
+    free, in_memory = P._space(tmp_path / "not" / "there" / "yet")
+    assert free > 0 and in_memory is False

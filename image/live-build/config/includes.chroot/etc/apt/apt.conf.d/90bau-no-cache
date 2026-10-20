@@ -1,0 +1,5 @@
+// On the live stick the system space is RAM (about half of it): delete each downloaded
+// package once it is installed, so an install does not need the room twice. apt already
+// does this; apt-get (used by most online instructions) did not. Checked with apt-config
+// in Debian 13, 2026-10-20.
+APT::Keep-Downloaded-Packages "false";

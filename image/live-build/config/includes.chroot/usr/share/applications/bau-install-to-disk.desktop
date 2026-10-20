@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Install BAU to a disk
+Comment=Keep what you install: put BAU on a disk instead of running from the stick
+Exec=bau-install-to-disk
+Terminal=true
+Icon=drive-harddisk
+Categories=System;

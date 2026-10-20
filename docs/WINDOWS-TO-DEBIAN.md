@@ -16,6 +16,17 @@ they are still the right tool on a Windows computer.
 PowerShell 7 can be installed on Debian, but it would not help: these scripts read
 Windows-only things (the registry, BitLocker, Windows disks), which do not exist on Linux.
 
+**"Unable to locate package powershell"** is normal: Debian does not carry PowerShell, so
+`apt install powershell` finds nothing until Microsoft's package source is added
+(Microsoft's page "Install PowerShell 7 on Debian" lists Debian 13 as supported). On the
+live stick it would also go into memory and be gone at restart (see
+[LIVE-USB.md](LIVE-USB.md), "Installing programs while running from the stick").
+
+**`.ps1` files on a stick do not run on Linux.** Use the Linux file next to it in the
+table above. A stick with a `BAU-PACK` folder (made on Windows by `BAU-Pack-Make.cmd`)
+needs no PowerShell at all: plug it in and run `sudo bau pack install` (see
+[PACK.md](PACK.md)).
+
 ## Sound and Bluetooth
 
 The laptop check on Debian now has **Sound**, **Bluetooth** and **Sound and Bluetooth

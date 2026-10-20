@@ -15,6 +15,9 @@ Environment=LD_LIBRARY_PATH=/opt/llama.cpp
 ExecStart=/opt/llama.cpp/llama-server --model ${BAU_LLM_MODEL} --alias ${BAU_LLM_ALIAS} \
   --jinja --host 127.0.0.1 --port 8080 --ctx-size 8192 --no-webui
 Restart=on-failure
+# When memory runs out (the live stick's system space is RAM too), Linux stops this
+# model first instead of the desktop or the terminal; it restarts by itself.
+OOMScoreAdjust=500
 RestartSec=5
 UMask=0007
 NoNewPrivileges=yes

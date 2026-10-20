@@ -76,6 +76,10 @@ scrub() {
 
 memory() {
   awk '/MemTotal/ {printf "  %.1f GB (BAU needs 8 GB or more)\n", $2/1048576}' /proc/meminfo
+  if [[ -d /run/live/medium ]]; then
+    # On the live stick the system space is RAM: installs land there and vanish at restart.
+    df -h --output=used,size,pcent / 2>/dev/null | tail -n 1 | awk '{print "  system space (in memory, live stick): " $1 " of " $2 " used (" $3 ")"}'
+  fi
 }
 
 firmware() {
