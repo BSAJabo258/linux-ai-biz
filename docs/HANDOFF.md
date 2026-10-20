@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 607 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 612 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
 from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
@@ -71,6 +71,13 @@ bau-health-console on tty9 (Ctrl+Alt+F9): Wi-Fi diagnosis, vitals every 30 s fro
 and /sys with bash builtins only, STICK GONE / MEMORY / HOT banners, dmesg -w. Cause not
 yet proven: waiting for the owner's photo of tty9 after the next crash. Wi-Fi still not
 working on the real laptop (Bluetooth adapter shows); the tty9 header should say why.
+Then: bau-usb-guard did nothing on the live stick (/ is an overlay), yet the system,
+the encrypted storage and downloads all sit on that one stick. With 8 GB RAM the default
+dirty_ratio lets ~1.6 GB of unwritten data build up (model download, pack copy) and the
+flush blocks every read from the stick: the desktop "dies". The guard now also finds the
+live medium; on any USB stick it caps vm.dirty_bytes at 48 MB (background 16 MB) and on
+the live stick remounts /run/live/persistence/* noatime,commit=60. tty9 shows MB waiting
+to be written and DISK BUSY at 256 MB. Leading suspect, still unproven.
 
 Liquid look (2026-10-19, docs/LOOK.md): Jarvis's art is now a WebGL shader (jarvis.html
 LIQUID_FS): domain-warped noise current, the picture sharp in the middle over a mipmap glow

@@ -52,18 +52,26 @@ done
 printf '\n\n'
 
 vitals() {
-  local k v _ mem=0 load hot=0 t now
-  while read -r k v _; do [ "$k" = MemAvailable: ] && mem=$((v / 1024)); done < "$PROC/meminfo"
+  local k v _ mem=0 dirty=0 load hot=0 t now
+  while read -r k v _; do
+    case "$k" in
+      MemAvailable:) mem=$((v / 1024)) ;;
+      Dirty: | Writeback:) dirty=$((dirty + v)) ;;
+    esac
+  done < "$PROC/meminfo"
+  dirty=$((dirty / 1024))
   read -r load _ < "$PROC/loadavg"
   for t in "$SYS"/class/thermal/thermal_zone*/temp; do
     [ -e "$t" ] && v=$(first "$t") && [ $((v / 1000)) -gt "$hot" ] && hot=$((v / 1000))
   done
   printf -v now '%(%H:%M:%S)T' -1
-  printf '%s  memory %s MB free  load %s  heat %s C\n' "$now" "$mem" "$load" "$hot"
+  printf '%s  memory %s MB free  load %s  heat %s C  %s MB waiting to be written\n' \
+    "$now" "$mem" "$load" "$hot" "$dirty"
   if [ -n "$DISK" ] && [ ! -e "$SYS/block/$DISK" ]; then
     printf '\n  !!! STICK GONE at %s: the USB stick (%s) dropped out. This is the crash.\n' "$now" "$DISK"
     printf '  !!! Take a photo of this screen.\n\n'
   fi
+  [ "$dirty" -ge 256 ] && printf '  !!! DISK BUSY: %s MB waiting to be written to the stick; the desktop waits for it.\n' "$dirty"
   [ "$mem" -lt 400 ] && printf '  !!! MEMORY ALMOST FULL: programs will be stopped. Take a photo.\n'
   [ "$hot" -ge 95 ] && printf '  !!! HOT: %s C. The laptop slows itself down. Take a photo.\n' "$hot"
   return 0
