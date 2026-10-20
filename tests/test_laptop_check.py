@@ -4,6 +4,7 @@ read-only. Windows (bau-laptop-check.ps1, no Python needed) and Linux from the s
 short summary that is safe to share, with a plain verdict. Written before the code."""
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -331,3 +332,19 @@ def test_linux_check_has_a_graphics_section(tmp_path):
                    timeout=180)
     summary = (tmp_path / "BAU-LAPTOP-SUMMARY-LINUX.txt").read_text()
     assert "Graphics card" in summary
+
+
+@pytest.mark.skipif(not shutil.which("bash"), reason="needs bash")
+def test_linux_check_reports_sound_and_bluetooth_with_the_fix(tmp_path):
+    fake = tmp_path / "bin"                    # a dpkg that has none of them installed
+    fake.mkdir()
+    (fake / "dpkg-query").write_text("#!/bin/sh\nexit 1\n")
+    (fake / "dpkg-query").chmod(0o755)
+    env = {**os.environ, "PATH": f"{fake}:{os.environ['PATH']}"}
+    subprocess.run(["bash", str(SH), str(tmp_path)], capture_output=True, text=True,
+                   timeout=180, env=env)
+    summary = (tmp_path / "BAU-LAPTOP-SUMMARY-LINUX.txt").read_text()
+    assert "Sound:" in summary and "Bluetooth:" in summary
+    assert "sudo apt install" in summary
+    for pkg in ("alsa-ucm-conf", "alsa-topology-conf", "libspa-0.2-bluetooth"):
+        assert pkg in summary, pkg
