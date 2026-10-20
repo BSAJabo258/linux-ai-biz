@@ -70,6 +70,29 @@ MediaTek Wi-Fi work from the stick; some Broadcom Wi-Fi does not (have Ethernet 
 Wi-Fi adapter ready); NVIDIA graphics may need **safe graphics** in the stick's menu. It
 is a good guess, not proof. The stick gives proof:
 
+### On a desktop (graphics card, spare drive)
+
+The same check works on a desktop. Put **`BAU-Desktop-Check.cmd`** next to
+`bau-laptop-check.ps1` and double-click it (the steps are the same as above; the report
+lands in a `BAU-Desktop-Check` folder). Download it from
+<https://raw.githubusercontent.com/BSAJabo258/linux-ai-biz/main/installer/BAU-Desktop-Check.cmd>.
+On top of the laptop report it says:
+
+- **Graphics cards:** the name, the card's real memory (for example 12 GB), the driver,
+  and on NVIDIA the *CUDA compute* level. A note says roughly how big a local model fits
+  on the card. That is a guide only: every model is approved after `bau models bench`.
+- **Which disk Windows starts from**, and **which disk has no Windows on it**. When there is
+  one (for example a spare 1 TB drive), the summary says `Install BAU on: <that disk>`:
+  Windows can stay on its own disk and you choose at start-up. Anything already on the
+  BAU disk is erased, so copy off what you want first.
+- **NVIDIA with Secure Boot on:** the NVIDIA driver must be signed with a key you enroll
+  once at start-up, or Secure Boot turned off. BAU shows you the steps when it gets there.
+- **No Wi-Fi card** (common on desktops): plug in an Ethernet cable before starting from
+  the stick.
+
+Send `BAU-LAPTOP-SUMMARY.txt` from the `BAU-Desktop-Check` folder. The desktop build is
+designed from that report, not from guesses.
+
 ## 2. From the stick (proof of what Linux does)
 
 Start the laptop from the My Jarvis stick (**limited mode** is enough: nothing is saved),
@@ -82,6 +105,7 @@ bash /run/live/medium/BAU-PAYLOAD/bau-laptop-check.sh ~/BAU-Laptop-Check
 With `sudo` in front it can also read the kernel's messages. It shows:
 
 - **Memory** and **Firmware** (UEFI or legacy BIOS, Secure Boot);
+- **Graphics card**: the driver Linux loaded and, when it can tell, the card's memory;
 - **Devices and their drivers**: each network, graphics and sound device with the driver
   Linux loaded, or `NO DRIVER LOADED`;
 - **Missing firmware**: files the kernel asked for and did not find;

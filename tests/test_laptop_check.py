@@ -243,3 +243,91 @@ def test_only_real_hardware_is_listed_and_judged():
     assert any("8 GB" in n and "small" in n for n in s["notes"])     # local models: small only
     usb = next(d for d in s["disks"] if d["bus"] == "USB")
     assert "not this one" in usb["note"]                             # never install on the stick
+
+
+# ------------------------------------------------------------------ the owner's desktop
+# Next machine: a desktop with a 12 GB graphics card and a spare 1 TB drive. Before any
+# design, the check must name the card, its memory (Windows' own AdapterRAM stops at 4 GB,
+# so the registry or nvidia-smi is read), its driver, which disk Windows starts from and
+# which disk is free for BAU.
+
+DESKTOP = {**GOOD,
+           "computer": {**GOOD["computer"], "Manufacturer": "Micro-Star International",
+                        "Model": "MS-7C56", "TotalPhysicalMemory": 34359738368},
+           "cpu": [{"Name": "AMD Ryzen 7 5800X 8-Core Processor", "NumberOfCores": 8,
+                    "NumberOfLogicalProcessors": 16, "VirtualizationFirmwareEnabled": True}],
+           "battery": [],
+           "disks": [{"FriendlyName": "Samsung SSD 970 EVO 500GB", "BusType": "NVMe",
+                      "MediaType": "SSD", "Size": 500107862016, "SerialNumber": "S3XYNX0R123456",
+                      "PartitionStyle": "GPT", "IsBoot": True, "IsSystem": True},
+                     {"FriendlyName": "WDC WDS100T2B0A", "BusType": "SATA", "MediaType": "SSD",
+                      "Size": 1000204886016, "PartitionStyle": "GPT", "IsBoot": False,
+                      "IsSystem": False}],
+           "pci": [{"Class": "Display", "FriendlyName": "NVIDIA GeForce RTX 3060",
+                    "InstanceId": "PCI\\VEN_10DE&DEV_2504&SUBSYS_397D1462"},
+                   {"Class": "Net", "FriendlyName": "Realtek PCIe 2.5GbE Family Controller",
+                    "InstanceId": "PCI\\VEN_10EC&DEV_8125"}],
+           "gpus": [{"Name": "NVIDIA GeForce RTX 3060", "VramBytes": 12884901888,
+                     "DriverVersion": "32.0.15.6094", "ComputeCap": "8.6",
+                     "NvidiaDriver": "560.94"}]}
+
+
+@needs_pwsh
+def test_desktop_graphics_card_is_named_with_its_real_memory():
+    s = verdict(DESKTOP)
+    g = s["gpus"][0]
+    assert g["name"] == "NVIDIA GeForce RTX 3060" and g["vendor"] == "NVIDIA"
+    assert g["vram_gb"] == 12 and g["compute"] == "8.6" and g["driver"] == "560.94"
+    assert any("12 GB" in n and "graphics card" in n and "bau models bench" in n
+               for n in s["notes"])                           # what fits, never "works"
+    assert s["model"].startswith("Micro-Star") and s["battery_health_percent"] is None
+
+
+@needs_pwsh
+def test_desktop_says_which_disk_has_windows_and_which_is_free():
+    s = verdict(DESKTOP)
+    by = {d["name"]: d["note"] for d in s["disks"]}
+    assert "Windows starts from this disk" in by["Samsung SSD 970 EVO 500GB"]
+    assert "no Windows" in by["WDC WDS100T2B0A"]
+    assert s["install_disk"] == "WDC WDS100T2B0A"             # the free 1 TB drive
+    assert s["verdict"] == "READY"
+
+
+@needs_pwsh
+def test_nvidia_with_secure_boot_and_no_wifi_are_explained():
+    s = verdict(DESKTOP)                                      # GOOD has Secure Boot on
+    assert any("NVIDIA" in n and "Secure Boot" in n for n in s["notes"])
+    assert any("Ethernet" in n for n in s["notes"])          # no Wi-Fi card in this desktop
+    # older reports without the new fields still work
+    plain = verdict(GOOD)
+    assert plain["gpus"] == [] or all("vram_gb" in g for g in plain["gpus"])
+
+
+@needs_pwsh
+def test_desktop_summary_stays_safe_to_share():
+    out = json.dumps(verdict(DESKTOP))
+    assert "S3XYNX0R123456" not in out
+
+
+def test_desktop_double_click_launcher_uses_the_same_check():
+    raw = (ROOT / "installer" / "BAU-Desktop-Check.cmd").read_bytes()
+    assert b"\n" not in raw.replace(b"\r\n", b"")
+    text = raw.decode("ascii")
+    assert "-Verb RunAs" in text and "%~dp0bau-laptop-check.ps1" in text
+    assert "BAU-Desktop-Check" in text and "pause" in text
+    assert "BAU-Desktop-Check.cmd" in (ROOT / "installer" / "make-payload.sh").read_text()
+    assert "BAU-Desktop-Check.cmd" in (ROOT / "docs" / "LAPTOP-CHECK.md").read_text()
+
+
+def test_windows_check_reads_real_graphics_memory():
+    text = PS1.read_text()
+    assert "HardwareInformation.qwMemorySize" in text and "nvidia-smi" in text
+    assert "IsBoot" in text
+
+
+@pytest.mark.skipif(not shutil.which("bash"), reason="needs bash")
+def test_linux_check_has_a_graphics_section(tmp_path):
+    subprocess.run(["bash", str(SH), str(tmp_path)], capture_output=True, text=True,
+                   timeout=180)
+    summary = (tmp_path / "BAU-LAPTOP-SUMMARY-LINUX.txt").read_text()
+    assert "Graphics card" in summary

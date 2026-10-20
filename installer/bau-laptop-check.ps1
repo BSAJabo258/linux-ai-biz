@@ -1,6 +1,6 @@
 <#
-BAU laptop check (Windows). Collects everything needed to decide whether BAU can go on
-this laptop, and changes nothing: no drivers, settings, disks or BitLocker are touched.
+BAU laptop check (Windows), also for desktops. Collects everything needed to decide whether
+BAU can go on this computer, and changes nothing: no drivers, settings, disks or BitLocker are touched.
 No Python needed.
 
 Run it in PowerShell "as administrator" (BitLocker, Secure Boot and TPM need that):
@@ -11,6 +11,10 @@ It writes two files in .\BAU-Laptop-Check (or -Out FOLDER):
   BAU-LAPTOP-SUMMARY.txt  short, safe to share: no computer name, user name, network
                           addresses or serial numbers. Send this one.
   BAU-LAPTOP-FULL.json    everything, including those private details. Keep it.
+
+On a desktop it also names each graphics card with its real memory (Windows' own
+AdapterRAM stops at 4 GB, so the registry and nvidia-smi are read), and says which disk
+Windows starts from and which disk is free for BAU.
 
 On the My Jarvis stick, bau-laptop-check.sh does the same from Linux and shows which
 drivers really load.
@@ -103,9 +107,13 @@ function Get-BauSummary($inv) {
     foreach ($d in @($inv.disks)) {
         if (-not $d) { continue }
         $gb = [math]::Round([double]$d.Size / 1GB)
-        $note = if ("$($d.BusType)" -eq "USB") { "USB stick or drive: not this one" } else { "" }
+        $windows = ($d.IsBoot -eq $true -or $d.IsSystem -eq $true)
+        $note = if ("$($d.BusType)" -eq "USB") { "USB stick or drive: not this one" }
+                elseif ($windows) { "Windows starts from this disk" }
+                elseif ($d.IsBoot -eq $false) { "no Windows on it" } else { "" }
         $disks += [ordered]@{ name = "$($d.FriendlyName)"; bus = "$($d.BusType)"; type = "$($d.MediaType)"
-                              size_gb = $gb; partition_style = "$($d.PartitionStyle)"; note = $note }
+                              size_gb = $gb; partition_style = "$($d.PartitionStyle)"; note = $note
+                              windows = $windows }
         if ("$($d.BusType)" -eq "RAID") {
             $warnings += "The internal disk ($($d.FriendlyName)) is behind Intel RST (firmware setting 'SATA Operation: RAID On'); the installer usually cannot see it. Switch that setting to AHCI before installing. If Windows must still start afterwards, set Windows to start in Safe Mode once before switching (docs/LAPTOP-CHECK.md has the steps)."
         }
@@ -113,6 +121,16 @@ function Get-BauSummary($inv) {
     $internal = @($disks | Where-Object { $_.bus -ne "USB" })
     if ($internal.Count -and -not @($internal | Where-Object { $_.size_gb -ge 64 }).Count) {
         $blockers += "No internal disk of 64 GB or more to install on."
+    }
+    # Where BAU would go: the biggest internal disk without Windows, so Windows can stay.
+    $installDisk = $null
+    $free = @($internal | Where-Object { $_.note -eq "no Windows on it" -and $_.size_gb -ge 64 } |
+              Sort-Object { $_.size_gb } -Descending)
+    if ($free.Count) {
+        $installDisk = $free[0].name
+        $notes += "Install BAU on $($free[0].name) ($($free[0].size_gb) GB): Windows is not on it, so Windows can stay and you choose at start-up. Everything already on that disk is erased, so copy off anything you want first."
+    } elseif (@($internal | Where-Object { $_.windows }).Count -eq $internal.Count -and $internal.Count) {
+        $notes += "Every internal disk holds Windows: installing BAU replaces Windows on the disk you pick. Back up first."
     }
 
     $devices = @()
@@ -131,6 +149,29 @@ function Get-BauSummary($inv) {
         }
         $devices += [ordered]@{ class = "$($p.Class)"; name = "$($p.FriendlyName)"; vendor = "$vendor"
                                 id = $id; linux = $linux }
+    }
+    $gpus = @()
+    foreach ($g in @($inv.gpus)) {
+        if (-not $g -or -not $g.Name) { continue }
+        $vendor = if ("$($g.Name)" -match "NVIDIA") { "NVIDIA" } elseif ("$($g.Name)" -match "AMD|Radeon") { "AMD" }
+                  elseif ("$($g.Name)" -match "Intel") { "Intel" } else { "" }
+        $vram = [math]::Round([double]$g.VramBytes / 1GB)
+        $driver = if ($g.NvidiaDriver) { "$($g.NvidiaDriver)" } else { "$($g.DriverVersion)" }
+        $gpus += [ordered]@{ name = "$($g.Name)"; vendor = $vendor; vram_gb = $vram
+                             driver = $driver; compute = "$($g.ComputeCap)" }
+        # About 0.6 GB per billion parameters at 4-bit, plus room for the conversation.
+        $fits = if ($vram -ge 24) { "32B" } elseif ($vram -ge 16) { "24B" } elseif ($vram -ge 12) { "14B" }
+                elseif ($vram -ge 8) { "8B" } elseif ($vram -ge 6) { "4B" } else { "" }
+        if ($fits -and $vendor -in @("NVIDIA", "AMD")) {
+            $notes += "$($g.Name) has $vram GB on the graphics card: local models up to about $fits parameters (4-bit) can run fully on it, much faster than on the processor. Each one is approved only after bau models bench."
+        }
+        if ($vendor -eq "NVIDIA" -and $inv.firmware.SecureBoot -eq $true) {
+            $notes += "NVIDIA card with Secure Boot on: the NVIDIA driver Linux needs for the card's AI speed must be signed with a key you enroll once at start-up, or Secure Boot turned off. BAU will show you the steps."
+        }
+    }
+    $nets = @($devices | Where-Object { $_.class -eq "Net" })
+    if ($nets.Count -and -not @($nets | Where-Object { $_.name -match "Wi-?Fi|Wireless|WLAN|802\.11|Killer" }).Count) {
+        $notes += "No Wi-Fi card found: plug in an Ethernet cable before starting from the stick (it connects by itself)."
     }
     $problems = @(@($inv.problem_devices) | Where-Object { $_ })
     if ($problems.Count) {
@@ -151,17 +192,18 @@ function Get-BauSummary($inv) {
         cpu = "$($cpu.Name)"; cores = $cpu.NumberOfCores; threads = $cpu.NumberOfLogicalProcessors
         ram_gb = $ramGb; firmware = $fw; secure_boot = $inv.firmware.SecureBoot
         tpm = if ($inv.tpm.TpmPresent) { "present $($inv.tpm.SpecVersion)".Trim() } else { "not found" }
-        disks = @($disks); devices = @($devices); battery_health_percent = $health
+        disks = @($disks); install_disk = $installDisk; gpus = @($gpus); devices = @($devices)
+        battery_health_percent = $health
     }
 }
 
 function ConvertTo-BauText($s) {
-    $l = @("BAU LAPTOP CHECK - safe to share (no names, network addresses or serial numbers)",
+    $l = @("BAU COMPUTER CHECK - safe to share (no names, network addresses or serial numbers)",
            "", "VERDICT: $($s.verdict)", "")
     foreach ($x in $s.blockers) { $l += "  BLOCKER: $x" }
     foreach ($x in $s.warnings) { $l += "  DO FIRST: $x" }
     foreach ($x in $s.notes) { $l += "  NOTE: $x" }
-    $l += "", "Laptop:   $($s.model)", "Windows:  $($s.windows)",
+    $l += "", "Computer: $($s.model)", "Windows:  $($s.windows)",
           "CPU:      $($s.cpu) ($($s.cores) cores, $($s.threads) threads)",
           "Memory:   $($s.ram_gb) GB", "Firmware: $($s.firmware), Secure Boot $($s.secure_boot), TPM $($s.tpm)"
     if ($null -ne $s.battery_health_percent) { $l += "Battery:  $($s.battery_health_percent)% of its original capacity" }
@@ -170,9 +212,52 @@ function ConvertTo-BauText($s) {
         $extra = if ($d.note) { " ($($d.note))" } else { "" }
         $l += "  $($d.name): $($d.size_gb) GB $($d.type) on $($d.bus), $($d.partition_style)$extra"
     }
+    if ($s.install_disk) { $l += "", "Install BAU on: $($s.install_disk)" }
+    if (@($s.gpus).Count) {
+        $l += "", "Graphics cards:"
+        foreach ($g in $s.gpus) {
+            $cc = if ($g.compute) { ", CUDA compute $($g.compute)" } else { "" }
+            $l += "  $($g.name): $($g.vram_gb) GB, driver $($g.driver)$cc"
+        }
+    }
     $l += "", "Devices and Linux:"
     foreach ($d in $s.devices) { $l += "  [$($d.class)] $($d.name) $($d.id): $($d.linux)" }
     return ($l -join [Environment]::NewLine)
+}
+
+# Graphics cards with their real memory: the registry's HardwareInformation.qwMemorySize
+# (AdapterRAM stops at 4 GB), and nvidia-smi for NVIDIA (memory, driver, CUDA compute level).
+function Invoke-BauGpus {
+    $present = @(try { Get-PnpDevice -PresentOnly -Class Display -ErrorAction Stop |
+                       ForEach-Object { "$($_.FriendlyName)" } } catch { @() })
+    $smi = @{}
+    $exe = if ($env:SystemRoot) { Join-Path $env:SystemRoot "System32\nvidia-smi.exe" } else { "" }
+    if ($exe -and (Test-Path $exe)) {
+        $rows = try { & $exe --query-gpu=name,memory.total,driver_version,compute_cap --format=csv,noheader,nounits 2>$null } catch { @() }
+        foreach ($row in @($rows)) {
+            $f = @("$row" -split ",\s*")
+            if ($f.Count -ge 4) { $smi[$f[0].Trim()] = $f }
+        }
+    }
+    $class = "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+    foreach ($key in @(Get-ChildItem $class -ErrorAction SilentlyContinue)) {
+        if ($key.PSChildName -notmatch "^\d{4}$") { continue }
+        try {
+            $k = Get-ItemProperty $key.PSPath -ErrorAction Stop
+            $name = "$($k.DriverDesc)"
+            if (-not $name -or ($present.Count -and $name -notin $present)) { continue }   # old cards
+            $mem = $k."HardwareInformation.qwMemorySize"
+            if ($null -eq $mem) { $mem = $k."HardwareInformation.MemorySize" }
+            if ($mem -is [byte[]]) {
+                $mem = if ($mem.Length -ge 8) { [BitConverter]::ToUInt64($mem, 0) } else { [BitConverter]::ToUInt32($mem, 0) }
+            }
+            $s = $smi[$name]
+            if ($s) { $mem = [double]$s[1] * 1MB }
+            [ordered]@{ Name = $name; VramBytes = [double]$mem; DriverVersion = "$($k.DriverVersion)"
+                        ComputeCap = $(if ($s) { $s[3].Trim() } else { "" })
+                        NvidiaDriver = $(if ($s) { $s[2].Trim() } else { "" }) }
+        } catch { continue }
+    }
 }
 
 function Get-BauInventory {
@@ -205,7 +290,10 @@ function Get-BauInventory {
         $n = $_.DeviceId
         $style = Invoke-BauSafe { (Get-Disk -Number $n).PartitionStyle }
         [ordered]@{ FriendlyName = $_.FriendlyName; BusType = "$($_.BusType)"; MediaType = "$($_.MediaType)"
-                    Size = $_.Size; SerialNumber = $_.SerialNumber; PartitionStyle = "$style" } } })
+                    Size = $_.Size; SerialNumber = $_.SerialNumber; PartitionStyle = "$style"
+                    IsBoot = (Invoke-BauSafe { (Get-Disk -Number $n).IsBoot })
+                    IsSystem = (Invoke-BauSafe { (Get-Disk -Number $n).IsSystem }) } } })
+    $inv.gpus = @(Invoke-BauGpus)
     $inv.volumes = @(Invoke-BauSafe { Get-Volume | Select-Object DriveLetter, FileSystemLabel, FileSystem, Size, SizeRemaining })
     $inv.pci = @(Invoke-BauSafe { Get-PnpDevice -PresentOnly | Where-Object {
             $_.InstanceId -like "PCI\*" -or $_.Class -in @("Net", "Bluetooth", "Camera", "Image", "Biometric") } |
@@ -229,7 +317,7 @@ if ($MyInvocation.InvocationName -ne ".") {
     if (-not $admin) {
         Write-Host "Note: not running as administrator - BitLocker, Secure Boot and TPM may show as unknown." -ForegroundColor Yellow
     }
-    Write-Host "Checking this laptop (read only, about a minute)..."
+    Write-Host "Checking this computer (read only, about a minute)..."
     New-Item -ItemType Directory -Force -Path $Out | Out-Null
     # Round-trip through JSON so the summary sees exactly what the full report holds.
     $json = Get-BauInventory | ConvertTo-Json -Depth 6
