@@ -44,7 +44,8 @@ stand and what is next.
 
 ```bash
 python3 -m pip install -e '.[dev]'        # once
-python3 -m pytest -q                      # all tests (~30 s)
+bash scripts/check.sh                     # every check, one line each (~2 min)
+python3 -m pytest -q                      # all tests
 ruff check .                              # lint (line length 100)
 bau reg validate                          # regulations + policies cross-check
 bau secrets .                             # secret scan (CI runs it)
@@ -54,8 +55,9 @@ bash image/build-live.sh --out /tmp/live                    # live USB image (Do
 docker compose up -d --build                                # test drive: http://localhost:8765
 ```
 
-Run tests, ruff, `bau reg validate` and shellcheck before every commit. CI
-(`.github/workflows/ci.yml`, `docker.yml`) runs the same on Python 3.11 and 3.13.
+`bash scripts/check.sh` runs every check (ruff, secret scan, `bau reg validate`, shellcheck
+on every shell script it finds, all tests) and prints one line each. Run it before every
+commit; CI (`.github/workflows/ci.yml`) runs the same script on Python 3.11 and 3.13.
 
 ## Rules that must not be broken
 
@@ -83,6 +85,24 @@ These are the product's safety model, not style preferences:
 - **Platform facts are verified.** When adding a platform or API, check the official docs,
   record facts with the date in the module docstring and an `examples/platform-*.yaml`
   policy record, and cite regulations by `reg_id` in `data/policies/`.
+
+## Check yourself (the owner's rule: AI makes things up, so prove it)
+
+Cheap checks that run on their own beat rereading. Before telling the owner anything is done:
+
+- **One command:** `bash scripts/check.sh` must say `ALL PASS`. Never report "checks pass"
+  from a narrower command.
+- **Docs cannot invent:** `tests/test_docs_truth.py` fails on any `bau` command, link or repo
+  path in README, CLAUDE.md or `docs/` that does not exist. A planned feature is written as
+  "planned", never as a command.
+- **Tested or not, said plainly:** every report to the owner separates what ran (with the
+  command or the run) from what was only written. "Works" only after it ran on the real
+  machine or in CI; before that, "should work, not tested on your hardware yet".
+- **Hardware and driver facts come from evidence:** the owner's check report
+  (`docs/LAPTOP-CHECK.md`) or an official page, with the link and date in a comment next
+  to the code. Never a package name, version or driver from memory; the stick build in CI
+  is the proof a package exists.
+- **Prove a new check catches the mistake:** plant the bad case once, see it fail, remove it.
 
 ## Conventions
 

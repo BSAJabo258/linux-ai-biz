@@ -38,7 +38,7 @@ from the map.
 | 2 | Connectors and MCP | partial | search the MCP Registry from Scout; a health check per connector |
 | 3 | Computer use | gap | one isolated desktop on the cloud server, practice tasks only |
 | 4 | Workflows and saved skills | partial | save each finished browser task as a procedure with its success rate and cost |
-| 5 | Seeing documents and screens | gap | read PDFs and scans locally (`bau docs read`) |
+| 5 | Seeing documents and screens | gap | read PDFs and scans locally, on the laptop (planned, not built yet) |
 | 6 | Checking the work | partial | a practice-task suite with expected results |
 | 7 | Teams of agents | partial | a coordinator that picks the smallest team for each job |
 | 8 | Coding and self-improvement | partial | Jarvis opens a draft pull request; you review and merge |
