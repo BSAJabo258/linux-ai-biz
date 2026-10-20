@@ -509,7 +509,9 @@ def cmd_look(a):
         elif a.look_cmd == "alive":
             _out(L.set_look(None, alive=a.state == "on"))
         elif a.look_cmd == "flow":
-            _out(L.set_look(None, flow=[] if a.names == ["all"] else a.names))
+            names = {"default": [], "all": [n for n in L.show()["choices"] if n != "none"]}
+            _out(L.set_look(None, flow=names.get(a.names[0], a.names) if len(a.names) == 1
+                            else a.names))
         elif a.look_cmd == "add":
             L.add(None, Path(a.file), a.name)
             _out(L.show())
@@ -1597,11 +1599,12 @@ def register(sub: argparse._SubParsersAction) -> None:
     s = sub.add_parser("look", help="your art behind Jarvis and Mission Control (docs/LOOK.md)")
     w = s.add_subparsers(dest="look_cmd")
     w.add_parser("show", help="the art in use, whether it is alive, and the choices")
-    x = w.add_parser("set", help="use one of the choices (moon, light, your own, or none)")
+    x = w.add_parser("set", help="use one of the choices (dusk, summer, your own, or none)")
     x.add_argument("name")
     x = w.add_parser("alive", help="the gentle animation on or off")
     x.add_argument("state", choices=["on", "off"])
-    x = w.add_parser("flow", help="which pictures melt into each other in Jarvis (or: all)")
+    x = w.add_parser("flow", help="which pictures melt into each other in Jarvis "
+                                  "(or: all, default)")
     x.add_argument("names", nargs="+")
     x = w.add_parser("add", help="bring in your own image (JPEG or PNG) and use it")
     x.add_argument("file")
