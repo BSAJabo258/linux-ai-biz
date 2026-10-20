@@ -33,5 +33,5 @@ lb config noauto \
   --iso-application "My Jarvis" \
   --iso-publisher "BAUBSA" \
   --iso-volume "MYJARVIS" \
-  --bootappend-live "boot=live components persistence persistence-encryption=lukslabel username=jarvis hostname=my-jarvis locales=en_US.UTF-8 keyboard-layouts=us quiet splash" \
+  --bootappend-live "boot=live components persistence persistence-encryption=lukslabel username=jarvis hostname=my-jarvis locales=en_US.UTF-8 keyboard-layouts=us i915.enable_psr=0 usbcore.autosuspend=-1 pcie_port_pm=off quiet splash" \
   "${@}"

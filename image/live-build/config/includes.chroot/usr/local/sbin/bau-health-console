@@ -1,0 +1,79 @@
+#!/bin/bash
+# The health console: press Ctrl+Alt+F9 (Ctrl+Alt+F7 goes back to the desktop). It shows
+# why Wi-Fi is off, then every 30 seconds the memory, heat and whether the USB stick the
+# system runs from is still there, and the kernel's warnings as they happen.
+#
+# Made to outlive a crash: once started it only uses bash builtins on /proc and /sys, so
+# it keeps reporting when the stick has dropped out and no program can be loaded from it.
+# Then it says so in big letters, for a photo. --once prints one round and exits (tests).
+set -u
+PROC=${BAU_PROC:-/proc}
+SYS=${BAU_SYS:-/sys}
+DMESG=${BAU_DMESG:-dmesg}
+ONCE=0
+[ "${1:-}" = "--once" ] && ONCE=1
+
+first() { local l; read -r l < "$1" 2>/dev/null && printf '%s' "$l"; }
+
+stick_disk() {                      # the disk the system was started from
+  [ -n "${BAU_STICK:-}" ] && { printf '%s' "$BAU_STICK"; return; }
+  local src
+  src=$(findmnt -no SOURCE /run/live/medium 2>/dev/null || findmnt -no SOURCE / 2>/dev/null)
+  lsblk -nrso NAME,TYPE "$src" 2>/dev/null | awk '$2 == "disk" { print $1; exit }'
+}
+
+wifi() {
+  local found=0 d drv rf
+  for d in "$SYS"/class/net/*; do
+    [ -d "$d/wireless" ] || continue
+    found=1
+    drv=$(readlink "$d/device/driver" 2>/dev/null); drv=${drv##*/}
+    printf 'Wi-Fi card: %s (driver %s), %s\n' "${d##*/}" "${drv:-none}" "$(first "$d/operstate")"
+  done
+  [ "$found" = 1 ] || printf 'Wi-Fi card: none found - its driver did not load\n'
+  for rf in "$SYS"/class/rfkill/rfkill*; do
+    [ -e "$rf/type" ] || continue
+    [ "$(first "$rf/type")" = wlan ] || continue
+    [ "$(first "$rf/hard")" = 1 ] && printf 'Wi-Fi is switched off by a key or switch (hard block)\n'
+    [ "$(first "$rf/soft")" = 1 ] && printf 'Wi-Fi is switched off in software: run  rfkill unblock wifi\n'
+  done
+  printf 'Kernel lines about Wi-Fi and firmware (last 6):\n'
+  $DMESG 2>/dev/null | grep -iE 'ath10k|ath11k|iwlwifi|wlan|firmware' | tail -n 6 | sed 's/^/  /'
+}
+
+DISK=$(stick_disk)
+printf '\n  BAU HEALTH  -  Ctrl+Alt+F7 goes back to the desktop\n\n'
+wifi
+printf 'Running from: %s\n' "${DISK:-unknown disk}"
+printf 'Steady options in use:'
+for o in i915.enable_psr=0 usbcore.autosuspend=-1 pcie_port_pm=off; do
+  [[ " $(first "$PROC/cmdline") " == *" $o "* ]] && printf ' %s' "$o"
+done
+printf '\n\n'
+
+vitals() {
+  local k v _ mem=0 load hot=0 t now
+  while read -r k v _; do [ "$k" = MemAvailable: ] && mem=$((v / 1024)); done < "$PROC/meminfo"
+  read -r load _ < "$PROC/loadavg"
+  for t in "$SYS"/class/thermal/thermal_zone*/temp; do
+    [ -e "$t" ] && v=$(first "$t") && [ $((v / 1000)) -gt "$hot" ] && hot=$((v / 1000))
+  done
+  printf -v now '%(%H:%M:%S)T' -1
+  printf '%s  memory %s MB free  load %s  heat %s C\n' "$now" "$mem" "$load" "$hot"
+  if [ -n "$DISK" ] && [ ! -e "$SYS/block/$DISK" ]; then
+    printf '\n  !!! STICK GONE at %s: the USB stick (%s) dropped out. This is the crash.\n' "$now" "$DISK"
+    printf '  !!! Take a photo of this screen.\n\n'
+  fi
+  [ "$mem" -lt 400 ] && printf '  !!! MEMORY ALMOST FULL: programs will be stopped. Take a photo.\n'
+  [ "$hot" -ge 95 ] && printf '  !!! HOT: %s C. The laptop slows itself down. Take a photo.\n' "$hot"
+  return 0
+}
+
+if [ "$ONCE" = 1 ]; then vitals; exit 0; fi
+printf 'Kernel warnings appear below as they happen.\n\n'
+dmesg -wT --level=emerg,alert,crit,err,warn &
+exec {tick}<> <(:)
+while :; do
+  vitals
+  read -rt 30 -u "$tick" _ || true
+done

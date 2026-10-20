@@ -176,6 +176,42 @@ straight away**: Windows set up in RAID mode may then not start. Windows must be
 first (start it once in Safe Mode, switch to AHCI, start Windows again). This is your
 choice; running BAU from the SanDisk does not need it.
 
+## If the desktop dies after a few minutes
+
+On the owner's Dell XPS 13 9380 the taskbar disappeared a few minutes after unlocking and
+then nothing worked. The stick now starts with three settings against the two known
+causes on that laptop:
+
+| Setting | What it stops |
+|---|---|
+| `i915.enable_psr=0` | the screen's power saving, which freezes parts of the picture on this laptop |
+| `usbcore.autosuspend=-1` | USB power saving that can put the stick to sleep |
+| `pcie_port_pm=off` | power saving on the USB-C / Thunderbolt ports, which can make a stick behind them drop out |
+
+They cost a little battery. A stick installed with the BAU installer gets them too.
+
+**Plug the stick into the port on the right side.** The two ports on the left are
+Thunderbolt; the right one is plain USB-C and is the steadiest place for the stick.
+
+**If it still happens: press Ctrl+Alt+F9.** That is the health console. It keeps working
+even when the rest of the system has stopped, and shows:
+
+- why Wi-Fi is off (no driver, switched off, or the card's firmware complaining);
+- every 30 seconds: free memory, heat, and whether the stick is still there;
+- **STICK GONE**, **MEMORY ALMOST FULL** or **HOT** in capitals when one of those is the
+  cause;
+- the kernel's warnings as they happen.
+
+Take a photo of that screen and send it: it says which of the causes it is.
+**Ctrl+Alt+F7** goes back to the desktop.
+
+BAU already installed on a stick before this change? Add the settings once:
+
+```bash
+sudo sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="/&i915.enable_psr=0 usbcore.autosuspend=-1 pcie_port_pm=off /' /etc/default/grub
+sudo update-grub
+```
+
 ## Good to know
 
 - **BAU installed onto a USB stick:** it works, but ordinary sticks are not made for an
