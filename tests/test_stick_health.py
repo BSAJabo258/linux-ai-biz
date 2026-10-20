@@ -247,3 +247,16 @@ def test_health_console_shouts_when_the_stick_drops_out_or_memory_runs_out(tmp_p
 def test_health_console_shellcheck():
     r = subprocess.run(["shellcheck", str(CONSOLE)], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
+
+
+# ------------------------------------------------------------------ sound and Bluetooth
+# The owner's laptop had no sound and Bluetooth "pops up but does nothing". The stick is
+# built with recommends off, and Debian 13.7's own package data (checked 2026-10-20 with
+# apt in a clean trixie) shows these only arrive as Recommends/Suggests, so they were
+# never installed: alsa-ucm-conf and alsa-topology-conf (libasound2-data Recommends; "absolutely
+# necessary to make some sound hardware work"), libspa-0.2-bluetooth (wireplumber Suggests;
+# PipeWire's Bluetooth audio).
+
+def test_stick_carries_sound_routing_and_bluetooth_audio():
+    for pkg in ("alsa-ucm-conf", "alsa-topology-conf", "libspa-0.2-bluetooth"):
+        assert pkg in LISTED, pkg

@@ -147,6 +147,7 @@ carries Debian's installer to put BAU on the laptop's disk.
 | 1. Build | On GitHub: **Actions → build-live → Run workflow** (no VS Code needed), then download the ISO from the release | [docs/BUILD-ISO.md](docs/BUILD-ISO.md) |
 | 2. Write | balenaEtcher, or Rufus in DD mode | [docs/LIVE-USB.md](docs/LIVE-USB.md) |
 | 3. Lock your keys | On your Windows computer, double-click `installer/BAU-Keys-Export.cmd`: your API keys go into one locked file, `BAU-KEYS.enc`. Only key *names* are ever shown | [docs/KEYS.md](docs/KEYS.md) |
+| [docs/WINDOWS-TO-DEBIAN.md](docs/WINDOWS-TO-DEBIAN.md) | Every Windows script and what to use on Debian; the sound and Bluetooth fix |
 | 4. Fill the BAU Pack | Double-click `installer/BAU-Pack-Make.cmd`: the local models (each pinned by its SHA-256) and `BAU-KEYS.enc` go on a stick you pick | [docs/PACK.md](docs/PACK.md) |
 | 5. Set up | On the laptop, `sudo bau pack install`: checks every file again while copying and asks yes or no before each change (start the model, benchmark it, name the boss, import the keys) | [docs/PACK.md](docs/PACK.md) |
 | 6. Make it yours | `bau look set dusk`, `summer` or your own picture; the desktop gets the same art | [docs/LOOK.md](docs/LOOK.md) |

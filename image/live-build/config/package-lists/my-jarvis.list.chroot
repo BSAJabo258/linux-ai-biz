@@ -43,6 +43,13 @@ pipewire-pulse
 pipewire-alsa
 wireplumber
 alsa-utils
+# Only Recommends/Suggests in Debian 13.7, so recommends-off never installed them (checked
+# 2026-10-20 with apt in a clean trixie; packages.debian.org/trixie/alsa-ucm-conf): the
+# sound routing for laptop chips like the XPS's ("absolutely necessary to make some sound
+# hardware work"), and PipeWire's Bluetooth audio (headphones and speakers).
+alsa-ucm-conf
+alsa-topology-conf
+libspa-0.2-bluetooth
 pavucontrol
 bluez
 blueman

@@ -110,6 +110,9 @@ With `sudo` in front it can also read the kernel's messages. It shows:
   Linux loaded, or `NO DRIVER LOADED`;
 - **Missing firmware**: files the kernel asked for and did not find;
 - **Radios**: whether Wi-Fi or Bluetooth is switched off or blocked.
+- **Sound** and **Bluetooth**: the sound cards and outputs, the Bluetooth service, and the
+  exact `sudo apt install` line if a needed package is missing (see
+  [WINDOWS-TO-DEBIAN.md](WINDOWS-TO-DEBIAN.md)).
 
 A device with `NO DRIVER LOADED` or a line under **Missing firmware** is the thing to ask
 about before installing. Copy `BAU-LAPTOP-SUMMARY-LINUX.txt` to another USB stick to send it.
