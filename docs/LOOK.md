@@ -11,10 +11,15 @@ BAU paints two original anime-style scenes itself, so they never end and stay sh
 
 - **Dusk:** a city at sunset: a big moon, stars that twinkle and a shooting star now and
   then, long clouds lit pink and gold from below, warm windows in the buildings, a red
-  light blinking on a tower, power lines, and cherry petals drifting past.
+  light blinking on a tower, power lines, and cherry petals drifting past. A woman stands
+  on the rooftop looking at the moon, her hair and coat moving in the wind, lit pink at
+  the edges by the sunset.
 - **Summer:** tall summer clouds, white in the sun and blue in their own shade, the sun
   with its rays and lens flare, green hills with grass moving in the wind, power lines
-  and a few petals.
+  and a few petals. A woman in a white sundress and a straw hat stands on the hill,
+  her long hair blowing.
+
+Both women are grown-ups, seen from behind, the classic anime shot.
 
 Jarvis stays in one scene for about 40 seconds, then breathes it into his glass core and
 the other one unfurls out, like dusk turning into day. The petals and clouds move faster
@@ -61,7 +66,10 @@ The picture you chose with `bau look set` always comes first. It costs little on
 laptop: the laptop's graphics chip draws it at half size and at most 30 times a second,
 with a few thousand embers at most,
 and it stops while Jarvis's window is hidden. Without a graphics chip that can do it, or
-with "reduce motion" on, you get the still picture.
+with "reduce motion" on, you get the still picture. If the computer would draw it with
+the processor instead of the graphics chip (that would run it hot), it never starts; if
+it falls behind (under 12 pictures a second), it first draws smaller, then stops and
+shows the still picture.
 
 ## Choose the art
 

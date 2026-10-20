@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 609 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 610 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
 from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
@@ -71,6 +71,13 @@ painted every frame into a 1024x512 FBO texture and melted/refracted like a pict
 (uFullA/uFullB); 40 s per scene. Default art "dusk", default flow dusk + summer + own;
 inkblots stay as choices only; their wallpapers removed; desktop/login now wall-dusk and
 wall-summer (stills rendered from the same shader); bau-look-desktop marker v2 re-applies.
+Then (owner: "grown art active women", read as grown, attractive women): an adult woman
+seen from behind in each scene (woman(): SDF figure, eight heads tall, hair and hem in
+the wind; dusk silhouette on a rooftop rim-lit by the sunset, summer sundress and straw
+hat on the hill). Page guard: failIfMajorPerformanceCaveat plus a renderer check
+(SwiftShader/llvmpipe/softpipe) keep the shaders off software GL; under 12 fps for 5 s it
+draws at 0.3 scale, a second time giveUp() shows the still. Soak (9 min, headless
+Chromium): JS heap 2-7 MB sawtooth, DOM 220 nodes flat, server 44 MB flat: no leak.
 
 Stick steady (2026-10-20): the owner's XPS 13 9380 still dies a few minutes after unlock
 on the new live stick (taskbar first, then everything; RAID->AHCI made no difference; no

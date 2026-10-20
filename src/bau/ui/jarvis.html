@@ -631,6 +631,9 @@ function holdChip(h) { const c = $("c-hold"); c.hidden = !h; c.className = "chip
 // frame into a small texture (SCENE_W x SCENE_H), then melted and refracted like a picture.
 const LIQUID_SCALE = 0.5, LIQUID_FPS = 30, HOLD_MS = 14000, MELT_MS = 7000, TEX = 1024, EMBERS = 2600;
 const SCENE_HOLD_MS = 40000, SCENE_W = 1024, SCENE_H = 512, SCENES = ["dusk", "summer"];
+// Below this many frames a second for 5 s the art draws smaller; a second time, it stops
+// and the still picture takes over. Drawn without the graphics chip it never starts.
+const LIQUID_MIN_FPS = 12, SOFTWARE_GL = /swiftshader|llvmpipe|softpipe|software/i;
 const ENERGY = { idle: 0.2, listening: 0.55, thinking: 1, speaking: 0.7 };
 const GLSL_HEAD = `#ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
@@ -821,6 +824,93 @@ vec3 powerLines(vec3 col, vec2 P, vec3 ink) {
   }
   return col;
 }
+// An adult woman seen from behind, the classic anime shot: long hair and a long dress or
+// coat moving in the wind. Built from simple shapes in figure space q (feet at 0, the top
+// of the head at 1; about eight heads tall). summer = 1: white sundress, straw hat, warm
+// colours; summer = 0: a dark coat, rim-lit by the sunset. wind > 0 blows to the right.
+float sdBox(vec2 p, vec2 b) { vec2 d = abs(p) - b; return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0); }
+float sdCap(vec2 p, vec2 a, vec2 b, float r) { vec2 pa = p - a, ba = b - a;
+  return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0)) - r; }
+float sdTrap(vec2 p, float y0, float y1, float w0, float w1) {
+  float w = mix(w0, w1, clamp((p.y - y0) / (y1 - y0), 0.0, 1.0));
+  return max(abs(p.x) - w, max(y0 - p.y, p.y - y1));
+}
+float sdEll(vec2 p, vec2 c, vec2 r) { return (length((p - c) / r) - 1.0) * min(r.x, r.y); }
+float sdTaper(vec2 p, vec2 a, vec2 b, float ra, float rb) {        // a limb: thick at a, thin at b
+  vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  return length(pa - ba * h) - mix(ra, rb, h);
+}
+float smin(float a, float b, float k) { float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return mix(b, a, h) - k * h * (1.0 - h); }
+vec3 woman(vec3 col, vec2 P, vec2 F, float H, float t, float wind, float summer, vec3 rim) {
+  vec2 q = (P - F) / H;
+  if (q.y < -0.03 || q.y > 1.12 || abs(q.x) > 0.5) return col;
+  float aa = px / H;
+  float gust = 0.6 + 0.4 * sin(t * 0.9) * sin(t * 0.37 + 1.0);
+  float breathe = sin(t * 1.4) * 0.002;
+  // hair: full, past the shoulder blades, lifting and curling in the wind; a few loose locks
+  float fy = clamp((0.92 - q.y) / 0.36, 0.0, 1.0);
+  vec2 hq = q - vec2(wind * gust * (0.06 * fy * fy + 0.014 * sin(t * 2.3 + q.y * 11.0) * fy), breathe);
+  float hw = 0.068 + 0.012 * sin(hq.y * 18.0 + 1.0) - 0.03 * fy * fy;
+  float tips = 0.56 + 0.025 * sin(hq.x * 90.0 + 2.0) + 0.02 * sin(hq.x * 37.0);
+  float hair = smin(sdEll(hq, vec2(0.0, 0.905), vec2(0.066, 0.074)),
+                    max(abs(hq.x) - hw, max(tips - hq.y, hq.y - 0.9)), 0.02);
+  for (int i = 0; i < 3; i++) {                                         // loose locks blown sideways
+    float fi = float(i), ly = 0.84 - fi * 0.06;
+    vec2 a0 = vec2(wind * 0.05, ly), a1 = vec2(wind * (0.13 + 0.03 * fi + 0.02 * sin(t * 2.0 + fi)), ly - 0.1 - 0.02 * sin(t * 1.7 + fi * 2.0));
+    hair = min(hair, sdTaper(hq + vec2(0.0, 0.0), a0, a1, 0.014, 0.002));
+  }
+  hair += sin(hq.y * 90.0 + hq.x * 30.0 + t * 1.5) * 0.0025 * fy;
+  // body: rounded shoulders, a waist, hips; standing with the weight on one leg
+  float shoulders = sdEll(q, vec2(0.0, 0.775 + breathe), vec2(0.098, 0.03));
+  float torso = smin(shoulders, sdTrap(q, 0.6, 0.78, 0.046, 0.085), 0.02);
+  float len = summer > 0.5 ? 0.31 : 0.25;
+  float gq = clamp((0.62 - q.y) / 0.35, 0.0, 1.0);
+  vec2 dq = vec2(q.x - wind * gust * (0.04 * gq * gq + 0.01 * sin(t * 2.6 + q.y * 14.0) * gq), q.y);
+  float hem = len + sin(dq.x * 45.0 + t * 3.0) * 0.01 * gust + 0.015 * dq.x * wind;
+  float skirt = sdTrap(dq, hem, 0.63, summer > 0.5 ? 0.125 : 0.1, 0.05);
+  float arms = min(min(sdTaper(q, vec2(-0.088, 0.77), vec2(-0.112, 0.645), 0.026, 0.019),
+                       sdTaper(q, vec2(-0.112, 0.645), vec2(-0.1, 0.53), 0.019, 0.013)),
+                   min(sdTaper(q, vec2(0.088, 0.77), vec2(0.108, 0.645), 0.026, 0.019),
+                       sdTaper(q, vec2(0.108, 0.645), vec2(0.088, 0.535), 0.019, 0.013)));
+  arms = min(arms, min(sdEll(q, vec2(-0.098, 0.515), vec2(0.014, 0.022)), sdEll(q, vec2(0.086, 0.52), vec2(0.014, 0.022))));
+  float legs = min(sdTaper(q, vec2(-0.03, 0.33), vec2(-0.024, 0.035), 0.029, 0.013),
+                   sdTaper(q, vec2(0.03, 0.33), vec2(0.05, 0.04), 0.029, 0.013));
+  legs = min(legs, min(sdEll(q, vec2(-0.026, 0.02), vec2(0.02, 0.016)), sdEll(q, vec2(0.054, 0.024), vec2(0.02, 0.016))));
+  float neck = sdBox(q - vec2(0.0, 0.82), vec2(0.017, 0.035));
+  float body = min(min(min(skirt, torso), min(arms, legs)), min(neck, hair));
+  float hat = 1.0, brim = 1.0;
+  if (summer > 0.5) {
+    brim = sdEll(q, vec2(0.0, 0.952), vec2(0.17 + 0.004 * sin(t), 0.022));
+    hat = min(brim, sdEll(q, vec2(0.0, 0.985), vec2(0.068, 0.052)));
+    body = min(body, hat);
+  }
+  if (body > aa * 2.0) return col;
+  vec3 c;
+  if (summer > 0.5) {
+    float sh = smoothstep(-0.01, 0.025, q.x + 0.012 * sin(q.y * 25.0));   // the sun is to the left
+    vec3 skin = mix(vec3(0.99, 0.86, 0.77), vec3(0.88, 0.67, 0.62), sh);
+    float folds = smoothstep(0.55, 0.9, sin(dq.x * 70.0 - dq.y * 6.0)) * gq * 0.6;
+    vec3 dress = mix(vec3(1.0, 0.99, 0.97), vec3(0.74, 0.8, 0.94), max(sh, folds));
+    vec3 hairc = mix(vec3(0.38, 0.21, 0.13), vec3(0.24, 0.13, 0.1), sh);
+    hairc = mix(hairc, vec3(0.66, 0.45, 0.32), smoothstep(0.012, 0.0, abs(hq.y - 0.84 - 0.8 * hq.x * hq.x)) * 0.8);
+    c = skin;                                                           // arms, legs, shoulders, neck
+    if (skirt < 0.0 || sdTrap(q, 0.6, 0.755, 0.05, 0.084) < 0.0) c = dress;
+    if (abs(abs(q.x) - 0.045) < 0.005 && q.y > 0.75 && q.y < 0.8) c = dress;   // the straps
+    if (legs < 0.0 && q.y < 0.04) c = vec3(0.55, 0.36, 0.24);         // sandals
+    if (hair < 0.0) c = hairc;
+    if (hat < 0.0) {
+      c = mix(vec3(0.96, 0.87, 0.62), vec3(0.8, 0.66, 0.42), sh);
+      if (brim < 0.0) c *= 0.92 + 0.08 * smoothstep(0.94, 0.96, q.y);
+      if (brim > 0.0 && abs(q.y - 0.972) < 0.011) c = vec3(0.88, 0.3, 0.36);   // the ribbon
+    }
+  } else {
+    c = vec3(0.09, 0.06, 0.15);                                          // a silhouette against the sunset
+    c = mix(c, rim, smoothstep(-0.012, 0.0, body) * smoothstep(0.03, -0.05, q.x) * 0.9);
+    c = mix(c, vec3(0.2, 0.12, 0.26), step(hair, 0.0) * 0.5);            // hair a shade lighter
+  }
+  c = mix(c, c * 0.45, smoothstep(-aa * 2.5, -aa * 0.5, body));        // a thin ink outline
+  return mix(col, c, smoothstep(aa, -aa, body));
+}
 vec3 dusk(vec2 P, float ca, float t) {
   float y = P.y;
   vec3 sky = mix(vec3(1.0, 0.68, 0.45), vec3(0.93, 0.38, 0.52), smoothstep(0.14, 0.3, y));
@@ -881,6 +971,8 @@ vec3 dusk(vec2 P, float ca, float t) {
   vec2 red = vec2((i2 + 0.5 - 0.37) / 11.0, hn + 0.072);
   col += vec3(1.0, 0.15, 0.1) * spire * step(0.0, sin(t * 2.5 + i2)) * smoothstep(0.008, 0.0, length(P - red)) * 1.5;
   col = powerLines(col, P, vec3(0.05, 0.03, 0.09));
+  col = mix(col, vec3(0.06, 0.04, 0.1), edge(P.y - 0.045));                 // the rooftop she stands on
+  col = woman(col, P, vec2(0.8 * ca, 0.044), 0.44, t, -1.0, 0.0, vec3(1.0, 0.72, 0.66));
   col = petals(col, P, t, 16.0, 0.5, 0.1, vec3(1.0, 0.72, 0.84), 0.87);
   col = petals(col, P, t * 1.3, 7.0, 0.8, 0.08, vec3(1.0, 0.78, 0.88), 0.93);
   return col;
@@ -920,6 +1012,8 @@ vec3 summer(vec2 P, float ca, float t) {
   vec3 green = mix(vec3(0.20, 0.50, 0.22), vec3(0.45, 0.78, 0.32), smoothstep(hill - 0.06, hill, y));
   col = mix(col, green, smoothstep(-0.002, 0.002, hd));
   col = powerLines(col, P, vec3(0.16, 0.20, 0.30));
+  float wx = 0.3 * ca, wy = 0.12 + 0.05 * sin(wx * 2.1 + 0.4) + 0.02 * noise(vec2(wx * 6.0, 0.0));
+  col = woman(col, P, vec2(wx, wy - 0.012), 0.36, t, 1.0, 1.0, vec3(1.0));
   col = petals(col, P, t, 9.0, 0.7, 0.08, vec3(1.0, 0.88, 0.92), 0.93);
   return col;
 }
@@ -934,7 +1028,11 @@ let LIQ = false, CORE = null;   // whether the liquid art is showing; the core's
 const liquid = (() => {
   const c = $("liquid"); let gl = null;
   try { gl = c && c.getContext("webgl", { premultipliedAlpha: true, antialias: false, depth: false,
-    powerPreference: "low-power" }); } catch (e) { gl = null; }
+    powerPreference: "low-power", failIfMajorPerformanceCaveat: true }); } catch (e) { gl = null; }
+  if (gl) {                                 // drawn by the processor: not on an 8 GB laptop
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    if (info && SOFTWARE_GL.test(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "")) gl = null;
+  }
   if (REDUCED || !gl) return null;          // the still picture (#art) is used instead
   function program(vs, fs, attr) {
     const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
@@ -1012,10 +1110,11 @@ const liquid = (() => {
     cache.set(name, p); return p;
   }
   let flow = [], at = 0, A = null, B = null, since = 0, raf = 0, last = 0, clock = 0, lost = false;
+  let scale = LIQUID_SCALE, win = 0, frames = 0, slow = 0;
   let E = 0.2, ptr = [0.5, 0.5], ptrTo = [0.5, 0.5], hue = [0.25, 0.84, 1], core = [0, 0, 0.16];
   addEventListener("pointermove", (e) => { ptrTo = [e.clientX / innerWidth, e.clientY / innerHeight]; });
-  function size() { c.width = Math.max(2, Math.round(innerWidth * LIQUID_SCALE));
-    c.height = Math.max(2, Math.round(innerHeight * LIQUID_SCALE)); gl.viewport(0, 0, c.width, c.height); }
+  function size() { c.width = Math.max(2, Math.round(innerWidth * scale));
+    c.height = Math.max(2, Math.round(innerHeight * scale)); gl.viewport(0, 0, c.width, c.height); }
   addEventListener("resize", size); size();
   async function next() {                   // line up the following picture
     if (flow.length < 2) { B = null; return; }
@@ -1032,6 +1131,13 @@ const liquid = (() => {
     if (now - last < 1000 / LIQUID_FPS) return;
     const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
     if (!A) return;
+    frames++;
+    if (!win) win = now;
+    if (now - win > 5000) {                  // keeping up? if not: smaller, then the still picture
+      const fps = frames * 1000 / (now - win); frames = 0; win = now;
+      if (fps < LIQUID_MIN_FPS && ++slow >= 2) { giveUp(); return; }
+      if (fps < LIQUID_MIN_FPS) { scale = LIQUID_SCALE * 0.6; size(); }
+    }
     const want = (ENERGY[STATE] || 0.2) + level * 0.4;
     E += (want - E) * Math.min(1, dt * 2);
     clock = (clock + dt * (0.6 + E * 1.4)) % 3600;
@@ -1060,11 +1166,12 @@ const liquid = (() => {
       gl.drawArrays(gl.POINTS, 0, EMBERS);
     }
   }
-  function run() { if (!raf && !lost && !document.hidden && flow.length) { last = 0; raf = requestAnimationFrame(draw); } }
+  function run() { if (!raf && !lost && !document.hidden && flow.length) { last = 0; win = 0; frames = 0; raf = requestAnimationFrame(draw); } }
   function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
   document.addEventListener("visibilitychange", () => (document.hidden ? stop() : run()));
-  c.addEventListener("webglcontextlost", (e) => { e.preventDefault(); lost = true; stop();
-    c.classList.remove("on"); LIQ = false; applyLook(LOOK); });
+  function giveUp() { lost = true; stop(); c.classList.remove("on"); LIQ = false;
+    document.body.classList.remove("liquid"); applyLook(LOOK); }
+  c.addEventListener("webglcontextlost", (e) => { e.preventDefault(); giveUp(); });
   return {
     ok: () => !lost,
     show(names) {

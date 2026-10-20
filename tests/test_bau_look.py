@@ -186,6 +186,16 @@ def test_the_core_is_a_glass_drop_that_breathes_the_pictures():
     assert "EMBERS = " in page and "% 3600" in page           # few of them; time kept small
 
 
+def test_the_liquid_art_never_loads_a_laptop_without_graphics_help():
+    # Drawn by the processor instead of the graphics chip, the shaders would run the CPU
+    # hot (3 frames a second in a test browser): then the still picture is used instead,
+    # and a laptop that falls behind first draws smaller, then stops.
+    page = (resources.files("bau.ui") / "jarvis.html").read_text()
+    assert "failIfMajorPerformanceCaveat: true" in page
+    assert "llvmpipe" in page and "swiftshader" in page.lower()
+    assert "LIQUID_MIN_FPS" in page and "giveUp(" in page
+
+
 def test_the_anime_scenes_are_painted_live_in_jarvis():
     page = (resources.files("bau.ui") / "jarvis.html").read_text()
     assert "SCENE_FS" in page and "LOOK.live" in page           # drawn by the GPU, not a file
@@ -193,6 +203,7 @@ def test_the_anime_scenes_are_painted_live_in_jarvis():
     assert "createFramebuffer" in page and "uFullA" in page     # melted, seen through the glass
     assert "SCENE_HOLD_MS" in page                              # a scene stays longer
     assert "petals(" in page and "powerLines(" in page
+    assert "woman(" in page                                     # a grown woman in each scene
 
 
 def test_cli_look_flow(tmp_path, monkeypatch, capsys):
