@@ -14,7 +14,7 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 603 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 607 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
 The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
 from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
@@ -62,6 +62,15 @@ words. After: 4-15 s, grounded answers. The 1.5B still lists in numbers and pads
 (Qwen3.5-4B) not yet measured this way. Decision lock test: llama.cpp grammar keeps answers
 in the list (<1 s each) but the 1.5B is order-biased and confidently wrong (quote request ->
 billing at 0.98), so bau decide must ask in shuffled orders and calibrate on owner answers.
+
+Stick steady (2026-10-20): the owner's XPS 13 9380 still dies a few minutes after unlock
+on the new live stick (taskbar first, then everything; RAID->AHCI made no difference; no
+logs survive because /var/log is not persisted). Boot options added on the live stick and
+via preseed add-kernel-opts: i915.enable_psr=0, usbcore.autosuspend=-1, pcie_port_pm=off.
+bau-health-console on tty9 (Ctrl+Alt+F9): Wi-Fi diagnosis, vitals every 30 s from /proc
+and /sys with bash builtins only, STICK GONE / MEMORY / HOT banners, dmesg -w. Cause not
+yet proven: waiting for the owner's photo of tty9 after the next crash. Wi-Fi still not
+working on the real laptop (Bluetooth adapter shows); the tty9 header should say why.
 
 Liquid look (2026-10-19, docs/LOOK.md): Jarvis's art is now a WebGL shader (jarvis.html
 LIQUID_FS): domain-warped noise current, the picture sharp in the middle over a mipmap glow

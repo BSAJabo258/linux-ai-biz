@@ -108,3 +108,101 @@ def test_the_owners_laptop_gets_sound_bluetooth_and_cooling():
             "pavucontrol", "bluez", "blueman", "thermald", "intel-media-va-driver",
             "firmware-atheros", "firmware-sof-signed", "firmware-intel-graphics"}
     assert need <= LISTED, need - LISTED
+
+
+# ------------------------------------------------------------------ the owner's crashes
+# On the owner's Dell XPS 13 9380 the desktop died a few minutes after unlocking: the
+# taskbar went first, then everything. The two known causes on that laptop are both
+# switched off at boot: the screen's power saving (PSR on Intel graphics freezes parts of
+# the picture) and power saving on the USB-C / Thunderbolt ports (a stick behind them
+# drops out, and nothing more can be loaded from it). The health console on Ctrl+Alt+F9
+# keeps running even when the stick is gone, so the next crash leaves proof on screen.
+
+STEADY = ("i915.enable_psr=0", "usbcore.autosuspend=-1", "pcie_port_pm=off")
+CONSOLE = CONF / "includes.chroot" / "usr" / "local" / "sbin" / "bau-health-console"
+CONSOLE_UNIT = UNIT.parent / "bau-health-console.service"
+
+
+def test_the_stick_and_the_installed_laptop_boot_steady():
+    live = (ROOT / "image" / "live-build" / "auto" / "config").read_text()
+    append = live.split("--bootappend-live", 1)[1].split("\n", 1)[0]
+    preseed = (CONF / "includes.installer" / "preseed.cfg").read_text()
+    opts = [ln for ln in preseed.splitlines()
+            if ln.startswith("d-i debian-installer/add-kernel-opts")]
+    assert len(opts) == 1
+    for o in STEADY:
+        assert o in append, o
+        assert o in opts[0], o
+
+
+def test_health_console_runs_on_its_own_screen_and_comes_back():
+    unit = CONSOLE_UNIT.read_text()
+    assert "ExecStart=/usr/local/sbin/bau-health-console" in unit
+    assert "TTYPath=/dev/tty9" in unit and "StandardOutput=tty" in unit
+    assert "Restart=always" in unit
+    hook = (CONF / "hooks" / "live" / "0500-bau.hook.chroot").read_text()
+    assert "systemctl enable bau-health-console.service" in hook
+    assert "bau-health-console" in hook and "chmod 0755" in hook
+
+
+def fake_machine(tmp_path, mem_kb=5_000_000, stick=True, temp=52000):
+    proc, sys_ = tmp_path / "proc", tmp_path / "sys"
+    proc.mkdir(parents=True)
+    (proc / "meminfo").write_text(f"MemTotal: 7900000 kB\nMemAvailable: {mem_kb} kB\n")
+    (proc / "loadavg").write_text("0.52 0.40 0.31 1/300 4242\n")
+    (proc / "cmdline").write_text("boot=live " + " ".join(STEADY) + "\n")
+    wl = sys_ / "class" / "net" / "wlp2s0"
+    (wl / "wireless").mkdir(parents=True)
+    (wl / "operstate").write_text("down\n")
+    drv = sys_ / "bus" / "pci" / "drivers" / "ath10k_pci"
+    drv.mkdir(parents=True)
+    (wl / "device").mkdir()
+    (wl / "device" / "driver").symlink_to(drv)
+    rf = sys_ / "class" / "rfkill" / "rfkill0"
+    rf.mkdir(parents=True)
+    (rf / "type").write_text("wlan\n")
+    (rf / "soft").write_text("1\n")
+    (rf / "hard").write_text("0\n")
+    tz = sys_ / "class" / "thermal" / "thermal_zone0"
+    tz.mkdir(parents=True)
+    (tz / "temp").write_text(f"{temp}\n")
+    if stick:
+        (sys_ / "block" / "sdb").mkdir(parents=True)
+    else:
+        (sys_ / "block").mkdir(parents=True)
+    fake_dmesg = tmp_path / "dmesg"
+    fake_dmesg.write_text("#!/bin/sh\necho 'ath10k_pci 0000:02:00.0: firmware crashed!'\n")
+    fake_dmesg.chmod(0o755)
+    return {"BAU_PROC": str(proc), "BAU_SYS": str(sys_), "BAU_STICK": "sdb",
+            "BAU_DMESG": str(fake_dmesg)}
+
+
+def console(tmp_path, **kw):
+    env = {**os.environ, **fake_machine(tmp_path, **kw)}
+    r = subprocess.run(["bash", str(CONSOLE), "--once"], capture_output=True, text=True,
+                       env=env, timeout=20)
+    assert r.returncode == 0, r.stderr
+    return r.stdout
+
+
+def test_health_console_tells_why_wifi_is_off_and_shows_the_vitals(tmp_path):
+    out = console(tmp_path)
+    assert "wlp2s0" in out and "ath10k_pci" in out
+    assert "switched off" in out                        # rfkill soft block, in plain words
+    assert "firmware crashed" in out                    # the kernel's own Wi-Fi lines
+    assert "4882 MB free" in out and "52" in out        # memory and heat
+    assert "i915.enable_psr=0" in out                   # the steady options are in use
+    assert "STICK GONE" not in out
+
+
+def test_health_console_shouts_when_the_stick_drops_out_or_memory_runs_out(tmp_path):
+    out = console(tmp_path / "a", stick=False)
+    assert "STICK GONE" in out and "photo" in out
+    out = console(tmp_path / "b", mem_kb=200_000, temp=97000)
+    assert "MEMORY ALMOST FULL" in out and "HOT" in out
+
+
+@pytest.mark.skipif(not shutil.which("shellcheck"), reason="needs shellcheck")
+def test_health_console_shellcheck():
+    r = subprocess.run(["shellcheck", str(CONSOLE)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout
