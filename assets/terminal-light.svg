@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 1280 548" width="1280" height="548" role="img" aria-labelledby="t d">
+     viewBox="0 0 1280 616" width="1280" height="616" role="img" aria-labelledby="t d">
 <title id="t">BAU at the terminal</title>
-<desc id="d">Three commands: asking the toolbox, planning a kids episode, checking usage.</desc>
+<desc id="d">Four commands: asking the toolbox, planning a kids episode, checking usage,
+choosing the living art.</desc>
 <style>
 .ln { animation-duration: 22.0s; animation-iteration-count: infinite;
        animation-timing-function: linear; clip-path: inset(0 100% 0 0); white-space: pre; }
@@ -17,6 +18,8 @@
 @keyframes l9 { 0%, 41.16% { clip-path: inset(0 100% 0 0); } 43.00%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
 @keyframes l10 { 0%, 46.18% { clip-path: inset(0 100% 0 0); } 46.73%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
 @keyframes l11 { 0%, 47.77% { clip-path: inset(0 100% 0 0); } 48.32%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l12 { 0%, 49.36% { clip-path: inset(0 100% 0 0); } 54.48%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
+@keyframes l13 { 0%, 57.66% { clip-path: inset(0 100% 0 0); } 58.20%, 96% { clip-path: inset(0 0 0 0); } 100% { clip-path: inset(0 100% 0 0); } }
 @media (prefers-reduced-motion: reduce) { .ln { animation: none !important;
        clip-path: none !important; } }
 </style>
@@ -34,9 +37,9 @@
     <stop offset="0" stop-color="#08263a"/><stop offset=".5" stop-color="#0a78a8"/>
     <stop offset="1" stop-color="#a87900"/></linearGradient>
 </defs>
-<rect width="1280" height="548" rx="18" fill="url(#sky)"/>
-<rect width="1280" height="548" rx="18" fill="url(#grid)"/>
-<rect x="24" y="22" width="1232" height="504" rx="14" fill="#ffffff"
+<rect width="1280" height="616" rx="18" fill="url(#sky)"/>
+<rect width="1280" height="616" rx="18" fill="url(#grid)"/>
+<rect x="24" y="22" width="1232" height="572" rx="14" fill="#ffffff"
       fill-opacity="0.85" stroke="#0a78a8" stroke-opacity=".35"/>
 <circle cx="52" cy="48" r="6" fill="#ff5f57"/><circle cx="74" cy="48" r="6" fill="#febc2e"/>
 <circle cx="96" cy="48" r="6" fill="#28c840"/>
@@ -55,5 +58,7 @@
 <text x="48" y="398" class="ln" style="animation-name:l9" fill="#08263a"><tspan fill="#0a78a8">jarvis@cloud</tspan><tspan fill="#3f5f72">:~$ </tspan>bau usage</text>
 <text x="48" y="432" class="ln" style="animation-name:l10" fill="#3f5f72">today    32,850 tokens · 9 calls · $0.00</text>
 <text x="48" y="466" class="ln" style="animation-name:l11" fill="#a87900">⚠ 98% of your daily token limit</text>
+<text x="48" y="500" class="ln" style="animation-name:l12" fill="#08263a"><tspan fill="#0a78a8">jarvis@cloud</tspan><tspan fill="#3f5f72">:~$ </tspan>bau look flow dusk summer</text>
+<text x="48" y="534" class="ln" style="animation-name:l13" fill="#a87900">✓ dusk -> summer, breathed through the glass core every 40 s</text>
 </g>
 </svg>

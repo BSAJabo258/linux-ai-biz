@@ -25,7 +25,7 @@ THEMES = {
               "panel": "#ffffff", "panel_op": "0.85", "grid_op": "0.10", "orb": "#0a78a8"},
 }
 
-TAGLINE = "human-only approvals · tamper-evident audit · your laptop, USB or cloud"
+TAGLINE = "human-only approvals · tamper-evident audit · one USB stick, laptop or cloud"
 CALM = """@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }"""
 
 
@@ -70,15 +70,19 @@ def _traces(t: dict, w: int, h: int, seed: int) -> str:
 
 
 CARDS = [
-    ("JARVIS", "Voice-first assistant, live HUD.", "He stages actions; you confirm.", "orb"),
+    ("JARVIS", "Voice-first assistant with a glass", "core; lean and fast on local models.", "orb"),
     ("COMPLIANCE", "49 regulations, 65 policies.", "PASS, REVIEW or BLOCK + evidence.",
      "shield"),
     ("APPROVALS", "Money, legal, email: SSH-signed", "by you. Never by a model.", "key"),
+    ("ONE STICK", "Boot, encrypted storage, install:", "one USB stick, crash console on F9.",
+     "stick"),
+    ("BAU PACK", "Models, keys and Wi-Fi from a", "Windows PC, checked on the laptop.", "pack"),
+    ("LIVING ART", "Anime scenes painted live, melted", "through Jarvis's glass core.", "art"),
     ("VIDEO STUDIO", "AI clips priced before they're", "made, inside your own budget.",
      "play"),
-    ("TOOLBOX + SCOUT", "77 researched open-source tools,", "inspected in quarantine first.",
+    ("TOOLBOX + SCOUT", "100 researched open-source tools,", "inspected in quarantine first.",
      "scan"),
-    ("YOUR HARDWARE", "Encrypted laptop, live USB, or", "your own cloud via SSH tunnel.",
+    ("YOUR HARDWARE", "Your laptop, the stick, or your", "own cloud via an SSH tunnel.",
      "node"),
 ]
 
@@ -101,6 +105,16 @@ def _icon(kind: str, x: float, y: float, t: dict) -> str:
         "scan": f'<circle cx="{x - 4}" cy="{y - 4}" r="13" {s}/><path d="M{x + 6} {y + 6}'
                 f'l11 11" {s}/><path d="M{x - 10} {y - 4}h12" stroke="{g}" '
                 'stroke-width="2.4" stroke-linecap="round"/>',
+        "stick": f'<rect x="{x - 10}" y="{y - 22}" width="20" height="34" rx="4" {s}/>'
+                 f'<rect x="{x - 6}" y="{y + 12}" width="12" height="10" rx="1" {s}/>'
+                 f'<circle cx="{x}" cy="{y - 8}" r="3" fill="{g}"/>',
+        "pack": f'<path d="M{x - 18} {y - 8}l18-10 18 10v18l-18 10-18-10z" {s}/>'
+                f'<path d="M{x - 18} {y - 8}l18 10 18-10M{x} {y + 2}v18" {s}/>'
+                f'<circle cx="{x}" cy="{y + 2}" r="3" fill="{g}"/>',
+        "art": f'<circle cx="{x}" cy="{y}" r="17" {s}/>'
+               f'<path d="M{x - 17} {y + 4}c8-10 14 8 22-2s10-6 12-4" fill="none" '
+               f'stroke="{g}" stroke-width="2.4" stroke-linecap="round"/>'
+               f'<circle cx="{x + 6}" cy="{y - 7}" r="3" fill="{g}"/>',
         "node": f'<rect x="{x - 18}" y="{y - 18}" width="36" height="14" rx="3" {s}/>'
                 f'<rect x="{x - 18}" y="{y + 2}" width="36" height="14" rx="3" {s}/>'
                 f'<circle cx="{x + 10}" cy="{y - 11}" r="2.5" fill="{g}"/>'
@@ -111,8 +125,8 @@ def _icon(kind: str, x: float, y: float, t: dict) -> str:
 
 def features(theme: str) -> str:
     t = THEMES[theme]
-    w, h = 1280, 520
     cw, ch, gap, top = 392, 214, 24, 34
+    w, h = 1280, top * 2 + ch * 3 + gap * 2
     left = (w - 3 * cw - 2 * gap) / 2
     cards = []
     for i, (title, l1, l2, icon) in enumerate(CARDS):
@@ -133,8 +147,8 @@ def features(theme: str) -> str:
     return f"""<svg xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-labelledby="t d">
 <title id="t">What BAU does</title>
-<desc id="d">Six features: Jarvis, compliance engine, human-only approvals, video studio,
-toolbox and Repo Scout, and running on hardware you own.</desc>
+<desc id="d">Nine features: Jarvis, compliance engine, human-only approvals, one USB stick,
+the BAU Pack, living art, video studio, toolbox and Repo Scout, and hardware you own.</desc>
 <style>
 .card {{ animation: rise 4.5s ease-in-out infinite; }}
 @keyframes rise {{ 50% {{ opacity: .86; }} }}
@@ -218,6 +232,8 @@ SESSION = [
     ("$", "bau usage"),
     (" ", "today    32,850 tokens · 9 calls · $0.00"),
     ("!", "98% of your daily token limit"),
+    ("$", "bau look flow dusk summer"),
+    ("~", "dusk -> summer, breathed through the glass core every 40 s"),
 ]
 
 
@@ -247,7 +263,8 @@ def terminal(theme: str) -> str:
     return f"""<svg xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-labelledby="t d">
 <title id="t">BAU at the terminal</title>
-<desc id="d">Three commands: asking the toolbox, planning a kids episode, checking usage.</desc>
+<desc id="d">Four commands: asking the toolbox, planning a kids episode, checking usage,
+choosing the living art.</desc>
 <style>
 .ln {{ animation-duration: {cycle}s; animation-iteration-count: infinite;
        animation-timing-function: linear; clip-path: inset(0 100% 0 0); white-space: pre; }}
@@ -271,6 +288,7 @@ def terminal(theme: str) -> str:
 
 PHRASES = ["compliance checked before every action",
            "approvals signed by you, never by a model",
+           "one USB stick boots, stores and installs BAU",
            "your AI team on hardware you own",
            "every clip priced first, made on your Confirm"]
 
