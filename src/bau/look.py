@@ -8,7 +8,12 @@ costs almost nothing on an 8 GB laptop and stops for reduced-motion users.
 
 The flow: in Jarvis the pictures melt into one another like liquid (a small WebGL shader
 drawn at part resolution and a capped frame rate), starting with the chosen art. The owner
-picks which pictures take part with ``bau look flow``; none picked means all of them.
+picks which pictures take part with ``bau look flow``; none picked means the default: the
+live anime scenes and the owner's own pictures.
+
+Live scenes (``LIVE``) are painted by the GPU in Jarvis and move (petals, clouds, stars,
+city lights); their ``.jpg`` is a still of the same scene for the desktop, the login
+screen, Mission Control and computers without WebGL.
 """
 
 from __future__ import annotations
@@ -22,9 +27,10 @@ from typing import Any
 from .home import bau_home
 from .store import YamlStore
 
-SHIPPED = {"moon": "moon.jpg", "light": "light.jpg", "watercolor": "watercolor.jpg",
-           "gold": "gold.jpg", "earth": "earth.jpg"}
-DEFAULT = "moon"
+SHIPPED = {"dusk": "dusk.jpg", "summer": "summer.jpg", "moon": "moon.jpg", "light": "light.jpg",
+           "watercolor": "watercolor.jpg", "gold": "gold.jpg", "earth": "earth.jpg"}
+LIVE = ("dusk", "summer")
+DEFAULT = "dusk"
 MAX_BYTES = 15 * 1024 * 1024
 TYPES = {b"\xff\xd8\xff": (".jpg", "image/jpeg"), b"\x89PNG\r\n\x1a\n": (".png", "image/png")}
 
@@ -42,8 +48,9 @@ def _own(home: Path) -> dict[str, Path]:
 def show(home: Path | None = None) -> dict[str, Any]:
     home = home or bau_home()
     saved = _store(home).load() or {}
-    pictures = [*SHIPPED, *_own(home)]
-    flow = [n for n in saved.get("flow") or [] if n in pictures] or pictures
+    own = list(_own(home))
+    pictures = [*SHIPPED, *own]
+    flow = [n for n in saved.get("flow") or [] if n in pictures] or [*LIVE, *own]
     return {"art": saved.get("art", DEFAULT), "alive": saved.get("alive", True),
             "flow": flow, "choices": [*pictures, "none"]}
 
@@ -53,9 +60,9 @@ def brief(home: Path | None = None) -> dict[str, Any]:
     pictures it melts between (the chosen art first)."""
     s = show(home)
     if s["art"] == "none":
-        return {"art": None, "alive": s["alive"], "flow": []}
+        return {"art": None, "alive": s["alive"], "flow": [], "live": list(LIVE)}
     return {"art": s["art"], "alive": s["alive"],
-            "flow": [s["art"], *(n for n in s["flow"] if n != s["art"])]}
+            "flow": [s["art"], *(n for n in s["flow"] if n != s["art"])], "live": list(LIVE)}
 
 
 def set_look(home: Path | None = None, art: str | None = None,
