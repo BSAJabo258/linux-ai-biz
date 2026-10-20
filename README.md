@@ -240,6 +240,7 @@ How the *My Jarvis OS* spec maps onto this repository, and the build order:
 | [docs/CLOUD-VM.md](docs/CLOUD-VM.md) | BAU and Jarvis on your own cloud server (DigitalOcean), reached through a private SSH tunnel |
 | [docs/CLOUD-TEST.md](docs/CLOUD-TEST.md) | Free cloud test drive: GitHub Codespaces + a free hosted model, from a computer or iPhone |
 | [docs/DEMO.md](docs/DEMO.md) | A five-minute demo you run yourself |
+| [docs/DESKTOP.md](docs/DESKTOP.md) | The desktop edition: its own design for a PC with a graphics card (planned) |
 
 **Jarvis and the team**
 

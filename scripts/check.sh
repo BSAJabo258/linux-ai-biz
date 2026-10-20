@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Every check, one command, the same as CI: lint, secret scan, regulations, tests and
-# shellcheck on every shell script in the repo (found, not listed by hand, so none is
+# Every check, one command, the same as CI: lint, secret scan, regulations, tests, and
+# ShellCheck on every shell script in the repo (found, not listed by hand, so none is
 # missed). One line per check; the output is shown only for a check that failed.
 #   bash scripts/check.sh
 set -uo pipefail
@@ -19,9 +19,10 @@ step() {
   fi
 }
 
+# shellcheck disable=SC2329  # called through step below
 shell_scripts() {
   local files
-  files="$({ git ls-files '*.sh'; git grep -lE '^#!.*\b(ba)?sh\b' -- ':!*.sh' ':!*.md'; } | sort -u)"
+  files="$({ git ls-files --cached --others --exclude-standard '*.sh'; git grep --untracked -lE '^#!.*\b(ba)?sh\b' -- ':!*.sh' ':!*.md'; } | sort -u)"
   xargs shellcheck -x <<< "${files}" && echo "$(wc -l <<< "${files}") scripts"
 }
 
