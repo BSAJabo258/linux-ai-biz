@@ -119,6 +119,10 @@ def make_handler(home: Path) -> type[BaseHTTPRequestHandler]:
             if self.path in ("/", "/index.html"):
                 self._send(200, page, "text/html; charset=utf-8")
                 return
+            if self.path == "/icon.svg":                 # the tab icon
+                self._send(200, (resources.files("bau.ui") / "icon.svg").read_bytes(),
+                           "image/svg+xml")
+                return
             if self.path.partition("?")[0] == "/art":    # the owner's art (bau look)
                 from ..look import art_file
                 got = art_file(home)

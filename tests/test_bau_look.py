@@ -276,3 +276,31 @@ def test_desktop_look_is_set_once_and_never_overrides_the_owners_choice():
 def test_shellcheck():
     r = subprocess.run(["shellcheck", str(DESKTOP)], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
+
+
+# ------------------------------------------------------------------ polish (overhaul check)
+
+def test_both_pages_have_a_tab_icon_so_the_browser_logs_no_error(jarvis, tmp_path):
+    # Without one the browser asks for /favicon.ico and logs a 404 on every visit.
+    for name in ("jarvis.html", "page.html"):
+        page = (resources.files("bau.ui") / name).read_text()
+        assert '<link rel="icon" href="/icon.svg"' in page, name
+    _, url = jarvis
+    with urllib.request.urlopen(url + "/icon.svg") as r:
+        assert r.headers["Content-Type"] == "image/svg+xml" and b"<svg" in r.read()
+    from bau.ui.server import serve
+    srv = serve(0, tmp_path / "mc")
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{srv.server_address[1]}/icon.svg") as r:
+            assert r.headers["Content-Type"] == "image/svg+xml"
+    finally:
+        srv.shutdown()
+
+
+def test_the_still_picture_fills_the_screen_for_a_scene_and_phones_read_the_caption():
+    page = (resources.files("bau.ui") / "jarvis.html").read_text()
+    assert "backgroundSize" in page and '"cover"' in page      # a scene fills, a picture fits
+    phone = page[page.index("@media (max-width:760px)"):]
+    assert "#caption{" in phone and "background:var(--panel)" in phone   # readable over the ring
+    assert "#text::placeholder" in phone

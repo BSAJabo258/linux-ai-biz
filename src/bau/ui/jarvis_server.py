@@ -166,6 +166,10 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     return
                 self._send(200, page, "text/html; charset=utf-8")
                 return
+            if path == "/icon.svg":                 # the tab icon
+                self._send(200, (resources.files("bau.ui") / "icon.svg").read_bytes(),
+                           "image/svg+xml")
+                return
             if path == "/art" or path.startswith("/art/"):   # the owner's art (bau look)
                 if not self._guard(api=False):
                     return

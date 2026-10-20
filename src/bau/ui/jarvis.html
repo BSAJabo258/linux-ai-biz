@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BAU Jarvis</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
 :root{--bg:#02060b;--ink:#cfefff;--dim:#5d8aa3;--line:rgba(80,200,255,.22);--cyan:#3fd6ff;
   --amber:#ffb340;--green:#46f2a4;--red:#ff4d5e;--violet:#a98bff;--panel:rgba(6,22,34,.62);--gold:#ffcf4d;
@@ -213,7 +214,9 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   aside.r,#timeline{left:8px;right:8px;width:auto;top:auto;bottom:96px;max-height:58vh;z-index:6}
   #eye{left:8px;right:8px;top:52px;bottom:96px}
   header .r{overflow-x:auto;max-width:72vw;scrollbar-width:none}
-  .hint{display:none}header>div:first-child{white-space:nowrap}header .chip{padding:2px 6px;font-size:10px;letter-spacing:.08em}header{padding:12px 16px;letter-spacing:.14em}header .r{gap:8px}#caption{font-size:16px;bottom:138px}#voicebar{bottom:92px}#voicebar .rule{width:40px}#wave{width:160px}}
+  .hint{display:none}header>div:first-child{white-space:nowrap}header .chip{padding:2px 6px;font-size:10px;letter-spacing:.08em}header{padding:12px 16px;letter-spacing:.14em}header .r{gap:8px}#caption{font-size:16px;bottom:138px;background:var(--panel);border-radius:10px;padding:8px 10px}#voicebar{bottom:92px}
+  #text::placeholder{font-size:13px}
+  #modepill{padding:6px 8px;font-size:10px;letter-spacing:.06em}#mic{width:44px;height:44px}#send{padding:8px 10px}#voicebar .rule{width:40px}#wave{width:160px}}
 </style>
 </head>
 <body>
@@ -1197,6 +1200,7 @@ function applyLook(look) {
   }
   if (liquid) liquid.hide();
   el.style.backgroundImage = "url(/art?v=" + encodeURIComponent(look.art) + ")";
+  el.style.backgroundSize = (look.live || []).includes(look.art) ? "cover" : "contain";  // a scene fills
   el.classList.add("on");
 }
 function paintState(s) {
