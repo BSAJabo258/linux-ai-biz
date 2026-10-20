@@ -1,25 +1,43 @@
 #!/bin/sh
-# Runs at every boot. When the system itself lives on a USB stick (BAU installed onto a
-# stick instead of the laptop's own drive), it eases the stick's load: sticks are not
-# made for an operating system's constant writes, and a stick that overheats or drops out
-# makes Linux switch the disk to read-only - programs then fail and the desktop dies.
-#   * root is remounted noatime with fewer, larger flushes (commit=60);
-#   * swap on that stick is turned off (zram, compressed swap in memory, takes over);
-#   * the kernel holds written data a little longer before flushing it.
-# On the laptop's own drive, or on the live stick (an overlay), it changes nothing.
+# Runs at every boot. When the system lives on a USB stick (the live stick, or BAU
+# installed onto a stick instead of the laptop's own drive), it eases the stick's load:
+# sticks are not made for an operating system's constant writes, and a stick that
+# overheats or drops out makes Linux switch the disk to read-only - programs then fail
+# and the desktop dies.
+#   * written data goes to the stick in small steps: with 8 GB of memory Linux otherwise
+#     gathers over a gigabyte (a model download, the pack) and writes it in one go, and
+#     everything that must read from the stick meanwhile - the whole desktop - waits;
+#   * the kernel holds small writes a little longer before flushing them;
+#   * installed onto a stick: root is remounted noatime with fewer, larger flushes
+#     (commit=60), and swap on that stick is turned off (zram, swap in memory, takes over);
+#   * the live stick: its encrypted storage is remounted the same way.
+# On the laptop's own drive, or a live system started from a drive, it changes nothing.
 set -u
 SWAPS=${BAU_PROC_SWAPS:-/proc/swaps}
 
 disk_of() { lsblk -nrso NAME,TYPE "$1" 2>/dev/null | awk '$2 == "disk" { print $1; exit }'; }
 
-src=$(findmnt -no SOURCE /) || exit 0
+src=$(findmnt -no SOURCE /) || src=
 disk=$(disk_of "${src}")
+live=0
+if [ -z "${disk}" ]; then                       # the live stick: / is an overlay in memory
+  medium=$(findmnt -no SOURCE /run/live/medium 2>/dev/null) || exit 0
+  disk=$(disk_of "${medium}")
+  live=1
+fi
 [ -n "${disk}" ] || exit 0
 [ "$(lsblk -dno TRAN "/dev/${disk}" 2>/dev/null)" = usb ] || exit 0
 
-echo "bau-usb-guard: the system runs from a USB stick (/dev/${disk}): fewer writes, no swap on it"
-mount -o remount,noatime,commit=60 / || true
+echo "bau-usb-guard: the system runs from a USB stick (/dev/${disk}): smaller writes, no swap on it"
+sysctl -q vm.dirty_background_bytes=16777216 vm.dirty_bytes=50331648 || true
 sysctl -q vm.dirty_writeback_centisecs=1500 vm.dirty_expire_centisecs=6000 || true
+if [ "${live}" = 1 ]; then
+  findmnt -rno TARGET | grep '^/run/live/persistence/' | while read -r m; do
+    mount -o remount,noatime,commit=60 "${m}" || true
+  done
+  exit 0
+fi
+mount -o remount,noatime,commit=60 / || true
 tail -n +2 "${SWAPS}" | while read -r dev _; do
   if [ "$(disk_of "${dev}")" = "${disk}" ]; then
     swapoff "${dev}" || true

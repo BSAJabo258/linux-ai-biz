@@ -27,18 +27,28 @@ case "$1" in
       /dev/mapper/root) printf 'root crypt\\nsda3 part\\nsda disk\\n' ;;
       /dev/dm-1) printf 'dm-1 lvm\\nsda3 part\\nsda disk\\n' ;;
       /dev/nvme0n1p3) printf 'nvme0n1p3 part\\nnvme0n1 disk\\n' ;;
+      /dev/sdb1) printf 'sdb1 part\\nsdb disk\\n' ;;
     esac ;;
   -dno) echo "$FAKE_TRAN" ;;
 esac
 """
 
 
-def guard(tmp_path, tran):
+FAKE_FINDMNT = """#!/bin/sh
+case "$*" in
+  "-no SOURCE /") echo "${FAKE_ROOT:-/dev/mapper/root}" ;;
+  "-no SOURCE /run/live/medium") [ -n "${FAKE_MEDIUM:-}" ] && echo "$FAKE_MEDIUM" || exit 1 ;;
+  "-rno TARGET") printf '/\\n/run/live/medium\\n/run/live/persistence/dm-0\\n/home\\n' ;;
+esac
+"""
+
+
+def guard(tmp_path, tran, **fake):
     bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
+    bin_dir.mkdir(parents=True)
     log = tmp_path / "log"
     (bin_dir / "lsblk").write_text(FAKE_LSBLK)
-    (bin_dir / "findmnt").write_text("#!/bin/sh\necho /dev/mapper/root\n")
+    (bin_dir / "findmnt").write_text(FAKE_FINDMNT)
     for name in ("mount", "swapoff", "sysctl"):
         (bin_dir / name).write_text(f'#!/bin/sh\necho "{name} $*" >> "{log}"\n')
     for f in bin_dir.iterdir():
@@ -49,7 +59,7 @@ def guard(tmp_path, tran):
                      "/dev/zram0 partition 999 0 100\n"
                      "/dev/nvme0n1p3 partition 999 0 -3\n")
     env = {**os.environ, "PATH": f"{bin_dir}:/usr/bin:/bin", "FAKE_TRAN": tran,
-           "BAU_PROC_SWAPS": str(swaps)}
+           "BAU_PROC_SWAPS": str(swaps), **fake}
     r = subprocess.run(["sh", str(GUARD)], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     return log.read_text().splitlines() if log.exists() else []
@@ -61,6 +71,30 @@ def test_on_a_usb_stick_it_writes_less_and_stops_swapping_onto_it(tmp_path):
     assert "swapoff /dev/dm-1" in calls                      # swap on the same stick
     assert not any("zram0" in c or "nvme0n1p3" in c for c in calls)  # nothing else
     assert any(c.startswith("sysctl -q vm.dirty_writeback_centisecs=") for c in calls)
+
+
+DIRTY = ("sysctl -q vm.dirty_background_bytes=16777216 vm.dirty_bytes=50331648")
+
+
+def test_on_a_usb_stick_it_writes_in_small_steps(tmp_path):
+    # With 8 GB of memory Linux gathers over a gigabyte of unwritten data and then writes
+    # it to the stick in one go (a model download, the pack); everything that must read
+    # from the stick meanwhile, the whole desktop, waits and seems dead.
+    assert DIRTY in guard(tmp_path, "usb")
+
+
+def test_the_live_stick_eases_its_storage_too(tmp_path):
+    # On the live stick / is an overlay in memory, but the system and the encrypted
+    # storage are both on the stick it started from.
+    calls = guard(tmp_path, "usb", FAKE_ROOT="overlay", FAKE_MEDIUM="/dev/sdb1")
+    assert DIRTY in calls
+    assert "mount -o remount,noatime,commit=60 /run/live/persistence/dm-0" in calls
+    assert not any(c.endswith(" /") for c in calls) and not any("swapoff" in c for c in calls)
+
+
+def test_a_live_system_started_from_a_drive_changes_nothing(tmp_path):
+    assert guard(tmp_path / "a", "nvme", FAKE_ROOT="overlay", FAKE_MEDIUM="/dev/sdb1") == []
+    assert guard(tmp_path / "b", "usb", FAKE_ROOT="overlay") == []      # no medium found
 
 
 def test_on_the_laptops_own_drive_it_changes_nothing(tmp_path):
@@ -145,10 +179,11 @@ def test_health_console_runs_on_its_own_screen_and_comes_back():
     assert "bau-health-console" in hook and "chmod 0755" in hook
 
 
-def fake_machine(tmp_path, mem_kb=5_000_000, stick=True, temp=52000):
+def fake_machine(tmp_path, mem_kb=5_000_000, stick=True, temp=52000, dirty_kb=2048):
     proc, sys_ = tmp_path / "proc", tmp_path / "sys"
     proc.mkdir(parents=True)
-    (proc / "meminfo").write_text(f"MemTotal: 7900000 kB\nMemAvailable: {mem_kb} kB\n")
+    (proc / "meminfo").write_text(f"MemTotal: 7900000 kB\nMemAvailable: {mem_kb} kB\n"
+                                  f"Dirty: {dirty_kb} kB\nWriteback: 1024 kB\n")
     (proc / "loadavg").write_text("0.52 0.40 0.31 1/300 4242\n")
     (proc / "cmdline").write_text("boot=live " + " ".join(STEADY) + "\n")
     wl = sys_ / "class" / "net" / "wlp2s0"
@@ -193,6 +228,12 @@ def test_health_console_tells_why_wifi_is_off_and_shows_the_vitals(tmp_path):
     assert "4882 MB free" in out and "52" in out        # memory and heat
     assert "i915.enable_psr=0" in out                   # the steady options are in use
     assert "STICK GONE" not in out
+    assert "3 MB waiting to be written" in out
+
+
+def test_health_console_shows_when_writing_to_the_stick_holds_everything_up(tmp_path):
+    out = console(tmp_path, dirty_kb=600_000)
+    assert "DISK BUSY" in out and "586 MB" in out
 
 
 def test_health_console_shouts_when_the_stick_drops_out_or_memory_runs_out(tmp_path):

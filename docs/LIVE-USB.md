@@ -190,6 +190,18 @@ causes on that laptop:
 
 They cost a little battery. A stick installed with the BAU installer gets them too.
 
+**Big copies no longer freeze the desktop.** With 8 GB of memory, Linux normally gathers
+over a gigabyte of data before writing it out (a model download, the BAU Pack). It then
+writes all of it to the stick in one go. On a slow stick that takes minutes, and every
+program that needs to read from the stick waits, so the desktop seems dead. The stick now
+writes in small steps (at most 48 MB waiting), on the live stick as well as on a stick
+BAU is installed on. To try this on a stick made before the change, type once after
+unlocking:
+
+```bash
+sudo sysctl vm.dirty_background_bytes=16777216 vm.dirty_bytes=50331648
+```
+
 **Plug the stick into the port on the right side.** The two ports on the left are
 Thunderbolt; the right one is plain USB-C and is the steadiest place for the stick.
 
@@ -197,9 +209,10 @@ Thunderbolt; the right one is plain USB-C and is the steadiest place for the sti
 even when the rest of the system has stopped, and shows:
 
 - why Wi-Fi is off (no driver, switched off, or the card's firmware complaining);
-- every 30 seconds: free memory, heat, and whether the stick is still there;
-- **STICK GONE**, **MEMORY ALMOST FULL** or **HOT** in capitals when one of those is the
-  cause;
+- every 30 seconds: free memory, heat, how much is waiting to be written, and whether
+  the stick is still there;
+- **STICK GONE**, **DISK BUSY**, **MEMORY ALMOST FULL** or **HOT** in capitals when one of
+  those is the cause;
 - the kernel's warnings as they happen.
 
 Take a photo of that screen and send it: it says which of the causes it is.
