@@ -3,10 +3,11 @@
 # desktop (it changes every 10 minutes between the pictures in /usr/share/backgrounds/bau)
 # and the dark theme. After that it never touches your choices: change them in Settings.
 set -u
-mark="${XDG_CONFIG_HOME:-${HOME}/.config}/bau/look-applied"
+# v2: the anime scenes replaced the inkblot pictures, so the new look is applied once more.
+mark="${XDG_CONFIG_HOME:-${HOME}/.config}/bau/look-applied-v2"
 [[ -e ${mark} ]] && exit 0
 command -v xfconf-query >/dev/null || exit 0
-art=/usr/share/backgrounds/bau/wall-moon.jpg
+art=/usr/share/backgrounds/bau/wall-dusk.jpg
 [[ -f ${art} ]] || exit 0
 
 xfconf-query -c xsettings -p /Net/ThemeName -n -t string -s Adwaita-dark

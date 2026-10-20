@@ -1,10 +1,25 @@
 # The BAU look: your art, gently alive
 
 Your art sits behind Jarvis and Mission Control, and on the stick's desktop and login
-screen. It is "alive" in a way an 8 GB laptop can afford: still pictures with a light
-animation in the page (a slow breathing glow, a golden pulse rising along the centre
-line, embers drifting up; faster while Jarvis is thinking). No video wallpaper, so the
-AI model keeps the memory and the battery lasts.
+screen. It is "alive" in a way an 8 GB laptop can afford: no video wallpaper, so the AI
+model keeps the memory and the battery lasts.
+
+## Two anime scenes, painted live (the default)
+
+BAU paints two original anime-style scenes itself, so they never end and stay sharp
+(better than a looping GIF, which repeats every few seconds and goes blurry):
+
+- **Dusk:** a city at sunset: a big moon, stars that twinkle and a shooting star now and
+  then, long clouds lit pink and gold from below, warm windows in the buildings, a red
+  light blinking on a tower, power lines, and cherry petals drifting past.
+- **Summer:** tall summer clouds, white in the sun and blue in their own shade, the sun
+  with its rays and lens flare, green hills with grass moving in the wind, power lines
+  and a few petals.
+
+Jarvis stays in one scene for about 40 seconds, then breathes it into his glass core and
+the other one unfurls out, like dusk turning into day. The petals and clouds move faster
+while he thinks. The desktop and the login screen show the same two scenes as still
+pictures (the desktop changes between them every 10 minutes).
 
 If your computer is set to reduce motion, the animation stops and the picture stays still.
 
@@ -36,8 +51,9 @@ Your mouse bends the light a little where it points, and the picture and its glo
 part slightly as it moves, like looking through a window.
 
 ```bash
-bau look flow gold earth moon   # only these pictures, in this order
-bau look flow all               # every picture, your own included (the default)
+bau look flow dusk summer gold  # only these pictures, in this order
+bau look flow all               # every picture there is
+bau look flow default           # back to the two anime scenes and your own pictures
 bau look alive off              # one still picture instead
 ```
 
@@ -51,7 +67,9 @@ with "reduce motion" on, you get the still picture.
 
 ```bash
 bau look                 # what is in use, and the choices
-bau look set moon        # the moonlit one (the default)
+bau look set dusk        # the anime city at dusk (the default)
+bau look set summer      # the anime summer sky
+bau look set moon        # the moonlit inkblot one
 bau look set light       # the white BAU one
 bau look set watercolor  # the watercolour BAU one
 bau look set gold        # the dark gold one

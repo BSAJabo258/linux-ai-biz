@@ -29,17 +29,20 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 
 def test_shipped_art_and_wallpapers():
     art = resources.files("bau.ui") / "art"
-    for name in [f"{n}.jpg" for n in L.SHIPPED] + [f"wall-{n}.jpg" for n in L.SHIPPED]:
+    for name in [f"{n}.jpg" for n in L.SHIPPED] + [f"wall-{n}.jpg" for n in L.LIVE]:
         assert (art / name).read_bytes()[:3] == b"\xff\xd8\xff", name
+    assert not (art / "wall-moon.jpg").is_file()        # the owner did not like the inkblots
     pil = pytest.importorskip("PIL.Image")
-    with pil.open(str(art / "wall-moon.jpg")) as im:
-        assert im.size == (1920, 1080)
+    for n in L.LIVE:
+        with pil.open(str(art / f"wall-{n}.jpg")) as im:
+            assert im.size == (1920, 1080)
 
 
-def test_default_is_the_moon_and_alive(tmp_path):
+def test_default_is_the_anime_dusk_and_alive(tmp_path):
     got = L.show(tmp_path)
-    assert got["art"] == "moon" and got["alive"] is True
-    assert {"moon", "light", "watercolor", "gold", "earth", "none"} <= set(got["choices"])
+    assert got["art"] == "dusk" and got["alive"] is True
+    assert {"dusk", "summer", "moon", "light", "watercolor", "gold", "earth", "none"} <= \
+        set(got["choices"])
 
 
 def test_owner_picks_the_art_and_can_switch_it_off(tmp_path):
@@ -100,8 +103,8 @@ def test_jarvis_serves_the_art_and_tells_the_page(jarvis):
     with urllib.request.urlopen(req) as r:
         assert "img-src 'self'" in r.headers["Content-Security-Policy"]
         look = json.loads(r.read())["look"]
-        assert look["art"] == "moon" and look["alive"] is True
-        assert look["flow"][0] == "moon" and len(look["flow"]) == len(L.SHIPPED)
+        assert look["art"] == "dusk" and look["alive"] is True
+        assert look["flow"] == ["dusk", "summer"] and look["live"] == ["dusk", "summer"]
     L.set_look(home, art="none")
     with pytest.raises(urllib.error.HTTPError) as e:
         urllib.request.urlopen(url + "/art")
@@ -121,7 +124,7 @@ def test_the_page_brings_the_art_to_life_calmly():
 # ------------------------------------------------------------------ liquid: the art melts
 
 def test_the_flow_starts_with_the_chosen_art_and_holds_the_rest(tmp_path):
-    assert L.brief(tmp_path)["flow"] == ["moon", "light", "watercolor", "gold", "earth"]
+    assert L.brief(tmp_path)["flow"] == ["dusk", "summer"]          # the live anime scenes
     L.set_look(tmp_path, art="gold")
     assert L.brief(tmp_path)["flow"][0] == "gold"
     L.set_look(tmp_path, flow=["earth", "moon"])
@@ -129,10 +132,10 @@ def test_the_flow_starts_with_the_chosen_art_and_holds_the_rest(tmp_path):
     assert L.show(tmp_path)["flow"] == ["earth", "moon"]
     with pytest.raises(ValueError):
         L.set_look(tmp_path, flow=["moon", "nope"])
-    L.set_look(tmp_path, flow=[])                                       # empty = all of them
-    assert len(L.show(tmp_path)["flow"]) == len(L.SHIPPED)
+    L.set_look(tmp_path, flow=[])                                       # empty = the default
+    assert L.show(tmp_path)["flow"] == ["dusk", "summer"]
     L.set_look(tmp_path, art="none")
-    assert L.brief(tmp_path) == {"art": None, "alive": True, "flow": []}
+    assert L.brief(tmp_path) == {"art": None, "alive": True, "flow": [], "live": ["dusk", "summer"]}
 
 
 def test_owner_art_joins_the_flow(tmp_path):
@@ -183,12 +186,23 @@ def test_the_core_is_a_glass_drop_that_breathes_the_pictures():
     assert "EMBERS = " in page and "% 3600" in page           # few of them; time kept small
 
 
+def test_the_anime_scenes_are_painted_live_in_jarvis():
+    page = (resources.files("bau.ui") / "jarvis.html").read_text()
+    assert "SCENE_FS" in page and "LOOK.live" in page           # drawn by the GPU, not a file
+    assert "dusk(" in page and "summer(" in page                # the two scenes
+    assert "createFramebuffer" in page and "uFullA" in page     # melted, seen through the glass
+    assert "SCENE_HOLD_MS" in page                              # a scene stays longer
+    assert "petals(" in page and "powerLines(" in page
+
+
 def test_cli_look_flow(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("BAU_HOME", str(tmp_path))
     assert cli.main(["look", "flow", "gold", "earth"]) == 0
     assert json.loads(capsys.readouterr().out)["flow"] == ["gold", "earth"]
-    assert cli.main(["look", "flow", "all"]) == 0
+    assert cli.main(["look", "flow", "all"]) == 0                 # every picture there is
     assert len(json.loads(capsys.readouterr().out)["flow"]) == len(L.SHIPPED)
+    assert cli.main(["look", "flow", "default"]) == 0
+    assert json.loads(capsys.readouterr().out)["flow"] == ["dusk", "summer"]
 
 
 # ------------------------------------------------------------------ Mission Control too
@@ -196,7 +210,7 @@ def test_cli_look_flow(tmp_path, monkeypatch, capsys):
 def test_mission_control_serves_the_art_and_its_choice(tmp_path):
     from bau.ui.server import _api, serve
     got = _api("/api/look", tmp_path)
-    assert got["art"] == "moon" and got["alive"] is True
+    assert got["art"] == "dusk" and got["alive"] is True
     srv = serve(0, tmp_path)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
@@ -233,7 +247,7 @@ def test_stick_puts_the_art_on_the_desktop_and_login_screen():
     assert "/usr/share/backgrounds/bau" in hook and '"${art}"/wall-*.jpg' in hook
     greeter = (CONF / "includes.chroot" / "etc" / "lightdm" / "lightdm-gtk-greeter.conf.d" /
                "50-bau.conf").read_text()
-    assert "background=/usr/share/backgrounds/bau/wall-moon.jpg" in greeter
+    assert "background=/usr/share/backgrounds/bau/wall-dusk.jpg" in greeter
     assert "theme-name=Adwaita-dark" in greeter
     auto = (CONF / "includes.chroot" / "etc" / "xdg" / "autostart" /
             "bau-look.desktop").read_text()
