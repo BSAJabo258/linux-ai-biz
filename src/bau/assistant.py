@@ -899,8 +899,10 @@ class Assistant:
         note = (f"[The owner confirmed {p.tool}. Result: "
                 f"{json.dumps(out, default=str)[:800]}]")
         self._log("system", note)
-        # keep the model's view consistent: the result arrives as a user-side note
-        self.messages.append({"role": "user", "content": note})
+        # keep the model's view consistent: the result arrives as a user-side note, and
+        # what a platform answered is data, never instructions
+        from .agents import untrusted
+        self.messages.append({"role": "user", "content": untrusted(p.tool, note)[0]})
         self.messages.append({"role": "assistant", "content": [
             {"type": "text", "text": "Done." if ok else "That didn't go through."}]})
         return {"done": ok, "result": out}
@@ -1062,7 +1064,7 @@ class Assistant:
             self.last_model = (getattr(self.provider, "answered_by", None)
                                or self.model.get("id") or resp.model)
             if resp.refused:
-                self.messages.pop()            # keep history valid for the next turn
+                del self.messages[start:]  # whole turn: no tool call left without its result
                 final = "I can't help with that one."
                 break
             raw = resp.raw_assistant

@@ -41,7 +41,7 @@ INJECTION = re.compile(
 def untrusted(source: str, text: str) -> tuple[str, bool]:
     """Wrap external content as data; flag likely injection attempts for the audit log."""
     flagged = bool(INJECTION.search(text))
-    safe = text.replace("</untrusted_data>", "</untrusted_data_>")
+    safe = re.sub(r"<\s*/\s*untrusted_data\s*>", "</untrusted_data_>", text, flags=re.I)
     return (f'<untrusted_data source="{source}" injection_suspected="{str(flagged).lower()}">'
             f"\n{safe}\n</untrusted_data>"), flagged
 

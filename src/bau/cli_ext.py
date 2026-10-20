@@ -496,7 +496,7 @@ def cmd_pack(a):
                         P.run_cmd, who, AuditLog(),
                         read_pass=lambda: getpass.getpass("Passphrase for BAU-KEYS.enc: "))
         _out(out)
-    except (P.PackError, OSError) as e:
+    except (P.PackError, OSError, ValueError) as e:
         raise SystemExit(f"bau pack: {e}") from None
     return 0
 

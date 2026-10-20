@@ -304,3 +304,21 @@ def test_the_still_picture_fills_the_screen_for_a_scene_and_phones_read_the_capt
     phone = page[page.index("@media (max-width:760px)"):]
     assert "#caption{" in phone and "background:var(--panel)" in phone   # readable over the ring
     assert "#text::placeholder" in phone
+
+
+def test_the_page_has_no_known_leaks_loops_or_echo():
+    # From the overhaul review: each of these was a real path to an echo, a stuck screen,
+    # a growing loop, or the art giving up for good after the laptop slept.
+    page = (resources.files("bau.ui") / "jarvis.html").read_text()
+    assert "micAnalyser" in page                       # the mic never plays through speakers
+    assert "micSrc.disconnect()" in page and "srcNode.disconnect()" in page
+    assert "catch (e) { setState(\"idle\")" in page     # a failed button never sticks on thinking
+    assert "cancelAnimationFrame(eyeRaf)" in page      # one map loop, not one per click
+    assert "nodesLoading" in page                      # one overview request at a time
+    assert "if (now - last > 1000)" in page and "slow = 0" in page   # sleep is not slowness
+    assert "gl.deleteTexture" in page                  # pictures leaving the flow are freed
+    assert "wakeFail" in page                          # a wake word that can't work says so
+    assert "if (wv.width !== cw)" in page              # the voice bar is not reallocated per frame
+    assert "clipUrl" in page and "URL.revokeObjectURL(clipUrl)" in page
+    ps = page[page.index("function paintState(s) {"):]
+    assert ps.index("if (!s) return;") < ps.index("applyLook(s.look)")

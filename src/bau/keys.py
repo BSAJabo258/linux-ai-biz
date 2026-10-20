@@ -58,21 +58,21 @@ def _unquote(v: str) -> str:
 
 
 def parse(text: str) -> dict[str, str]:
-    lines = [ln.strip() for ln in text.splitlines()]
-    body = [ln for ln in lines if ln]
-    if not body or body[0] != HEADER:
+    body = [(n, ln.strip()) for n, ln in enumerate(text.splitlines(), 1) if ln.strip()]
+    if not body or body[0][1] != HEADER:
         raise KeyFileError("not a BAU keys file (or a wrong passphrase)")
     out: dict[str, str] = {}
-    for ln in body[1:]:
+    for n, ln in body[1:]:
         if ln.startswith("#"):
             continue
         ln = ln.removeprefix("export ").strip()
         name, sep, value = ln.partition("=")
         name, value = name.strip(), _unquote(value)
+        # By line number only: a bad line can be part of a secret (a key over several lines).
         if not sep or not NAME_RE.match(name) or name.startswith(NEVER):
-            raise KeyFileError(f"not an API key name: {name[:40]!r}")
+            raise KeyFileError(f"line {n} is not NAME=value with an API key name")
         if any(c in value for c in "\"'\\") or any(ord(c) < 32 for c in value):
-            raise KeyFileError(f"{name}: the value has characters a key never has")
+            raise KeyFileError(f"line {n} ({name}): the value has characters a key never has")
         if value:
             out[name] = value
     return out

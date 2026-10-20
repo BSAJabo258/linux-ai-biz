@@ -335,6 +335,7 @@ async function settle(r) {
 let STATE = "idle";            // idle | listening | thinking | speaking
 let level = 0, target = 0;     // speaking/listening loudness 0..1
 let analyser = null, actx = null, buf = null;
+let micAnalyser = null, micSrc = null;   // the mic gets its own analyser: never to the speakers
 const LABEL = { idle: "STANDBY", listening: "LISTENING", thinking: "PROCESSING", speaking: "SPEAKING" };
 const HUE = { idle: [63, 214, 255], listening: [255, 179, 64], thinking: [169, 139, 255], speaking: [63, 214, 255] };
 function setState(s) { STATE = s; $("statelabel").textContent = LABEL[s];
@@ -434,7 +435,10 @@ function drawOrb(X, Y, R, now) {
 const wv = document.getElementById("wave"), wx = wv ? wv.getContext("2d") : null;
 function drawWave(now) {
   if (!wx) return;
-  const w = wv.width = wv.clientWidth * DPR, h = wv.height = wv.clientHeight * DPR, bars = 31, mid = h / 2;
+  const cw = Math.round(wv.clientWidth * DPR), ch = Math.round(wv.clientHeight * DPR);
+  if (wv.width !== cw) wv.width = cw;            // resizing reallocates: only when it changed
+  if (wv.height !== ch) wv.height = ch;
+  const w = wv.width, h = wv.height, bars = 31, mid = h / 2;
   wx.clearRect(0, 0, w, h);
   const c = STATE === "idle" ? [93, 138, 163] : STATE === "speaking" ? GOLD : col;
   for (let i = 0; i < bars; i++) {
@@ -452,8 +456,9 @@ function frame(now) {
     // The browser's own voice never passes through the analyser, so silence there while
     // speaking falls back to the envelope instead of a dead orb.
     let heard = 0;
-    if (analyser && (STATE === "speaking" || STATE === "listening")) {
-      analyser.getByteTimeDomainData(buf); let sum = 0;
+    const an = STATE === "listening" ? micAnalyser : analyser;
+    if (an && (STATE === "speaking" || STATE === "listening")) {
+      an.getByteTimeDomainData(buf); let sum = 0;
       for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
       heard = Math.min(1, Math.sqrt(sum / buf.length) * 4);
     }
@@ -506,7 +511,8 @@ function ensureAudio() {
   if (actx) return;
   try { actx = new (window.AudioContext || window.webkitAudioContext)();
     analyser = actx.createAnalyser(); analyser.fftSize = 1024; buf = new Uint8Array(analyser.fftSize);
-    analyser.connect(actx.destination); } catch (e) { actx = null; analyser = null; }
+    analyser.connect(actx.destination);
+    micAnalyser = actx.createAnalyser(); micAnalyser.fftSize = 1024; } catch (e) { actx = null; analyser = null; }
 }
 function stopSpeaking() {
   speakToken++;
@@ -531,9 +537,11 @@ async function speak(text) {
       const url = URL.createObjectURL(await r.blob());
       if (my !== speakToken) return;
       const a = new Audio(url); current = a;
-      try { if (actx) { actx.createMediaElementSource(a).connect(analyser); } } catch (e) {}
+      let srcNode = null;
+      try { if (actx) { srcNode = actx.createMediaElementSource(a); srcNode.connect(analyser); } } catch (e) {}
       await new Promise((res) => { a.onended = a.onerror = res; a.play().catch(res); });
       URL.revokeObjectURL(url);
+      try { if (srcNode) srcNode.disconnect(); } catch (e) {}
     } else if ("speechSynthesis" in window) {
       await new Promise((res) => { const u = new SpeechSynthesisUtterance(text);
         const v = pickVoice(); if (v) u.voice = v; u.rate = 1.04; u.pitch = 0.92;
@@ -1132,14 +1140,16 @@ const liquid = (() => {
   function draw(now) {
     raf = requestAnimationFrame(draw);
     if (now - last < 1000 / LIQUID_FPS) return;
+    if (now - last > 1000) { win = now; frames = 0; }   // after sleep or a hidden tab: not slowness
     const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
     if (!A) return;
     frames++;
     if (!win) win = now;
     if (now - win > 5000) {                  // keeping up? if not: smaller, then the still picture
       const fps = frames * 1000 / (now - win); frames = 0; win = now;
-      if (fps < LIQUID_MIN_FPS && ++slow >= 2) { giveUp(); return; }
-      if (fps < LIQUID_MIN_FPS) { scale = LIQUID_SCALE * 0.6; size(); }
+      if (fps >= LIQUID_MIN_FPS) slow = 0;
+      else if (++slow >= 2) { giveUp(); return; }
+      else { scale = LIQUID_SCALE * 0.6; size(); }
     }
     const want = (ENERGY[STATE] || 0.2) + level * 0.4;
     E += (want - E) * Math.min(1, dt * 2);
@@ -1180,8 +1190,19 @@ const liquid = (() => {
     show(names) {
       const key = names.join("|");
       if (key !== flow.join("|")) {
+        for (const [n, v] of cache) {        // free what left the flow
+          if (names.includes(n) || !v || !v.tex) continue;
+          gl.deleteTexture(v.tex); if (v.fb) gl.deleteFramebuffer(v.fb); cache.delete(n);
+        }
         flow = names; at = 0; A = null; B = null;
-        load(flow[0]).then((got) => { if (got && got.tex && flow[0] === names[0]) { A = got; since = performance.now(); next(); } });
+        const first = async (i) => {         // a missing picture: try the next one, else the still
+          if (flow !== names) return;
+          if (i >= names.length) { giveUp(); return; }
+          const got = await load(names[i]);
+          if (flow !== names) return;
+          if (got && got.tex) { at = i; A = got; since = performance.now(); next(); } else first(i + 1);
+        };
+        first(0);
       }
       c.classList.add("on"); LIQ = true; document.body.classList.add("liquid"); run();
     },
@@ -1204,8 +1225,8 @@ function applyLook(look) {
   el.classList.add("on");
 }
 function paintState(s) {
-  applyLook(s.look);
   if (!s) return;
+  applyLook(s.look);
   const backups = s.backups || [];
   $("c-mode").textContent = s.mode === "model"
     ? (s.model || "MODEL") + (backups.length ? " + " + backups.length + " BACKUP" : "") : "PLAIN MODE";
@@ -1313,7 +1334,7 @@ async function startListening() {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
       if (!live) { stream.getTracks().forEach(t => t.stop()); return; }
-      try { if (actx) actx.createMediaStreamSource(stream).connect(analyser); } catch (e) {}
+      try { if (actx) { if (micSrc) micSrc.disconnect(); micSrc = actx.createMediaStreamSource(stream); micSrc.connect(micAnalyser); } } catch (e) {}
       const type = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
       rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined); chunks = [];
       rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
@@ -1337,6 +1358,7 @@ async function stopListening() {
   const r = rec; rec = null;
   const done = new Promise(res => { r.onstop = res; }); try { r.stop(); } catch (e) {}
   await done; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null;
+  try { if (micSrc) { micSrc.disconnect(); micSrc = null; } } catch (e) {}
   const blob = new Blob(chunks, { type: (r.mimeType || "audio/webm") });
   if (blob.size < 2000) { setState("idle"); caption("Hold the button while you talk."); return; }
   setState("thinking"); caption("…");
@@ -1421,7 +1443,10 @@ function drawLinks(X, Y, R, now) {
     }
   }
 }
+let nodesLoading = false;
 async function loadNodes() {
+  if (nodesLoading) return;                      // one overview request at a time
+  nodesLoading = true;
   try {
     const o = await apiJson("/api/overview");
     const box = $("nodes"), old = Object.fromEntries(NODES.map(n => [n.id, n]));
@@ -1438,6 +1463,7 @@ async function loadNodes() {
     if (SEL) { SEL = NODES.find(n => n.id === SEL.id) || null; const d = $("detail");
       if (SEL && !(d && d.dataset.keep)) showDetail(SEL); }
   } catch (e) { /* the screen keeps working without the map */ }
+  finally { nodesLoading = false; }
 }
 addEventListener("resize", drawerChanged);
 function openNode(id) { const n = NODES.find(x => x.id === id); if (!n) return;
@@ -1450,7 +1476,9 @@ function cmd(p, text) { const c = el("code", "cmd", text); c.title = "Click to c
   c.onclick = () => { try { navigator.clipboard.writeText(text); c.textContent = "copied ✓"; setTimeout(() => c.textContent = text, 1200); } catch (e) {} };
   p.appendChild(c); }
 function button(p, label, fn, owner) { const b = el("button", "act" + (owner ? " owner" : ""), label);
-  b.onclick = async () => { b.disabled = true; try { await fn(); } finally { b.disabled = false; } }; p.appendChild(b); return b; }
+  b.onclick = async () => { b.disabled = true;
+    try { await fn(); } catch (e) { setState("idle"); caption("That didn't work: " + ((e && e.message) || e)); }
+    finally { b.disabled = false; } }; p.appendChild(b); return b; }
 function showDetail(n) {
   const cls = { ok: "ok", warn: "warn", bad: "bad" }[n.state] || "";
   const p = panel(n.label, cls); p.id = "detail";
@@ -1551,6 +1579,7 @@ async function openEditor(p, e, stage, fresh) {
 function field(wrap, label, node) { const id = "st-" + label.toLowerCase().replace(/\W+/g, "-");
   const l = el("label", null, label); l.htmlFor = id; node.id = id; wrap.appendChild(l); wrap.appendChild(node); return node; }
 function choice(opts, val) { const sel = el("select", "q"); for (const o of opts) { const op = el("option", null, o); op.value = o; sel.appendChild(op); } sel.value = val; return sel; }
+let clipUrl = null;                      // the studio clip being played
 async function renderStudio(p) {
   const wrap = el("div"); p.appendChild(wrap);
   let d; try { d = await settle(await apiJson("/api/studio")); } catch (e) { wrap.appendChild(el("div", "issue", e.message)); return; }
@@ -1578,7 +1607,9 @@ async function renderStudio(p) {
     card.appendChild(el("div", null, c.model + " · " + c.duration + " s · " + c.aspect_ratio + " · $" + Number(c.usd).toFixed(2) + (c.note ? " · " + c.note : "")));
     if (c.status === "completed") button(card, "Play", async () => {
       const r = await api("/api/studio/clip/" + encodeURIComponent(c.id)); if (!r.ok) { caption("That clip file is missing."); return; }
-      const v = el("video"); v.controls = true; v.playsInline = true; v.style.width = "100%"; v.src = URL.createObjectURL(await r.blob());
+      if (clipUrl) URL.revokeObjectURL(clipUrl);   // one clip in memory at a time
+      clipUrl = URL.createObjectURL(await r.blob());
+      const v = el("video"); v.controls = true; v.playsInline = true; v.style.width = "100%"; v.src = clipUrl;
       card.appendChild(v); p.dataset.keep = "1"; v.play().catch(() => {}); });
     wrap.appendChild(card);
   }
@@ -1621,13 +1652,15 @@ function openEye(d) {
     : d.list.slice(0, 12).map(s => s.name + " · " + s.inclination + "° · " + s.orbits_per_day + " orbits a day");
   const ol = el("ol"); items.forEach(t => ol.appendChild(el("li", null, t))); box.appendChild(ol);
   EYE = { d, cv, t0: performance.now() }; x.focus();
-  requestAnimationFrame(eyeFrame);
+  if (eyeRaf) cancelAnimationFrame(eyeRaf);      // one drawing loop, not one per click
+  eyeRaf = requestAnimationFrame(eyeFrame);
 }
-function closeEye() { const b = $("eye"); if (b) b.remove(); EYE = null; }
+let eyeRaf = 0;
+function closeEye() { const b = $("eye"); if (b) b.remove(); EYE = null; if (eyeRaf) cancelAnimationFrame(eyeRaf); eyeRaf = 0; }
 function eyeFrame(t) {
   if (!EYE) return;
   const { cv, d } = EYE, css = getComputedStyle(document.documentElement), dpr = window.devicePixelRatio || 1;
-  const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) { requestAnimationFrame(eyeFrame); return; }
+  const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) { eyeRaf = requestAnimationFrame(eyeFrame); return; }
   if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
   const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   const cyan = css.getPropertyValue("--cyan").trim(), gold = css.getPropertyValue("--gold").trim(), red = css.getPropertyValue("--red").trim();
@@ -1656,7 +1689,7 @@ function eyeFrame(t) {
     } else { g.globalAlpha = .9; g.fillStyle = cyan; g.beginPath(); g.arc(px, py, 2.2, 0, 7); g.fill(); }
   }
   g.globalAlpha = 1;
-  if (!REDUCED) requestAnimationFrame(eyeFrame);
+  if (!REDUCED) eyeRaf = requestAnimationFrame(eyeFrame);
 }
 // The usage meter: tokens and dollars per model today and this week, the owner's daily
 // limits (set only in the terminal), warnings, and GitHub's limits from Repo Scout.
@@ -1869,7 +1902,7 @@ paintAlerts();
 // ---------------------------------------------------------------- wake word (opt-in)
 // Off on every page load. When on, this tab's speech recognition listens for "Jarvis";
 // it stops as soon as you leave the page and never runs while Jarvis is talking.
-let wakeOn = false, wakeRec = null, armed = false;
+let wakeOn = false, wakeRec = null, armed = false, wakeFail = null;
 function paintWake() { $("c-wake").textContent = wakeOn ? "WAKE WORD ON" : "WAKE WORD OFF"; $("c-wake").classList.toggle("on", wakeOn); }
 function wakeListen() {
   if (!wakeOn || wakeRec || document.hidden || live || STATE === "speaking" || STATE === "thinking") return;
@@ -1880,8 +1913,14 @@ function wakeListen() {
       if (i < 0) return;
       const rest = t.slice(i + 6).replace(/^[\s,.!?]+/, "");
       if (rest) ask(rest); else { armed = true; caption("Yes?"); } };
-    wakeRec.onend = () => { wakeRec = null; setTimeout(wakeListen, 400); };
-    wakeRec.onerror = () => {};
+    wakeRec.onend = () => { wakeRec = null;
+      if (wakeFail) {                      // it can't work here: say why, don't retry forever
+        wakeOn = false; paintWake();
+        caption(wakeFail === "network" ? "This browser can't listen for a wake word here. Hold the mic button instead."
+          : "The microphone isn't allowed for this page, so the wake word is off.");
+        wakeFail = null; return; }
+      setTimeout(wakeListen, 400); };
+    wakeRec.onerror = (e) => { if (["network", "not-allowed", "service-not-allowed"].includes(e.error)) wakeFail = e.error; };
     wakeRec.start();
   } catch (e) { wakeRec = null; }
 }

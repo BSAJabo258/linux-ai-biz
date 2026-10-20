@@ -41,6 +41,12 @@ touch "${LOG}" && chmod 0600 "${LOG}"
 # ---------------------------------------------------------------- 1. verify payload
 log "verifying payload checksums"
 (cd "${HERE}" && sha256sum --quiet --strict -c SHA256SUMS) || die "payload corrupted or modified"
+# Every file must be listed too: sha256sum only checks the files SHA256SUMS names, so a
+# wheel or unit file added to the stick would otherwise be installed and run as root.
+unlisted="$(cd "${HERE}" && comm -23 \
+  <(find . -type f ! -name SHA256SUMS ! -name SHA256SUMS.asc | sed 's|^\./||' | sort) \
+  <(sed -E 's/^[0-9a-f]{64} [ *]//; s|^\./||' SHA256SUMS | sort))"
+[[ -z "${unlisted}" ]] || die "payload has files not in SHA256SUMS: ${unlisted//$'\n'/ }"
 if [[ -f "${HERE}/SHA256SUMS.asc" ]]; then
   if [[ -n "${EXPECT_FPR}" ]]; then
     st="$(gpg --batch --status-fd 1 --verify "${HERE}/SHA256SUMS.asc" "${HERE}/SHA256SUMS" 2>/dev/null || true)"

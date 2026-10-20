@@ -18,6 +18,13 @@ if ! /usr/local/bin/jarvis-storage status >/dev/null 2>&1; then
   exit 0
 fi
 
+# The files in the encrypted storage keep the bau account's number from the image that
+# made them; a newer image can number the account differently. Give them back to bau.
+if [[ -d /var/lib/bau && "$(stat -c %u /var/lib/bau)" != "$(id -u bau)" ]]; then
+  echo "bau-live-init: the storage came from another image: handing its files back to bau"
+  chown -R bau:bau /var/lib/bau
+  [[ -d /etc/bau ]] && chgrp -R bau /etc/bau
+fi
 install -d -m 0750 -o root -g bau /etc/bau
 install -d -m 2770 -o bau -g bau /var/lib/bau
 umask 077

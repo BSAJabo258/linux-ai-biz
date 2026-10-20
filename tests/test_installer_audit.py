@@ -72,3 +72,25 @@ def test_upgrade_restarts_long_running_services():
     assert long_running, "expected at least one long-running service"
     for svc in long_running:
         assert re.search(rf"systemctl (try-)?restart [^\n]*{re.escape(svc)}", sh), svc
+
+
+def test_install_refuses_payload_files_that_are_not_in_sha256sums(tmp_path):
+    # sha256sum -c only checks the files it lists: a wheel or unit added to the stick
+    # would otherwise be installed and run as root, even with a good signature.
+    import subprocess
+    text = (Path(__file__).resolve().parents[1] / "installer" / "payload" /
+            "install.sh").read_text()
+    block = text[text.index('(cd "${HERE}" && sha256sum'):text.index('[[ -z "${unlisted}" ]]')]
+    block += '[[ -z "${unlisted}" ]] || die "payload has files not in SHA256SUMS: ${unlisted}"\n'
+    here = tmp_path / "p"
+    (here / "wheels").mkdir(parents=True)
+    (here / "wheels" / "bau-1.0-py3-none-any.whl").write_text("w")
+    subprocess.run("sha256sum ./wheels/*.whl > SHA256SUMS", shell=True, cwd=here, check=True)
+    script = 'die() { echo "DIE: $*"; exit 3; }\nset -euo pipefail\n' + block + 'echo OK\n'
+    ok = subprocess.run(["bash", "-c", script], env={"HERE": str(here), "PATH": "/usr/bin:/bin"},
+                        capture_output=True, text=True)
+    assert ok.stdout.strip() == "OK", ok.stderr
+    (here / "wheels" / "bau-9.9.9-py3-none-any.whl").write_text("evil")
+    bad = subprocess.run(["bash", "-c", script], env={"HERE": str(here), "PATH": "/usr/bin:/bin"},
+                         capture_output=True, text=True)
+    assert bad.returncode == 3 and "bau-9.9.9" in bad.stdout

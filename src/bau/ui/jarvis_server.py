@@ -50,6 +50,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
              "studio": threading.Lock(), "godseye": threading.Lock(),
              "results": threading.Lock()}
     jobs: dict[str, dict[str, Any]] = {}  # slow answers the page is checking back on
+    last_overview: dict[str, Any] = {}    # served while a model turn holds the lock
 
     def state() -> dict[str, Any]:
         from ..look import brief
@@ -59,7 +60,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 "backups": list(assistant.model.get("fallbacks") or []),
                 "answered_by": assistant.last_model,
                 "voice": voice.available, "listen": voice.can_listen,
-                "pending": [p.public() for p in assistant.pending.values()]}
+                "pending": [p.public() for p in list(assistant.pending.values())]}
 
     def waiting() -> list[dict[str, Any]]:
         """What already waits for the owner while a slow answer is still being written: a
@@ -209,9 +210,18 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
             elif path == "/api/state":
                 self._json(200, self._state())
             elif path == "/api/overview":
+                # Never wait for a long model turn: the page polls this, and waiting
+                # requests use up the browser's few connections and stall the live feed.
                 from ..overview import overview
-                with lock:
-                    self._json(200, overview(assistant))
+                if lock.acquire(blocking=False):
+                    try:
+                        last_overview["data"] = overview(assistant)
+                    finally:
+                        lock.release()
+                elif "data" not in last_overview:
+                    with lock:
+                        last_overview["data"] = overview(assistant)
+                self._json(200, last_overview["data"])
             elif path == "/api/activity":
                 q = dict(p.partition("=")[::2] for p in query.split("&") if p)
                 try:
