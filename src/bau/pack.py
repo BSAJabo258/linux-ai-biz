@@ -19,11 +19,12 @@ from __future__ import annotations
 
 import datetime as dt
 import glob
+import grp
 import hashlib
 import json
 import os
+import pwd
 import re
-import shutil
 import subprocess
 import time
 from collections.abc import Callable
@@ -190,12 +191,30 @@ def scan(pack: Path, recs: dict[str, dict[str, Any]], check_hash: bool = True
     return out
 
 
+def _new_file(path: Path):
+    """A fresh file opened for writing that never follows a link. /var/lib/bau is
+    writable by the bau service account, and the install runs as root: a link planted
+    there must not make root write to (or hand over) another file."""
+    path.unlink(missing_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    return os.fdopen(fd, "wb")
+
+
+def _safe_write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".new")
+    with _new_file(tmp) as f:
+        f.write(text.encode())
+    os.replace(tmp, path)                       # replaces a planted link, never follows it
+    os.chmod(path, 0o644)
+
+
 def _copy_verified(src: Path, dst: Path, want: str) -> bool:
     """Copy while hashing; the file lands under its name only if the hash matches."""
     part = dst.with_name(dst.name + ".part")
     h = hashlib.sha256()
     try:
-        with src.open("rb") as fi, part.open("wb") as fo:
+        with src.open("rb") as fi, _new_file(part) as fo:
             while b := fi.read(CHUNK):
                 fo.write(b)
                 h.update(b)
@@ -208,11 +227,14 @@ def _copy_verified(src: Path, dst: Path, want: str) -> bool:
 
 
 def _owned_by_bau(path: Path, mode: int) -> None:
+    if path.is_symlink():                       # never chmod/chown through a link
+        raise PackError(f"{path} is a link; remove it and run the install again")
     os.chmod(path, mode)
     if os.geteuid() == 0:
         try:
-            shutil.chown(path, "root" if path.suffix == ".env" else "bau", "bau")
-        except (LookupError, OSError):
+            os.chown(path, pwd.getpwnam("root" if path.suffix == ".env" else "bau").pw_uid,
+                     grp.getgrnam("bau").gr_gid, follow_symlinks=False)
+        except (KeyError, OSError):
             pass
 
 
@@ -230,6 +252,8 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
     out: dict[str, Any] = {"pack": str(pack), "copied": [], "already": [], "skipped": {},
                            "approved": [], "boss": None, "keys": None, "problems": []}
     models = home / "models"
+    if models.is_symlink():
+        raise PackError(f"{models} is a link; remove it and run the install again")
     models.mkdir(parents=True, exist_ok=True)
 
     say("Checking the models on the stick (each against its pinned SHA-256)...")
@@ -260,9 +284,13 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
     boss = next((m for m in BOSS_ORDER if m in have), None)
     if boss and ask(f"Use {boss} as the local model Jarvis runs on (starts it now)?"):
         _register(home, boss, recs[boss])
-        _start(boss, recs[boss], models, etc, run, say)
-        res = _measure(boss, bench or _bench(home, by, audit), say, sleep)
-        if res is None:
+        started = _start(boss, recs[boss], models, etc, run, say)
+        res = _measure(boss, bench or _bench(home, by, audit), say, sleep) if started else None
+        if not started:
+            out["problems"].append("bau-llm.service is not on this laptop, so the model "
+                                   "could not start: install BAU from the stick first "
+                                   "(docs/PACK.md)")
+        elif res is None:
             out["problems"].append(f"{boss} did not answer; look at: journalctl -u bau-llm")
         elif not res.get("reply_ok"):
             out["problems"].append(f"{boss} did not answer properly, so it is not approved")
@@ -281,7 +309,10 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
     if enc.is_file() and ask("Import your keys from BAU-KEYS.enc (asks for its passphrase)?"):
         if read_pass is None:
             raise PackError("no way to ask for the passphrase")
-        out["keys"] = keys.import_file(enc, read_pass(), etc, audit, by)
+        try:
+            out["keys"] = keys.import_file(enc, read_pass(), etc, audit, by)
+        except ValueError as e:            # a wrong passphrase: say so, keep going
+            out["problems"].append(f"keys not imported: {e}")
 
     text = laptop_report(run)
     try:
@@ -290,8 +321,7 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
         say(f"Laptop report written to the stick: {REPORT}")
     except OSError:                         # a drive opened read-only, e.g. Windows' own
         here = home / "reports" / REPORT
-        here.parent.mkdir(parents=True, exist_ok=True)
-        here.write_text(text)
+        _safe_write(here, text)
         out["report"] = str(here)
         say(f"The pack is read-only here, so the laptop report is in {here}")
     return out
@@ -311,7 +341,12 @@ def _wifi(pack: Path, ask: Ask, run: Run, say: Callable[..., None]) -> str | Non
     if not ask("Install the Wi-Fi programs from the stick (wpasupplicant and helpers)?"):
         return "skipped"
     say("Installing the Wi-Fi programs...")
-    run(["apt-get", "install", "-y", *[str(folder / d["file"]) for d in WIFI_DEBS]])
+    said = run(["apt-get", "install", "-y", *[str(folder / d["file"]) for d in WIFI_DEBS]])
+    # apt can refuse (an older version than the laptop has, a missing dependency):
+    # trust only what dpkg says is installed.
+    if "install ok installed" not in run(["dpkg-query", "-W", "-f=${Status}", "wpasupplicant"]):
+        last = said.strip().splitlines()[-1][:200] if said.strip() else "nothing"
+        return f"not installed: apt said {last}"
     run(["systemctl", "restart", "NetworkManager"])
     return "installed"
 
@@ -325,14 +360,15 @@ def _register(home: Path, mid: str, rec: dict[str, Any]) -> None:
 
 
 def _start(mid: str, rec: dict[str, Any], models: Path, etc: Path, run: Run,
-           say: Callable[..., None]) -> None:
+           say: Callable[..., None]) -> bool:
     etc.mkdir(parents=True, exist_ok=True)
     env = etc / "llm.env"
     env.write_text(f"BAU_LLM_MODEL={models / rec['download']['file']}\n"
                    f"BAU_LLM_ALIAS={rec.get('api_model') or mid}\n")
     _owned_by_bau(env, 0o640)
     say(f"Starting {mid}...")
-    run(["systemctl", "restart", "bau-llm.service"])
+    said = run(["systemctl", "restart", "bau-llm.service"])
+    return "not found" not in said and "not loaded" not in said
 
 
 def _bench(home: Path, by: str, audit: Any) -> Callable[[str], dict[str, Any]]:
@@ -368,8 +404,7 @@ def approve(home: Path, mid: str, by: str, audit: Any, rec: dict[str, Any],
     if errs:
         raise ValueError("; ".join(errs))
     reg.data["model"][mid] = new
-    reg.path.parent.mkdir(parents=True, exist_ok=True)
-    reg.path.write_text(yaml.safe_dump(reg.data, sort_keys=True))
+    _safe_write(reg.path, yaml.safe_dump(reg.data, sort_keys=True))
     if audit is not None:
         audit.append("registry.status", by, {"kind": "model", "key": mid,
                                              "status": "APPROVED"})

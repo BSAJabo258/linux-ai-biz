@@ -145,3 +145,34 @@ def test_confirm_is_never_focused_and_ignores_the_first_moment():
     assert 'querySelector(".box")).focus()' in page and 'class="box" tabindex="-1"' in page
     assert "const CONFIRM_SETTLE_MS = 900;" in page
     assert "if (approve && performance.now() - shownAt < CONFIRM_SETTLE_MS) return;" in page
+
+
+def test_the_screen_keeps_answering_while_jarvis_thinks(tmp_path):
+    # /api/overview used to wait for the whole model turn; the page polls it, the waiting
+    # requests used up the browser's connections and the live feed stalled.
+    import time
+
+    from bau.ui.jarvis_server import serve
+    gate = threading.Event()
+
+    class Slow(ScriptedProvider):
+        def complete(self, *a, **k):
+            gate.wait(10)
+            return super().complete(*a, **k)
+
+    a = Assistant(tmp_path, Slow(["done"]), MODEL, "human:owner",
+                  AuditLog(tmp_path / "audit" / "chain.jsonl", key=b""))
+    srv, _ = serve(a, Voice(tmp_path), 0, key="k123")
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        assert call(url, "/api/overview")[0] == 200
+        threading.Thread(target=call, args=(url, "/api/ask", {"text": "think hard"}),
+                         daemon=True).start()
+        time.sleep(0.5)
+        t0 = time.monotonic()
+        code, o = call(url, "/api/overview")
+        assert code == 200 and o["nodes"] and time.monotonic() - t0 < 2
+    finally:
+        gate.set()
+        srv.shutdown()

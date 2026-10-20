@@ -140,6 +140,7 @@ if ((use_local)); then
 fi
 
 say "Ready"
+touch "${BAU_HOME}/.setup-done" 2>/dev/null || true   # it stops opening at every login
 if ask "Talk to Jarvis now?"; then
   exec bau jarvis
 fi

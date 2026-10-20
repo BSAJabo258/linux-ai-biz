@@ -44,7 +44,13 @@ function Get-BauSha256([string]$Path) {
 }
 
 function Select-BauStick {
-    $drives = @([IO.DriveInfo]::GetDrives() | Where-Object { $_.DriveType -eq "Removable" -and $_.IsReady })
+    # Bigger USB sticks and USB SSDs often call themselves "Fixed": also take any drive
+    # on a USB disk. Never the Windows drive (that is not on USB).
+    $usb = @(Get-Disk -ErrorAction SilentlyContinue | Where-Object { $_.BusType -eq "USB" } |
+        Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } |
+        ForEach-Object { "$($_.DriveLetter):\" })
+    $drives = @([IO.DriveInfo]::GetDrives() | Where-Object {
+        $_.IsReady -and ($_.DriveType -eq "Removable" -or $usb -contains $_.Name) })
     if (-not $drives.Count) {
         Write-Host "No USB stick found. Plug one in (8 GB or more) and run this again." -ForegroundColor Yellow
         exit 1
@@ -110,12 +116,12 @@ On the BAU laptop, plug in this stick and open it once in the file manager.
 
 If the laptop has no Wi-Fi (laptops installed from a stick made before 18 October
 2026), first open a terminal and type these four lines:
-  cd /media/$USER/*/BAU-PACK/wifi
+  cd /media/`$USER/*/BAU-PACK/wifi
   sha256sum -c SHA256SUMS
   sudo apt install ./*.deb
   sudo systemctl restart NetworkManager
 Then pick your Wi-Fi from the network icon. Once it is connected, bring BAU up to date:
-  sudo /opt/bau/venv/bin/pip install --no-deps --upgrade /media/$USER/*/BAU-PACK/bau-main.zip
+  sudo /opt/bau/venv/bin/pip install --no-deps --upgrade /media/`$USER/*/BAU-PACK/bau-main.zip
 
 Then, in the terminal:
   sudo bau pack install

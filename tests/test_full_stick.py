@@ -138,6 +138,8 @@ def _late_command(tmp_path: Path) -> Path:
         (timers / u).symlink_to(f"/etc/systemd/system/{u}")
     (etc / "xdg" / "autostart").mkdir(parents=True)
     (etc / "xdg" / "autostart" / "my-jarvis-setup.desktop").write_text("[Desktop Entry]\n")
+    (target / "usr" / "share" / "applications").mkdir(parents=True)
+    (target / "usr" / "share" / "applications" / "my-jarvis-setup.desktop").write_text("x")
     fake = tmp_path / "bin"
     fake.mkdir()
     # in-target runs a command inside /target: here, rewrite its absolute paths instead.
@@ -185,6 +187,35 @@ def test_live_only_startup_is_removed_from_the_installed_laptop(tmp_path):
     enabled = {p.name for p in units.glob("*.wants/*")}
     assert enabled == {"bau-llm.service", "ssh.service"}       # llm waits on /etc/bau/llm.env
     assert not (target / "etc" / "xdg" / "autostart" / "my-jarvis-setup.desktop").exists()
+    # the menu entry too: on the laptop it only offered a storage setup that refuses
+    assert not (target / "usr" / "share" / "applications" / "my-jarvis-setup.desktop").exists()
+
+
+def test_the_model_service_gives_up_instead_of_reloading_forever():
+    # Bad settings or port 8080 taken: every restart reloads gigabytes from the stick.
+    unit = (LB / "config" / "includes.chroot" / "etc" / "systemd" / "system" /
+            "bau-llm.service").read_text()
+    head = unit.split("[Service]")[0]
+    assert "StartLimitIntervalSec=" in head and "StartLimitBurst=" in head
+
+
+def test_storage_from_an_older_image_is_given_back_to_bau():
+    # The bau account's number can differ between images; the files in the encrypted
+    # storage keep the old one and the services could no longer read them.
+    init = (LB / "config" / "includes.chroot" / "usr" / "local" / "sbin" /
+            "bau-live-init").read_text()
+    assert "stat -c %u /var/lib/bau" in init and "chown -R" in init
+
+
+def test_setup_stops_opening_once_it_is_done_even_without_a_local_model():
+    auto = (LB / "config" / "includes.chroot" / "etc" / "xdg" / "autostart" /
+            "my-jarvis-setup.desktop").read_text()
+    setup = (LB / "config" / "includes.chroot" / "usr" / "local" / "bin" /
+             "jarvis-setup").read_text()
+    assert "/var/lib/bau/.setup-done" in auto and ".setup-done" in setup
+    journald = (LB / "config" / "includes.chroot" / "etc" / "systemd" / "journald.conf.d" /
+                "bau.conf").read_text()
+    assert "live stick" in journald                     # says honestly where logs survive
 
 
 def test_live_to_disk_only_touches_what_the_live_image_added():
@@ -233,3 +264,38 @@ def test_the_stick_carries_every_package_install_sh_needs():
 def test_owner_guide_explains_a_phone_as_the_network():
     doc = (ROOT / "docs" / "LIVE-USB.md").read_text()
     assert "USB tethering" in doc
+
+
+def test_a_mistyped_passphrase_leaves_the_stick_as_it_was(monkeypatch, capsys):
+    # sfdisk adds the partition before cryptsetup asks for the passphrase twice. A typo
+    # used to leave an empty partition behind, and setup then found "0 MB free" for good.
+    import subprocess as sp
+
+    from bau import live as L
+    tables = [{"partitiontable": {"partitions": [{"node": "/dev/sdb1"}]}},
+              {"partitiontable": {"partitions": [{"node": "/dev/sdb1"}, {"node": "/dev/sdb3"}]}}]
+    monkeypatch.setattr(L, "boot_disk", lambda: "/dev/sdb")
+    monkeypatch.setattr(L, "_table", lambda d: tables.pop(0) if tables else None)
+    monkeypatch.setattr(L, "_geometry", lambda d: (250_000_000, 512))
+    monkeypatch.setattr(L, "needs_gpt_relocation", lambda t, s: False)
+
+    class Plan:
+        disk, gib, new_table = "/dev/sdb", 100, False
+        def sfdisk_input(self): return "size=+\n"
+    monkeypatch.setattr(L, "plan_free_space", lambda *a: Plan())
+    ran = []
+
+    def run(cmd, **kw):
+        ran.append(cmd)
+        code = 2 if cmd[:2] == ["cryptsetup", "luksFormat"] else 0
+        if kw.get("check") and code:
+            raise sp.CalledProcessError(code, cmd)
+        return sp.CompletedProcess(cmd, code, "", "")
+    monkeypatch.setattr(L.subprocess, "run", run)
+    monkeypatch.setattr("builtins.input", lambda *_: "YES")
+    with pytest.raises(L.StorageError, match="removed again"):
+        L.setup(None, None, False)
+    assert sum(c[:2] == ["cryptsetup", "luksFormat"] for c in ran) == 3        # three tries
+    assert ["sfdisk", "--no-reread", "--no-tell-kernel", "--delete", "/dev/sdb", "3"] in ran
+    assert ["partx", "-d", "--nr", "3", "/dev/sdb"] in ran
+    assert not any(c[:2] == ["cryptsetup", "open"] for c in ran)

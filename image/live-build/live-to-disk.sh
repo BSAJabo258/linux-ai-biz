@@ -22,7 +22,8 @@ for f in "$U"/*.service.d/live.conf; do
   rm -f "$f"
   rmdir "$(dirname "$f")" 2>/dev/null || true
 done
-rm -f "$T/etc/xdg/autostart/my-jarvis-setup.desktop"
+rm -f "$T/etc/xdg/autostart/my-jarvis-setup.desktop" \
+  "$T/usr/share/applications/my-jarvis-setup.desktop"
 for u in bau-recover.service bau-ui.service bau-governor.timer bau-regwatch.timer; do
   rm -f "$U"/*.wants/"$u"
 done

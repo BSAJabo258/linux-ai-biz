@@ -12,6 +12,9 @@ Then carry BAU-KEYS.enc to the BAU laptop and run: sudo bau keys import BAU-KEYS
 The file is AES-256 locked in openssl's format (PBKDF2-SHA256, 600000 rounds), so the
 laptop opens it with openssl. docs/KEYS.md explains every step.
 #>
+# Only -From takes bare paths (the .env files to read); -Out must be named, so a bare path
+# can never be taken for the output and overwritten with the locked file.
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [string]$Out = (Join-Path (Get-Location) "BAU-KEYS.enc"),
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$From = @(),

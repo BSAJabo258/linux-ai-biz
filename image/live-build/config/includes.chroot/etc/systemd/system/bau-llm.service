@@ -1,6 +1,10 @@
 [Unit]
 Description=My Jarvis local model (llama.cpp llama-server on 127.0.0.1:8080)
 ConditionPathExists=/etc/bau/llm.env
+# Bad settings or port 8080 taken: give up after 3 tries in 5 minutes instead of
+# reloading the model from the stick every 5 seconds forever.
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
 User=bau

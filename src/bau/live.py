@@ -183,7 +183,8 @@ def setup(device: str | None, passphrase_file: str | None, yes: bool) -> int:
           "--wipe-partitions", "never"] + ([] if plan.new_table else ["--append"]) + [plan.disk],
          input=plan.sfdisk_input(), capture_output=True)
     after = _table(plan.disk) or {}
-    new = [p for p in after["partitiontable"]["partitions"] if p["node"] not in before]
+    new = [p for p in after.get("partitiontable", {}).get("partitions", [])
+           if p["node"] not in before]
     if len(new) != 1:
         raise StorageError("could not find the new partition; nothing was encrypted")
     part = new[0]["node"]
@@ -193,8 +194,19 @@ def setup(device: str | None, passphrase_file: str | None, yes: bool) -> int:
     _run(["udevadm", "settle"])
 
     key = ["--key-file", passphrase_file] if passphrase_file else []
-    _run(["cryptsetup", "luksFormat", "--batch-mode", "--type", "luks2", "--label", LABEL,
-          *([] if passphrase_file else ["--verify-passphrase"]), *key, part])
+    fmt = ["cryptsetup", "luksFormat", "--batch-mode", "--type", "luks2", "--label", LABEL,
+           *([] if passphrase_file else ["--verify-passphrase"]), *key, part]
+    for _ in range(1 if passphrase_file else 3):        # a typo in the second passphrase
+        if subprocess.run(fmt, text=True).returncode == 0:
+            break
+        print("The passphrases did not match (or encryption failed). Try again.")
+    else:
+        # Take the empty partition away again, or setup would find no free space next time.
+        subprocess.run(["sfdisk", "--no-reread", "--no-tell-kernel", "--delete", plan.disk,
+                        number], capture_output=True)
+        subprocess.run(["partx", "-d", "--nr", number, plan.disk], capture_output=True)
+        raise StorageError("encryption did not start, so the new partition was removed "
+                           "again; nothing else changed. Run jarvis-setup again.")
     _run(["cryptsetup", "open", *key, part, MAPPER])
     mnt = Path("/run") / MAPPER
     try:

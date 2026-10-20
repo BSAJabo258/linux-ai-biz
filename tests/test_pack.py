@@ -401,6 +401,8 @@ def test_windows_script_never_picks_the_stick_and_uses_real_curl():
     assert not re.search(r"\b(Format-Volume|Clear-Disk|Initialize-Disk|Remove-Partition)\b",
                          code, re.I)
     assert "??" not in code                        # Windows PowerShell 5.1 has no ??
+    assert "BusType" in code                       # USB drives that call themselves "Fixed"
+    assert "/media/`$USER/" in text and "/media/$USER/" not in text.replace("`$USER", "")
     raw = CMD.read_bytes()
     assert b"\r\n" in raw and b"pause" in raw and b"bau-pack-make.ps1" in raw
 
@@ -498,7 +500,7 @@ def test_wifi_programs_are_installed_only_on_yes_and_only_when_checked(tmp_path,
     assert not any(c[0] == "apt-get" for c in run.calls)
 
     shutil.rmtree(tmp_path / "home")
-    run = Runner()
+    run = Runner({"dpkg-query": "install ok installed"})
     _, _, out = do_install(tmp_path, pack, Owner("Wi-Fi"), run=run)
     apt = next(c for c in run.calls if c[0] == "apt-get")
     assert apt[:3] == ["apt-get", "install", "-y"]
@@ -541,3 +543,56 @@ def test_a_model_missing_from_the_laptop_registry_is_registered_before_measuring
               by="human:owner", bench=bench, records=records(), say=lambda *_: None,
               sleep=lambda _: None)
     assert seen == ["REGISTERED"]
+
+
+# ------------------------------------------------------------------ overhaul check
+
+def test_wifi_says_so_when_apt_did_not_install_it(tmp_path, monkeypatch):
+    # e.g. the laptop already has a newer wpasupplicant: apt refuses the older one.
+    pack = make_pack(tmp_path)
+    monkeypatch.setattr(P, "WIFI_DEBS", make_wifi(pack))
+    _, _, out = do_install(tmp_path, pack, Owner("Wi-Fi"),
+                           run=Runner({"apt-get": "E: downgrade refused",
+                                       "dpkg-query": "unknown ok not-installed"}))
+    assert out["wifi"].startswith("not installed")
+
+
+def test_a_missing_model_service_is_said_plainly_not_waited_for(tmp_path):
+    pack = make_pack(tmp_path)
+    waited = []
+    _, _, out = do_install(tmp_path, pack, Owner("local model"),
+                           bench=lambda mid: waited.append(mid) or good_bench(mid),
+                           run=Runner({"systemctl": "Unit bau-llm.service not found."}))
+    assert waited == [] and out["approved"] == []
+    assert any("bau-llm.service" in p and "not on this laptop" in p for p in out["problems"])
+
+
+def test_a_wrong_passphrase_is_a_problem_and_the_report_is_still_written(tmp_path, monkeypatch):
+    pack = make_pack(tmp_path, keys=True)
+
+    def bad(*a, **k):
+        raise P.keys.KeyFileError("not a BAU keys file (or a wrong passphrase)")
+    monkeypatch.setattr(P.keys, "import_file", bad)
+    _, _, out = do_install(tmp_path, pack, Owner("keys"), read_pass=lambda: "nope")
+    assert out["keys"] is None and any("passphrase" in p for p in out["problems"])
+    assert out.get("report")
+
+
+def test_install_never_follows_a_planted_link(tmp_path):
+    # /var/lib/bau is writable by the bau service account; run as root, a link planted
+    # there must never make the install write to (or hand over) another file.
+    pack = make_pack(tmp_path)
+    home, _ = make_home(tmp_path)
+    victim = tmp_path / "victim"
+    victim.write_text("root stuff")
+    rec = next(iter(records().values()))["download"]
+    (home / "models").mkdir(parents=True, exist_ok=True)
+    (home / "models" / (rec["file"] + ".part")).symlink_to(victim)
+    P.install(pack, home, tmp_path / "etc", ask=Owner(), run=Runner(), by="human:owner",
+              audit=None, records=records(), say=lambda *_: None, sleep=lambda _: None)
+    assert victim.read_text() == "root stuff"
+    (home / "reports").mkdir(exist_ok=True)
+    report = home / "reports" / P.REPORT
+    report.symlink_to(victim)
+    assert P._safe_write(report, "report") is None or True
+    assert victim.read_text() == "root stuff" and not report.is_symlink()

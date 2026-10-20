@@ -14,7 +14,36 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 614 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 632 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+
+Overhaul check (2026-10-20, owner: "check everything before the next stick"). Ran: full
+suite, ruff, reg validate, secrets, shellcheck on all 25 shell scripts (incl. the image's
+own), every stick package and install.sh package against the trixie indexes (all exist;
+the 7 pinned Wi-Fi debs still current), a real payload build (checksums OK), systemd-analyze
+verify on every unit, the Docker test drive (Mission Control healthy, selftest ok), a
+browser click-through of Jarvis (desktop + phone) and all 9 Mission Control views, a 9-min
+soak, and three code reviews. Fixed (each with a test):
+- pack install as root followed links planted in /var/lib/bau (bau account -> root):
+  O_EXCL|O_NOFOLLOW writes, chown without following, refuse linked models dir;
+- install.sh installed payload files SHA256SUMS does not list (an added wheel ran as root);
+- keys: errors named a bad line by its text (part of a secret): now by line number;
+  bau-keys-export.ps1's documented call overwrote the .env (PositionalBinding off);
+  pack README's /media/$USER was eaten by PowerShell; USB drives reporting "Fixed" missed;
+- pack: wrong passphrase was a traceback (now a problem, report still written); Wi-Fi said
+  "installed" when apt refused; a missing bau-llm.service is said plainly, not waited for;
+- Jarvis: a refusal after a tool call broke the history until restart; confirmed results
+  reached the model without untrusted(); </untrusted_data> closable in other spellings;
+  /api/overview waited for whole model turns (page stalled): serves the last one instead;
+- page: mic played through the speakers; a failed draft left "thinking"; map loops stacked;
+  the art gave up for good after sleep; textures never freed; wave canvas reallocated per
+  frame; audio sources and clip URLs leaked; wake word retried forever; tab icon (404);
+  phones: readable caption, full hint, scene fills the still picture;
+- stick: a typo in the second passphrase left an empty partition ("0 MB free" for good);
+  bau-llm restarted forever (start limit); storage from another image handed back to bau;
+  Setup no longer opens at every login once done; menu entry removed after install.
+Left (minor, noted): bau-look-desktop marks done even if xfdesktop names its monitor
+differently; pending cards never expire; pack README's pip install of bau-main.zip is
+unpinned; nftables enabled before its config check.
 
 The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
 from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
