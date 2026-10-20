@@ -48,6 +48,8 @@ scrub() {
   run ip -brief link
   run ip -brief address
   run rfkill list
+  run nvidia-smi
+  run vulkaninfo --summary
   run nmcli device status
   run nmcli radio all
   run upower -d
@@ -98,6 +100,35 @@ radios() {
   if have nmcli; then nmcli -t -f TYPE,STATE device 2>/dev/null | sed 's/^/  /'; fi
 }
 
+# The graphics card decides which local models run fast: its memory and the driver loaded.
+graphics() {
+  local f gb found=0
+  if have lspci; then
+    lspci -nnk | awk '
+      /^[0-9a-f]/ { if (dev != "") report(); dev = $0; drv = ""; next }
+      /Kernel driver in use:/ { sub(/.*in use: /, ""); drv = $0 }
+      END { if (dev != "") report() }
+      function report() {
+        if (dev ~ /VGA|3D controller|Display controller/)
+          printf "  %s\n      driver: %s\n", dev, (drv == "" ? "NO DRIVER LOADED" : drv)
+      }'
+  fi
+  if have nvidia-smi; then
+    nvidia-smi --query-gpu=name,memory.total,driver_version,compute_cap \
+      --format=csv,noheader 2>/dev/null | sed 's/^/  nvidia-smi: /'
+    found=1
+  fi
+  for f in /sys/class/drm/card*/device/mem_info_vram_total; do
+    [[ -r "${f}" ]] || continue
+    gb=$(( $(cat "${f}") / 1073741824 ))
+    echo "  graphics memory (${f#/sys/class/drm/}): ${gb} GB"
+    found=1
+  done
+  if [[ "${found}" -eq 0 ]]; then
+    echo "  graphics memory: not shown (NVIDIA needs its own driver for that; nouveau does not report it)"
+  fi
+}
+
 disks() {
   if have lsblk; then lsblk -d -o NAME,MODEL,SIZE,TRAN,TYPE 2>/dev/null | sed 's/^/  /'
   else echo "  (lsblk not available)"; fi
@@ -109,6 +140,7 @@ disks() {
   echo "Memory:"; memory; echo
   echo "Firmware and processor:"; firmware; echo
   echo "Disks:"; disks; echo
+  echo "Graphics card (for local AI models):"; graphics; echo
   echo "Devices and their drivers:"; devices; echo
   echo "Missing firmware:"; missing_firmware; echo
   echo "Radios (Wi-Fi / Bluetooth, blocked or not):"; radios; echo

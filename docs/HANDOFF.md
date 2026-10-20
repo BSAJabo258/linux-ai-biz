@@ -495,6 +495,14 @@ reads back what `remember` saved (memory used to be write-only for him).
 
 ## Next steps (in order)
 
+### 0. Desktop edition (owner's decision, 2026-10-20)
+
+The owner's desktop (12 GB graphics card, spare 1 TB drive, one USB stick) gets **its own
+design**: its own model, tools, workflows and look, with the same `CLAUDE.md` rules. Design
+waits for the owner's desktop check report (`installer/BAU-Desktop-Check.cmd`). The plan and
+open questions are in [DESKTOP.md](DESKTOP.md). Follow the "Check yourself" rules in
+`CLAUDE.md`: no driver, package or model choice from memory.
+
 ### 1. VM rehearsal on this computer (the owner's current goal)
 
 Files the owner needs in `Downloads`:
