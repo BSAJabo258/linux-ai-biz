@@ -1,0 +1,52 @@
+#!/bin/bash
+# "Install BAU to a disk" from inside the live desktop (docs/LIVE-USB.md). The live stick's
+# system space is RAM (about half of it), so programs installed there vanish at restart and
+# fill memory. This shows the disks, says which one never to pick, and on a y restarts to
+# the stick's start menu, where "Install BAU on this laptop" does the install. It changes
+# nothing itself.
+set -u
+
+if [[ ! -d /run/live/medium ]]; then
+  echo "BAU is already installed on this computer's disk: programs you install stay."
+  read -r -p "Press Enter to close. " _
+  exit 0
+fi
+
+boot_part="$(findmnt -no SOURCE /run/live/medium 2>/dev/null)"
+boot_disk="$(lsblk -no PKNAME "${boot_part}" 2>/dev/null | head -n 1)"
+
+cat <<'EOF'
+INSTALL BAU TO A DISK
+
+Right now BAU runs from the stick. Its system space is in memory: anything you install
+here is gone at the next restart, and big installs fill the laptop's memory.
+Installed on a disk, BAU keeps everything you install, and it has the whole disk.
+
+EOF
+echo "System space in memory: $(df -h --output=used,size / | tail -n 1 | awk '{print $1 " of " $2 " used"}')"
+echo
+echo "Disks on this computer:"
+lsblk -dno NAME,SIZE,TRAN,MODEL 2>/dev/null | while read -r name size tran model; do
+  [[ ${name} == loop* || ${name} == sr* || ${name} == zram* || ${name} == fd* ]] && continue
+  note=""
+  [[ ${name} == "${boot_disk}" ]] && note="  <- the stick BAU started from: NEVER pick this one"
+  printf '  %-8s %7s  %-5s %s%s\n' "${name}" "${size}" "${tran:--}" "${model}" "${note}"
+done
+cat <<'EOF'
+
+How to install:
+  1. Restart (this asks first).
+  2. In the stick's start menu, choose "Install BAU on this laptop"
+     (arrow down, then Enter).
+  3. Pick the disk you want BAU on (for example your 64 GB stick or the laptop's own
+     disk). Everything on that disk is erased, so copy off what you need first.
+  4. Choose the passphrase and the password when it asks. Nothing is chosen for you.
+
+EOF
+read -r -p "Restart now to install? Type y and Enter (anything else: cancel): " answer
+if [[ ${answer} == y ]]; then
+  systemctl reboot
+else
+  echo "Cancelled. Nothing was changed."
+  read -r -p "Press Enter to close. " _
+fi

@@ -86,6 +86,28 @@ see the dashboard. Setup can be run again any time; it only does what is still m
 This menu is what UEFI PCs (nearly every PC from the last ten years) show. Older BIOS-only
 PCs show a simpler menu: choose the first entry for a normal start.
 
+## Installing programs while running from the stick
+
+Running from the stick, the system's "disk" is a slice of the laptop's **memory**: about
+half of it (3.7 GB on an 8 GB laptop). Only your files and settings are kept on the
+encrypted storage. So, on the live stick:
+
+- **programs you install are gone at the next restart;**
+- **big installs fill memory.** When that slice is full, nothing more installs (apt says
+  *"You don't have enough free space in /var/cache/apt/archives/"*), and the laptop is
+  short of memory for Jarvis and the desktop. Linux may then stop a program. The stick
+  tells Linux to stop the local model first (it restarts by itself), so your terminal and
+  the desktop are spared where possible.
+
+The laptop check shows how full it is (`system space (in memory, live stick)`).
+
+**To install programs that stay, put BAU on a disk:** open **Install BAU to a disk**
+from the applications menu (System). It lists the disks, marks the stick BAU started
+from (never pick that one), and on your `y` restarts to the start menu.
+
+`bau pack install` refuses to copy the models into this memory: start My Jarvis normally
+and unlock your encrypted storage first, or install BAU to a disk.
+
 ## Install BAU on this laptop
 
 When you want BAU on a laptop's own drive instead of running it from the stick:

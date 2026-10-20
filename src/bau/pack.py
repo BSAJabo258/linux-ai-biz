@@ -25,6 +25,7 @@ import json
 import os
 import pwd
 import re
+import shutil
 import subprocess
 import time
 from collections.abc import Callable
@@ -238,13 +239,49 @@ def _owned_by_bau(path: Path, mode: int) -> None:
             pass
 
 
+SPARE = 512 << 20            # room left over after the copy, for logs and the system
+
+
+def _space(path: Path) -> tuple[int, bool]:
+    """Free bytes where the models go, and whether that is the live stick's memory: on the
+    live system the root is an overlay on a RAM tmpfs (live-boot: 50% of RAM), so
+    anything copied there without the encrypted storage open fills the laptop's memory."""
+    while not path.exists() and path != path.parent:     # e.g. /var/lib/bau without storage
+        path = path.parent
+    free = shutil.disk_usage(path).free
+    fstype = ""
+    best = -1
+    for line in Path("/proc/mounts").read_text().splitlines():
+        parts = line.split()
+        if len(parts) > 2 and str(path).startswith(parts[1]) and len(parts[1]) > best:
+            best, fstype = len(parts[1]), parts[2]
+    return free, Path("/run/live/medium").is_dir() and fstype in ("overlay", "tmpfs")
+
+
+def _check_room(need: int, models: Path, space: Callable[[Path], tuple[int, bool]]) -> None:
+    if need <= 0:
+        return
+    free, in_memory = space(models)
+    if in_memory:
+        raise PackError(
+            f"{models} is in the live stick's memory, not on a disk: copying "
+            f"{need / 2**30:.1f} GB there would fill the laptop's memory and stop programs. "
+            "Start My Jarvis normally and unlock your encrypted storage (or install BAU to a "
+            "disk from the stick's start menu), then run this again.")
+    if free < need + SPARE:
+        raise PackError(
+            f"Not enough room in {models}: the models need {need / 2**30:.1f} GB plus "
+            f"{SPARE >> 20} MB spare, and {free / 2**30:.1f} GB is free. Nothing was copied.")
+
+
 # ------------------------------------------------------------------ install
 def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str,
             audit: Any = None, bench: Callable[[str], dict[str, Any]] | None = None,
             read_pass: Callable[[], str] | None = None,
             records: dict[str, dict[str, Any]] | None = None,
             say: Callable[..., None] = print,
-            sleep: Callable[[float], None] = time.sleep) -> dict[str, Any]:
+            sleep: Callable[[float], None] = time.sleep,
+            space: Callable[[Path], tuple[int, bool]] = _space) -> dict[str, Any]:
     if not by.startswith("human:"):
         raise PermissionError("only the owner installs a BAU Pack")
     pack = root(path)
@@ -257,7 +294,14 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
     models.mkdir(parents=True, exist_ok=True)
 
     say("Checking the models on the stick (each against its pinned SHA-256)...")
-    for e in scan(pack, recs, check_hash=False):
+    found = scan(pack, recs, check_hash=False)
+    need = 0
+    for e in found:
+        dl = recs[e["model_id"]]["download"]
+        if e["status"] == "ok" and _status(models / dl["file"], dl, True) != "ok":
+            need += (pack / "models" / dl["file"]).stat().st_size
+    _check_room(need, models, space)
+    for e in found:
         mid, dl = e["model_id"], recs[e["model_id"]]["download"]
         dst = models / dl["file"]
         if e["status"] != "ok":

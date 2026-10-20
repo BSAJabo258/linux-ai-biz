@@ -260,3 +260,32 @@ def test_health_console_shellcheck():
 def test_stick_carries_sound_routing_and_bluetooth_audio():
     for pkg in ("alsa-ucm-conf", "alsa-topology-conf", "libspa-0.2-bluetooth"):
         assert pkg in LISTED, pkg
+
+
+# ------------------------------------------------------------------ memory on the live stick
+# The owner's stick in a VM (2026-10-20): "/" is a 3.7 GB RAM overlay; filling it stopped
+# even a 94 KB install ("not enough free space in /var/cache/apt/archives").
+
+def test_the_local_model_goes_first_when_memory_runs_out():
+    unit = (CONF / "includes.chroot" / "etc" / "systemd" / "system" / "bau-llm.service").read_text()
+    assert "OOMScoreAdjust=500" in unit
+
+
+def test_installs_do_not_keep_a_second_copy_in_memory():
+    conf = CONF / "includes.chroot" / "etc" / "apt" / "apt.conf.d" / "90bau-no-cache"
+    assert 'APT::Keep-Downloaded-Packages "false";' in conf.read_text()
+
+
+def test_install_to_disk_is_on_the_live_desktop_and_only_there():
+    bin_ = CONF / "includes.chroot" / "usr" / "local" / "bin" / "bau-install-to-disk"
+    text = bin_.read_text()
+    assert "NEVER pick this one" in text and "systemctl reboot" in text
+    assert 'if [[ ${answer} == y ]]' in text                 # restarts only on the owner's y
+    assert not any(w in text for w in ("mkfs", "wipefs", "parted", "dd if="))   # changes nothing
+    apps = CONF / "includes.chroot" / "usr" / "share" / "applications"
+    app = apps / "bau-install-to-disk.desktop"
+    assert "Exec=bau-install-to-disk" in app.read_text()
+    hook = (CONF / "hooks" / "live" / "0500-bau.hook.chroot").read_text()
+    assert "/usr/local/bin/bau-install-to-disk" in hook       # made runnable in the image
+    l2d = (CONF.parent / "live-to-disk.sh").read_text()
+    assert "bau-install-to-disk.desktop" in l2d               # gone once BAU is on a disk
