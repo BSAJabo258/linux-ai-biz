@@ -56,5 +56,9 @@ With the Qwen3.5-4B model and the exact model server from your stick:
 - "Clear the system logs": it looked first, then asked to delete two log files. On your
   laptop that fails without sudo, and you would have seen the `rm` and could say no.
 - `sudo` was never offered to the owner in any run.
+- "Delete old-notes.txt", answered `n`: the file stayed, but the model first claimed "has been
+  deleted". Now BAU itself lists every command you said no to under `you_said_no_to`, and
+  says they did not run, whatever the model's answer says. Rerun: the model answered "Cannot
+  delete old-notes.txt - owner declined".
 
 Not yet tried on your laptop itself; it will be slower there than these numbers.
