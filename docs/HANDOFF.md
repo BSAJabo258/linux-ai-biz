@@ -495,6 +495,32 @@ reads back what `remember` saved (memory used to be write-only for him).
 
 ## Next steps (in order)
 
+### Laptop "best setup" (owner's go, 2026-10-21): what was searched, tested and built
+
+Two research rounds (8 researchers, primary sources only) plus real tests on the stick's
+own llama-server (v0.6.0, d812350) with the pinned GGUFs. Built and measured:
+
+- **Speed:** the server's prompt cache already works (first question 42 s, later ones
+  3.5 s; follow-up turns reuse it). Jarvis now warms it at start (`Assistant.warm`, first
+  real question 23 s with a tool call, ~60 s without). `LLAMA_ARG_CACHE_RAM=1024` (the
+  default was 8 GB, the whole laptop).
+- **Team:** head-to-head on BAU's bench + two real Jarvis questions: Qwen3.5-4B stays boss
+  (both right); LFM2.5-2.6B registered as the fast alternative (both right, 9.5 tok/s, LFM
+  Open License: free under $10M revenue); Granite-4.2-3B rejected (one wrong answer).
+  Claude Haiku 5.5 registered ($0.10/$0.50, 40x cheaper than Opus 5.5).
+- **Web research:** `web_search` + `read_page` (src/bau/web.py); `bau-search-setup.sh`
+  installs SearXNG (pinned 81371861f) on 127.0.0.1:8888, tested in a clean Debian 13 (that
+  run caught a git ownership bug, fixed).
+- **Hands:** `bau hands` (mini-swe-agent's method); real Qwen runs: right answer in 39 s
+  after telling it its folder; sudo never offered.
+- **Skipped on evidence:** dsh-purge (a jailbreak, removed from GitHub), REA (not a harness,
+  inflated stars), IndexTTS / Fish / Spark / Higgs v3 (non-commercial), Pi (no permission
+  checks), Vane (tells users to bind 0.0.0.0).
+- **Next, in order:** voice (Kyutai Pocket TTS / phonon-31m for Jarvis, Moonshine or
+  Parakeet for listening; NeuTTS Air / Chatterbox for narration, watermark, consent only);
+  fal.ai Wan 2.2 as a second studio adapter (~$0.20 per 5 s clip at 480p vs Higgsfield
+  ~$0.35+); desktop: Qwen3-TTS, ComfyUI + Wan 2.2 / Z-Image, LFM2.5-24B-A2B, Ternary-Bonsai.
+
 ### 0. Desktop edition (owner's decision, 2026-10-20)
 
 The owner's desktop (12 GB graphics card, spare 1 TB drive, one USB stick) gets **its own

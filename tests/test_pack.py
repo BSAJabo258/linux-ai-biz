@@ -639,3 +639,19 @@ def test_qwen35_is_asked_not_to_think_and_loading_from_a_stick_gets_time():
     rec = yaml.safe_load(DEFAULTS.read_text())["model"]["qwen3.5-4b"]
     assert rec["chat_template_kwargs"] == {"enable_thinking": False}
     assert P.BENCH_TRIES * 4 >= 300        # 2.7 GB from a USB stick can take minutes
+
+
+def test_lfm25_is_registered_pinned_and_never_approved_by_default():
+    rec = yaml.safe_load(DEFAULTS.read_text())["model"]["lfm2.5-2.6b"]
+    assert rec["status"] == "REGISTERED" and rec["tools"] and rec["license"] == "LFM-Open-1.0"
+    dl = rec["download"]
+    assert dl["size"] == 1674455040 and len(dl["sha256"]) == 64
+    assert dl["url"].startswith("https://huggingface.co/LiquidAI/")
+
+
+def test_haiku_is_the_cheap_claude_and_needs_the_owner_to_approve_it():
+    reg = yaml.safe_load(DEFAULTS.read_text())["model"]
+    h, o = reg["claude-haiku-5-5"], reg["claude-opus-5-5"]
+    assert h["status"] == "REGISTERED" and h["adapter"] == "anthropic"
+    assert (h["cost_in_per_mtok"], h["cost_out_per_mtok"]) == (0.10, 0.50)    # official, dated
+    assert o["cost_in_per_mtok"] / h["cost_in_per_mtok"] == 40

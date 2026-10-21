@@ -304,3 +304,8 @@ def test_the_local_model_server_does_not_think_out_loud():
     # systemd.exec: "Settings from these files override settings made with Environment=",
     # so the owner can still turn thinking on in /etc/bau/llm.env.
     assert "EnvironmentFile=/etc/bau/llm.env" in unit
+
+
+def test_the_prompt_cache_cannot_take_the_whole_laptop():
+    unit = (CONF / "includes.chroot" / "etc" / "systemd" / "system" / "bau-llm.service").read_text()
+    assert "Environment=LLAMA_ARG_CACHE_RAM=1024" in unit     # default would be 8192 MiB

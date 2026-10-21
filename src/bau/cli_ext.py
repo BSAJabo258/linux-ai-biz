@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from dataclasses import asdict
 from decimal import Decimal
 from pathlib import Path
@@ -994,6 +995,24 @@ def cmd_chats(a):
     return EXIT_OK
 
 
+def cmd_hands(a):
+    """The local model does a job in the terminal; you say y to every command."""
+    from . import hands as H
+    from .assistant import load_env_file, pick_model
+    owner = _human()
+    load_env_file()
+    provider, rec = pick_model()
+    if provider is None:
+        print("No approved model yet: approve one first (docs/PACK.md).", file=sys.stderr)
+        return 1
+    print(f"Hands, on {rec.get('model_id')}. Every command is shown to you first; "
+          "nothing runs without your y.", file=sys.stderr)
+    out = H.Hands(provider, H.ask_at_terminal, audit=AuditLog(), workdir=Path(a.dir),
+                  owner=owner).do(a.task)
+    print(H.show(out))
+    return 0 if out["done"] else 1
+
+
 def cmd_jarvis(a):
     from .assistant import Voice, build_assistant, load_env_file, save_config
     if a.jv_cmd == "config":
@@ -1038,6 +1057,8 @@ def cmd_jarvis(a):
         owner = _human()
     load_env_file()
     jv = build_assistant(owner=owner)
+    # A local model reads Jarvis's prompt once now, so the first question is fast.
+    threading.Thread(target=jv.warm, daemon=True).start()
     if a.text:
         return _jarvis_terminal(jv)
     from .ui.jarvis_server import serve, service_key
@@ -1910,6 +1931,12 @@ def register(sub: argparse._SubParsersAction) -> None:
 
     s = sub.add_parser("gateway", help="list gateway capabilities")
     s.set_defaults(fn=cmd_gateway)
+
+    s = sub.add_parser("hands", help="the local model does a job in the terminal; you "
+                       "say y to every command (docs/HANDS.md)")
+    s.add_argument("task", help="the job, in plain words")
+    s.add_argument("--dir", default=".", help="the work folder (default: here)")
+    s.set_defaults(fn=cmd_hands)
 
     s = sub.add_parser("jarvis", help="talk to Jarvis: spoken briefing, conversation, "
                        "actions you confirm")
