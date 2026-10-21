@@ -90,6 +90,31 @@ model:
     cost_in_per_mtok: 4.0
     cost_out_per_mtok: 20.0
     status: REGISTERED
+  claude-haiku-5-5:
+    model_id: claude-haiku-5-5
+    name: Claude Haiku 5.5 - the cheap Claude for routine steps and takeovers
+    version: "5.5"
+    provider: anthropic
+    # Checked 2026-10-21 (platform.claude.com pricing): $0.10 in / $0.50 out per million
+    # tokens for prompts up to 100K ($0.50 / $2.50 above), cache hits $0.01; Opus 5.5 is
+    # $4 / $20. Accepts output_config.effort (low..max, default medium).
+    source: Anthropic API
+    license: Anthropic commercial terms
+    commercial_use: true
+    deployment: cloud
+    adapter: anthropic
+    api_model: claude-haiku-5-5
+    effort: medium
+    trust_level: OFFICIAL
+    privacy: cloud
+    context: 1000000
+    tools: true
+    input_types: [text, image, pdf]
+    quality: 0.8
+    latency_ms: 3000
+    cost_in_per_mtok: 0.10
+    cost_out_per_mtok: 0.50
+    status: REGISTERED
   local-llm:
     model_id: local-llm
     name: Local model via llama.cpp llama-server
@@ -221,6 +246,39 @@ model:
     cost_in_per_mtok: 0
     cost_out_per_mtok: 0
     status: REGISTERED
+  lfm2.5-2.6b:
+    model_id: lfm2.5-2.6b
+    name: LFM2.5-2.6B - fast small brain with tool calling for 8 GB CPU machines (llama.cpp)
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-21: LiquidAI/LFM2.5-2.6B-GGUF (official), LFM Open License v1.0: free
+    # commercial use below $10M annual revenue; no content rules; keep the licence and
+    # notices when passing it on. Measured the same day on the stick's llama-server v0.6.0
+    # against Qwen3.5-4B with Jarvis's real prompt: bench reply and tool call OK, 9.5 tok/s
+    # (Qwen 3.1), both Jarvis questions answered right (Granite-4.2-3B got one wrong).
+    source: huggingface.co/LiquidAI/LFM2.5-2.6B-GGUF
+    license: LFM-Open-1.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: lfm2.5-2.6b
+    download:
+      url: https://huggingface.co/LiquidAI/LFM2.5-2.6B-GGUF/resolve/main/LFM2.5-2.6B-Q4_K_M.gguf
+      file: LFM2.5-2.6B-Q4_K_M.gguf
+      size: 1674455040
+      sha256: 02a8b7e17487d326e46d68ce0ba24211e1b80a14c4cd0597fa73c1cd697f52ed
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.6
+    latency_ms: 5000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    notes: Free below $10M yearly revenue (LFM Open License v1.0). Bench it before approving.
   qwen3.5-4b:
     model_id: qwen3.5-4b
     name: Qwen3.5-4B - best small brain for 8 GB CPU machines, with tool calling (llama.cpp)

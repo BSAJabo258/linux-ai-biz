@@ -253,6 +253,8 @@ How the *My Jarvis OS* spec maps onto this repository, and the build order:
 | [docs/AGENT-FOLDERS.md](docs/AGENT-FOLDERS.md) | Agents as folders: instructions, skills and tools you can read and edit; you approve each one |
 | [docs/USAGE.md](docs/USAGE.md) | See tokens and dollars per AI model, set your own daily limits |
 | [docs/CHATS.md](docs/CHATS.md) | Your Claude and ChatGPT exports in one searchable library; you decide what Jarvis may share |
+| [docs/RESEARCH.md](docs/RESEARCH.md) | Jarvis searches the web privately and reads pages; how to turn on private search |
+| [docs/HANDS.md](docs/HANDS.md) | Jarvis does terminal jobs, one command at a time, each on your yes |
 | [docs/TOOLBOX.md](docs/TOOLBOX.md) | Researched open-source tools Jarvis looks up before guessing; licences to watch |
 | [docs/CAPABILITY-MAP.md](docs/CAPABILITY-MAP.md) | What Jarvis can do, what's missing, which tools fill each gap, and the build order |
 | [docs/engineering/repo-intelligence.md](docs/engineering/repo-intelligence.md) | Repo Scout (`bau scout`) and the weekly open-source watch |

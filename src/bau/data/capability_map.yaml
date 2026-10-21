@@ -13,8 +13,9 @@ layers:
   - id: web
     name: Web interaction
     what: Open websites, read them, fill in forms, save drafts and, only on the owner's click, submit.
-    status: gap
+    status: partial
     in_bau:
+      - {path: src/bau/web.py, does: "private search (SearXNG on 127.0.0.1) and reading a page as text, audited, never the home network"}
       - {path: src/bau/scout/github.py, does: reads GitHub's API only; no general browsing}
       - {path: src/bau/gateway.py, does: the one path from an agent to a capability, with audit}
       - {path: src/bau/blast.py, does: scores how bad an action could be before it runs}
@@ -63,8 +64,9 @@ layers:
   - id: computer-use
     name: Computer use
     what: Work apps that have no API by looking at the screen and using mouse and keyboard.
-    status: gap
+    status: partial
     in_bau:
+      - {path: src/bau/hands.py, does: "terminal jobs by the local model, one command at a time, each on the owner's y (bau hands)"}
       - {path: src/bau/sandbox.py, does: rootless containers with no network by default, for untrusted code}
     tools:
       - {name: Cua, plan: adapter, why: "Sandboxed desktops for computer-use agents; use only its MIT parts (some parts are FSL or AGPL)."}
