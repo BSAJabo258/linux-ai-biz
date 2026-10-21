@@ -139,3 +139,16 @@ def test_the_model_is_told_its_folder_and_nudged_once_to_finish(tmp_path):
     ("chmod -R 777 .", True)])
 def test_commands_that_change_things_are_flagged_before_the_owner_answers(cmd, risky):
     assert (H.warning(cmd).startswith("Careful")) is risky
+
+
+def test_a_no_is_reported_by_bau_not_by_the_model(tmp_path):
+    # Live test 2026-10-21, Qwen3.5-4B: the owner said n to "rm old-notes.txt" and the model
+    # still answered "The file old-notes.txt has been deleted." BAU states the facts itself.
+    h, prov = make(tmp_path, [run_cmd("rm old-notes.txt", "delete it"),
+                              finish("The file old-notes.txt has been deleted.")], Owner(False))
+    out = h.do("Delete old-notes.txt")
+    assert out["declined"] == ["rm old-notes.txt"] and out["commands"] == 0
+    shown = json.loads(H.show(out))
+    assert shown["you_said_no_to"] == ["rm old-notes.txt"]
+    assert "did not run" in shown["result"].lower()
+    assert "did not run" in json.dumps(prov.calls[1]["messages"]).lower()  # the model is told

@@ -88,6 +88,7 @@ class Hands:
             raise PermissionError("run hands as yourself, not with sudo")
         self.provider, self.ask, self.shell, self.audit = provider, ask, shell, audit
         self.workdir, self.owner, self.max_steps = Path(workdir), owner, max_steps
+        self.declined: list[str] = []
 
     def _log(self, event: str, data: dict[str, Any]) -> None:
         if self.audit is not None:
@@ -102,7 +103,9 @@ class Hands:
         if not approved:
             self._log("hands.command", {"command": command[:500], "why": why[:200],
                                         "approved": False})
-            return "the owner said no: nothing ran. Try something else or finish."
+            self.declined.append(command[:500])
+            return ("the owner said no: this command did not run and changed nothing. Never "
+                    "say it ran. Try something else, or finish and say it was not done.")
         code, out = self.shell(command, self.workdir, TIMEOUT)
         self._log("hands.command", {"command": command[:500], "why": why[:200],
                                     "approved": True, "exit": code})
@@ -110,6 +113,7 @@ class Hands:
 
     def do(self, task: str) -> dict[str, Any]:
         self._log("hands.start", {"task": task[:500], "workdir": str(self.workdir)})
+        self.declined = []
         messages: list[dict[str, Any]] = [{"role": "user", "content": task[:4000]}]
         seen: Counter[str] = Counter()
         ran, nudged = 0, False
@@ -150,7 +154,10 @@ class Hands:
         return self._end(False, "", ran, stopped=f"reached the limit of {self.max_steps} steps")
 
     def _end(self, done: bool, summary: str, ran: int, stopped: str = "") -> dict[str, Any]:
-        out = {"done": done, "summary": summary, "commands": ran, "stopped": stopped}
+        # The model's summary can claim what never happened (a live run said "deleted" after
+        # the owner's no), so what was refused is recorded by BAU, not taken from the model.
+        out = {"done": done, "summary": summary, "commands": ran, "stopped": stopped,
+               "declined": list(self.declined)}
         self._log("hands.end", {k: v for k, v in out.items() if k != "summary"}
                   | {"summary": summary[:500]})
         return out
@@ -178,5 +185,10 @@ def ask_at_terminal(command: str, why: str) -> bool:
 
 def show(out: dict[str, Any]) -> str:
     head = "Done." if out["done"] else f"Stopped: {out['stopped']}."
-    return json.dumps({"result": head, "answer": out["summary"],
-                       "commands_run": out["commands"]}, indent=2)
+    shown: dict[str, Any] = {"result": head, "answer": out["summary"],
+                             "commands_run": out["commands"]}
+    if out.get("declined"):
+        shown["result"] = (f"{head} You said no to {len(out['declined'])} command(s): they did "
+                           "not run, whatever the answer says.")
+        shown["you_said_no_to"] = out["declined"]
+    return json.dumps(shown, indent=2)
