@@ -289,3 +289,18 @@ def test_install_to_disk_is_on_the_live_desktop_and_only_there():
     assert "/usr/local/bin/bau-install-to-disk" in hook       # made runnable in the image
     l2d = (CONF.parent / "live-to-disk.sh").read_text()
     assert "bau-install-to-disk.desktop" in l2d               # gone once BAU is on a disk
+
+
+# ------------------------------------------------------------------ the boss answers in time
+# The owner's pack install said "qwen3.5-4b did not answer". Reproduced 2026-10-21 with the
+# stick's own llama-server (v0.6.0, d812350) and the pinned GGUF: Qwen3.5 thinks by default
+# and spent all 1024 tokens of "Say hello" thinking (190 s, empty reply). With
+# LLAMA_ARG_REASONING=off (the server's env for --reasoning off) BAU's own benchmark gave
+# reply_ok and tool_calls true in 15 s.
+
+def test_the_local_model_server_does_not_think_out_loud():
+    unit = (CONF / "includes.chroot" / "etc" / "systemd" / "system" / "bau-llm.service").read_text()
+    assert "Environment=LLAMA_ARG_REASONING=off" in unit
+    # systemd.exec: "Settings from these files override settings made with Environment=",
+    # so the owner can still turn thinking on in /etc/bau/llm.env.
+    assert "EnvironmentFile=/etc/bau/llm.env" in unit

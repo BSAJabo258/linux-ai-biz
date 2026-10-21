@@ -135,3 +135,26 @@ model") has the commands to start, measure and approve it, then:
 ```bash
 bau team set --thinker qwen3-4b-heretic-content
 ```
+
+## If it says "qwen3.5-4b did not answer"
+
+Qwen 3.5 "thinks out loud" before it answers, and on a laptop processor that took over
+three minutes for one hello, so the check gave up. Sticks built after 21 October 2026
+switch that off. On a laptop set up before, type these lines (none has the letter j):
+
+```bash
+echo LLAMA_ARG_REASONING=off | sudo tee -a /etc/bau/llm.env
+sudo systemctl restart bau-llm
+```
+
+Wait a minute for the model to load, then measure it and, if it answered, approve it and
+make it the boss:
+
+```bash
+sudo bau models bench qwen3.5-4b
+sudo bau set-status model qwen3.5-4b APPROVED
+sudo bau team set --boss qwen3.5-4b
+```
+
+`sudo systemctl status bau-llm` shows whether the model server is running and its last
+messages.
