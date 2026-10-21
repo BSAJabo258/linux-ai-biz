@@ -633,3 +633,9 @@ def test_room_is_measured_even_before_the_folder_exists(tmp_path):
     # In the owner's live VM /var/lib/bau did not exist yet (no storage unlocked).
     free, in_memory = P._space(tmp_path / "not" / "there" / "yet")
     assert free > 0 and in_memory is False
+
+
+def test_qwen35_is_asked_not_to_think_and_loading_from_a_stick_gets_time():
+    rec = yaml.safe_load(DEFAULTS.read_text())["model"]["qwen3.5-4b"]
+    assert rec["chat_template_kwargs"] == {"enable_thinking": False}
+    assert P.BENCH_TRIES * 4 >= 300        # 2.7 GB from a USB stick can take minutes

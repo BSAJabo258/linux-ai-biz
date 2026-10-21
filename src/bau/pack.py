@@ -75,7 +75,7 @@ WIFI_DEBS = (
      "sha256": "99f50410baddebd421497703ad9b6d0e05deb3dfda99a96b2814f630d9b84498"},
 )
 CHUNK = 1 << 20
-BENCH_TRIES = 30
+BENCH_TRIES = 90                 # ~6 min: 2.7 GB loads slowly from a USB stick
 
 Ask = Callable[[str], bool]
 Run = Callable[[list[str]], str]

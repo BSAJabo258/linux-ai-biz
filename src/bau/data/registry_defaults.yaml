@@ -252,6 +252,9 @@ model:
     cost_in_per_mtok: 0
     cost_out_per_mtok: 0
     status: REGISTERED
+    # Thinking off (checked 2026-10-21 on the stick's llama-server v0.6.0): with it on,
+    # "Say hello" spent all 1024 tokens thinking (190 s, empty reply); off, 5 s.
+    chat_template_kwargs: {enable_thinking: false}
     notes: Needs a llama.cpp with the qwen35 architecture (bench it first). Run with
       --ctx-size 8192 to 16384 on 8 GB; turn thinking off for routine steps.
   qwen3.5-0.8b:
