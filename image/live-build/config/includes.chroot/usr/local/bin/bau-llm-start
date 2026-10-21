@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Starts the local model (bau-llm.service) with one processor core left free.
+# Measured 2026-10-21 (llama-server v0.6.0, Qwen3.5-4B, 4 cores): on every core the model
+# fell from 6.2 to 0.19 tokens/s while the Jarvis page drew its animations; with one core
+# free it kept 3.2 tokens/s. Real cores come from lscpu (util-linux, Essential in Debian).
+# LLAMA_ARG_THREADS in /etc/bau/llm.env still wins.
+set -euo pipefail
+
+if [[ -z ${LLAMA_ARG_THREADS:-} ]]; then
+  cores=$(lscpu -p=core,socket 2>/dev/null | grep -v '^#' | sort -u | wc -l || true)
+  cores=${cores:-0}
+  if ((cores > 1)); then
+    export LLAMA_ARG_THREADS=$((cores - 1))
+  else
+    export LLAMA_ARG_THREADS=1
+  fi
+fi
+
+exec "${BAU_LLAMA_SERVER:-/opt/llama.cpp/llama-server}" "$@"

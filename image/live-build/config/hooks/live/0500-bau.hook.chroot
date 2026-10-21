@@ -20,7 +20,8 @@ rm -rf /opt/bau/wheels
 art="$(/opt/bau/venv/bin/python -c 'from importlib import resources; print(resources.files("bau.ui") / "art")')"
 install -d /usr/share/backgrounds/bau
 install -m 0644 "${art}"/wall-*.jpg /usr/share/backgrounds/bau/
-chmod 0755 /usr/local/bin/bau-look-desktop /usr/local/bin/bau-install-to-disk
+chmod 0755 /usr/local/bin/bau-look-desktop /usr/local/bin/bau-install-to-disk \
+  /usr/local/bin/bau-llm-start
 ln -sf /opt/bau/venv/bin/bau /usr/local/bin/bau
 ln -sf /opt/bau/venv/bin/jarvis-storage /usr/local/bin/jarvis-storage
 cat > /etc/profile.d/bau.sh <<'EOF'

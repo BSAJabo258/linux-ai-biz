@@ -21,7 +21,9 @@ Environment=LLAMA_ARG_CACHE_RAM=1024
 # BAU_LLM_MODEL (path to the .gguf) and BAU_LLM_ALIAS, written by jarvis-setup.
 EnvironmentFile=/etc/bau/llm.env
 Environment=LD_LIBRARY_PATH=/opt/llama.cpp
-ExecStart=/opt/llama.cpp/llama-server --model ${BAU_LLM_MODEL} --alias ${BAU_LLM_ALIAS} \
+# bau-llm-start leaves one processor core free for the desktop and the Jarvis page (on every
+# core the model ran 30 times slower while the page was open, 2026-10-21).
+ExecStart=/usr/local/bin/bau-llm-start --model ${BAU_LLM_MODEL} --alias ${BAU_LLM_ALIAS} \
   --jinja --host 127.0.0.1 --port 8080 --ctx-size 8192 --no-webui
 Restart=on-failure
 # When memory runs out (the live stick's system space is RAM too), Linux stops this
