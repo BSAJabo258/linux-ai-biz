@@ -309,3 +309,38 @@ def test_the_local_model_server_does_not_think_out_loud():
 def test_the_prompt_cache_cannot_take_the_whole_laptop():
     unit = (CONF / "includes.chroot" / "etc" / "systemd" / "system" / "bau-llm.service").read_text()
     assert "Environment=LLAMA_ARG_CACHE_RAM=1024" in unit     # default would be 8192 MiB
+
+
+# ------------------------------------------------------------------ the model leaves a core free
+# Measured 2026-10-21 with the stick's llama-server (v0.6.0, d812350), Qwen3.5-4B Q4_K_M, on
+# 4 cores: alone it wrote 6.2 tokens/s. With the Jarvis page open and "thinking" (Chromium
+# drawing its animations) the server's default of every core fell to 0.19 tokens/s, 30 times
+# slower; with one core left free (-t 3) it wrote 3.2 tokens/s. --poll 0 did not help.
+
+START = CONF / "includes.chroot" / "usr" / "local" / "bin" / "bau-llm-start"
+
+
+def _threads(tmp_path, cores, logical, preset=None):
+    fake = tmp_path / "bin"
+    fake.mkdir(exist_ok=True)
+    rows = "\n".join(f"{c % cores},0" for c in range(logical))
+    (fake / "lscpu").write_text(f"#!/bin/sh\necho '# Core,Socket'\nprintf '%s\\n' '{rows}'\n")
+    server = tmp_path / "llama-server"
+    server.write_text('#!/bin/sh\necho "threads=${LLAMA_ARG_THREADS} args=$*"\n')
+    for f in (fake / "lscpu", server):
+        f.chmod(0o755)
+    env = {"PATH": f"{fake}:/usr/bin:/bin", "BAU_LLAMA_SERVER": str(server)}
+    if preset:
+        env["LLAMA_ARG_THREADS"] = preset
+    return subprocess.run(["bash", str(START), "--port", "8080"], env=env,
+                          capture_output=True, text=True, check=True).stdout.strip()
+
+
+def test_the_model_leaves_one_core_for_the_desktop_and_jarvis(tmp_path):
+    assert _threads(tmp_path, cores=4, logical=8) == "threads=3 args=--port 8080"  # XPS 9380
+    assert _threads(tmp_path, cores=1, logical=2) == "threads=1 args=--port 8080"  # never 0
+    assert _threads(tmp_path, cores=4, logical=8, preset="4") == "threads=4 args=--port 8080"
+    unit = (CONF / "includes.chroot" / "etc" / "systemd" / "system" / "bau-llm.service").read_text()
+    assert "ExecStart=/usr/local/bin/bau-llm-start " in unit
+    hook = (CONF / "hooks" / "live" / "0500-bau.hook.chroot").read_text()
+    assert "/usr/local/bin/bau-llm-start" in hook                 # made runnable in the image
