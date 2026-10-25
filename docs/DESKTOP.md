@@ -1,4 +1,4 @@
-# The desktop edition (planned, not built yet)
+# The desktop edition (designed, not built yet)
 
 **Owner's decision, 2026-10-20:** the desktop gets **its own design**, not a copy of the
 laptop: its own model (bigger, on the graphics card), its own set of tools, its own
@@ -48,7 +48,7 @@ it takes longer than from an SSD (to be measured on the desktop).
 | 1 | The desktop check: `installer/BAU-Desktop-Check.cmd` (see [LAPTOP-CHECK.md](LAPTOP-CHECK.md)) | built |
 | 2 | The owner runs it and sends `BAU-LAPTOP-SUMMARY.txt` | done 2026-10-23 (above) |
 | 3 | Optional proof from Linux: the stick's `bau-laptop-check.sh` shows which graphics driver really loads | waiting on the owner |
-| 4 | Design, from the report only (below) | not started |
+| 4 | Design, from the report and official pages (below) | written 2026-10-25 |
 | 5 | Build the desktop stick, test it in CI, then on the desktop | not started |
 
 ## What the report decides
@@ -65,21 +65,63 @@ official page with its link and date written next to the code.
 | Where BAU is installed | the `Install BAU on:` line (the disk without Windows) |
 | Wi-Fi or cable | whether a Wi-Fi card is found |
 
-## Design areas (to fill in after the report)
+## The design (2026-10-25, from the report and official pages)
 
-These are questions, not promises. Each candidate goes through the `grow-bau` method (find,
-inspect, test in a sandbox, the owner decides) before it is added.
+Every fact below was read on 2026-10-25 from the page named next to it. Nothing here has
+run on the desktop yet; each step is proved by the stick build on GitHub first, then on the
+desktop.
 
-- **The model team:** a stronger boss on the graphics card; whether a second local model
-  (thinker or helper) fits next to it; when Claude is still called.
-- **Tools:** what a desktop with a graphics card can do that the laptop could not, for
-  example speech in and out on the machine, more agents working at once, and local image
-  work. Each one is measured, not assumed.
-- **Workflows:** which jobs run on the desktop by themselves (scheduled, with every
-  consequential step still waiting for your click).
-- **The look:** its own design for a big screen.
-- **Laptop and desktop together:** whether the laptop keeps its own edition and how the two
-  share your work.
+### Graphics driver
+
+- Debian 13's own NVIDIA driver: `nvidia-driver` and `nvidia-kernel-dkms` 550.163.01, in
+  non-free (packages.debian.org/trixie/nvidia-driver). NVIDIA's list for 550.163.01 has the
+  RTX 3060 (download.nvidia.com/XFree86/Linux-x86_64/550.163.01/README/supportedchips.html).
+- The **closed** flavour, not the open one: Debian's wiki says the open flavour of 550.163.01
+  "no longer compiles" from kernel 6.12.100 on (wiki.debian.org/NvidiaGraphicsDrivers).
+- Honest warning from the same wiki: the 550 branch "is no longer maintained and contains
+  several security issues". It is still the newest driver Debian 13 packages. A newer
+  driver straight from NVIDIA is possible later, as its own tested step.
+
+### Secure Boot
+
+- The driver is built **on the desktop after the install**, not on the stick. The tool that
+  builds it (dkms) makes a signing key on that computer (`/var/lib/dkms/mok.key`); a key
+  baked into the stick would be the same on every stick, which is unsafe.
+- You enroll that key once: `sudo mokutil --import /var/lib/dkms/mok.pub`, choose a one-time
+  password, restart, and in the blue screen choose **Enroll MOK**, Continue, Yes, the
+  password, OK (wiki.debian.org/SecureBoot; dkms 3.2.2 README).
+- Check afterwards: `mokutil --list-enrolled | grep DKMS` shows "DKMS module signing key".
+- The stick carries the driver packages, so this step needs no internet.
+
+### The model engine on the graphics card
+
+- llama.cpp built with **Vulkan**: it needs only the driver's `nvidia-vulkan-icd`, not the
+  multi-gigabyte CUDA kit. Community results on an RTX 3060 (Llama-2-7B, 4-bit): Vulkan wrote
+  80.6 tokens/s, CUDA 76.9 (github.com/ggml-org/llama.cpp discussions 10879 and 15013,
+  different machines). CUDA (Debian's 12.4 kit, card level 8.6) stays the fallback if the
+  desktop's own benchmark says Vulkan is worse.
+- The port is always given (`--port 8080`): llama.cpp v0.7.0 changed its default to 9931.
+
+### The boss model
+
+| Choice | Model (licence) | File (4-bit) | Context |
+|---|---|---|---|
+| 1st | Qwen3.5-9B (Apache-2.0) | `unsloth/Qwen3.5-9B-GGUF`, Q4_K_M, 5,680,522,464 bytes | 262K (capped for 12 GB) |
+| 2nd | Gemma 4 12B-it (Apache-2.0) | `unsloth/gemma-4-12b-it-GGUF`, Q4_K_M, 7,121,861,440 bytes | 256K |
+| 3rd | Granite 4.2 8B (Apache-2.0) | `ibm-granite/granite-4.2-8b-GGUF`, Q4_K_M, 5,347,917,952 bytes | 128K |
+
+Sizes and SHA-256 come from each Hugging Face file list; they are pinned when added. No
+Qwen3.5 14B exists; gpt-oss-20b (12.1 GB file) leaves no room. As always, a model is
+approved only after `bau models bench` on the desktop.
+
+### The rest
+
+- **Drive:** BAU on the 932 GB TOSHIBA, encrypted like the laptop. It is a hard disk, so a
+  5.7 GB model takes longer to load than from an SSD; it stays on the card once loaded.
+- **Processor:** 12 cores, so the CPU keeps plenty free for the desktop and Jarvis's page.
+- **Network:** Wi-Fi (MT7921) and the 2.5 GbE port, firmware already on the stick.
+- **Next design areas** (each through the `grow-bau` method): voice in and out on the card,
+  more agents at once, local image work, and how the laptop and desktop share your work.
 
 ## How it is checked
 
