@@ -187,13 +187,25 @@ class LocalHTTPProvider(Provider):
                 "name": t.name, "description": t.description,
                 "parameters": t.input_schema}} for t in tools]
         data = self._post(self.chat_path, body)
-        choice = data["choices"][0]
-        msg = choice["message"]
-        calls = []
-        for tc in msg.get("tool_calls") or []:
-            args = tc["function"].get("arguments") or "{}"
-            calls.append(ToolCall(tc.get("id", tc["function"]["name"]), tc["function"]["name"],
-                                  json.loads(args) if isinstance(args, str) else args))
+        # A reply BAU cannot use is this model failing, so a backup can answer and the
+        # turn is not lost (audit 2026-10-25: a cut-off tool call or an error body without
+        # "choices" crashed Jarvis's turn).
+        try:
+            msg = data["choices"][0]["message"]
+            calls = []
+            for tc in msg.get("tool_calls") or []:
+                args = tc["function"].get("arguments") or "{}"
+                args = json.loads(args) if isinstance(args, str) else args
+                if not isinstance(args, dict):
+                    raise TypeError("tool arguments are not an object")
+                calls.append(ToolCall(tc.get("id", tc["function"]["name"]),
+                                      tc["function"]["name"], args))
+        except (KeyError, IndexError, TypeError, ValueError, AttributeError) as e:
+            said = str((data.get("error") or {}).get("message", "")) if isinstance(
+                data, dict) and isinstance(data.get("error"), dict) else ""
+            raise ProviderError(f"{self.model} sent a reply BAU cannot use "
+                                f"({type(e).__name__}{': ' + said[:200] if said else ''})"
+                                ) from e
         usage = data.get("usage") or {}
         # Reasoning models (GLM, Qwen3...) may inline their thinking; never speak it.
         text = re.sub(r"<think>.*?</think>", "", msg.get("content") or "", flags=re.S).strip()

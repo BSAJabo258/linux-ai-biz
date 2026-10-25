@@ -8,6 +8,7 @@ capabilities may be routed to.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -106,8 +107,14 @@ class CapabilityRegistry:
             raise ValueError("; ".join(errs))
         key = rec[REQUIRED[kind][0]]
         self.data[kind][key] = rec
+        self.save()
+
+    def save(self) -> None:
+        """Written whole, then swapped in: a crash never leaves a half-written list."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(yaml.safe_dump(self.data, sort_keys=True))
+        tmp = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
+        tmp.write_text(yaml.safe_dump(self.data, sort_keys=True))
+        tmp.replace(self.path)
 
     def routable(self, kind: str) -> list[dict[str, Any]]:
         return [r for r in self.data[kind].values() if r.get("status") in ROUTABLE]

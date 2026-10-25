@@ -321,3 +321,48 @@ def test_docs_explain_the_team():
                  "never holds tools", "bau models bench"):
         assert need in doc, need
     assert "docs/TEAM.md" in (root / "CLAUDE.md").read_text()
+
+
+# ------------------------------------------------------------------ audit 2026-10-25
+def test_the_specialist_and_its_double_check_count_against_the_daily_limit(tmp_path):
+    # Before: agent-folder runs and the double-check went around the usage meter, so the
+    # owner's $0.50/day limit never tripped on $4.56 of Claude.
+    import yaml
+
+    from bau import agentfolders as AF
+    from bau import network
+    from bau.economics import Ledger
+    from bau.models.providers import ScriptedProvider
+    from bau.usage import Usage
+
+    class BigClaude(ScriptedProvider):
+        def complete(self, system, messages, tools=None, max_tokens=16000):
+            r = super().complete(system, messages, tools, max_tokens)
+            r.tokens_in, r.tokens_out = 150_000, 8_000
+            return r
+    audit = home_with_team(tmp_path, takeover="auto")
+    reg = CapabilityRegistry(tmp_path / "registry" / "capabilities.yaml")
+    reg.data["model"]["claude-test"].update(cost_in_per_mtok=4.0, cost_out_per_mtok=20.0)
+    reg.path.write_text(yaml.safe_dump(reg.data))
+    agent(tmp_path, audit)
+    u = Usage(tmp_path, audit)
+    u.set_limits(None, 0.50, by="human:owner")
+    made = {}
+
+    def factory(mid, home):
+        rec = CapabilityRegistry(home / "registry" / "capabilities.yaml").data["model"][mid]
+        if mid not in made:
+            made[mid] = (BigClaude(["Answer: two suppliers.", "OK"] * 10)
+                         if mid == "claude-test" else ScriptedProvider([LOOP] * 40))
+        return made[mid], rec
+    from bau.usage import UsageLimit
+    first = AF.run("shop-researcher", "find mugs", tmp_path, audit, factory=factory,
+                   trust=lambda: network.Trust.TRUSTED, double_check=True)
+    assert "not double-checked" in first.supervision["double_check"]   # over the limit
+    for _ in range(2):                              # the limit stops the next runs
+        with pytest.raises(UsageLimit):
+            AF.run("shop-researcher", "find mugs", tmp_path, audit, factory=factory,
+                   trust=lambda: network.Trust.TRUSTED, double_check=True)
+    assert len(made["claude-test"].calls) == 1      # the answer; the check was refused
+    assert u.today()["usd"] == pytest.approx(Ledger(tmp_path).spent(), abs=0.01)
+    assert u.over_limit()

@@ -16,6 +16,7 @@ Money rules, in order:
 from __future__ import annotations
 
 import datetime as dt
+import fcntl
 import secrets
 from pathlib import Path
 from typing import Any
@@ -63,8 +64,15 @@ class Studio:
         return cfg
 
     def spent_this_month(self) -> float:
+        """Paid clips this month plus clips still being made (their price is committed;
+        the ledger records it on completion). Audit 2026-10-25: in-flight clips were not
+        counted, so two at once could pass a monthly budget."""
         start = _now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        return round(Ledger(self.home).spent(agent=AGENT, since=start), 4)
+        done = Ledger(self.home).spent(agent=AGENT, since=start)
+        pending = sum(float(j.get("usd") or 0) for j in self.jobs()
+                      if j.get("status") in ("submitting", "submitted")
+                      and str(j.get("at", "")) >= start.isoformat(timespec="seconds"))
+        return round(done + pending, 4)
 
     def _provider_status(self) -> str:
         from .registry import CapabilityRegistry
@@ -125,19 +133,30 @@ class Studio:
             raise PermissionError("only the owner starts a paid clip")
         if hold_reason(self.home):
             raise PermissionError(f"BAU is on HOLD ({hold_reason(self.home)}); no new clips")
-        running = [j for j in self.jobs() if j["status"] == "submitted"]
+        running = [j for j in self.jobs() if j["status"] == "submitted"]   # "submitting":
+        # a send whose answer was lost; retrying it below resends the same key.
         if len(running) >= int(self.budget().get("max_running", 2)):
             raise PermissionError(f"{len(running)} clip(s) still in progress; wait for them")
         q = self.quote(prompt, model, duration, aspect_ratio, sound)
         if not q["allowed"]:
             raise PermissionError(q["why"])
-        jid = "clip_" + secrets.token_hex(5)
-        req = self.client.submit(model, q["body"], jid)          # job id = idempotency key
-        job = {"id": jid, "at": _now().isoformat(timespec="seconds"), "by": by,
-               "prompt": q["body"]["prompt"], "model": model, "duration": duration,
-               "aspect_ratio": aspect_ratio, "sound": sound, "usd": q["usd"],
-               "credits": q["credits"], "request_id": req["request_id"],
-               "status_url": req.get("status_url"), "status": "submitted"}
+        # The job id is the Idempotency-Key. It is written down before sending, so a retry
+        # after a lost answer (timeout) resends the same key and Higgsfield does not charge
+        # twice (audit 2026-10-25).
+        same = next((j for j in self.jobs() if j.get("status") == "submitting"
+                     and (j.get("prompt"), j.get("model"), j.get("duration"),
+                          j.get("aspect_ratio"), j.get("sound"))
+                     == (q["body"]["prompt"], model, duration, aspect_ratio, sound)), None)
+        jid = same["id"] if same else "clip_" + secrets.token_hex(5)
+        job = {"id": jid, "at": same["at"] if same else _now().isoformat(timespec="seconds"),
+               "by": by, "prompt": q["body"]["prompt"], "model": model,
+               "duration": duration, "aspect_ratio": aspect_ratio, "sound": sound,
+               "usd": q["usd"], "credits": q["credits"], "status": "submitting"}
+        if not same:
+            self.jobs_log.append(job)
+        req = self.client.submit(model, q["body"], jid)
+        job.update(request_id=req["request_id"], status_url=req.get("status_url"),
+                   status="submitted")
         self.jobs_log.append(job)
         self.audit.append("studio.submitted", by, {"clip": jid, "model": model,
                                                    "usd": q["usd"],
@@ -148,6 +167,17 @@ class Studio:
         """Check every clip in progress once (or wait up to ``max_wait`` seconds each);
         download finished ones and record their cost. Never charges a clip twice."""
         from .media.gateway import MediaGateway
+        # One refresh at a time across processes (Jarvis and the CLI), and never a second
+        # charge for the same clip (audit 2026-10-25: two at once wrote the cost twice).
+        self.dir.mkdir(parents=True, exist_ok=True)
+        with open(self.dir / ".refresh.lock", "w") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:          # another check is running: it does the work
+                return self.jobs()
+            return self._refresh(max_wait, MediaGateway)
+
+    def _refresh(self, max_wait: float, MediaGateway: Any) -> list[dict[str, Any]]:  # noqa: N803
         for job in [j for j in self.jobs() if j["status"] == "submitted"]:
             req = {"request_id": job["request_id"], "status_url": job.get("status_url")}
             try:
@@ -171,9 +201,10 @@ class Studio:
             except HiggsfieldError as e:
                 self.jobs_log.append({"id": job["id"], "note": f"download failed: {e}"})
                 continue                     # kept 7+ days by Higgsfield: try again later
-            Ledger(self.home).cost("api", job["usd"], agent=AGENT, job_id=job["id"],
-                                   provider=PROVIDER, model=job["model"],
-                                   note="Higgsfield's estimate at submission")
+            if not Ledger(self.home).spent(agent=AGENT, job_id=job["id"]):
+                Ledger(self.home).cost("api", job["usd"], agent=AGENT, job_id=job["id"],
+                                       provider=PROVIDER, model=job["model"],
+                                       note="Higgsfield's estimate at submission")
             self.jobs_log.append({"id": job["id"], "status": "completed", "file": str(out),
                                   "done_at": _now().isoformat(timespec="seconds")})
             self.audit.append("studio.completed", "studio", {"clip": job["id"],

@@ -303,22 +303,30 @@ def _supervised(a: Agent, task: str, home: Path, audit: Any, boss: dict[str, Any
         audit.append("team.takeover", f"folder:{a.name}",
                      {"from": boss["model"].get("id"), "to": s["model"].get("id"),
                       "task": task[:200]})
-        return _run_once(a, t, home, audit, (s["provider"], s["model"]), mission_id, trust)
+        return _run_once(a, t, home, audit,
+                         (_metered(s, home, audit, f"folder:{a.name}"), s["model"]),
+                         mission_id, trust)
 
     def verify(answer: str, evidence: list[str]) -> str:
         s = specialist_brain()
+        checker = _metered(s, home, audit, f"folder:{a.name}:check", ledger=True)
         from .agents import untrusted
         msg = (f"Answer to check:\n{answer}\n\n"
                + untrusted("evidence", "\n---\n".join(evidence)[:20000])[0])
-        r = s["provider"].complete(
-            "Check the answer against the evidence only. Reply OK if every fact in it is "
-            "backed by the evidence; otherwise list each fact that is not, in one line each.",
-            [{"role": "user", "content": msg}], [], 1000)
+        from .models.providers import ProviderError
+        try:
+            r = checker.complete(
+                "Check the answer against the evidence only. Reply OK if every fact in it is "
+                "backed by the evidence; otherwise list each fact that is not, in one line "
+                "each.", [{"role": "user", "content": msg}], [], 1000)
+        except ProviderError as e:             # e.g. the owner's daily limit is reached
+            return f"not double-checked: {e}"
         return (r.text or "").strip() or "no reply"
 
     res = supervisor.supervise(
-        task, lambda t: _run_once(a, t, home, audit, (boss["provider"], boss["model"]),
-                                  mission_id, trust),
+        task, lambda t: _run_once(a, t, home, audit,
+                                  (_metered(boss, home, audit, f"folder:{a.name}"),
+                                   boss["model"]), mission_id, trust),
         specialist if chosen["specialist"] else None, mode=mode,
         over_limit=Usage(home, audit).over_limit,
         verify=verify if double_check and chosen["specialist"] else None)
@@ -326,6 +334,24 @@ def _supervised(a: Agent, task: str, home: Path, audit: Any, boss: dict[str, Any
                                 (spec_brain.get("model") or {}).get("id") or "",
                                 f"folder:{a.name}"))
     return res
+
+
+def _metered(brain: dict[str, Any], home: Path, audit: Any, who: str,
+             ledger: bool = False) -> Any:
+    """A brain's provider on the usage meter and held to the owner's daily limits (audit
+    2026-10-25: agent-folder runs and the double-check went around it). Agent runs write
+    the ledger themselves, so only the double-check writes it here."""
+    from .registry import CapabilityRegistry
+    from .usage import Metered, Usage
+    model = brain["model"]
+    mid = model.get("id") or model.get("model_id") or ""
+
+    def price(m: str) -> dict[str, Any]:
+        if not m or m == mid:
+            return model
+        return CapabilityRegistry(home / "registry" / "capabilities.yaml").data["model"].get(
+            m) or {}
+    return Metered(brain["provider"], Usage(home, audit), price, mid, who, ledger=ledger)
 
 
 def _run_once(a: Agent, task: str, home: Path, audit: Any,
