@@ -11,10 +11,14 @@ with the reason given.
 
 from __future__ import annotations
 
+import functools
+import http.client
 import ipaddress
 import json
 import os
 import socket
+import ssl
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,6 +31,7 @@ LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 MAX_BYTES = 2_000_000
 MAX_TEXT = 20_000
 TIMEOUT = 20
+DEADLINE = 45          # a whole page, however slowly it arrives (audit 2026-10-25)
 TEXT_TYPES = ("text/html", "text/plain", "application/xhtml+xml")
 NOT_RUNNING = ("the private search is not running on this computer; docs/RESEARCH.md says "
                "how to start it")
@@ -71,12 +76,23 @@ def _resolve(host: str) -> list[str]:
     return [a[4][0] for a in socket.getaddrinfo(host, None)]
 
 
+# IPv6 forms that carry an IPv4 address inside: Python calls some of them global, but
+# they can reach this computer or the home network (audit 2026-10-25).
+_WRAPPED = [ipaddress.ip_network(n) for n in ("::/96", "64:ff9b::/96", "64:ff9b:1::/48")]
+
+
 def _public(addr: str) -> bool:
     ip = ipaddress.ip_address(addr.split("%")[0])
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped
+        elif any(ip in n for n in _WRAPPED):
+            return False
     return ip.is_global and not ip.is_multicast
 
 
-def _check(url: str, resolve: Callable[[str], list[str]]) -> None:
+def _check(url: str, resolve: Callable[[str], list[str]]) -> str:
+    """The one public address this page is read from (looked up once, here)."""
     parts = urllib.parse.urlsplit(url)
     host = (parts.hostname or "").lower()
     if parts.scheme not in ("http", "https") or not host:
@@ -92,6 +108,52 @@ def _check(url: str, resolve: Callable[[str], list[str]]) -> None:
             raise ValueError(f"{host} could not be found") from e
     if not addrs or not all(_public(a) for a in addrs):
         raise ValueError("pages on this computer or the home network are never read")
+    return addrs[0]
+
+
+# The connection goes to the address that was checked, never to a second lookup of the
+# name: a name can answer "public" when checked and 127.0.0.1 a moment later (DNS
+# rebinding, audit 2026-10-25). The page's own name still goes in Host and TLS (SNI).
+class _PinnedHTTP(http.client.HTTPConnection):
+    def __init__(self, *a: Any, pinned: str, connect: Callable[..., Any], **kw: Any):
+        super().__init__(*a, **kw)
+        self.pinned, self._dial = pinned, connect
+
+    def connect(self) -> None:
+        self.sock = self._dial((self.pinned, self.port), self.timeout)
+
+
+class _PinnedHTTPS(http.client.HTTPSConnection):
+    def __init__(self, *a: Any, pinned: str, connect: Callable[..., Any], **kw: Any):
+        super().__init__(*a, **kw)
+        self.pinned, self._dial = pinned, connect
+
+    def connect(self) -> None:
+        sock = self._dial((self.pinned, self.port), self.timeout)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+
+
+class _PinnedHandler(urllib.request.HTTPHandler, urllib.request.HTTPSHandler):
+    def __init__(self, pinned: str, connect: Callable[..., Any]):
+        urllib.request.HTTPHandler.__init__(self)
+        urllib.request.HTTPSHandler.__init__(self, context=ssl.create_default_context())
+        self.pinned, self.dial = pinned, connect
+
+    def http_open(self, req):
+        return self.do_open(functools.partial(_PinnedHTTP, pinned=self.pinned,
+                                              connect=self.dial), req)
+
+    def https_open(self, req):
+        return self.do_open(functools.partial(_PinnedHTTPS, pinned=self.pinned,
+                                              connect=self.dial), req,
+                            context=self._context)
+
+
+def _opener(pinned: str, connect: Callable[..., Any] | None) -> Any:
+    # ProxyHandler({}): proxy settings in the environment never route around the check.
+    return urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), _NoRedirect,
+        _PinnedHandler(pinned, connect or socket.create_connection))
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -141,18 +203,49 @@ class _Text(HTMLParser):
 
 def read(url: str, why: str, *, audit: Any = None, actor: str = "agent:jarvis",
          opener: Callable[..., Any] | None = None,
-         resolve: Callable[[str], list[str]] = _resolve) -> dict[str, Any]:
+         resolve: Callable[[str], list[str]] = _resolve,
+         connect: Callable[..., Any] | None = None) -> dict[str, Any]:
     _need_reason(why)
-    open_ = opener or urllib.request.build_opener(_NoRedirect).open
+    asked = url
+    try:
+        return _read(url, why, audit, actor, opener, resolve, connect, asked)
+    except ValueError as e:
+        # A refused or failed read is audited too: that is the event worth seeing.
+        _audit(audit, "web.read", actor, {"url": asked[:500], "why": why[:200],
+                                          "refused": str(e)[:200]})
+        raise
+
+
+def _body(r: Any) -> bytes:
+    """At most MAX_BYTES + 1, and never longer than DEADLINE seconds in all."""
+    end, out = time.monotonic() + DEADLINE, bytearray()
+    while len(out) <= MAX_BYTES:
+        if time.monotonic() > end:
+            raise ValueError("the page took too long to arrive")
+        chunk = r.read1(65536) if hasattr(r, "read1") else r.read(MAX_BYTES + 1 - len(out))
+        if not chunk:
+            break
+        out += chunk
+    return bytes(out[:MAX_BYTES + 1])
+
+
+def _read(url: str, why: str, audit: Any, actor: str, opener: Callable[..., Any] | None,
+          resolve: Callable[[str], list[str]], connect: Callable[..., Any] | None,
+          asked: str) -> dict[str, Any]:
     for _ in range(4):                           # the page, then at most 3 redirects
-        _check(url, resolve)
+        pinned = _check(url, resolve)
+        open_ = opener or _opener(pinned, connect).open
         req = urllib.request.Request(url, headers={"User-Agent": "BAU-Jarvis/1 (read-only)",
                                                    "Accept": "text/html,text/plain"})
         try:
             with open_(req, timeout=TIMEOUT) as r:
                 ctype = (r.headers.get("Content-Type") or "").lower()
-                body = r.read(MAX_BYTES + 1)
+                body = _body(r)
             break
+        except (OSError, http.client.HTTPException) as e:
+            if isinstance(e, urllib.error.HTTPError):
+                raise
+            raise ValueError(f"the page could not be reached ({type(e).__name__})") from e
         except urllib.error.HTTPError as e:
             if e.code in (301, 302, 303, 307, 308) and e.headers.get("Location"):
                 url = urllib.parse.urljoin(url, e.headers["Location"])
@@ -170,6 +263,6 @@ def read(url: str, why: str, *, audit: Any = None, actor: str = "agent:jarvis",
     p = _Text()
     p.feed(html)
     text = p.text()
-    _audit(audit, "web.read", actor, {"url": url, "why": why[:200]})
+    _audit(audit, "web.read", actor, {"url": url, "asked": asked[:500], "why": why[:200]})
     return {"url": url, "title": " ".join(p.title.split())[:200], "text": text[:MAX_TEXT],
             "truncated": len(text) > MAX_TEXT or len(body) > MAX_BYTES}

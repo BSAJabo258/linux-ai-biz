@@ -185,3 +185,86 @@ def test_search_installer_is_pinned_private_and_refuses_the_live_stick():
 def test_search_installer_ships_on_the_stick():
     mk = (SETUP.parent / "make-payload.sh").read_text()
     assert '"${HERE}/bau-search-setup.sh"' in mk
+
+
+# ------------------------------------------------------------------ audit 2026-10-25
+def _local_server(body=b"<title>internal</title>SECRET-ON-LOOPBACK", drip=0.0):
+    import http.server
+    import threading
+    import time
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            for i in range(len(body)):
+                self.wfile.write(body[i:i + 1])
+                self.wfile.flush()
+                if drip:
+                    time.sleep(drip)
+
+        def log_message(self, *a):
+            pass
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def test_the_address_checked_is_the_address_connected_to(tmp_path):
+    # DNS rebinding: a name that answers "public" when checked and 127.0.0.1 when the
+    # connection is made. The connection must go to the address that was checked.
+    srv = _local_server()
+    port = srv.server_address[1]
+    lookups, dialled = [], []
+
+    def resolve(host):
+        lookups.append(host)
+        return ["93.184.216.34"] if len(lookups) == 1 else ["127.0.0.1"]
+
+    def connect(addr, timeout=None, *a, **k):
+        dialled.append(addr[0])
+        raise OSError("unreachable in the test")      # the public address is not real here
+    with pytest.raises(ValueError):
+        W.read(f"http://rebind.example:{port}/", "check", resolve=resolve, connect=connect,
+               audit=audit(tmp_path))
+    srv.shutdown()
+    assert dialled == ["93.184.216.34"] and len(lookups) == 1
+
+
+def test_a_page_that_drips_forever_is_stopped(monkeypatch, tmp_path):
+    srv = _local_server(body=b"a" * 50, drip=0.2)
+    port = srv.server_address[1]
+    monkeypatch.setattr(W, "DEADLINE", 1.0)
+    monkeypatch.setattr(W, "_public", lambda addr: True)     # let the test server count
+    with pytest.raises(ValueError, match="too long"):
+        W.read(f"http://drip.example:{port}/", "check", resolve=lambda h: ["127.0.0.1"])
+    srv.shutdown()
+
+
+def test_a_refused_page_is_audited(tmp_path):
+    with pytest.raises(ValueError):
+        W.read("http://169.254.169.254/latest/meta-data/", "check", audit=audit(tmp_path))
+    ev = events(tmp_path, "web.read")
+    assert ev and ev[0]["data"]["refused"] and "169.254.169.254" in ev[0]["data"]["url"]
+
+
+@pytest.mark.parametrize("url", ["http://[::127.0.0.1]/", "http://[64:ff9b::7f00:1]/",
+                                 "http://[64:ff9b:1::a00:1]/"])
+def test_ipv6_forms_that_carry_a_private_ipv4_address_are_refused(url):
+    with pytest.raises(ValueError, match="never read"):
+        W.read(url, "check", resolve=lambda h: [])
+
+
+def test_environment_proxies_cannot_route_around_the_check(monkeypatch):
+    # urllib would send the request to http_proxy (here: this computer) by default.
+    monkeypatch.setenv("http_proxy", "http://127.0.0.1:9")
+    dialled = []
+
+    def connect(addr, timeout=None, *a, **k):
+        dialled.append(addr)
+        raise OSError("stop")
+    with pytest.raises(ValueError):
+        W.read("http://example.com/", "check", resolve=lambda h: ["93.184.216.34"],
+               connect=connect)
+    assert dialled == [("93.184.216.34", 80)]

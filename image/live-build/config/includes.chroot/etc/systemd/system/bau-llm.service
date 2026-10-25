@@ -18,11 +18,23 @@ Environment=LLAMA_ARG_REASONING=off
 # laptop's whole memory (llama-server v0.6.0 --help, 2026-10-21). 1 GB is plenty for
 # Jarvis's prompt.
 Environment=LLAMA_ARG_CACHE_RAM=1024
+# By default any website open in the browser may call this server (CORS "*") and read
+# /slots (what is in the prompts). Checked 2026-10-25 against the stick's v0.6.0: with
+# these two, a foreign Origin gets no CORS header and /slots answers 501. BAU itself
+# calls the server from Python (no Origin) and never uses /slots.
+Environment=LLAMA_ARG_CORS_ORIGINS=localhost
+Environment=LLAMA_ARG_ENDPOINT_SLOTS=false
 # BAU_LLM_MODEL (path to the .gguf) and BAU_LLM_ALIAS, written by jarvis-setup.
 EnvironmentFile=/etc/bau/llm.env
 Environment=LD_LIBRARY_PATH=/opt/llama.cpp
 # bau-llm-start leaves one processor core free for the desktop and the Jarvis page (on every
 # core the model ran 30 times slower while the page was open, 2026-10-21).
+# The desktop: Debian's NVIDIA driver makes /dev/nvidia0 only when something with root
+# opens the card (nvidia-modprobe is setuid, which NoNewPrivileges blocks), so the model
+# could start on the processor after a reboot (audit 2026-10-25). "+": as root, "-": the
+# laptop has no nvidia-modprobe. -c 0 creates the device file (nvidia-modprobe 570.133.07
+# --help, Debian 13.7, 2026-10-25); "-" and "+" may be combined (systemd.service(5)).
+ExecStartPre=-+/usr/bin/nvidia-modprobe -c 0
 ExecStart=/usr/local/bin/bau-llm-start --model ${BAU_LLM_MODEL} --alias ${BAU_LLM_ALIAS} \
   --jinja --host 127.0.0.1 --port 8080 --ctx-size 8192 --no-webui
 Restart=on-failure
