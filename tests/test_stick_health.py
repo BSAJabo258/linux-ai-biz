@@ -382,3 +382,19 @@ def test_the_model_engine_carries_the_graphics_card_backend():
     assert all(p in inside for p in ("libvulkan-dev", "glslc", "spirv-headers"))
     assert "libggml-vulkan.so" in inside                    # the build fails without it
     assert "libvulkan1" in LISTED                            # what that part needs to load
+
+
+def test_no_website_can_use_the_local_model_server():
+    # Audit 2026-10-25, proved against the stick's llama-server v0.6.0: by default a page
+    # from https://evil.example got Access-Control-Allow-Origin and /slots answered 200.
+    unit = (CONF / "includes.chroot" / "etc" / "systemd" / "system" / "bau-llm.service").read_text()
+    assert "Environment=LLAMA_ARG_CORS_ORIGINS=localhost" in unit
+    assert "Environment=LLAMA_ARG_ENDPOINT_SLOTS=false" in unit
+
+
+def test_the_card_is_ready_before_the_model_starts():
+    # Audit 2026-10-25: /dev/nvidia0 exists only once something with root opens the card;
+    # under NoNewPrivileges the model could start on the processor after a reboot.
+    unit = (CONF / "includes.chroot" / "etc" / "systemd" / "system" / "bau-llm.service").read_text()
+    pre = unit.index("ExecStartPre=-+/usr/bin/nvidia-modprobe -c 0")
+    assert pre < unit.index("ExecStart=/usr/local/bin/bau-llm-start")
