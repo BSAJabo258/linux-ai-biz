@@ -201,7 +201,12 @@ class Results:
                 cost_of[c["job_id"]] = cost_of.get(c["job_id"], 0.0) + c["usd"]
         used: set[str] = set()
         rows = []
-        for v in self.videos():
+        videos = self.videos()
+        shared: dict[str, int] = {}
+        for v in videos:
+            for c in links.get((v["platform"], v["item_id"]), {}).get("clips") or []:
+                shared[c] = shared.get(c, 0) + 1
+        for v in videos:
             snap = latest.get((v["platform"], v["video_id"]), {})
             link = links.get((v["platform"], v["item_id"]), {})
             notes = [snap["note"]] if snap.get("note") else []
@@ -210,7 +215,9 @@ class Results:
             cost = None
             if link.get("clips"):
                 used.update(link["clips"])
-                cost = round(sum(cost_of.get(c, 0.0) for c in link["clips"]), 2)
+                # A clip posted to two platforms is paid for once: its cost is shared
+                # between the videos that use it (audit 2026-10-25).
+                cost = round(sum(cost_of.get(c, 0.0) / shared[c] for c in link["clips"]), 2)
             else:
                 notes.append(NOT_LINKED)
             rev = snap.get("revenue_usd")

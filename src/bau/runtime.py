@@ -178,6 +178,11 @@ def provider_for(model_id: str, home: Path | None = None) -> tuple[Provider, dic
         raise KeyError(f"model {model_id} not registered")
     if rec.get("status") not in ("APPROVED", "ACTIVE"):
         raise PermissionError(f"model {model_id} is {rec.get('status')}; approve it first")
+    bench = rec.get("benchmark")
+    if isinstance(bench, dict) and bench.get("reply_ok") is False:
+        # Audit 2026-10-25: a model whose re-run benchmark gave no answer was still used.
+        raise PermissionError(f"model {model_id}: its last benchmark produced no answer; "
+                              "fix the model server and run `bau models bench` again")
     return build(rec), rec
 
 

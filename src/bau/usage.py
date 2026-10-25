@@ -200,9 +200,10 @@ class Metered(Provider):
     then records the call (which model answered, tokens, price, failures) after it."""
 
     def __init__(self, inner: Provider, usage: Usage, price: Callable[[str], dict[str, Any]],
-                 default_id: str = "", agent: str = "jarvis"):
+                 default_id: str = "", agent: str = "jarvis", ledger: bool = True):
         self.inner, self.usage, self.price = inner, usage, price
         self.default_id, self.agent = default_id, agent
+        self.ledger = ledger          # False where the caller writes the ledger (agent runs)
 
     @property
     def answered_by(self) -> str | None:
@@ -232,7 +233,7 @@ class Metered(Provider):
         self.usage.record(mid, rec.get("provider", ""), resp.tokens_in, resp.tokens_out, usd,
                           agent=self.agent, ms=int((time.monotonic() - t0) * 1000),
                           limits=getattr(self.inner, "last_limits", None))
-        if usd:
+        if usd and self.ledger:
             Ledger(self.usage.home).cost("model", usd, agent=self.agent,
                                          provider=rec.get("provider", ""), model=mid,
                                          tokens_in=resp.tokens_in, tokens_out=resp.tokens_out)

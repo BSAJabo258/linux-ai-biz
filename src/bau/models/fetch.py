@@ -41,6 +41,24 @@ def fetch(rec: dict[str, Any], dest: Path, opener: Callable[..., Any] | None = N
         with part.open("rb") as f:
             while b := f.read(CHUNK):
                 h.update(b)
+    # Already whole (the last run stopped just before renaming it): asking for more gets
+    # "416 Range Not Satisfiable" forever (audit 2026-10-25), so check it as it is.
+    if not (size and have >= size):
+        have, h = _download(url, part, have, h, size, opener, progress)
+
+    if size and have != size:
+        part.unlink(missing_ok=True)
+        raise FetchError(f"size {have} != expected {size}: file deleted, download it again")
+    if h.hexdigest() != want:
+        part.unlink(missing_ok=True)
+        raise FetchError("SHA-256 does not match the pinned value: file deleted (wrong or "
+                         "tampered download)")
+    part.replace(final)
+    return final
+
+
+def _download(url: str, part: Path, have: int, h: Any, size: int, opener: Callable[..., Any],
+              progress: Callable[[int, int], None] | None) -> tuple[int, Any]:
     req = urllib.request.Request(url, headers={"Range": f"bytes={have}-"} if have else {})
     try:
         with opener(req, timeout=60) as r:
@@ -56,16 +74,7 @@ def fetch(rec: dict[str, Any], dest: Path, opener: Callable[..., Any] | None = N
     except (urllib.error.URLError, OSError) as e:
         raise FetchError(f"download interrupted ({e}); run the same command again to resume"
                          ) from e
-
-    if size and have != size:
-        part.unlink(missing_ok=True)
-        raise FetchError(f"size {have} != expected {size}: file deleted, download it again")
-    if h.hexdigest() != want:
-        part.unlink(missing_ok=True)
-        raise FetchError("SHA-256 does not match the pinned value: file deleted (wrong or "
-                         "tampered download)")
-    part.replace(final)
-    return final
+    return have, h
 
 
 def _sha256(path: Path) -> str:

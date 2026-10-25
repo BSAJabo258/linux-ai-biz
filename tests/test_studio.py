@@ -294,3 +294,62 @@ def test_studio_node_and_screen_endpoints(studio):
             assert e.code == 404
     finally:
         srv.shutdown()
+
+
+# ------------------------------------------------------------------ audit 2026-10-25
+def test_clips_in_progress_count_against_the_monthly_budget(studio):
+    s, api, home = studio
+    api.usd = 3.0
+    approve_provider(home)
+    s.set_budget(monthly=5, per_clip=3, by="human:owner", max_running=2)
+    s.make("boat one", "kling-3-pro", 5, "16:9", "off", "human:owner")
+    with pytest.raises(PermissionError, match="left"):
+        s.make("boat two", "kling-3-pro", 5, "16:9", "off", "human:owner")
+    assert len(api.submits()) == 1
+
+
+class TimeoutAfterAccept(FakeAPI):
+    def __call__(self, req, timeout=0):
+        r = super().__call__(req, timeout)
+        if req.get_method() == "POST" and "/estimate/" not in req.full_url \
+                and len(self.submits()) == 1:
+            raise TimeoutError("The read operation timed out")    # Higgsfield took the job
+        return r
+
+
+def test_a_retry_after_a_lost_answer_reuses_the_same_idempotency_key(tmp_path, monkeypatch):
+    # Higgsfield's docs: resend the same Idempotency-Key and it is not charged twice.
+    from bau.studio import Studio
+    seed_registry(tmp_path)
+    monkeypatch.setenv("HIGGSFIELD_API_KEY_ID", KEY_ID)
+    monkeypatch.setenv("HIGGSFIELD_API_KEY_SECRET", SECRET)
+    api = TimeoutAfterAccept(usd=2.0)
+    s = Studio(tmp_path, AuditLog(tmp_path / "a.jsonl", key=b""), client=client(api))
+    approve_provider(tmp_path)
+    s.set_budget(monthly=10, per_clip=3, by="human:owner")
+    with pytest.raises((HiggsfieldError, OSError)):
+        s.make("boat", "kling-3-pro", 5, "16:9", "off", "human:owner")
+    s.make("boat", "kling-3-pro", 5, "16:9", "off", "human:owner")
+    keys = {c[2].get("Idempotency-key") for c in api.submits()}
+    assert len(api.submits()) == 2 and len(keys) == 1
+
+
+def test_two_refreshes_at_once_charge_a_clip_once(studio):
+    from bau.studio import Studio
+    s1, api, home = studio
+    api.usd = 2.0
+    approve_provider(home)
+    s1.set_budget(monthly=10, per_clip=3, by="human:owner")
+    s1.make("boat", "kling-3-pro", 5, "16:9", "off", "human:owner")
+    api.polls = 5                                          # finished
+    s2 = Studio(home, s1.audit, client=client(api))       # Jarvis and the CLI together
+    orig, fired = s1.client.download, []
+
+    def download(url, dest):
+        if not fired:
+            fired.append(1)
+            s2.refresh()
+        return orig(url, dest)
+    s1.client.download = download
+    s1.refresh()
+    assert Ledger(home).spent(agent="studio") == 2.0
