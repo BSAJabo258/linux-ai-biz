@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from .home import bau_home
+from .store import fresh_line, read_lines
 
 GENESIS = "0" * 64
 PII_KEYS = {"email", "phone", "name", "address", "ssn", "dob", "ip", "ip_address",
@@ -80,26 +81,36 @@ class AuditLog:
         return hmac.new(self.key, digest.encode(), hashlib.sha256).hexdigest()
 
     def _last(self) -> tuple[int, str]:
+        """The last readable record; a line cut off by a power cut is passed over."""
         if not self.path.exists() or self.path.stat().st_size == 0:
             return -1, GENESIS
         with self.path.open("rb") as fh:
-            fh.seek(0, os.SEEK_END)
-            pos = fh.tell() - 1
-            while pos > 0:
-                fh.seek(pos - 1)
-                if fh.read(1) == b"\n":
-                    break
-                pos -= 1
-            fh.seek(max(pos, 0))
-            last = json.loads(fh.readline())
-        return last["seq"], last["hash"]
+            end = fh.seek(0, os.SEEK_END)
+            while end > 0:
+                start = end - 1
+                while start > 0:
+                    fh.seek(start - 1)
+                    if fh.read(1) == b"\n":
+                        break
+                    start -= 1
+                fh.seek(start)
+                line = fh.read(end - start).strip()
+                end = start
+                if not line:
+                    continue
+                try:
+                    last = json.loads(line)
+                    return last["seq"], last["hash"]
+                except (ValueError, KeyError, TypeError):
+                    continue
+        return -1, GENESIS
 
     def append(self, event: str, actor: str, data: dict[str, Any] | None = None,
                policy_version: str | None = None, artifact_hash: str | None = None
                ) -> dict[str, Any]:
         data = data or {}
         _check_pii(data)
-        with self.path.open("a+") as fh:
+        with self.path.open("ab+") as fh:
             fcntl.flock(fh, fcntl.LOCK_EX)
             try:
                 seq, prev = self._last()
@@ -115,7 +126,7 @@ class AuditLog:
                 }
                 body["hash"] = sha256(canonical(body))
                 body["sig"] = self._sig(body["hash"])
-                fh.write(json.dumps(body, sort_keys=True) + "\n")
+                fh.write(fresh_line(fh) + (json.dumps(body, sort_keys=True) + "\n").encode())
                 fh.flush()
                 os.fsync(fh.fileno())
             finally:
@@ -123,16 +134,14 @@ class AuditLog:
         return body
 
     def records(self):
-        if not self.path.exists():
-            return
-        with self.path.open() as fh:
-            for line in fh:
-                if line.strip():
-                    yield json.loads(line)
+        yield from (r for r in read_lines(self.path) if r is not None)
 
     def verify(self) -> tuple[bool, str]:
-        prev, expect_seq, n = GENESIS, 0, 0
-        for rec in self.records():
+        prev, expect_seq, n, cut = GENESIS, 0, 0, 0
+        for rec in read_lines(self.path):
+            if rec is None:                 # a write cut off mid-line: nothing to check
+                cut += 1
+                continue
             n += 1
             body = {k: v for k, v in rec.items() if k not in ("hash", "sig")}
             if rec["seq"] != expect_seq:
@@ -147,7 +156,8 @@ class AuditLog:
                 if not hmac.compare_digest(rec["sig"], self._sig(rec["hash"]) or ""):
                     return False, f"seq {rec['seq']} signature invalid"
             prev, expect_seq = rec["hash"], expect_seq + 1
-        return True, f"{n} records verified; head {prev}"
+        note = f" ({cut} line(s) cut off mid-write, passed over)" if cut else ""
+        return True, f"{n} records verified; head {prev}{note}"
 
     def anchor(self) -> dict[str, Any]:
         seq, head = self._last()
