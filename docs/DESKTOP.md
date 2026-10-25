@@ -91,7 +91,7 @@ desktop.
   password, restart, and in the blue screen choose **Enroll MOK**, Continue, Yes, the
   password, OK (wiki.debian.org/SecureBoot; dkms 3.2.2 README).
 - Check afterwards: `mokutil --list-enrolled | grep DKMS` shows "DKMS module signing key".
-- The stick carries the driver packages, so this step needs no internet.
+- It needs the internet once (the cable port or Wi-Fi): the driver comes from Debian.
 
 ### The model engine on the graphics card
 
@@ -132,8 +132,8 @@ computer with an NVIDIA card.
    turn off Windows Fast Startup (the list above).
 2. **Install BAU on the TOSHIBA drive** from the stick: start the computer from the stick and
    choose **Install BAU on this laptop**. Pick the TOSHIBA DT01ACA100 (932 GB), never the
-   Micron NVMe (that is Windows). If the screen stays black, choose **safe graphics** in the
-   stick's menu.
+   Micron NVMe (that is Windows). If the screen stays black, start again and choose **Install BAU -
+   safe graphics** in the stick's menu.
 3. **Start from the new drive** and log in. The internet is needed for the next step (the
    cable port or Wi-Fi).
 4. **The graphics driver**, once:

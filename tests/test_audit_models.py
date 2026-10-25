@@ -164,3 +164,17 @@ def test_a_benchmark_never_undoes_a_revoke_made_while_it_ran(tmp_path, monkeypat
     B.record("qwen3.5-4b", "human:owner", tmp_path, AuditLog(tmp_path / "a.jsonl", key=b""))
     rec = yaml.safe_load(path.read_text())["model"]["qwen3.5-4b"]
     assert rec["status"] == "REVOKED" and rec["benchmark"]["reply_ok"] is True
+
+
+def test_an_audit_key_that_exists_but_cannot_be_read_stops_instead_of_signing_nothing(
+        tmp_path, monkeypatch):
+    # Audit 2026-10-25: an unreadable /etc/bau/audit.key (e.g. before the bau group
+    # applies) quietly wrote unsigned records, which the keyed service then calls tampered.
+    from bau.audit import AuditError, AuditLog
+    unreadable = tmp_path / "audit.key"
+    unreadable.mkdir()                                  # exists, cannot be read as a file
+    monkeypatch.setenv("BAU_AUDIT_KEY", str(unreadable))
+    with pytest.raises(AuditError, match="cannot be read"):
+        AuditLog(tmp_path / "chain.jsonl")
+    monkeypatch.setenv("BAU_AUDIT_KEY", str(tmp_path / "absent.key"))
+    assert AuditLog(tmp_path / "chain.jsonl").key is None     # no key at all: unsigned

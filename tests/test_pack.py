@@ -176,14 +176,14 @@ def test_locate_does_not_mount_when_a_pack_is_already_there(tmp_path):
 
 def test_report_goes_to_the_laptop_when_the_pack_is_read_only(tmp_path, monkeypatch):
     pack = make_pack(tmp_path)
-    real = Path.write_text
+    real = P._new_file
 
-    def ro(self, *a, **k):
-        if self.parent == pack:
+    def ro(path):
+        if path.parent == pack:
             raise OSError("Read-only file system")
-        return real(self, *a, **k)
+        return real(path)
 
-    monkeypatch.setattr(Path, "write_text", ro)
+    monkeypatch.setattr(P, "_new_file", ro)
     home, _, out = do_install(tmp_path, pack, Owner(), run=Runner({"lspci": LSPCI}))
     assert out["report"] == str(home / "reports" / "laptop-report.txt")
     assert "QCA6174" in (home / "reports" / "laptop-report.txt").read_text()
@@ -688,3 +688,29 @@ def test_the_9b_is_the_boss_only_where_the_nvidia_driver_is_loaded(tmp_path):
     _, _, out = do_install(tmp_path / "desktop", make_pack(tmp_path / "desktop", desktop=True),
                            Owner("Use", "Approve", "boss"), desktop=True, gpu=lambda: True)
     assert out["boss"] == "qwen3.5-9b" and "qwen3.5-9b" in out["copied"]
+
+
+# ------------------------------------------------------------------ audit 2026-10-25
+def test_a_link_planted_on_the_stick_never_makes_root_overwrite_a_file(tmp_path):
+    # The stick is untrusted: laptop-report.txt -> /etc/passwd must not be followed.
+    pack = make_pack(tmp_path)
+    victim = tmp_path / "victim"
+    victim.write_text("keep me")
+    (pack / P.REPORT).symlink_to(victim)
+    do_install(tmp_path, pack, Owner())                     # the owner says no to all
+    assert victim.read_text() == "keep me"
+    assert not (pack / P.REPORT).is_symlink()
+
+
+def test_an_approved_registry_stays_writable_for_the_bau_group(tmp_path):
+    # Root wrote it 0644, so the Governor (account bau) could no longer quarantine.
+    home, _, out = do_install(tmp_path, make_pack(tmp_path), Owner("Use", "Approve"))
+    reg = home / "registry" / "capabilities.yaml"
+    assert out["approved"] and (reg.stat().st_mode & 0o777) == 0o660
+
+
+def test_the_pack_maker_refuses_a_fat32_stick():
+    # Audit 2026-10-25: FAT32 holds at most 4 GB per file; the 9B model is 5.7 GB, so the
+    # download failed forever with "run this again".
+    text = (Path(__file__).resolve().parents[1] / "installer" / "bau-pack-make.ps1").read_text()
+    assert '$d.DriveFormat -eq "FAT32"' in text and "exFAT" in text
