@@ -51,9 +51,13 @@ TOOLS = [
 # Refused before the owner is even asked: root, BAU's approvals, keys and secrets.
 FORBIDDEN = re.compile(
     r"(^|[\s;&|(`$])(sudo|su|doas|pkexec|run0)(\s|$)"
-    r"|\bbau\s+(approve|set-status|keys|team\s+set)\b"
+    # BAU itself (its approvals, registry, governor, budgets) is never run from here; the
+    # owner runs those at their own terminal (audit 2026-10-25: `python3 -m bau.cli
+    # set-status` and `bau registry add` were not caught).
+    r"|(^|[\s;&|(`$/])bau(\s|$)|-m\s*bau\b|\bbau\.cli\b"
     r"|\bssh-keygen\b.*\s-Y\s+sign"
-    r"|/etc/bau/|\.ssh/|\bBAU-KEYS\.enc\b|approval[_-]?key", re.I)
+    r"|/etc/bau/|\.ssh/|\.config/bau\b|\bjarvis\.key\b|\bBAU-KEYS\.enc\b"
+    r"|approval[_-]?key", re.I)
 
 Ask = Callable[[str, str], bool]
 Shell = Callable[[str, Path, int], tuple[int, str]]
@@ -163,15 +167,21 @@ class Hands:
         return out
 
 
-# Commands that change or delete things get a plain warning before the owner answers.
-RISKY = re.compile(r"(^|[\s;&|(])(rm|rmdir|mv|dd|mkfs\S*|truncate|shred|chmod|chown|kill|"
-                   r"pkill|shutdown|reboot)(\s|$)|>|\bgit\s+(push|reset|clean)\b|"
-                   r"\b(curl|wget)\b.*\|\s*(ba)?sh", re.I)
+# "This only looks." is said only for commands known to just look, one at a time; anything
+# else gets the warning (audit 2026-10-25: `python3 x.py` and `B=bau; $B approve` were
+# called looking).
+LOOKING = {"ls", "cat", "head", "tail", "wc", "du", "df", "file", "stat", "pwd", "grep",
+           "find", "tree", "sort", "uniq", "less", "echo", "date", "whoami", "free",
+           "uptime", "lsblk", "ffprobe", "md5sum", "sha256sum", "which", "type"}
+CHAINS = re.compile(r"[;&|`$<>()]|\n")
+FIND_ACTS = re.compile(r"\s-(delete|exec\w*|ok\w*|fprint\w*|fls)\b")
 
 
 def warning(command: str) -> str:
-    return ("Careful: this changes or deletes things." if RISKY.search(command)
-            else "This only looks.")
+    words = command.split()
+    looks = (bool(words) and words[0] in LOOKING and not CHAINS.search(command)
+             and not (words[0] == "find" and FIND_ACTS.search(command)))
+    return "This only looks." if looks else "Careful: this can change or delete things."
 
 
 def ask_at_terminal(command: str, why: str) -> bool:

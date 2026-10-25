@@ -263,6 +263,11 @@ def test_the_thinker_never_works_on_kids_content_or_without_the_ideas_job(tmp_pa
     factory = factory_for({"qwen-unc": ["x"]})
     with pytest.raises(PermissionError):
         T.think(tmp_path, "Ideas for our kids channel?", factory=factory)
+    # Audit 2026-10-25: these slipped through the older word list.
+    for q in ("A song for 4-year-olds", "little ones aged 3 to 5",
+              "Benny the Bear counting series (ages 2-4)"):
+        with pytest.raises(PermissionError):
+            T.think(tmp_path, q, factory=factory)
     reg = CapabilityRegistry(tmp_path / "registry" / "capabilities.yaml")
     reg.add("model", {**UNC, "use_for": ["script"]})
     with pytest.raises(ValueError, match="ideas"):

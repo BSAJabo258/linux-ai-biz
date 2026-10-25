@@ -228,3 +228,14 @@ def test_hub_routes_kids_only_to_youtube_and_jarvis_posts_through_it(tmp_path, e
     assert res["done"], res
     assert client.http.meta["status"]["selfDeclaredMadeForKids"] is True
     assert client.http.meta["status"]["privacyStatus"] == "unlisted"
+
+
+def test_nothing_posts_to_youtube_while_bau_is_on_hold(tmp_path, engine):
+    # Audit 2026-10-25: the HOLD contract ("only read-only actions run") covers posting.
+    video, client, q = setup(tmp_path)
+    item = q.add(video, "Lyric video", "human:owner", engine=engine)
+    hold = tmp_path / "governor" / "hold.json"
+    hold.parent.mkdir(parents=True, exist_ok=True)
+    hold.write_text(json.dumps({"reason": "incident"}))
+    with pytest.raises(youtube.YouTubeError, match="HOLD"):
+        q.post(item, client, "human:owner", "private", made_for_kids=False)

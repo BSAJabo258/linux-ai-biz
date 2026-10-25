@@ -137,7 +137,10 @@ class FactoryRunner:
                     break
                 d = self.engine.evaluate(st["domain"], facts, on=on)
                 run.outputs[st["id"]] = d.to_dict()
-                approved = st["domain"] in run.approvals
+                # A signed approval, checked like an approval stage: a path to any file is
+                # not one (audit 2026-10-25).
+                ref = run.approvals.get(st["domain"])
+                approved = bool(ref) and bool(self.hooks["approval_ok"](st["domain"], run, ref))
                 if not d.may_proceed(approved=approved):
                     run.status = "WAITING_GATE"
                     run.waiting_on = (f"{st['id']}: {d.status} - "

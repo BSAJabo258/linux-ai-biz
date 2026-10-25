@@ -769,9 +769,11 @@ def cmd_factory_run(a):
         if a.fr_cmd == "confirm":
             fr.confirm(run, a.item, _human())
         elif a.fr_cmd == "facts":
+            _human()
             run.gate_facts[a.domain] = _load(a.file)
             fr._save(run)
         elif a.fr_cmd == "approval":
+            _human()
             run.approvals[a.capability] = str(Path(a.file).resolve())
             fr._save(run)
         if a.fr_cmd != "show":
