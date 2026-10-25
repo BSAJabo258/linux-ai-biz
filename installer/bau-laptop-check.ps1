@@ -240,12 +240,17 @@ function Invoke-BauGpus {
         }
     }
     $class = "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+    # Windows can keep an old driver entry with the same name: list a card at most as many
+    # times as it is plugged in (one RTX 3060 showed twice on the owner's desktop).
+    $left = @{}
+    foreach ($n in $present) { $left[$n] = 1 + [int]$left[$n] }
     foreach ($key in @(Get-ChildItem $class -ErrorAction SilentlyContinue)) {
         if ($key.PSChildName -notmatch "^\d{4}$") { continue }
         try {
             $k = Get-ItemProperty $key.PSPath -ErrorAction Stop
             $name = "$($k.DriverDesc)"
             if (-not $name -or ($present.Count -and $name -notin $present)) { continue }   # old cards
+            if ($present.Count) { if ($left[$name] -lt 1) { continue }; $left[$name] -= 1 }
             $mem = $k."HardwareInformation.qwMemorySize"
             if ($null -eq $mem) { $mem = $k."HardwareInformation.MemorySize" }
             if ($mem -is [byte[]]) {

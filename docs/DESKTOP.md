@@ -6,19 +6,47 @@ workflows and its own look. What stays the same are the rules in `CLAUDE.md` (ap
 are human-only, posting waits for your click, kids content only to YouTube made-for-kids,
 nothing listens beyond the computer itself, no compliance claims).
 
-What we know so far, from the owner:
+**Owner's decision, 2026-10-23:** BAU goes on the desktop's second drive (Windows calls it
+D:) and Windows stays on its own drive (C:). At start-up you choose which one runs. It is
+installed from the 128 GB stick. The laptop waits until a second 1 TB drive is bought.
 
-- a desktop PC with a graphics card with 12 GB of memory (to be confirmed by the check);
-- a 1 TB drive already in it, for BAU to run from;
-- started and installed from **one USB stick**, the same way as the laptop;
-- Windows may be wiped if it has to be; the owner can restore those files later.
+## What the desktop check found (2026-10-23)
+
+From the owner's `BAU-LAPTOP-SUMMARY.txt` (verdict: READY, AFTER THESE STEPS):
+
+| Part | Found |
+|---|---|
+| Computer | ASUS ROG Strix G15CF, Windows 11 Home |
+| Processor | Intel Core i7-12700F, 12 cores, 20 threads |
+| Memory | 16 GB |
+| Graphics | NVIDIA GeForce RTX 3060, 12 GB, CUDA compute 8.6 (Windows driver 576.57) |
+| Windows drive | Micron 3400 NVMe SSD, 477 GB (BitLocker on) |
+| BAU's drive | TOSHIBA DT01ACA100, 932 GB hard disk on SATA, no Windows on it |
+| Network | MediaTek MT7921 Wi-Fi 6 and Bluetooth, Realtek 2.5 GbE cable port |
+| Start-up | UEFI, Secure Boot on, TPM 2.0 |
+
+The card was listed twice; that was the check counting an old Windows driver entry (fixed:
+a card is now listed at most as many times as it is plugged in).
+
+Before installing:
+
+1. **Copy off anything on the TOSHIBA drive (D:)**: installing erases it.
+2. **Write down the BitLocker recovery key for C:** (aka.ms/myrecoverykey). Windows may ask
+   for it once after a new start-up menu is added.
+3. **Turn off Windows Fast Startup** (Control Panel > Power Options > Choose what the power
+   buttons do), so Windows really shuts down and leaves the disks alone.
+4. Secure Boot is on: the NVIDIA driver must then be signed with a key you enroll once at
+   start-up, or Secure Boot turned off. The desktop stick will show the steps.
+
+BAU's drive is a hard disk, not an SSD: everything works, but loading a large model from
+it takes longer than from an SSD (to be measured on the desktop).
 
 ## The order (the same method as the laptop)
 
 | Step | What | Status |
 |---|---|---|
 | 1 | The desktop check: `installer/BAU-Desktop-Check.cmd` (see [LAPTOP-CHECK.md](LAPTOP-CHECK.md)) | built |
-| 2 | The owner runs it and sends `BAU-LAPTOP-SUMMARY.txt` | waiting on the owner |
+| 2 | The owner runs it and sends `BAU-LAPTOP-SUMMARY.txt` | done 2026-10-23 (above) |
 | 3 | Optional proof from Linux: the stick's `bau-laptop-check.sh` shows which graphics driver really loads | waiting on the owner |
 | 4 | Design, from the report only (below) | not started |
 | 5 | Build the desktop stick, test it in CI, then on the desktop | not started |
