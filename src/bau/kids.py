@@ -53,6 +53,15 @@ FRANCHISES = [
 FRANCHISE = re.compile(r"\b(?:" + "|".join(FRANCHISES) + r")\b", _I)
 
 
+# Words that say a text is aimed at children. Used to keep such material away from 13+
+# platforms and from the content lane (audit 2026-10-25: "for 4-year-olds", "little ones
+# aged 3 to 5" and "(ages 2-4)" slipped through the thinker's older list).
+CHILD_DIRECTED = re.compile(
+    r"\b(kids?|child(?:ren)?|toddlers?|preschool\w*|nursery|kindergarten\w*|made for kids|"
+    r"under[- ]13|babies|baby|little ones|\d{1,2}[- ]?(?:year|yr)s?[- ]?olds?|"
+    r"ages? \d{1,2}(?:\s*(?:-|to|–)\s*\d{1,2})?|aged \d{1,2})\b", _I)
+
+
 def _clickbait(title: str) -> str | None:
     letters = [c for c in title if c.isalpha()]
     if len(letters) >= 8 and sum(c.isupper() for c in letters) / len(letters) > .6:

@@ -152,3 +152,22 @@ def test_a_no_is_reported_by_bau_not_by_the_model(tmp_path):
     assert shown["you_said_no_to"] == ["rm old-notes.txt"]
     assert "did not run" in shown["result"].lower()
     assert "did not run" in json.dumps(prov.calls[1]["messages"]).lower()  # the model is told
+
+
+# ------------------------------------------------------------------ audit 2026-10-25
+@pytest.mark.parametrize("cmd", [
+    "python3 -m bau.cli set-status provider zai APPROVED", "bau registry add provider x.yaml",
+    "bau governor release", "bau agents approve helper", "bau video budget --monthly 500",
+    "cat ~/.config/bau/jarvis.key", "cat /home/me/.config/bau/jarvis.key"])
+def test_bau_itself_and_jarvis_key_are_never_offered(tmp_path, cmd):
+    owner, shell = Owner(True), Shell()
+    h, prov = make(tmp_path, [run_cmd(cmd), finish("stopped")], owner, shell)
+    h.do("do it")
+    assert owner.shown == [] and shell.ran == []
+
+
+@pytest.mark.parametrize("cmd", ["B=bau; $B approve 1", "python3 x.py", "find . -delete",
+                                 "find . -exec rm {} +", "ls; rm -rf x", "tee notes.txt",
+                                 "sed -i s/a/b/ f.txt"])
+def test_only_known_looking_commands_are_called_looking(cmd):
+    assert H.warning(cmd).startswith("Careful")

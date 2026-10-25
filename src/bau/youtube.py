@@ -466,6 +466,10 @@ class YouTubeQueue:
         """Called only after the owner chose the audience and privacy and confirmed."""
         if not approver.startswith("human:"):
             raise PermissionError("only a human at the review screen can upload to YouTube")
+        from .governor import hold_reason
+        if (why := hold_reason(self.home)) is not None:
+            raise YouTubeError(f"BAU is on HOLD ({why}): nothing is uploaded until it is "
+                               "released")
         if item.status != "QUEUED":
             raise YouTubeError(f"{item.item_id} is {item.status}; it can be uploaded only once")
         if privacy not in PRIVACY_LABELS:
