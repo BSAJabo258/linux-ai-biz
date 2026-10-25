@@ -160,6 +160,19 @@ computer with an NVIDIA card.
    computer without NVIDIA's driver loaded (the laptop) it leaves the 9B on the stick and
    keeps the 4B.
 
+## Tested so far (2026-10-25, not on the desktop yet)
+
+- The stick's llama.cpp (v0.6.0, d812350) built with its Vulkan part in a clean Debian 13:
+  9 minutes on 4 cores, `libggml-vulkan.so` made.
+- With no Vulkan loader it starts and lists no card. With a software Vulkan card (Mesa's
+  lavapipe) it lists "Vulkan0" and answered "What is 7 times 8?" right through it.
+- Through `bau-llm-start` with no NVIDIA driver loaded, it set `LLAMA_ARG_DEVICE=none` and
+  answered right on the processor (15.7 tokens/s, Qwen2.5-1.5B).
+- llama.cpp's own code (ggml-vulkan.cpp) uses dedicated cards first and otherwise falls
+  back to built-in graphics, which is why BAU turns the card off without NVIDIA's driver.
+- The driver packages resolve with apt in a clean Debian 13.7. The NVIDIA card itself, the
+  driver build and Secure Boot can only be proved on the desktop.
+
 ## How it is checked
 
 The "Check yourself" rules in `CLAUDE.md` apply: `bash scripts/check.sh` must say ALL PASS,
