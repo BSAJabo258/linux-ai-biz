@@ -28,9 +28,10 @@ used.
 
 ## 1. On the Windows computer: fill the stick
 
-You need a USB stick of 8 GB or more (the 64 GB one is fine).
+You need a USB stick of 16 GB or more (the 64 GB one is fine), formatted **exFAT**. Not
+FAT32: it cannot hold a file over 4 GB, and the desktop's model is 5.7 GB.
 
-1. **If the stick still holds a BAU installer image, format it first.** This **erases**
+1. **If the stick still holds a BAU installer image, or is FAT32, format it first.** This **erases**
    everything on it, including the installer. In File Explorer: right-click the stick,
    **Format**, File system **exFAT**, **Start**. (Keep another stick with the installer if
    you still need it.)
@@ -44,7 +45,7 @@ You need a USB stick of 8 GB or more (the 64 GB one is fine).
    (If Windows says *Windows protected your PC*: **More info**, then **Run anyway**.)
 5. It lists the USB sticks it sees. **Type the letter** of the one to fill (for example
    `E`). It never picks one for you, and never formats or erases anything.
-6. Type `y` to start. The download takes a while (6.5 GB). If it stops, double-click
+6. Type `y` to start. The download takes a while (about 12 GB). If it stops, double-click
    again: it carries on where it stopped, and skips files that are already done.
 7. When it says **The BAU Pack is ready**, eject the stick.
 

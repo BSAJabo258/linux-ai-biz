@@ -62,11 +62,17 @@ def _check_pii(obj: Any, path: str = "") -> None:
 
 
 def _load_key() -> bytes | None:
+    """No key file: records are unsigned. A key file that cannot be read stops here:
+    signing nothing would make the keyed service later call those records tampered
+    (audit 2026-10-25)."""
     p = Path(os.environ.get("BAU_AUDIT_KEY", "/etc/bau/audit.key"))
+    if not p.exists():
+        return None
     try:
         return p.read_bytes().strip() or None
-    except OSError:
-        return None
+    except OSError as e:
+        raise AuditError(f"the audit key {p} cannot be read ({type(e).__name__}). If you "
+                         "were just added to the bau group, log out and back in") from e
 
 
 class AuditLog:

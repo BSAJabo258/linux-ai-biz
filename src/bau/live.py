@@ -77,10 +77,18 @@ def plan_free_space(disk: str, table: dict, disk_sectors: int, sector: int,
 
 
 def plan_empty_disk(disk: str, table: dict | None, disk_sectors: int, sector: int,
-                    mounted: bool, min_bytes: int = MIN_BYTES) -> Plan:
-    """A separate disk is used only when it holds no partitions at all."""
+                    mounted: bool, min_bytes: int = MIN_BYTES, *, kind: str = "disk",
+                    signatures: list[str] | tuple[str, ...] = ()) -> Plan:
+    """A separate disk is used only when it is a whole disk holding nothing at all: no
+    partitions and no filesystem or encryption written straight onto it (audit
+    2026-10-25: those have no partition table and were treated as empty)."""
+    if kind != "disk":
+        raise StorageError(f"{disk} is not a whole disk ({kind}); give the disk itself")
     if mounted:
         raise StorageError(f"{disk} is in use (mounted); refusing")
+    if signatures:
+        raise StorageError(f"{disk} holds {', '.join(signatures)} data; jarvis-storage never "
+                           "deletes data. Choose an empty disk")
     if table and table["partitiontable"].get("partitions"):
         raise StorageError(f"{disk} already has partitions; jarvis-storage never deletes "
                            "data. Choose an empty disk")
@@ -128,6 +136,17 @@ def _geometry(disk: str) -> tuple[int, int]:
     return int(_out(["blockdev", "--getsize64", disk])) // sector, sector
 
 
+def _signatures(disk: str) -> list[str]:
+    """What is written on the disk itself (filesystems, LUKS, BitLocker, RAID...), read
+    only: `wipefs --no-act` lists and changes nothing (util-linux, Essential in Debian)."""
+    out = _out(["wipefs", "--no-act", "--noheadings", "--output", "TYPE", disk])
+    return [x.strip() for x in out.splitlines() if x.strip()]
+
+
+def _kind(disk: str) -> str:
+    return _out(["lsblk", "-dno", "TYPE", disk]).splitlines()[0].strip()
+
+
 def _mounted(disk: str) -> bool:
     rows = _out(["lsblk", "-rno", "MOUNTPOINTS", disk])
     return any(r.strip() for r in rows.splitlines())
@@ -150,7 +169,8 @@ def setup(device: str | None, passphrase_file: str | None, yes: bool) -> int:
     if device:
         table = _table(device)
         sectors, sector = _geometry(device)
-        plan = plan_empty_disk(device, table, sectors, sector, _mounted(device))
+        plan = plan_empty_disk(device, table, sectors, sector, _mounted(device),
+                               kind=_kind(device), signatures=_signatures(device))
     else:
         disk = boot_disk()
         if not disk:

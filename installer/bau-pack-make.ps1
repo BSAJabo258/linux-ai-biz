@@ -53,7 +53,7 @@ function Select-BauStick {
     $drives = @([IO.DriveInfo]::GetDrives() | Where-Object {
         $_.IsReady -and ($_.DriveType -eq "Removable" -or $usb -contains $_.Name) })
     if (-not $drives.Count) {
-        Write-Host "No USB stick found. Plug one in (8 GB or more) and run this again." -ForegroundColor Yellow
+        Write-Host "No USB stick found. Plug one in (16 GB or more, exFAT) and run this again." -ForegroundColor Yellow
         exit 1
     }
     Write-Host "USB sticks on this computer:"
@@ -64,7 +64,14 @@ function Select-BauStick {
     }
     $letter = (Read-Host "Type the letter of the stick to fill (for example E)").Trim().TrimEnd(":", "\").ToUpper()
     foreach ($d in $drives) {
-        if ($d.Name.Substring(0, 1).ToUpper() -eq $letter -and $letter.Length -eq 1) { return $d.Name }
+        if ($d.Name.Substring(0, 1).ToUpper() -eq $letter -and $letter.Length -eq 1) {
+            # FAT32 cannot hold a file over 4 GB, and the desktop's model is 5.7 GB.
+            if ($d.DriveFormat -eq "FAT32") {
+                Write-Host "$letter is formatted FAT32, which cannot hold the 5.7 GB model. Format it exFAT first (docs/PACK.md). Nothing written." -ForegroundColor Yellow
+                exit 1
+            }
+            return $d.Name
+        }
     }
     Write-Host "$letter is not one of the USB sticks above. Nothing written." -ForegroundColor Yellow
     exit 1

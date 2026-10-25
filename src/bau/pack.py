@@ -204,13 +204,13 @@ def _new_file(path: Path):
     return os.fdopen(fd, "wb")
 
 
-def _safe_write(path: Path, text: str) -> None:
+def _safe_write(path: Path, text: str, mode: int = 0o644) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".new")
     with _new_file(tmp) as f:
         f.write(text.encode())
+    os.chmod(tmp, mode)
     os.replace(tmp, path)                       # replaces a planted link, never follows it
-    os.chmod(path, 0o644)
 
 
 def _copy_verified(src: Path, dst: Path, want: str) -> bool:
@@ -369,7 +369,7 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
 
     text = laptop_report(run)
     try:
-        (pack / REPORT).write_text(text)
+        _safe_write(pack / REPORT, text)     # a link planted on the stick is replaced
         out["report"] = str(pack / REPORT)
         say(f"Laptop report written to the stick: {REPORT}")
     except OSError:                         # a drive opened read-only, e.g. Windows' own
@@ -457,7 +457,9 @@ def approve(home: Path, mid: str, by: str, audit: Any, rec: dict[str, Any],
     if errs:
         raise ValueError("; ".join(errs))
     reg.data["model"][mid] = new
-    _safe_write(reg.path, yaml.safe_dump(reg.data, sort_keys=True))
+    # 0660: the bau group (the Governor's account, the owner) must still write it after
+    # root approved a model here (audit 2026-10-25: 0644 broke the Governor's quarantine).
+    _safe_write(reg.path, yaml.safe_dump(reg.data, sort_keys=True), 0o660)
     if audit is not None:
         audit.append("registry.status", by, {"kind": "model", "key": mid,
                                              "status": "APPROVED"})
