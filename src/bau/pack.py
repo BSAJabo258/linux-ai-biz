@@ -39,8 +39,11 @@ from .home import shipped_data
 
 PACK_DIR = "BAU-PACK"
 THINKER = "qwen3-4b-heretic-content"
-BOSS_ORDER = ("qwen3.5-4b", "qwen2.5-1.5b-instruct")
-PACK_MODELS = ("qwen3.5-4b", THINKER, "qwen2.5-1.5b-instruct")
+# The desktop's boss runs on its NVIDIA card (docs/DESKTOP.md); elsewhere it is not copied.
+DESKTOP_BOSS = "qwen3.5-9b"
+NVIDIA = Path("/proc/driver/nvidia/version")         # there once NVIDIA's driver is loaded
+BOSS_ORDER = (DESKTOP_BOSS, "qwen3.5-4b", "qwen2.5-1.5b-instruct")
+PACK_MODELS = (DESKTOP_BOSS, "qwen3.5-4b", THINKER, "qwen2.5-1.5b-instruct")
 # Where drives show up (a pack folder sits at the top of one): sticks the desktop opened,
 # drives opened by hand, and the ones `locate` opens read-only itself.
 SEARCH = ("/media/*/*", "/media/*", "/run/media/*/*", "/mnt", "/mnt/*", "/run/bau-pack/*")
@@ -281,7 +284,8 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
             records: dict[str, dict[str, Any]] | None = None,
             say: Callable[..., None] = print,
             sleep: Callable[[float], None] = time.sleep,
-            space: Callable[[Path], tuple[int, bool]] = _space) -> dict[str, Any]:
+            space: Callable[[Path], tuple[int, bool]] = _space,
+            gpu: Callable[[], bool] = NVIDIA.exists) -> dict[str, Any]:
     if not by.startswith("human:"):
         raise PermissionError("only the owner installs a BAU Pack")
     pack = root(path)
@@ -295,6 +299,11 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
 
     say("Checking the models on the stick (each against its pinned SHA-256)...")
     found = scan(pack, recs, check_hash=False)
+    if not gpu():
+        for e in found:
+            if e["model_id"] == DESKTOP_BOSS and e["status"] == "ok":
+                e["status"] = ("for a computer with an NVIDIA card: run sudo bau-gpu-setup "
+                               "first, restart, then this again (docs/DESKTOP.md)")
     need = 0
     for e in found:
         dl = recs[e["model_id"]]["download"]

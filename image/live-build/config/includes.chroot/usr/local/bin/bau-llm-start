@@ -16,4 +16,11 @@ if [[ -z ${LLAMA_ARG_THREADS:-} ]]; then
   fi
 fi
 
+# The graphics card only with NVIDIA's driver loaded (the desktop, docs/DESKTOP.md): the
+# server would otherwise use any Vulkan device it finds, and a laptop's built-in graphics
+# is slower than its processor. LLAMA_ARG_DEVICE in /etc/bau/llm.env still wins.
+if [[ -z ${LLAMA_ARG_DEVICE+set} && ! -r ${BAU_NVIDIA_PROC:-/proc/driver/nvidia/version} ]]; then
+  export LLAMA_ARG_DEVICE=none
+fi
+
 exec "${BAU_LLAMA_SERVER:-/opt/llama.cpp/llama-server}" "$@"

@@ -123,6 +123,56 @@ approved only after `bau models bench` on the desktop.
 - **Next design areas** (each through the `grow-bau` method): voice in and out on the card,
   more agents at once, local image work, and how the laptop and desktop share your work.
 
+## Set up the desktop, step by step
+
+Steps 1 to 3 use the same stick as the laptop. The desktop parts switch on only on a
+computer with an NVIDIA card.
+
+1. **Before:** copy off anything on the D drive, write down the BitLocker key for C:, and
+   turn off Windows Fast Startup (the list above).
+2. **Install BAU on the TOSHIBA drive** from the stick: start the computer from the stick and
+   choose **Install BAU on this laptop**. Pick the TOSHIBA DT01ACA100 (932 GB), never the
+   Micron NVMe (that is Windows). If the screen stays black, choose **safe graphics** in the
+   stick's menu.
+3. **Start from the new drive** and log in. The internet is needed for the next step (the
+   cable port or Wi-Fi).
+4. **The graphics driver**, once:
+
+   ```bash
+   sudo bau-gpu-setup
+   ```
+
+   Type `y` when it asks. It installs Debian's NVIDIA driver and the newest Debian kernel.
+   With Secure Boot on, it asks you for a one-time password. Restart with
+   `sudo systemctl reboot`; on the blue screen choose **Enroll MOK**, Continue, Yes, the
+   password, OK.
+5. **Check the card:** `nvidia-smi` shows the RTX 3060.
+6. **The desktop's boss model.** On the Windows side of the desktop (or any Windows
+   computer), fill the 64 GB stick with `BAU-Pack-Make.cmd` (see [PACK.md](PACK.md)); it
+   now also carries Qwen3.5-9B (5.7 GB). Back on BAU, with the driver from step 4 running:
+
+   ```bash
+   sudo bau pack install
+   ```
+
+   It copies and checks the models, starts the 9B on the card, measures it with a real
+   benchmark, and asks you before approving it and before making it the boss. On a
+   computer without NVIDIA's driver loaded (the laptop) it leaves the 9B on the stick and
+   keeps the 4B.
+
+## Tested so far (2026-10-25, not on the desktop yet)
+
+- The stick's llama.cpp (v0.6.0, d812350) built with its Vulkan part in a clean Debian 13:
+  9 minutes on 4 cores, `libggml-vulkan.so` made.
+- With no Vulkan loader it starts and lists no card. With a software Vulkan card (Mesa's
+  lavapipe) it lists "Vulkan0" and answered "What is 7 times 8?" right through it.
+- Through `bau-llm-start` with no NVIDIA driver loaded, it set `LLAMA_ARG_DEVICE=none` and
+  answered right on the processor (15.7 tokens/s, Qwen2.5-1.5B).
+- llama.cpp's own code (ggml-vulkan.cpp) uses dedicated cards first and otherwise falls
+  back to built-in graphics, which is why BAU turns the card off without NVIDIA's driver.
+- The driver packages resolve with apt in a clean Debian 13.7. The NVIDIA card itself, the
+  driver build and Secure Boot can only be proved on the desktop.
+
 ## How it is checked
 
 The "Check yourself" rules in `CLAUDE.md` apply: `bash scripts/check.sh` must say ALL PASS,

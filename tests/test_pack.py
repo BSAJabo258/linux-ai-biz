@@ -39,15 +39,16 @@ BASE = {"version": "1", "source": "test", "license": "Apache-2.0", "commercial_u
         "cost_out_per_mtok": 0, "status": "REGISTERED"}
 BLOBS = {"qwen3.5-4b": b"boss model bytes", "qwen3-4b-heretic-content": b"thinker bytes",
          "qwen2.5-1.5b-instruct": b"backup model bytes"}
+DESKTOP = {"qwen3.5-9b": b"desktop boss bytes"}
 
 
 def sha(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
-def records() -> dict[str, dict]:
+def records(desktop=False) -> dict[str, dict]:
     out = {}
-    for mid, blob in BLOBS.items():
+    for mid, blob in {**BLOBS, **(DESKTOP if desktop else {})}.items():
         rec = {**BASE, "model_id": mid, "name": mid, "api_model": mid,
                "endpoint": "http://127.0.0.1:8080", "tools": True,
                "download": {"url": f"https://example.invalid/{mid}.gguf",
@@ -59,10 +60,10 @@ def records() -> dict[str, dict]:
     return out
 
 
-def make_pack(tmp_path: Path, only=None, keys=False) -> Path:
+def make_pack(tmp_path: Path, only=None, keys=False, desktop=False) -> Path:
     pack = tmp_path / "stick" / "BAU-PACK"
     (pack / "models").mkdir(parents=True)
-    for mid, blob in BLOBS.items():
+    for mid, blob in {**BLOBS, **(DESKTOP if desktop else {})}.items():
         if only is None or mid in only:
             (pack / "models" / f"{mid}.gguf").write_bytes(blob)
     if keys:
@@ -102,12 +103,14 @@ def good_bench(mid):
     return {"reply_ok": True, "tool_calls": True, "tokens_per_sec": 9.5, "latency_ms": 900}
 
 
-def do_install(tmp_path, pack, owner, bench=good_bench, read_pass=None, run=None, **kw):
+def do_install(tmp_path, pack, owner, bench=good_bench, read_pass=None, run=None,
+               desktop=False, **kw):
     home, audit = make_home(tmp_path)
     etc = tmp_path / "etc"
+    kw.setdefault("gpu", lambda: False)                 # the laptop, unless a test says
     out = P.install(pack, home, etc, ask=owner, run=run or Runner(), by="human:owner",
-                    audit=audit, bench=bench, read_pass=read_pass, records=records(),
-                    say=lambda *_: None, sleep=lambda _: None, **kw)
+                    audit=audit, bench=bench, read_pass=read_pass,
+                    records=records(desktop), say=lambda *_: None, sleep=lambda _: None, **kw)
     return home, etc, out
 
 
@@ -655,3 +658,33 @@ def test_haiku_is_the_cheap_claude_and_needs_the_owner_to_approve_it():
     assert h["status"] == "REGISTERED" and h["adapter"] == "anthropic"
     assert (h["cost_in_per_mtok"], h["cost_out_per_mtok"]) == (0.10, 0.50)    # official, dated
     assert o["cost_in_per_mtok"] / h["cost_in_per_mtok"] == 40
+
+
+def test_the_desktop_boss_is_registered_pinned_and_never_approved_by_default():
+    # docs/DESKTOP.md: Qwen3.5-9B for the RTX 3060 (12 GB). Size and SHA-256 from the HF API
+    # tree of unsloth/Qwen3.5-9B-GGUF, read 2026-10-25; approved only after bau models bench.
+    rec = yaml.safe_load(DEFAULTS.read_text())["model"]["qwen3.5-9b"]
+    assert rec["status"] == "REGISTERED" and rec["tools"] and rec["license"] == "Apache-2.0"
+    assert rec["chat_template_kwargs"] == {"enable_thinking": False}   # as the 4B (190 s)
+    assert rec["endpoint"] == "http://127.0.0.1:8080"
+    dl = rec["download"]
+    assert (dl["size"], dl["sha256"]) == (
+        5680522464, "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8")
+    assert dl["url"] == ("https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/"
+                         "Qwen3.5-9B-Q4_K_M.gguf")
+
+
+
+# ------------------------------------------------------------------ the desktop's boss
+# docs/DESKTOP.md: the 9B runs on the RTX 3060. On a computer without NVIDIA's driver loaded
+# (the laptop, or the desktop before sudo bau-gpu-setup) it is not copied (5.7 GB) and the
+# 4B stays the boss.
+
+def test_the_9b_is_the_boss_only_where_the_nvidia_driver_is_loaded(tmp_path):
+    _, _, out = do_install(tmp_path / "laptop", make_pack(tmp_path / "laptop", desktop=True),
+                           Owner("Use", "Approve", "boss"), desktop=True)
+    assert out["boss"] == "qwen3.5-4b" and "qwen3.5-9b" not in out["copied"]
+    assert "NVIDIA" in out["skipped"]["qwen3.5-9b"]
+    _, _, out = do_install(tmp_path / "desktop", make_pack(tmp_path / "desktop", desktop=True),
+                           Owner("Use", "Approve", "boss"), desktop=True, gpu=lambda: True)
+    assert out["boss"] == "qwen3.5-9b" and "qwen3.5-9b" in out["copied"]

@@ -279,6 +279,40 @@ model:
     cost_out_per_mtok: 0
     status: REGISTERED
     notes: Free below $10M yearly revenue (LFM Open License v1.0). Bench it before approving.
+  qwen3.5-9b:
+    model_id: qwen3.5-9b
+    name: Qwen3.5-9B - the desktop's boss, on the RTX 3060's 12 GB (llama.cpp, Vulkan)
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-25 (HF API model + tree): Qwen/Qwen3.5-9B, Apache-2.0, released
+    # 2026-02-27, 9.65B parameters, tool calling, 262K native context (capped for 12 GB).
+    # Pinned file: unsloth's quantisation, as for the 4B. See docs/DESKTOP.md.
+    source: huggingface.co/Qwen/Qwen3.5-9B (GGUF by unsloth/Qwen3.5-9B-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.5-9b
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf
+      file: Qwen3.5-9B-Q4_K_M.gguf
+      size: 5680522464
+      sha256: 03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.75
+    latency_ms: 3000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    # Thinking off, as for the 4B (same family; with it on the 4B spent 190 s thinking).
+    chat_template_kwargs: {enable_thinking: false}
+    notes: For the desktop's graphics card (docs/DESKTOP.md). On a processor only it is
+      slow; bench it on the machine that will run it before approving.
   qwen3.5-4b:
     model_id: qwen3.5-4b
     name: Qwen3.5-4B - best small brain for 8 GB CPU machines, with tool calling (llama.cpp)

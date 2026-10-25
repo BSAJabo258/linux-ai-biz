@@ -62,6 +62,9 @@ systemctl enable bau-usb-guard.service
 # The health console on Ctrl+Alt+F9: Wi-Fi, memory, heat, the stick, kernel warnings; it
 # keeps going when the stick drops out, so a crash leaves proof on screen.
 chmod 0755 /usr/local/sbin/bau-health-console
+
+# The desktop's NVIDIA driver, run by the owner on the installed desktop (docs/DESKTOP.md).
+chmod 0755 /usr/local/sbin/bau-gpu-setup
 systemctl enable bau-health-console.service
 
 chmod 0755 /usr/local/sbin/bau-live-init /usr/local/bin/jarvis-setup /opt/llama.cpp/llama-server
