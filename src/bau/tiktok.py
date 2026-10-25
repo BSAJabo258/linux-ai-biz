@@ -390,6 +390,18 @@ class TikTokQueue:
             problems.append("provenance says AI-generated: the TikTok AI label cannot be "
                             "turned off")
         is_aigc = True if ai else bool(is_aigc)
+        # Kids content goes only to YouTube made for kids (CLAUDE.md): never a video queued
+        # there as made for kids, never a caption aimed at children (audit 2026-10-25).
+        from .kids import CHILD_DIRECTED
+        from .youtube import YouTubeQueue
+        digest = _sha256(video)
+        if any(y.kids and y.checks.get("video_sha256") == digest
+               for y in YouTubeQueue(self.home, self.audit).items()):
+            problems.append("this video is queued on YouTube as made for kids: kids content "
+                            "goes only to YouTube made for kids, never TikTok")
+        if CHILD_DIRECTED.search(item.caption):
+            problems.append("the caption speaks to children: kids content goes only to "
+                            "YouTube made for kids, never TikTok (13+)")
         claims = scan(item.caption)
         if claims:
             problems.append("caption makes claims that need evidence: "
@@ -425,6 +437,9 @@ class TikTokQueue:
         """Called only from the interactive review, after the owner confirmed."""
         if not approver.startswith("human:"):
             raise PermissionError("only a human at the review screen can post to TikTok")
+        from .governor import hold_reason
+        if (why := hold_reason(self.home)) is not None:
+            raise TikTokError(f"BAU is on HOLD ({why}): nothing is posted until it is released")
         if item.status != "QUEUED":
             raise TikTokError(f"{item.item_id} is {item.status}; it can be posted only once")
         video = self.path(item)

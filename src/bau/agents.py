@@ -179,7 +179,11 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
                 results.append((call, f"DENIED by BAU gateway at {e.step}: {e.reason}", True))
             except Exception as e:  # tool crashed: report, do not hide
                 entry.update(ok=False, error=type(e).__name__)
-                results.append((call, f"tool error: {type(e).__name__}: {e}"[:2000], True))
+                # The error text can come from outside (an MCP server's own message): data.
+                wrapped, flagged = untrusted(f"{cap} error",
+                                             f"{type(e).__name__}: {e}"[:2000])
+                flags += flagged
+                results.append((call, wrapped, True))
             log.append(entry)
         msg = provider.tool_result_message(results)
         if msg.get("role") == "_multi":

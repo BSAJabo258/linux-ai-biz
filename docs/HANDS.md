@@ -12,7 +12,7 @@ a plain warning when it changes or deletes things:
 Jarvis wants to run:
   rm notes-old.txt
   (why: remove the old copy to free space)
-  Careful: this changes or deletes things.
+  Careful: this can change or delete things.
 Run it? Type y and Enter (anything else: no):
 ```
 

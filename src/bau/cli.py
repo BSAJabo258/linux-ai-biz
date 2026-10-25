@@ -392,8 +392,18 @@ def cmd_registry(a: argparse.Namespace) -> int:
     from .registry import CapabilityRegistry
     reg = CapabilityRegistry()
     if a.registry_cmd == "add":
+        from .registry import ROUTABLE
+        if not sys.stdin.isatty():
+            print("registry changes must be made by a human at a terminal", file=sys.stderr)
+            return EXIT_BLOCKED
+        rec = _load(a.file)
+        # Approving is `bau set-status` (checked, human-only); adding never approves.
+        if isinstance(rec, dict) and rec.get("status") in ROUTABLE:
+            print(f"add it as REGISTERED, then approve it with: bau set-status {a.kind} ... "
+                  "APPROVED", file=sys.stderr)
+            return EXIT_BLOCKED
         try:
-            reg.add(a.kind, _load(a.file))
+            reg.add(a.kind, rec)
         except ValueError as e:
             print(str(e), file=sys.stderr)
             return EXIT_BLOCKED
