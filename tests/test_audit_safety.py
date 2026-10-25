@@ -61,3 +61,17 @@ def test_registry_add_cannot_approve_and_needs_a_person(tmp_path):
     assert r.returncode != 0
     reg = (tmp_path / "registry" / "capabilities.yaml").read_text()
     assert "evil" not in reg
+
+
+def test_a_wrong_workspace_name_is_a_plain_message_not_a_traceback(tmp_path):
+    # Audit 2026-10-25: `bau series check nope` printed a Python traceback.
+    assert _bau(tmp_path, "init").returncode == 0
+    r = _bau(tmp_path, "series", "check", "nope")
+    assert r.returncode != 0 and "Traceback" not in r.stderr
+    assert "no workspace 'nope'" in r.stderr
+
+
+def test_scanning_a_path_that_does_not_exist_is_not_called_clean(tmp_path):
+    # Audit 2026-10-25: a typo in the path gave {"findings": []} and exit 0.
+    r = _bau(tmp_path, "secrets", str(tmp_path / "no-such-folder"))
+    assert r.returncode != 0 and "findings" not in r.stdout

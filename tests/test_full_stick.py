@@ -299,3 +299,13 @@ def test_a_mistyped_passphrase_leaves_the_stick_as_it_was(monkeypatch, capsys):
     assert ["sfdisk", "--no-reread", "--no-tell-kernel", "--delete", "/dev/sdb", "3"] in ran
     assert ["partx", "-d", "--nr", "3", "/dev/sdb"] in ran
     assert not any(c[:2] == ["cryptsetup", "open"] for c in ran)
+
+
+def test_the_install_has_a_safe_graphics_entry_too():
+    # Audit 2026-10-25: the desktop guide said "choose safe graphics" while installing, but
+    # only the live system had that entry; an RTX 3060 can leave the installer black.
+    grub = (LB / "grub.cfg").read_text()
+    entries = re.findall(r'menuentry "([^"]+)"', grub)
+    safe = next(e for e in entries if e.startswith("Install BAU") and "safe graphics" in e)
+    block = grub[grub.index(safe):].split("}", 1)[0]
+    assert "@KERNEL_GI@" in block and "@APPEND_INSTALL@" in block and "nomodeset" in block

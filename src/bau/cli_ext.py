@@ -476,11 +476,10 @@ def cmd_pack(a):
         if a.pack_cmd == "report":
             text, dest = P.laptop_report(P.run_cmd), pack / P.REPORT
             try:
-                dest.write_text(text)
+                P._safe_write(dest, text)   # never follows a link planted on the stick
             except OSError:                 # the pack's drive is open read-only
                 dest = bau_home() / "reports" / P.REPORT
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_text(text)
+                P._safe_write(dest, text)
             print(f"written: {dest}")
             return 0
         if os.geteuid() != 0:

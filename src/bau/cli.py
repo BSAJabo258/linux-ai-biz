@@ -371,6 +371,8 @@ def cmd_audit(a: argparse.Namespace) -> int:
 
 def cmd_secrets(a: argparse.Namespace) -> int:
     from .security.secrets_scan import scan_path
+    if not Path(a.path).exists():          # a typo is not "clean" (audit 2026-10-25)
+        raise FileNotFoundError(f"{a.path} does not exist: nothing was scanned")
     found = scan_path(Path(a.path))
     _out({"findings": found})
     return EXIT_BLOCKED if found else EXIT_OK
@@ -747,6 +749,9 @@ def main(argv: list[str] | None = None) -> int:
     except (FileNotFoundError, json.JSONDecodeError, yaml.YAMLError, ValueError, KeyError,
             TypeError) as e:
         print(f"error: {e}", file=sys.stderr)
+        return EXIT_ERROR
+    except RuntimeError as e:      # BAU's own errors (workspace, audit key, storage...):
+        print(f"error: {e}", file=sys.stderr)        # a plain line, not a traceback
         return EXIT_ERROR
 
 
