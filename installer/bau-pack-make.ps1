@@ -19,6 +19,7 @@ param(
 
 # The same files, links and hashes as src/bau/data/registry_defaults.yaml (a test checks).
 $BauModels = @(
+    @{ Id = "qwen3.5-9b"; File = "Qwen3.5-9B-Q4_K_M.gguf"; Url = "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf"; Size = 5680522464; Sha256 = "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8"; Role = "the desktop boss: runs on the NVIDIA card (docs/DESKTOP.md)" },
     @{ Id = "qwen3.5-4b"; File = "Qwen3.5-4B-Q4_K_M.gguf"; Url = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf"; Size = 2740937888; Sha256 = "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4"; Role = "the boss: runs Jarvis and the agents" },
     @{ Id = "qwen3-4b-heretic-content"; File = "Qwen3-4B-Instruct-2507-heretic.Q4_K_M.gguf"; Url = "https://huggingface.co/mradermacher/Qwen3-4B-Instruct-2507-heretic-GGUF/resolve/main/Qwen3-4B-Instruct-2507-heretic.Q4_K_M.gguf"; Size = 2497279584; Sha256 = "5d38e532cf33a5b56760bc7803aaabffb240d0604f1e389e4db148830c2bb747"; Role = "the thinker: uncensored ideas, sealed" },
     @{ Id = "qwen2.5-1.5b-instruct"; File = "qwen2.5-1.5b-instruct-q4_k_m.gguf"; Url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"; Size = 1117320736; Sha256 = "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e"; Role = "the backup: small and fast" }

@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# The desktop's graphics driver (docs/DESKTOP.md), run once on the installed desktop:
+#   sudo bau-gpu-setup
+# Debian 13's closed NVIDIA driver 550.163.01: the open flavour no longer compiles from
+# kernel 6.12.100 on (wiki.debian.org/NvidiaGraphicsDrivers, read 2026-10-25). dkms builds
+# it on this computer and signs it with this computer's own key (/var/lib/dkms/mok.pub);
+# with Secure Boot on, the owner enrolls that key once (wiki.debian.org/SecureBoot).
+# Needs the internet once (cable or Wi-Fi). Every change waits for the owner's y.
+set -euo pipefail
+
+SYSFS=${BAU_SYSFS:-/sys/bus/pci/devices}
+LIVE=${BAU_LIVE_MEDIUM:-/run/live/medium}
+PUB=${BAU_DKMS_PUB:-/var/lib/dkms/mok.pub}
+SOURCES=${BAU_APT_SOURCES:-/etc/apt/sources.list.d/bau-nonfree.sources}
+# Resolved with apt in a clean debian:trixie (13.7), 2026-10-25. The kernel and its headers
+# come along so dkms builds for the kernel that starts next.
+PACKAGES=(linux-image-amd64 linux-headers-amd64 nvidia-kernel-dkms nvidia-driver
+          nvidia-vulkan-icd mokutil)
+
+say() { printf '%s\n' "$*"; }
+
+if [[ $(id -u) -ne 0 ]]; then
+  say "Run it with sudo: sudo bau-gpu-setup"; exit 1
+fi
+if [[ -d ${LIVE} ]]; then
+  say "This is the live stick: the driver and its key would be gone at the next restart."
+  say "Install BAU to a disk first, start from that disk, then run this again."
+  exit 1
+fi
+
+card=""
+for dev in "${SYSFS}"/*; do
+  [[ -r ${dev}/vendor && -r ${dev}/class ]] || continue
+  if [[ $(<"${dev}/vendor") == 0x10de && $(<"${dev}/class") == 0x03* ]]; then
+    card=${dev##*/}; break
+  fi
+done
+if [[ -z ${card} ]]; then
+  say "No NVIDIA graphics card found: nothing to do (BAU uses the processor)."; exit 1
+fi
+
+say "NVIDIA graphics card found (${card})."
+say "This installs Debian's NVIDIA driver 550.163.01 and the newest Debian kernel, builds"
+say "the driver for this computer and signs it with this computer's own key. Then you"
+say "restart. It needs the internet and takes a few minutes."
+read -r -p "Go ahead? Type y and Enter (anything else: no): " answer || answer=""
+if [[ ${answer} != y ]]; then
+  say "Nothing was changed."; exit 1
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -q
+if ! apt-cache policy nvidia-driver | grep -q 'Candidate: [0-9]'; then
+  say "Adding Debian's contrib, non-free and non-free-firmware areas (${SOURCES})..."
+  cat > "${SOURCES}" <<'EOF'
+# Added by bau-gpu-setup: Debian's own non-free area, for the NVIDIA driver.
+Types: deb
+URIs: http://deb.debian.org/debian
+Suites: trixie trixie-updates
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: http://deb.debian.org/debian-security
+Suites: trixie-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
+  apt-get update -q
+fi
+apt-get install -y -q "${PACKAGES[@]}"
+
+sb=$(mokutil --sb-state 2>&1 || true)
+if [[ ${sb} == *"SecureBoot enabled"* ]]; then
+  # mokutil 0.7.2's own words (strings of /usr/bin/mokutil in debian:trixie, 2026-10-25):
+  # "%s is not enrolled", "%s is already in the enrollment request".
+  key=$(mokutil --test-key "${PUB}" 2>&1 || true)
+  if [[ ${key} == *"enrollment request"* ]]; then
+    say "Secure Boot: the key is waiting. Restart and finish the blue screen (Enroll MOK)."
+  elif [[ ${key} != *"is not enrolled"* ]]; then
+    say "Secure Boot: this computer's driver key is already enrolled."
+  else
+    say ""
+    say "Secure Boot is on, so the card needs this computer's driver key enrolled once."
+    say "Choose a short one-time password now and type it twice (you need it once more"
+    say "after the restart, then never again):"
+    mokutil --import "${PUB}"
+    say ""
+    say "After the restart a blue screen appears (MOK management). Press a key, then choose"
+    say "Enroll MOK, Continue, Yes, type the password, and OK. The computer starts normally."
+  fi
+fi
+
+say ""
+say "Done. Restart now so the driver starts: sudo systemctl reboot"
+say "Afterwards, check it with: nvidia-smi"

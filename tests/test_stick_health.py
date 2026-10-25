@@ -320,20 +320,32 @@ def test_the_prompt_cache_cannot_take_the_whole_laptop():
 START = CONF / "includes.chroot" / "usr" / "local" / "bin" / "bau-llm-start"
 
 
-def _threads(tmp_path, cores, logical, preset=None):
+def _threads(tmp_path, cores, logical, preset=None, nvidia=False, device=None):
     fake = tmp_path / "bin"
     fake.mkdir(exist_ok=True)
     rows = "\n".join(f"{c % cores},0" for c in range(logical))
     (fake / "lscpu").write_text(f"#!/bin/sh\necho '# Core,Socket'\nprintf '%s\\n' '{rows}'\n")
     server = tmp_path / "llama-server"
-    server.write_text('#!/bin/sh\necho "threads=${LLAMA_ARG_THREADS} args=$*"\n')
+    server.write_text('#!/bin/sh\necho "threads=${LLAMA_ARG_THREADS} args=$*"\n'
+                      'echo "device=${LLAMA_ARG_DEVICE:-}"\n')
     for f in (fake / "lscpu", server):
         f.chmod(0o755)
-    env = {"PATH": f"{fake}:/usr/bin:/bin", "BAU_LLAMA_SERVER": str(server)}
+    proc = tmp_path / "nvidia-version"
+    if nvidia:
+        proc.write_text("NVRM version: NVIDIA UNIX x86_64 Kernel Module  550.163.01\n")
+    elif proc.exists():
+        proc.unlink()
+    env = {"PATH": f"{fake}:/usr/bin:/bin", "BAU_LLAMA_SERVER": str(server),
+           "BAU_NVIDIA_PROC": str(proc)}
     if preset:
         env["LLAMA_ARG_THREADS"] = preset
-    return subprocess.run(["bash", str(START), "--port", "8080"], env=env,
-                          capture_output=True, text=True, check=True).stdout.strip()
+    if device is not None:
+        env["LLAMA_ARG_DEVICE"] = device
+    out = subprocess.run(["bash", str(START), "--port", "8080"], env=env,
+                         capture_output=True, text=True, check=True).stdout.strip()
+    first, _, dev = out.partition("\ndevice=")
+    _threads.device = dev
+    return first
 
 
 def test_the_model_leaves_one_core_for_the_desktop_and_jarvis(tmp_path):
@@ -344,3 +356,29 @@ def test_the_model_leaves_one_core_for_the_desktop_and_jarvis(tmp_path):
     assert "ExecStart=/usr/local/bin/bau-llm-start " in unit
     hook = (CONF / "hooks" / "live" / "0500-bau.hook.chroot").read_text()
     assert "/usr/local/bin/bau-llm-start" in hook                 # made runnable in the image
+
+
+# ------------------------------------------------------------------ the graphics card, only NVIDIA
+# The desktop (RTX 3060, owner's report 2026-10-23) runs the model on the card through
+# llama.cpp's Vulkan backend. llama-server's default is "-ngl auto" on any Vulkan device it
+# finds (v0.6.0 --help), so without NVIDIA's driver loaded BAU says LLAMA_ARG_DEVICE=none:
+# the laptop's built-in graphics would be slower than its processor, not faster.
+
+def test_the_card_is_used_only_when_the_nvidia_driver_is_loaded(tmp_path):
+    _threads(tmp_path, cores=4, logical=8)                       # laptop, no NVIDIA driver
+    assert _threads.device == "none"
+    _threads(tmp_path, cores=12, logical=20, nvidia=True)        # desktop, driver loaded
+    assert _threads.device == ""                                 # llama-server's own auto + fit
+    _threads(tmp_path, cores=4, logical=8, device="Vulkan0")     # the owner's llm.env wins
+    assert _threads.device == "Vulkan0"
+
+
+def test_the_model_engine_carries_the_graphics_card_backend():
+    # llama.cpp's Vulkan backend (docs/build.md: libvulkan-dev glslc spirv-headers,
+    # -DGGML_VULKAN=1), built as its own loadable part next to the processor ones
+    # (GGML_BACKEND_DL), so the same engine runs the laptop (no card) and the desktop.
+    inside = (CONF.parents[1] / "inside.sh").read_text()
+    assert "-DGGML_VULKAN=ON" in inside and "-DGGML_BACKEND_DL=ON" in inside
+    assert all(p in inside for p in ("libvulkan-dev", "glslc", "spirv-headers"))
+    assert "libggml-vulkan.so" in inside                    # the build fails without it
+    assert "libvulkan1" in LISTED                            # what that part needs to load

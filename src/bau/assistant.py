@@ -1365,8 +1365,8 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
     cfg = YamlStore(home / "config" / "jarvis.yaml").load() or {}
     chosen: list[tuple[Provider, dict[str, Any], str]] = []
     order = [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "glm-4.7-flash-zai",
-             "nemotron-3-super-nim", "qwen3.5-4b", "lfm2.5-2.6b", "qwen2.5-1.5b-instruct",
-             "local-llm"]
+             "nemotron-3-super-nim", "qwen3.5-9b", "qwen3.5-4b", "lfm2.5-2.6b",
+             "qwen2.5-1.5b-instruct", "local-llm"]
     for mid in dict.fromkeys(m for m in order if m):
         try:
             provider, rec = provider_for(mid, home)

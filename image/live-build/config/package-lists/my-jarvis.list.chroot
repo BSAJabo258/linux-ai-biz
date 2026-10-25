@@ -113,3 +113,7 @@ firmware-intel-sound
 firmware-sof-signed
 intel-microcode
 amd64-microcode
+
+# The desktop's graphics card (docs/DESKTOP.md): llama.cpp's Vulkan part needs the Vulkan
+# loader to start; the NVIDIA driver itself comes later, with sudo bau-gpu-setup.
+libvulkan1
