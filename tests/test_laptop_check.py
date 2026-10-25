@@ -326,6 +326,32 @@ def test_windows_check_reads_real_graphics_memory():
     assert "IsBoot" in text
 
 
+# The owner's desktop report (2026-10-23) listed one RTX 3060 twice: Windows keeps an old
+# driver entry under the display class with the same name. A card is counted at most as
+# many times as Windows says that card is plugged in.
+GPU_STUBS = """
+function Get-PnpDevice {{ param([switch]$PresentOnly, $Class, $ErrorAction)
+    1..{present} | ForEach-Object {{
+        [pscustomobject]@{{ FriendlyName = 'NVIDIA GeForce RTX 3060' }} }} }}
+function Get-ChildItem {{ param($Path, $ErrorAction)
+    '0000', '0001' | ForEach-Object {{ [pscustomobject]@{{ PSChildName = $_; PSPath = $_ }} }} }}
+function Get-ItemProperty {{ param($Path, $ErrorAction)
+    [pscustomobject]@{{ DriverDesc = 'NVIDIA GeForce RTX 3060'; DriverVersion = '32.0.15.7657';
+                        'HardwareInformation.qwMemorySize' = [uint64]12884901888 }} }}
+"""
+
+
+@needs_pwsh
+@pytest.mark.parametrize("present", [1, 2])
+def test_a_graphics_card_is_listed_once_per_card_plugged_in(present):
+    script = (f". '{PS1}'; " + GPU_STUBS.format(present=present) +
+              "@(Invoke-BauGpus).Count")
+    r = subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-Command", script],
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip().splitlines()[-1] == str(present)
+
+
 @pytest.mark.skipif(not shutil.which("bash"), reason="needs bash")
 def test_linux_check_has_a_graphics_section(tmp_path):
     subprocess.run(["bash", str(SH), str(tmp_path)], capture_output=True, text=True,
