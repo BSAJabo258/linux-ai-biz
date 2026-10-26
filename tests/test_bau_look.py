@@ -104,7 +104,7 @@ def test_jarvis_serves_the_art_and_tells_the_page(jarvis):
         assert "img-src 'self'" in r.headers["Content-Security-Policy"]
         look = json.loads(r.read())["look"]
         assert look["art"] == "dusk" and look["alive"] is True
-        assert look["flow"] == ["dusk", "summer"] and look["live"] == ["dusk", "summer"]
+        assert look["flow"] == list(L.LIVE) and look["live"] == list(L.LIVE)
     L.set_look(home, art="none")
     with pytest.raises(urllib.error.HTTPError) as e:
         urllib.request.urlopen(url + "/art")
@@ -124,7 +124,7 @@ def test_the_page_brings_the_art_to_life_calmly():
 # ------------------------------------------------------------------ liquid: the art melts
 
 def test_the_flow_starts_with_the_chosen_art_and_holds_the_rest(tmp_path):
-    assert L.brief(tmp_path)["flow"] == ["dusk", "summer"]          # the live anime scenes
+    assert L.brief(tmp_path)["flow"] == list(L.LIVE)                # the live scenes
     L.set_look(tmp_path, art="gold")
     assert L.brief(tmp_path)["flow"][0] == "gold"
     L.set_look(tmp_path, flow=["earth", "moon"])
@@ -133,9 +133,9 @@ def test_the_flow_starts_with_the_chosen_art_and_holds_the_rest(tmp_path):
     with pytest.raises(ValueError):
         L.set_look(tmp_path, flow=["moon", "nope"])
     L.set_look(tmp_path, flow=[])                                       # empty = the default
-    assert L.show(tmp_path)["flow"] == ["dusk", "summer"]
+    assert L.show(tmp_path)["flow"] == list(L.LIVE)
     L.set_look(tmp_path, art="none")
-    assert L.brief(tmp_path) == {"art": None, "alive": True, "flow": [], "live": ["dusk", "summer"]}
+    assert L.brief(tmp_path) == {"art": None, "alive": True, "flow": [], "live": list(L.LIVE)}
 
 
 def test_owner_art_joins_the_flow(tmp_path):
@@ -206,6 +206,29 @@ def test_the_anime_scenes_are_painted_live_in_jarvis():
     assert "woman(" in page                                     # a grown woman in each scene
 
 
+def test_seven_live_scenes_in_very_different_styles():
+    # Owner, 2026-10-26: "more different styles, be creative, big difference, live art".
+    page = (resources.files("bau.ui") / "jarvis.html").read_text()
+    order = re.search(r"SCENES = \[([^\]]*)\]", page).group(1)
+    assert re.findall(r'"(\w+)"', order) == list(L.LIVE)       # the page and bau look agree
+    for fn in ("neonCity(", "aurora(", "ocean(", "space(", "synthwave("):
+        assert fn in page
+    for i, fn in enumerate(("dusk", "summer", "neonCity", "aurora", "ocean", "space")):
+        assert f"uScene < {i}.5 ? {fn}(" in page or (i == 0 and "uScene < 0.5 ? dusk(" in page)
+    assert ": synthwave(P, ca, uTime);" in page
+
+
+def test_render_script_reads_the_same_shader(tmp_path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "render_scenes", Path(__file__).resolve().parents[1] / "scripts" / "render_scenes.py")
+    rs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rs)
+    assert rs.scenes() == list(L.LIVE)
+    src = rs.PAGE.read_text()
+    assert "void main()" in rs._js_const(src, "SCENE_FS")
+
+
 def test_cli_look_flow(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("BAU_HOME", str(tmp_path))
     assert cli.main(["look", "flow", "gold", "earth"]) == 0
@@ -213,7 +236,7 @@ def test_cli_look_flow(tmp_path, monkeypatch, capsys):
     assert cli.main(["look", "flow", "all"]) == 0                 # every picture there is
     assert len(json.loads(capsys.readouterr().out)["flow"]) == len(L.SHIPPED)
     assert cli.main(["look", "flow", "default"]) == 0
-    assert json.loads(capsys.readouterr().out)["flow"] == ["dusk", "summer"]
+    assert json.loads(capsys.readouterr().out)["flow"] == list(L.LIVE)
 
 
 # ------------------------------------------------------------------ Mission Control too

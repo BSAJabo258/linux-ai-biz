@@ -641,7 +641,7 @@ function holdChip(h) { const c = $("c-hold"); c.hidden = !h; c.className = "chip
 // The anime scenes (bau look's LIVE: dusk, summer) are not files but painted here every
 // frame into a small texture (SCENE_W x SCENE_H), then melted and refracted like a picture.
 const LIQUID_SCALE = 0.5, LIQUID_FPS = 30, HOLD_MS = 14000, MELT_MS = 7000, TEX = 1024, EMBERS = 2600;
-const SCENE_HOLD_MS = 40000, SCENE_W = 1024, SCENE_H = 512, SCENES = ["dusk", "summer"];
+const SCENE_HOLD_MS = 40000, SCENE_W = 1024, SCENE_H = 512, SCENES = ["dusk", "summer", "neon", "aurora", "ocean", "space", "synthwave"];
 // Below this many frames a second for 5 s the art draws smaller; a second time, it stops
 // and the still picture takes over. Drawn without the graphics chip it never starts.
 const LIQUID_MIN_FPS = 12, SOFTWARE_GL = /swiftshader|llvmpipe|softpipe|software/i;
@@ -1028,11 +1028,278 @@ vec3 summer(vec2 P, float ca, float t) {
   col = petals(col, P, t, 9.0, 0.7, 0.08, vec3(1.0, 0.88, 0.92), 0.93);
   return col;
 }
+// ---- neon: a rainy cyberpunk street at night, neon signs flickering on wet asphalt
+vec3 neonSign(vec2 P, vec2 c, vec2 hs, vec3 tint, float t, float seed) {
+  vec2 d = abs(P - c) - hs;
+  float box = max(d.x, d.y);
+  float tube = abs(box + 0.004) - 0.0025;                         // the glowing outline
+  float on = step(0.06, fract(sin(floor(t * 7.0 + seed * 13.0) * 91.7 + seed) * 437.5));
+  on = mix(1.0, on, step(0.8, hash1(seed)));                       // a few flicker
+  // glyphs: a grid of short strokes, like characters lit in tubes
+  vec2 gq = (P - c + hs) / (2.0 * hs) * (hs.x > hs.y ? vec2(5.0, 1.0) : vec2(1.0, 5.0));
+  vec2 gi = floor(gq), gf = fract(gq) - 0.5;
+  float r1 = hash(gi + seed), r2 = hash(gi + seed + 4.0);
+  float strokes = max(step(abs(gf.y - (r1 - 0.5) * 0.5), 0.05) * step(abs(gf.x), 0.32),
+                      step(abs(gf.x - (r2 - 0.5) * 0.5), 0.05) * step(abs(gf.y), 0.32));
+  strokes = max(strokes, step(abs(length(gf) - 0.25), 0.04) * step(0.7, r1));
+  float glyph = step(box, -0.006) * strokes;
+  return tint * on * (smoothstep(0.004, 0.0, tube) * 1.6 + exp(-max(box, 0.0) * 55.0) * 0.45 + glyph * 1.3 + step(box, 0.0) * 0.06);
+}
+vec3 neonCity(vec2 P, float ca, float t) {
+  vec3 col = mix(vec3(0.20, 0.06, 0.26), vec3(0.02, 0.02, 0.07), smoothstep(0.2, 0.95, P.y));
+  col += vec3(0.9, 0.2, 0.6) * exp(-abs(P.y - 0.3) * 6.0) * 0.25;           // smog lit pink
+  for (int L = 0; L < 3; L++) {                                              // three rows of towers
+    float fl = float(L), sc = 7.0 + fl * 6.0, sh = 1.0 - fl * 0.28;
+    float cx = P.x * sc + fl * 3.7, id = floor(cx);
+    float top = (0.45 + 0.4 * hash1(id + fl * 31.0)) * sh;
+    if (P.y < top) {
+      vec3 b = mix(vec3(0.05, 0.04, 0.11), vec3(0.18, 0.08, 0.25), 0.6 - fl * 0.25);
+      vec2 w = vec2(fract(cx) * 7.0, P.y * (60.0 + fl * 30.0)), wi = floor(w);
+      float lit = step(0.6, hash(wi + id * 9.0 + fl)) * step(0.25, fract(w.x)) * step(0.3, fract(w.y)) * step(fract(w.x), 0.75) * step(fract(w.y), 0.7);
+      vec3 wc = mix(vec3(0.3, 0.9, 1.0), vec3(1.0, 0.4, 0.8), step(0.5, hash(wi + 3.0)));
+      col = mix(b, wc * (0.55 + 0.25 * fl), lit * (1.0 - fl * 0.25));
+    }
+  }
+  // neon signs on the near towers
+  col += neonSign(P, vec2(0.18 * ca, 0.55), vec2(0.035, 0.12), vec3(1.0, 0.2, 0.7), t, 1.0);
+  col += neonSign(P, vec2(0.42 * ca, 0.42), vec2(0.09, 0.03), vec3(0.2, 0.95, 1.0), t, 2.0);
+  col += neonSign(P, vec2(0.83 * ca, 0.5), vec2(0.03, 0.15), vec3(1.0, 0.75, 0.2), t, 3.0);
+  col += neonSign(P, vec2(0.66 * ca, 0.33), vec2(0.06, 0.025), vec3(0.6, 0.3, 1.0), t, 4.0);
+  // the wet street: a rippled mirror of the city
+  if (P.y < 0.16) {
+    vec2 R = vec2(P.x + (noise(vec2(P.x * 40.0, P.y * 90.0 - t * 2.0)) - 0.5) * 0.012, 0.32 - P.y);
+    vec3 refl = mix(vec3(0.20, 0.06, 0.26), vec3(0.02, 0.02, 0.07), smoothstep(0.2, 0.95, R.y));
+    refl += neonSign(R, vec2(0.18 * ca, 0.55), vec2(0.035, 0.12), vec3(1.0, 0.2, 0.7), t, 1.0);
+    refl += neonSign(R, vec2(0.42 * ca, 0.42), vec2(0.09, 0.03), vec3(0.2, 0.95, 1.0), t, 2.0);
+    refl += neonSign(R, vec2(0.83 * ca, 0.5), vec2(0.03, 0.15), vec3(1.0, 0.75, 0.2), t, 3.0);
+    col = mix(vec3(0.02, 0.02, 0.04), refl * 0.55, smoothstep(0.0, 0.16, P.y) * 0.6 + 0.25);
+    // rings where drops land
+    vec2 g = vec2(P.x * 30.0, P.y * 90.0), gi = floor(g);
+    float ph = fract(t * 1.3 + hash(gi) * 7.0), rr = length((fract(g) - 0.5) * vec2(1.0, 0.35));
+    col += vec3(0.6, 0.8, 1.0) * smoothstep(0.03, 0.0, abs(rr - ph * 0.45)) * (1.0 - ph) * step(0.7, hash(gi + 1.0)) * 0.5;
+  }
+  col = woman(col, P, vec2(0.58 * ca, 0.035), 0.36, t, 0.4, 0.0, vec3(0.3, 0.95, 1.0));
+  col += vec3(0.2, 0.9, 1.0) * exp(-length((P - vec2(0.58 * ca, 0.2)) * vec2(9.0, 3.0))) * 0.15;   // her rim light
+  // rain: long thin streaks falling at a slant, two depths
+  for (int i = 0; i < 2; i++) {
+    float fi = float(i), s = 60.0 + fi * 50.0;
+    vec2 q = vec2(P.x + P.y * 0.18, P.y) * vec2(s, s * 0.08) + vec2(0.0, t * (5.0 + fi * 3.0));
+    vec2 id = floor(q), f = fract(q);
+    float drop = step(0.82, hash(id + fi * 7.0)) * smoothstep(0.08, 0.0, abs(f.x - 0.5)) * smoothstep(0.0, 0.3, f.y) * smoothstep(1.0, 0.6, f.y);
+    col += vec3(0.6, 0.75, 1.0) * drop * (0.25 + fi * 0.15);
+  }
+  return col;
+}
+// ---- aurora: northern lights over snowy peaks and a still lake that mirrors them
+vec3 auroraSky(vec2 P, float ca, float t) {
+  vec3 col = mix(vec3(0.02, 0.10, 0.14), vec3(0.0, 0.01, 0.04), smoothstep(0.3, 1.0, P.y));
+  vec2 g = P * 90.0, id = floor(g);
+  float h = hash(id);
+  if (h > 0.93) col += vec3(0.9, 0.95, 1.0) * smoothstep(0.12, 0.0, length(fract(g) - 0.5 - (vec2(hash(id + 1.0), hash(id + 2.0)) - 0.5) * 0.6)) * (0.6 + 0.4 * sin(t * 2.0 + h * 50.0));
+  for (int i = 0; i < 3; i++) {                                   // three curtains
+    float fi = float(i);
+    float y0 = 0.62 + fi * 0.09 + 0.07 * sin(P.x * (1.6 + fi * 0.7) + t * 0.12 + fi * 2.0) + 0.05 * (fbm(vec2(P.x * 1.5 + t * 0.05, fi)) - 0.5);
+    float rays = pow(fbm(vec2(P.x * 18.0 + fi * 5.0 + t * 0.3, t * 0.15 + fi)), 2.0) * 2.2;
+    float above = P.y - y0;
+    float band = exp(-max(-above, 0.0) * 40.0) * exp(-max(above, 0.0) * (4.0 + fi * 2.0)) * rays;
+    vec3 c = mix(vec3(0.1, 1.0, 0.55), vec3(0.65, 0.3, 1.0), smoothstep(0.0, 0.2, above) + fi * 0.25);
+    col += c * band * (0.75 - fi * 0.15);
+  }
+  return col;
+}
+float peaks(float x, float seed, float base, float hgt) {
+  float y = 0.0, a = 1.0, f = 1.0;
+  for (int i = 0; i < 5; i++) { y += a * (1.0 - abs(noise(vec2(x * f * 2.2 + seed, seed)) * 2.0 - 1.0)); a *= 0.45; f *= 2.2; }
+  return base + hgt * y / 1.8;
+}
+vec3 ridge(vec3 col, vec2 P, float seed, float base, float hgt, vec3 dark, vec3 lit, vec3 snow, float snowLine) {
+  float y = peaks(P.x, seed, base, hgt);
+  if (P.y > y) return col;
+  vec3 c = mix(dark, lit, smoothstep(base - 0.05, y, P.y) * 0.9);   // lighter toward the summit
+  float line = snowLine + 0.03 * fbm(vec2(P.x * 9.0, seed));
+  float patchy = noise(P * vec2(55.0, 110.0)) * 0.6 + noise(P * vec2(14.0, 30.0)) * 0.4;
+  float cap = step(line, P.y) * smoothstep(0.55, 0.45, patchy - (P.y - line) * 9.0);
+  c = mix(c, snow * (0.75 + 0.25 * noise(P * 200.0)), cap);
+  c += vec3(0.05, 0.25, 0.15) * cap * 0.35;                          // the aurora's green on the snow
+  return mix(c, col, smoothstep(y - px, y, P.y));
+}
+vec3 mountains(vec3 col, vec2 P, float t) {
+  col = ridge(col, P, 4.0, 0.25, 0.30, vec3(0.05, 0.10, 0.16), vec3(0.16, 0.28, 0.36), vec3(0.75, 0.92, 0.95), 0.38);
+  col = ridge(col, P, 9.0, 0.22, 0.14, vec3(0.03, 0.05, 0.08), vec3(0.08, 0.14, 0.2), vec3(0.55, 0.72, 0.78), 0.31);
+  // a line of pines along the shore
+  float tx = P.x * 70.0, ti = floor(tx), tf = fract(tx) - 0.5;
+  float th = (0.025 + 0.035 * hash1(ti)) * step(0.35, hash1(ti + 7.0)), ty = P.y - 0.22;
+  float tiers = 0.75 + 0.25 * fract(ty / max(th, 0.001) * 4.0);
+  if (ty > 0.0 && ty < th && abs(tf) < (1.0 - ty / th) * 0.5 * tiers) col = vec3(0.01, 0.025, 0.035);
+  return col;
+}
+vec3 aurora(vec2 P, float ca, float t) {
+  float shore = 0.22;
+  if (P.y >= shore) return mountains(auroraSky(P, ca, t), P, t);
+  vec2 R = vec2(P.x + (noise(vec2(P.x * 8.0, P.y * 60.0 + t * 0.6)) - 0.5) * 0.01 * (shore - P.y) * 8.0, 2.0 * shore - P.y);
+  vec3 refl = mountains(auroraSky(R, ca, t), R, t);
+  return mix(refl * 0.7, vec3(0.0, 0.02, 0.04), smoothstep(shore, 0.0, P.y) * 0.5);
+}
+// ---- ocean: golden hour at sea, a lighthouse sweeping its beam, gulls overhead
+vec3 ocean(vec2 P, float ca, float t) {
+  float hz = 0.42;
+  vec2 S = vec2(0.42 * ca, hz + 0.035);
+  vec3 sky = mix(vec3(1.0, 0.55, 0.25), vec3(0.95, 0.45, 0.45), smoothstep(hz, hz + 0.2, P.y));
+  sky = mix(sky, vec3(0.25, 0.32, 0.62), smoothstep(hz + 0.15, 1.0, P.y));
+  vec3 col = sky;
+  float ds = length(P - S);
+  col += vec3(1.0, 0.7, 0.35) * exp(-ds * 5.0) * 0.6;
+  col = mix(col, vec3(1.0, 0.92, 0.65), smoothstep(0.06, 0.055, ds) * step(hz, P.y));
+  for (int i = 0; i < 6; i++) {                                   // long thin clouds lit from below
+    float fi = float(i), cy = 0.55 + 0.07 * fi + 0.02 * sin(fi * 3.0);
+    float band = exp(-pow((P.y - cy - 0.015 * sin(P.x * 3.0 + fi)) * (70.0 - fi * 6.0), 2.0));
+    float wisp = smoothstep(0.35, 0.75, fbm(vec2(P.x * 3.0 - t * 0.01 * (fi + 1.0), fi * 4.0 + P.y * 6.0)));
+    vec3 cc = mix(vec3(1.0, 0.62, 0.42), vec3(0.62, 0.36, 0.55), smoothstep(0.5, 0.9, cy));
+    col = mix(col, cc + vec3(0.25, 0.15, 0.05) * exp(-abs(P.y - cy + 0.01) * 90.0), band * wisp * 0.85);
+  }
+  if (P.y < hz) {                                                 // the sea in perspective
+    float z = 1.0 / (hz - P.y + 0.015);
+    vec2 w = vec2((P.x - 0.5 * ca) * z, z);
+    float wv = sin(w.x * 1.3 + w.y * 0.8 - t * 1.4) * 0.5 + sin(w.x * 2.7 - w.y * 1.1 + t * 1.1) * 0.3 + noise(w * 1.5 + t * 0.4) * 0.6;
+    vec3 sea = mix(vec3(0.05, 0.18, 0.30), vec3(0.65, 0.40, 0.40), smoothstep(0.0, hz, P.y));
+    sea += vec3(1.0, 0.6, 0.3) * smoothstep(0.75, 1.1, wv) * 0.25;
+    // the glitter path under the sun
+    float path = exp(-abs(P.x - S.x) * (8.0 + 30.0 * P.y));
+    vec2 sg = vec2(P.x * 260.0, P.y * 900.0 / (0.3 + P.y * 3.0)), si = floor(sg);
+    float spark = step(0.9, hash(si + floor(t * 5.0 + hash(si) * 5.0))) * smoothstep(0.5, 0.0, abs(fract(sg.y) - 0.5));
+    sea += vec3(1.0, 0.85, 0.5) * path * (0.35 + spark * 1.8);
+    col = sea;
+  }
+  // a cliff with a lighthouse on the right
+  float cl = hz + 0.13 * smoothstep(0.7 * ca, 0.86 * ca, P.x) + 0.015 * fbm(vec2(P.x * 14.0, 0.0)) - 0.6 * smoothstep(0.75 * ca, 0.6 * ca, P.x);
+  float rock = fbm(P * vec2(30.0, 60.0));
+  if (P.y < cl) col = mix(vec3(0.07, 0.04, 0.08), vec3(0.28, 0.14, 0.14), smoothstep(cl - 0.02, cl, P.y) * 0.6 + rock * 0.2 * step(0.6 * ca, P.x));
+  float foam = smoothstep(0.006, 0.0, abs(P.y - cl + 0.004)) * step(P.y, hz) * (0.5 + 0.5 * sin(P.x * 120.0 - t * 2.0));
+  col += vec3(1.0, 0.9, 0.85) * foam * 0.5;
+  vec2 Lh = vec2(0.9 * ca, 0.54);
+  if (abs(P.x - Lh.x) < 0.012 - (P.y - Lh.y) * 0.03 && P.y > Lh.y && P.y < Lh.y + 0.13) col = mix(vec3(0.9, 0.85, 0.8), vec3(0.75, 0.2, 0.2), step(0.5, fract((P.y - Lh.y) * 40.0)));
+  vec2 lamp = Lh + vec2(0.0, 0.14);
+  col += vec3(1.0, 0.95, 0.7) * exp(-length(P - lamp) * 60.0) * 1.5;
+  float ang = atan(P.y - lamp.y, P.x - lamp.x), beam = t * 0.6;
+  float bd = abs(mod(ang - beam + 3.14159, 6.28318) - 3.14159);
+  col += vec3(1.0, 0.95, 0.75) * smoothstep(0.09, 0.0, bd) * exp(-length(P - lamp) * 1.5) * 0.35 * step(P.y, 1.0);
+  // gulls: little curved Vs gliding across
+  for (int i = 0; i < 5; i++) {
+    float fi = float(i), sp = 0.03 + 0.02 * hash1(fi + 70.0);
+    vec2 b = vec2(mod(hash1(fi + 60.0) * (ca + 0.4) + t * sp, ca + 0.4) - 0.2, 0.62 + 0.25 * hash1(fi + 80.0) + 0.01 * sin(t + fi));
+    vec2 q = (P - b) * (55.0 + 25.0 * hash1(fi));
+    float flap = 0.25 * sin(t * 6.0 + fi * 3.0);
+    float wing = abs(q.y - (abs(q.x) * (0.55 + flap) - q.x * q.x * 0.4));
+    col = mix(col, vec3(0.15, 0.1, 0.15), smoothstep(0.12, 0.0, wing) * step(abs(q.x), 1.0));
+  }
+  return col;
+}
+// ---- space: a ringed planet in front of a slowly turning nebula
+vec3 space(vec2 P, float ca, float t) {
+  vec2 C = P - vec2(0.5 * ca, 0.5);
+  float r = length(C), a = atan(C.y, C.x) + t * 0.01;
+  vec2 q = vec2(cos(a), sin(a)) * r * 2.5;
+  vec2 warp = vec2(fbm(q + t * 0.02), fbm(q + 7.3 - t * 0.015));
+  float n = fbm(q * 1.4 + warp * 2.2);
+  vec3 col = vec3(0.01, 0.0, 0.03);
+  col += mix(vec3(0.5, 0.05, 0.6), vec3(0.05, 0.35, 0.9), warp.x) * pow(n, 2.5) * 1.8;
+  col += vec3(1.0, 0.45, 0.2) * pow(fbm(q * 3.0 - warp), 4.0) * 1.5;
+  for (int i = 0; i < 3; i++) {                                   // stars at three depths drift
+    float fi = float(i), s = 40.0 + fi * 60.0;
+    vec2 g = (P + vec2(t * 0.002 * (fi + 1.0), 0.0)) * s, id = floor(g);
+    float h = hash(id + fi * 17.0);
+    vec2 d = fract(g) - 0.5 - (vec2(hash(id + 1.0), hash(id + 2.0)) - 0.5) * 0.7;
+    float st = smoothstep(0.06 + 0.04 * (2.0 - fi), 0.0, length(d)) * step(0.9, h) * (0.6 + 0.4 * sin(t * 3.0 + h * 90.0));
+    if (h > 0.995) st += (smoothstep(0.02, 0.0, abs(d.y)) + smoothstep(0.02, 0.0, abs(d.x))) * smoothstep(0.5, 0.0, length(d)) * 0.8;
+    col += mix(vec3(0.7, 0.8, 1.0), vec3(1.0, 0.85, 0.7), hash(id + 5.0)) * st;
+  }
+  // the planet, lit from the right, with bands and a tilted ring
+  vec2 Pc = vec2(0.32 * ca, 0.42); float R0 = 0.2;
+  vec2 d = P - Pc;
+  mat2 tilt = mat2(cos(0.35), -sin(0.35), sin(0.35), cos(0.35));
+  vec2 rd = tilt * d; float re = length(rd * vec2(1.0, 4.2));
+  float ring = smoothstep(0.012, 0.0, abs(re - 0.33) - 0.06) * (0.6 + 0.4 * sin(re * 260.0)) * 0.75;
+  vec3 ringC = vec3(0.9, 0.75, 0.55) * ring;
+  float dp = length(d);
+  if (rd.y > 0.0) col = mix(col, ringC, ring);                     // the ring's far half
+  if (dp < R0) {
+    vec3 nrm = vec3(d / R0, sqrt(1.0 - dot(d, d) / (R0 * R0)));
+    float lat = (tilt * d).y / R0;
+    vec3 base = mix(vec3(0.75, 0.5, 0.35), vec3(0.95, 0.85, 0.65), 0.5 + 0.5 * sin(lat * 18.0 + fbm(vec2(lat * 8.0, (tilt * d).x * 3.0 + t * 0.02)) * 3.0));
+    float li = max(0.0, dot(nrm, normalize(vec3(0.8, 0.3, 0.5))));
+    col = base * (0.06 + li);
+    col = mix(col, col * 0.3, smoothstep(0.02, 0.0, abs((tilt * d).y + 0.03) - 0.012) * 0.7);   // the ring's shadow
+    col += vec3(0.4, 0.6, 1.0) * pow(1.0 - nrm.z, 3.0) * 0.4;                                  // atmosphere
+  }
+  if (rd.y <= 0.0) col = mix(col, ringC + col * 0.2, ring);       // the near half crosses in front
+  // a small moon on its orbit
+  vec2 mo = Pc + vec2(cos(t * 0.08), sin(t * 0.08) * 0.3) * 0.42;
+  float dm = length(P - mo);
+  if (dm < 0.03) col = vec3(0.7, 0.7, 0.75) * (0.2 + max(0.0, dot(normalize(vec3((P - mo) / 0.03, 0.5)), normalize(vec3(0.8, 0.3, 0.5)))));
+  // a comet now and then
+  float k = floor(t / 12.0), ph = fract(t / 12.0);
+  vec2 c0 = vec2(ca * (0.6 + 0.4 * hash1(k)), 1.05), dir = normalize(vec2(-0.7 - 0.3 * hash1(k + 1.0), -0.6));
+  vec2 head = c0 + dir * ph * 1.6, rel = P - head;
+  float along = dot(rel, -dir), across = abs(dot(rel, vec2(-dir.y, dir.x)));
+  col += vec3(0.7, 0.9, 1.0) * smoothstep(0.004 + along * 0.02, 0.0, across) * smoothstep(0.35, 0.0, along) * step(0.0, along) * smoothstep(0.7, 0.4, ph);
+  return col;
+}
+// ---- synthwave: a striped sun sinking behind neon mountains, a grid racing toward you
+vec3 synthwave(vec2 P, float ca, float t) {
+  float hz = 0.38;
+  vec3 col = mix(vec3(1.0, 0.45, 0.35), vec3(0.85, 0.15, 0.55), smoothstep(hz, hz + 0.18, P.y));
+  col = mix(col, vec3(0.12, 0.03, 0.25), smoothstep(hz + 0.12, 0.95, P.y));
+  vec2 g = P * 80.0, id = floor(g);
+  if (hash(id) > 0.96) col += vec3(1.0) * smoothstep(0.1, 0.0, length(fract(g) - 0.5)) * smoothstep(0.55, 0.9, P.y) * (0.6 + 0.4 * sin(t * 3.0 + hash(id) * 40.0));
+  vec2 S = vec2(0.5 * ca, hz + 0.16); float ds = length(P - S), sr = 0.2;
+  col += vec3(1.0, 0.3, 0.6) * exp(-max(ds - sr, 0.0) * 8.0) * 0.4;
+  if (ds < sr) {
+    float yy = (P.y - (S.y - sr)) / (2.0 * sr);                   // 0 at the bottom of the sun
+    float gap = step(fract(yy * 9.0 - t * 0.2), 0.45 * (1.0 - yy) * (1.0 - yy) * 1.4) * step(yy, 0.62);
+    col = mix(col, mix(vec3(1.0, 0.2, 0.55), vec3(1.0, 0.9, 0.3), yy), 1.0 - gap);
+  }
+  // wireframe mountains with glowing ridges
+  float m = hz + 0.1 * pow(abs(sin(P.x * 3.0 + 1.0)), 3.0) * (0.6 + 0.4 * noise(vec2(P.x * 4.0, 1.0))) + 0.03 * noise(vec2(P.x * 25.0, 2.0));
+  m *= 1.0 - 0.15 * smoothstep(0.25 * ca, 0.0, abs(P.x - 0.5 * ca));
+  if (P.y < m && P.y > hz) {
+    col = vec3(0.09, 0.02, 0.18);
+    col += vec3(0.2, 0.9, 1.0) * smoothstep(0.003, 0.0, abs(fract(P.x * 30.0 + P.y * 12.0) - 0.5) * 0.02) * 0.25;
+  }
+  col += vec3(0.2, 0.95, 1.0) * smoothstep(0.004, 0.0, abs(P.y - m)) * step(hz, P.y) * 1.2;
+  // the grid floor
+  if (P.y < hz) {
+    float z = 1.0 / (hz - P.y + 0.002);
+    vec2 w = vec2((P.x - 0.5 * ca) * z * 0.6, z * 0.6 + t * 2.0);
+    vec2 fw = abs(fract(w) - 0.5), lw = vec2(z * 0.6 * px, 0.6 * z * z * px);   // one pixel in grid units
+    float line = max(smoothstep(lw.x * 1.5, 0.0, 0.5 - fw.x), smoothstep(lw.y * 1.5, 0.0, 0.5 - fw.y));
+    col = mix(vec3(0.05, 0.0, 0.1), vec3(0.25, 0.0, 0.3), smoothstep(0.0, hz, P.y));
+    col += vec3(1.0, 0.2, 0.85) * line * exp(-z * 0.04) * 1.4;
+    col += vec3(1.0, 0.3, 0.6) * exp(-(hz - P.y) * 25.0) * 0.5;            // the sun's glow on the floor
+  }
+  // palms in silhouette
+  for (int i = 0; i < 2; i++) {
+    float fi = float(i), bx = (fi < 0.5 ? 0.1 : 0.9) * ca, s = fi < 0.5 ? 1.0 : -1.0;
+    float trunk = abs(P.x - bx - s * 0.06 * (P.y - 0.0) * (P.y - 0.0) * 3.0) - 0.006;
+    if (trunk < 0.0 && P.y < 0.62) col = vec3(0.04, 0.0, 0.08);
+    vec2 top = vec2(bx + s * 0.06 * 0.62 * 0.62 * 3.0, 0.62);
+    for (int j = 0; j < 6; j++) {
+      float aj = 0.25 + float(j) * 0.53 + 0.05 * sin(t * 1.5 + float(j));
+      vec2 dir = vec2(cos(aj), sin(aj) * 0.45);
+      vec2 rel = P - top; float along = dot(rel, dir);
+      float droop = along * along * 6.0 * sign(dir.x + 0.0001);
+      float across = abs(dot(rel, vec2(-dir.y, dir.x)) + droop);
+      if (along > 0.0 && along < 0.13 && across < 0.012 * (1.0 - along / 0.13)) col = vec3(0.04, 0.0, 0.08);
+    }
+  }
+  return col;
+}
 void main() {
   float ca = uRes.x / uRes.y;
   px = 1.5 / uRes.y;
   vec2 P = vec2(vUv.x * ca, uFlip > 0.5 ? vUv.y : 1.0 - vUv.y);   // a texture's rows run bottom up
-  vec3 col = uScene < 0.5 ? dusk(P, ca, uTime) : summer(P, ca, uTime);
+  vec3 col = uScene < 0.5 ? dusk(P, ca, uTime) : uScene < 1.5 ? summer(P, ca, uTime)
+    : uScene < 2.5 ? neonCity(P, ca, uTime) : uScene < 3.5 ? aurora(P, ca, uTime)
+    : uScene < 4.5 ? ocean(P, ca, uTime) : uScene < 5.5 ? space(P, ca, uTime) : synthwave(P, ca, uTime);
   gl_FragColor = vec4(col, 1.0);
 }`;
 let LIQ = false, CORE = null;   // whether the liquid art is showing; the core's place (CSS px)
