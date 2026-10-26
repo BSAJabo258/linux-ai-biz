@@ -33,25 +33,33 @@ Neither hands your files or conversations to a model.
 
 ## The best local models for your computers
 
-From Qwen's own model cards (huggingface.co/Qwen, read 2026-10-26). These are Qwen's
-numbers, not ours; BAU's own test is `bau models bench` on your computer.
+Read 2026-10-26 from the Hugging Face pages named below. Scores are each maker's own
+numbers (not ours, and not always measured the same way); BAU's own test is
+`bau models bench` on your computer. Sizes are the real file sizes.
 
-| | Qwen3.5-9B | Qwen3.5-35B-A3B |
-|---|---|---|
-| MMLU-Pro (knowledge) | 82.5 | 85.3 |
-| IFBench (following instructions) | 64.5 | 70.2 |
-| BFCL-V4 (using tools) | 66.1 | 67.3 |
-| TAU2-Bench (agent jobs) | 79.1 | 81.2 |
-| 4-bit file (unsloth) | 5.7 GB (Q4_K_M) | 16.6 GB (UD-Q3_K_XL), 22.0 GB (Q4_K_M) |
-| Licence | Apache-2.0 | Apache-2.0 |
+| Model (licence) | Kind | 4-bit-or-smaller files | Maker's scores |
+|---|---|---|---|
+| Qwen3.5-9B (Apache-2.0), today's boss | 9B | Q4_K_M 5.7 GB | IFBench 64.5, BFCL-V4 66.1, GPQA 81.7 |
+| Qwen3.8-27B (Apache-2.0), August 2026 | 27B | UD-Q2_K_XL 9.8 GB, UD-IQ3_XXS 10.9 GB, UD-IQ3_S 12.0 GB, Q4_0 16.1 GB | IFBench 79.5, GPQA 89.2, LiveCodeBench v6 90.3, Terminal Bench 2.1 73.0 |
+| Qwen3.5-35B-A3B (Apache-2.0) | 35B, 3B working per word | UD-Q3_K_XL 16.6 GB | IFBench 70.2, BFCL-V4 67.3 |
+| Mellum2.1-12B-A2.5B Thinking (Apache-2.0), JetBrains, coding | 12B, 2.5B per word | Q4_K_M 8.1 GB | JetBrains's own table: LiveCodeBench 82.0 vs the 9B's 75.4, but SWE-bench Verified 47.0 vs the 9B's 50.0 |
 
-- **Desktop (RTX 3060, 12 GB on the card, 16 GB memory):** Qwen3.5-9B is the boss. It
-  fits on the card whole, so it is fast, and it is already on the stick and in the pack.
-- **A stronger specialist for the desktop (planned, not tested):** Qwen3.5-35B-A3B. It
-  is a "mixture of experts": only 3B of its 35B parts work on each word, so part of it can
-  sit in normal memory and still be quick. Its 16.6 GB file does not fit on the card
-  alone, and with 16 GB of memory it is tight. It goes in only after a real run on the
-  desktop shows its speed and memory use, and you say yes.
+Pages: `Qwen/Qwen3.5-9B`, `unsloth/Qwen3.5-9B-GGUF`, `Qwen/Qwen3.8-27B`,
+`unsloth/Qwen3.8-27B-GGUF`, `Qwen/Qwen3.5-35B-A3B`, `unsloth/Qwen3.5-35B-A3B-GGUF`,
+`JetBrains/Mellum2.1-12B-A2.5B-Thinking(-GGUF)`.
+
+- **Desktop today:** Qwen3.5-9B is the boss. It fits on the card whole, it is on the stick
+  and in the pack.
+- **First to test on the desktop (planned, not tested):** Qwen3.8-27B in its 9.8 GB and
+  10.9 GB files. It uses the same design as Qwen3.5 (`qwen3_5` in its config), so the
+  stick's llama.cpp should load it, but only a run proves that. Whether it fits next to the
+  desktop's own screen on the card, how fast it is, and how much 2- and 3-bit compression
+  costs in right answers are exactly what the desktop test must measure.
+- **Later:** Qwen3.5-35B-A3B (part of it in normal memory); Mellum2.1 only after the
+  stick's llama.cpp is updated (its files need llama.cpp build b11747, 19 October 2026,
+  or newer, says its page).
+- **Not for this computer:** Qwen3.8-Flash-Next (125B; and its own "qwen-community"
+  licence, not Apache).
 - **Laptop (8 GB, no graphics card):** Qwen3.5-4B stays the boss.
 
 With local only, set the team like this (all on your computer):
