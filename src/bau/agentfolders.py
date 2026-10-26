@@ -308,7 +308,10 @@ def _supervised(a: Agent, task: str, home: Path, audit: Any, boss: dict[str, Any
                          mission_id, trust)
 
     def verify(answer: str, evidence: list[str]) -> str:
-        s = specialist_brain()
+        try:
+            s = specialist_brain()
+        except (KeyError, PermissionError, ImportError, ValueError) as e:
+            return not_checked(e)     # e.g. local only is on and the specialist is Claude
         checker = _metered(s, home, audit, f"folder:{a.name}:check", ledger=True)
         from .agents import untrusted
         msg = (f"Answer to check:\n{answer}\n\n"
@@ -320,7 +323,7 @@ def _supervised(a: Agent, task: str, home: Path, audit: Any, boss: dict[str, Any
                 "backed by the evidence; otherwise list each fact that is not, in one line "
                 "each.", [{"role": "user", "content": msg}], [], 1000)
         except ProviderError as e:             # e.g. the owner's daily limit is reached
-            return f"not double-checked: {e}"
+            return not_checked(e)
         return (r.text or "").strip() or "no reply"
 
     res = supervisor.supervise(
@@ -334,6 +337,10 @@ def _supervised(a: Agent, task: str, home: Path, audit: Any, boss: dict[str, Any
                                 (spec_brain.get("model") or {}).get("id") or "",
                                 f"folder:{a.name}"))
     return res
+
+
+def not_checked(why: Exception) -> str:
+    return f"not double-checked: {why}"
 
 
 def _metered(brain: dict[str, Any], home: Path, audit: Any, who: str,

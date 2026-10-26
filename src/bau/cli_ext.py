@@ -537,6 +537,23 @@ def cmd_team(a):
     return 0
 
 
+def cmd_privacy(a):
+    from . import localonly as L
+    if a.choice:
+        try:
+            L.set_mode(None, a.choice, _human(), AuditLog())
+        except (ValueError, PermissionError) as e:
+            raise SystemExit(f"bau privacy: {e}") from None
+    m = L.mode()
+    _out({"models": m or "not chosen yet: `bau privacy local-only` keeps every model on "
+          "this computer; `bau privacy cloud` allows approved cloud models",
+          "means": {"local-only": "Claude, OpenAI-style hosted models and model servers on "
+                                  "other computers are refused everywhere in BAU",
+                    "cloud": "approved cloud models may be used, within your daily limits"
+                    }.get(m or "", "")})
+    return 0
+
+
 def cmd_agents(a):
     from . import agentfolders as AF
     try:
@@ -1645,6 +1662,11 @@ def register(sub: argparse._SubParsersAction) -> None:
                         "ask: the job stops and waits for you")
     w.add_parser("score", help="the score sheet: jobs, loops, handovers, unchecked facts, cost")
     s.set_defaults(fn=cmd_team)
+
+    s = sub.add_parser("privacy", help="keep every model on this computer (docs/LOCAL-ONLY.md)")
+    s.add_argument("choice", nargs="?", choices=["local-only", "cloud"],
+                   help="you choose; leave out to see the current choice")
+    s.set_defaults(fn=cmd_privacy)
 
     s = sub.add_parser("results", help="how posted videos are doing: views, earnings, profit")
     w = s.add_subparsers(dest="res_cmd")

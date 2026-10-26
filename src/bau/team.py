@@ -67,6 +67,11 @@ def set_team(home: Path | None, by: str, audit: Any = None, boss: str | None = N
         if mid and (models.get(mid) or {}).get("lane") == CONTENT_LANE:
             raise ValueError(f"{mid} is a content lane model: it never holds tools, so it "
                              f"can only be the thinker, not the {role}")
+    from .localonly import is_local, mode
+    for role, mid in (("boss", boss), ("thinker", thinker), ("specialist", specialist)):
+        if mid and mode(home) == "local-only" and not is_local(models.get(mid) or {}):
+            raise ValueError(f"{mid} runs off this computer and local only is on: pick a "
+                             f"local model as the {role} (`bau privacy` to see)")
     if boss and not (models.get(boss) or {}).get("tools"):
         raise ValueError(f"{boss} cannot use tools, so it cannot be the boss")
     B.choose(home, by, audit, small=boss, strong=specialist, content=thinker)
