@@ -165,6 +165,8 @@ computer with an NVIDIA card.
    bau privacy local-only
    bau team set --boss qwen3.5-9b --specialist qwen3.5-9b --takeover ask
    ```
+8. **Measure, then try stronger models:** `bau hw`, then the steps in
+   [MODEL-LAB.md](MODEL-LAB.md) (the 9B as the baseline, then Qwen3.8-27B).
 
 ## Tested so far (2026-10-25, not on the desktop yet)
 

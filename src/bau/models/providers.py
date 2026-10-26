@@ -161,6 +161,7 @@ class LocalHTTPProvider(Provider):
         self.timeout = timeout
         self._open = opener or urllib.request.urlopen
         self.last_limits: dict[str, str] = {}
+        self.last_timings: dict[str, Any] | None = None
 
     def _headers(self) -> dict[str, str]:
         return {"Content-Type": "application/json"}
@@ -187,6 +188,9 @@ class LocalHTTPProvider(Provider):
                 "name": t.name, "description": t.description,
                 "parameters": t.input_schema}} for t in tools]
         data = self._post(self.chat_path, body)
+        # llama-server's own measurements (prompt_ms, predicted_ms, predicted_n,
+        # predicted_per_second), read by the model lab.
+        self.last_timings = data.get("timings") if isinstance(data, dict) else None
         # A reply BAU cannot use is this model failing, so a backup can answer and the
         # turn is not lost (audit 2026-10-25: a cut-off tool call or an error body without
         # "choices" crashed Jarvis's turn).

@@ -74,12 +74,71 @@ def cmd_models(a):
             return EXIT_BLOCKED
         _out(res)
         return EXIT_OK if res["reply_ok"] else EXIT_BLOCKED
+    elif a.models_cmd == "lab":
+        from .models import lab
+        from .models.providers import ProviderError
+        try:
+            res = lab.record(a.model, f"human:{getpass.getuser()}", audit=AuditLog(),
+                             run_code=a.run_code, long_context=not a.no_long)
+        except KeyError:
+            print(f"model {a.model} not registered", file=sys.stderr)
+            return EXIT_ERROR
+        except (PermissionError, ProviderError) as e:
+            print(f"lab: {e}", file=sys.stderr)
+            return EXIT_BLOCKED
+        _out(res if a.full else {k: v for k, v in res.items() if k != "details"})
+        return EXIT_OK if res["meets_bar"] else EXIT_BLOCKED
+    elif a.models_cmd == "use":
+        # Which file the model server runs (to test a candidate). Root: /etc/bau/llm.env
+        # is root:bau 0640. It never approves the model and never names it the boss.
+        from . import pack as P
+        rec = reg.data["model"].get(a.model)
+        if rec is None or rec.get("deployment") != "local" or not rec.get("download"):
+            print(f"{a.model} is not a registered local model file", file=sys.stderr)
+            return EXIT_ERROR
+        if os.geteuid() != 0:
+            raise SystemExit(f"run with sudo: sudo bau models use {a.model}")
+        who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
+        if not sys.stdin.isatty():
+            raise PermissionError("this action must be taken by a human at a terminal")
+        models = bau_home() / "models"
+        if not (models / rec["download"]["file"]).exists():
+            print(f"not downloaded yet: bau models fetch {a.model}", file=sys.stderr)
+            return EXIT_BLOCKED
+        if not P._start(a.model, rec, models, Path("/etc/bau"), P.run_cmd, print):
+            print("the model service did not start (systemctl status bau-llm)", file=sys.stderr)
+            return EXIT_BLOCKED
+        AuditLog().append("model.served", who, {"model": a.model})
+        _out({"serving": a.model, "next": f"wait a minute for it to load, then: "
+              f"bau models lab {a.model}"})
+    elif a.models_cmd == "compare":
+        from .models import lab
+        a_res, b_res = lab.latest(a.baseline, bau_home()), lab.latest(a.candidate, bau_home())
+        missing = [m for m, r in ((a.baseline, a_res), (a.candidate, b_res)) if r is None]
+        if missing:
+            print(f"no lab result yet for {', '.join(missing)}: bau models lab MODEL",
+                  file=sys.stderr)
+            return EXIT_BLOCKED
+        _out(lab.compare(a_res, b_res))
     elif a.models_cmd == "fetch":
         from .models.fetch import FetchError, fetch
         rec = reg.data["model"].get(a.model)
         if rec is None:
             print(f"model {a.model} not registered", file=sys.stderr)
             return EXIT_ERROR
+        # Check before a download of many GB (the owner's evaluation rules, 2026-10-26).
+        from . import machine
+        size = int((rec.get("download") or {}).get("size") or 0)
+        dest = Path(a.dir) if a.dir else bau_home() / "models"
+        prof = {**machine.saved(), "disk": machine._disk(dest)}
+        fit = machine.fits(size, prof) if size else None
+        if fit and not fit["disk_ok"]:
+            print(f"not enough free disk space in {dest} for {size >> 20} MB",
+                  file=sys.stderr)
+            return EXIT_BLOCKED
+        if fit and prof.get("memory"):
+            print(f"estimate for this computer: {fit['where']} ({fit['why']})",
+                  file=sys.stderr)
         last = [-1]
 
         def progress(done: int, total: int) -> None:
@@ -89,7 +148,7 @@ def cmd_models(a):
                 print(f"\r{done >> 20} MB of {total >> 20} MB ({pct}%)", end="",
                       file=sys.stderr)
         try:
-            path = fetch(rec, Path(a.dir) if a.dir else bau_home() / "models", progress=progress)
+            path = fetch(rec, dest, progress=progress)
         except FetchError as e:
             print(f"\n{e}", file=sys.stderr)
             return EXIT_BLOCKED
@@ -1364,6 +1423,20 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = ms.add_parser("bench", help="measure a model on this machine (required before a "
                       "local model can be approved)")
     x.add_argument("model")
+    x = ms.add_parser("lab", help="the full test on this machine: known-answer questions, "
+                      "tool calls, JSON, long prompts, speed and memory (docs/MODEL-LAB.md)")
+    x.add_argument("model")
+    x.add_argument("--run-code", action="store_true",
+                   help="also run the model's two small code fixes, in a locked-down Python")
+    x.add_argument("--no-long", action="store_true", help="skip the long-prompt part")
+    x.add_argument("--full", action="store_true", help="show every answer")
+    x = ms.add_parser("use", help="sudo: the model server runs this downloaded model "
+                      "(to test it); never approves it or makes it the boss")
+    x.add_argument("model")
+    x = ms.add_parser("compare", help="two models' latest lab results side by side "
+                      "(e.g. a compressed file against a bigger one)")
+    x.add_argument("baseline")
+    x.add_argument("candidate")
     x = ms.add_parser("fetch", help="download a registered model file, verified against "
                       "its pinned SHA-256 (resumes if interrupted)")
     x.add_argument("model")
