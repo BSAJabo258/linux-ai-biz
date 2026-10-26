@@ -50,8 +50,9 @@ Pages: `Qwen/Qwen3.5-9B`, `unsloth/Qwen3.5-9B-GGUF`, `Qwen/Qwen3.8-27B`,
 
 - **Desktop today:** Qwen3.5-9B is the boss. It fits on the card whole, it is on the stick
   and in the pack.
-- **First to test on the desktop (planned, not tested):** Qwen3.8-27B in its 9.8 GB and
-  10.9 GB files. It uses the same design as Qwen3.5 (`qwen3_5` in its config), so the
+- **First to test on the desktop (registered, not tested):** Qwen3.8-27B in its 9.8 GB
+  and 10.9 GB files (`qwen3.8-27b-q2`, `qwen3.8-27b-iq3`; steps in
+  [MODEL-LAB.md](MODEL-LAB.md)). It uses the same design as Qwen3.5 (`qwen3_5` in its config), so the
   stick's llama.cpp should load it, but only a run proves that. Whether it fits next to the
   desktop's own screen on the card, how fast it is, and how much 2- and 3-bit compression
   costs in right answers are exactly what the desktop test must measure.

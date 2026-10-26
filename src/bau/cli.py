@@ -454,8 +454,21 @@ def cmd_recover(a: argparse.Namespace) -> int:
 
 
 def cmd_hw(a: argparse.Namespace) -> int:
-    paths = hardware.audit(Path(a.out))
-    _out({k: str(v) for k, v in paths.items()})
+    if a.action == "audit":
+        if not a.out:
+            raise SystemExit("bau hw audit: --out FOLDER is needed")
+        paths = hardware.audit(Path(a.out))
+        _out({k: str(v) for k, v in paths.items()})
+        return EXIT_OK
+    from . import machine
+    prof = machine.profile()
+    machine.save(prof)
+    if a.action == "fit":
+        if a.size is None:
+            raise SystemExit("bau hw fit: --size BYTES is needed (e.g. a model's file size)")
+        _out(machine.fits(a.size, prof))
+        return EXIT_OK
+    _out(prof if a.full else machine.summary(prof))
     return EXIT_OK
 
 
@@ -705,9 +718,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("recover", help="boot-time recovery sequence").set_defaults(fn=cmd_recover)
     sub.add_parser("selftest", help="on-machine acceptance subset").set_defaults(fn=cmd_selftest)
 
-    s = sub.add_parser("hw", help="read-only hardware audit")
-    s.add_argument("action", choices=["audit"])
-    s.add_argument("--out", required=True)
+    s = sub.add_parser("hw", help="read-only: profile (memory, graphics card, engine for "
+                       "models), fit (would a model file run here?), audit (pre-wipe)")
+    s.add_argument("action", nargs="?", default="profile", choices=["profile", "fit", "audit"])
+    s.add_argument("--out", help="audit: folder for the baseline files")
+    s.add_argument("--size", type=int, help="fit: the model file's size in bytes")
+    s.add_argument("--full", action="store_true", help="profile: every detail, not the summary")
     s.set_defaults(fn=cmd_hw)
 
     s = sub.add_parser("backup", help="backup manifest and verification")

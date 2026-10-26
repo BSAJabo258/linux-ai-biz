@@ -1,0 +1,110 @@
+# BAU's model lab (`bau models lab MODEL`): the same questions for every model, with known
+# answers, so models and compressed versions of one model can be compared fairly
+# (owner's evaluation checklist, 2026-10-26). Changing this file changes the suite's
+# fingerprint, which every stored result carries.
+version: 1
+
+# The bar a model must reach before the lab says "meets the bar". The owner still decides.
+bar:
+  reasoning: 0.7
+  tools: 0.75
+  structured: 1.0
+  coding: 0.5          # only when the coding part was run (--run-code)
+  long_context: 0.5    # of the lengths the model's context allows
+  errors: 0            # failed calls (no reply, unusable reply)
+
+reasoning:
+  - ask: A shop sells pens at 3 for 2 dollars. How many dollars do 12 pens cost? Answer with the number only.
+    answer: '^\$?8(\.0+)?$'
+  - ask: If today is Wednesday, what day is it 10 days from now? Answer with one word.
+    answer: '^saturday\.?$'
+  - ask: Tom is taller than Ann. Ann is taller than Bob. Who is the shortest? Answer with one name.
+    answer: '^bob\.?$'
+  - ask: What is 17 times 23? Answer with the number only.
+    answer: '^391\.?$'
+  - ask: A train leaves at 14:45 and the trip takes 2 hours 30 minutes. When does it arrive? Answer as HH:MM.
+    answer: '^17:15$'
+  - ask: How many letters are in the word "channel"? Answer with the number only.
+    answer: '^7\.?$'
+  - ask: 'Sort from smallest to largest: 42, 7, 19, 3. Answer with the numbers separated by commas.'
+    answer: '^3, ?7, ?19, ?42\.?$'
+  - ask: All bloops are razzies and all razzies are lazzies. Are all bloops lazzies? Answer yes or no.
+    answer: '^yes\.?$'
+  - ask: What is 15 percent of 240? Answer with the number only.
+    answer: '^36(\.0+)?$'
+  - ask: Is 221 a prime number? Answer yes or no.
+    answer: '^no\.?$'
+
+tools:
+  specs:
+    - name: get_weather
+      description: The weather now in a city.
+      parameters:
+        type: object
+        properties:
+          city: {type: string}
+          unit: {type: string, enum: [c, f]}
+        required: [city, unit]
+        additionalProperties: false
+    - name: add_numbers
+      description: Add two numbers.
+      parameters:
+        type: object
+        properties:
+          a: {type: number}
+          b: {type: number}
+        required: [a, b]
+        additionalProperties: false
+    - name: search_files
+      description: Find files whose names match a pattern, in one folder.
+      parameters:
+        type: object
+        properties:
+          pattern: {type: string}
+          folder: {type: string}
+        required: [pattern, folder]
+        additionalProperties: false
+  cases:
+    - ask: What is the weather in Paris right now, in Celsius?
+      tool: get_weather
+      args: {city: '(?i)paris', unit: '^c$'}
+    - ask: Add 1234 and 5678.
+      tool: add_numbers
+      args: {a: '^(1234|5678)(\.0+)?$', b: '^(1234|5678)(\.0+)?$'}
+    - ask: Find the files ending in .mp4 in the folder called videos.
+      tool: search_files
+      args: {pattern: 'mp4', folder: '(?i)videos'}
+    - ask: Say hello in three words.
+      tool: null           # no tool fits: calling one is a mistake
+
+structured:
+  - ask: 'Reply with JSON only, no other text: an object with "title" (text) and "minutes" (whole number) for a 12-minute video called Moon Song.'
+    expect: {title: '(?i)moon song', minutes: 12}
+
+coding:
+  - name: average
+    ask: |
+      Fix this Python function so it returns the average of the list, and 0.0 for an empty list.
+      Reply with only the fixed function, no explanation.
+
+      def average(xs):
+          return sum(xs) / len(xs) + 1
+    test: |
+      assert average([2, 4]) == 3
+      assert average([]) == 0.0
+      assert average([5]) == 5
+  - name: is_palindrome
+    ask: |
+      Write a Python function is_palindrome(s) that returns True when s reads the same
+      backwards, ignoring spaces and upper/lower case. Reply with only the function.
+    test: |
+      assert is_palindrome("Never odd or even")
+      assert not is_palindrome("hello")
+      assert is_palindrome("")
+
+long_context:
+  # Approximate prompt sizes in tokens; only those that fit the model's context are tried.
+  lengths: [2000, 8000, 16000, 32000]
+  needle: The secret code for the blue box is 7419.
+  ask: What is the secret code for the blue box? Answer with the number only.
+  answer: '^7419\.?$'

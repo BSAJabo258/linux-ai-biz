@@ -313,6 +313,74 @@ model:
     chat_template_kwargs: {enable_thinking: false}
     notes: For the desktop's graphics card (docs/DESKTOP.md). On a processor only it is
       slow; bench it on the machine that will run it before approving.
+  qwen3.8-27b-q2:
+    model_id: qwen3.8-27b-q2
+    name: Qwen3.8-27B UD-Q2_K_XL - candidate for the desktop's card, to be measured (bau models lab)
+    version: UD-Q2_K_XL
+    provider: local
+    # Checked 2026-10-26 (HF API): Qwen/Qwen3.8-27B, Apache-2.0, created 2026-08-05,
+    # 27.8B parameters, architecture qwen3_5 (same as Qwen3.5, which the stick's llama.cpp
+    # runs), thinking on by default (turned off below, as the model card shows). File and
+    # SHA-256 from unsloth/Qwen3.8-27B-GGUF's tree. 2-bit: the most likely to fit on the 12 GB card.
+    source: huggingface.co/Qwen/Qwen3.8-27B (GGUF by unsloth/Qwen3.8-27B-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.8-27b-q2
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-Q2_K_XL.gguf
+      file: Qwen3.8-27B-UD-Q2_K_XL.gguf
+      size: 9828981664
+      sha256: fd4730dd8aad070517978752b63d530aeb1740d2283cab9fa24f1e404032ddb0
+    trust_level: QUANTIZED
+    privacy: local
+    context: 8192
+    tools: true
+    input_types: [text]
+    quality: 0.8
+    latency_ms: 4000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    chat_template_kwargs: {enable_thinking: false}
+    notes: Not tested yet. Desktop only (needs the graphics card). Steps in
+      docs/MODEL-LAB.md; approve only after `bau models lab` meets the bar on the desktop.
+  qwen3.8-27b-iq3:
+    model_id: qwen3.8-27b-iq3
+    name: Qwen3.8-27B UD-IQ3_XXS - candidate for the desktop's card, to be measured (bau models lab)
+    version: UD-IQ3_XXS
+    provider: local
+    # Checked 2026-10-26 (HF API): Qwen/Qwen3.8-27B, Apache-2.0, created 2026-08-05,
+    # 27.8B parameters, architecture qwen3_5 (same as Qwen3.5, which the stick's llama.cpp
+    # runs), thinking on by default (turned off below, as the model card shows). File and
+    # SHA-256 from unsloth/Qwen3.8-27B-GGUF's tree. 3-bit: better answers, close to the card's limit.
+    source: huggingface.co/Qwen/Qwen3.8-27B (GGUF by unsloth/Qwen3.8-27B-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.8-27b-iq3
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-IQ3_XXS.gguf
+      file: Qwen3.8-27B-UD-IQ3_XXS.gguf
+      size: 10934860704
+      sha256: c0b7c3038681ed2e3040456c1dd45f9858b6c2290bed172c70388a94874f3eee
+    trust_level: QUANTIZED
+    privacy: local
+    context: 8192
+    tools: true
+    input_types: [text]
+    quality: 0.8
+    latency_ms: 4000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    chat_template_kwargs: {enable_thinking: false}
+    notes: Not tested yet. Desktop only (needs the graphics card). Steps in
+      docs/MODEL-LAB.md; approve only after `bau models lab` meets the bar on the desktop.
   qwen3.5-4b:
     model_id: qwen3.5-4b
     name: Qwen3.5-4B - best small brain for 8 GB CPU machines, with tool calling (llama.cpp)
