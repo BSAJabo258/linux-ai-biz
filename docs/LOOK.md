@@ -105,3 +105,10 @@ At your first login the desktop gets the BAU art (it changes every 10 minutes be
 pictures in `/usr/share/backgrounds/bau`) and the dark theme. The login screen shows the
 same art. That happens once only: after that it never changes your own choices. To pick
 another picture, including your own: right-click the desktop, **Desktop Settings**.
+
+Fixed 2026-10-26: until then the desktop kept Xfce's own picture (the mouse). A new Xfce
+desktop stores no picture setting until someone picks one, so BAU found nothing to change
+and gave up. Now it writes the setting for every screen and workspace itself. Proved in a
+Debian 13 Xfce desktop (xfdesktop 4.20.1): before, Xfce's default; after, the dusk scene.
+It comes with a stick built after this fix; if the desktop still shows the mouse after
+logging in, run `bau-look-desktop` once in a terminal.

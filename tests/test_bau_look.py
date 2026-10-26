@@ -272,6 +272,65 @@ def test_desktop_look_is_set_once_and_never_overrides_the_owners_choice():
     assert "Adwaita-dark" in text
 
 
+# Fake xfconf-query (properties in a file) and xrandr, as a new Xfce desktop has them:
+# xfdesktop 4.20.1 (Debian 13) stores no picture setting until someone picks one.
+FAKE_XFCONF = r"""#!/bin/bash
+db="$FAKE_DB"; touch "$db"
+chan=; prop=; val=; list=0
+while (($#)); do
+  case $1 in -c) chan=$2; shift ;; -p) prop=$2; shift ;; -s) val=$2; shift ;;
+    -t) shift ;; -l) list=1 ;; -n|-v) ;; esac
+  shift
+done
+if ((list)); then grep "^$chan " "$db" | cut -d' ' -f2; exit 0; fi
+if [[ -n $val ]]; then grep -v "^$chan $prop " "$db" > "$db.t"; mv "$db.t" "$db"
+  echo "$chan $prop $val" >> "$db"; exit 0; fi
+line=$(grep "^$chan $prop " "$db") || exit 1
+echo "${line#"$chan $prop "}"
+"""
+FAKE_XRANDR = """#!/bin/sh
+echo 'Monitors: 2'
+echo ' 0: +*eDP-1 1920/290x1080/170+0+0  eDP-1'
+echo ' 1: +HDMI-1 1920/530x1080/300+1920+0  HDMI-1'
+"""
+
+
+def _run_desktop_look(tmp_path, script=DESKTOP):
+    bin_ = tmp_path / "bin"
+    bin_.mkdir(exist_ok=True)
+    for name, body in (("xfconf-query", FAKE_XFCONF), ("xrandr", FAKE_XRANDR)):
+        (bin_ / name).write_text(body)
+        (bin_ / name).chmod(0o755)
+    art = tmp_path / "wall-dusk.jpg"
+    art.write_bytes(JPEG)
+    db = tmp_path / "xfconf.db"
+    if not db.exists():
+        db.write_text("xfce4-desktop /last-settings-migration-version 1\n")
+    env = {"PATH": f"{bin_}:/usr/bin:/bin", "HOME": str(tmp_path), "FAKE_DB": str(db),
+           "BAU_LOOK_ART": str(art)}
+    r = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True,
+                       timeout=60)
+    return r, dict(line.split(" ", 1)[1].split(" ", 1) for line in db.read_text().splitlines()
+                   if line.startswith("xfce4-desktop "))
+
+
+def test_a_new_xfce_desktop_gets_the_art_on_every_screen_and_workspace(tmp_path):
+    # The owner saw Xfce's mouse after v2 (2026-10-26): with no picture setting stored the
+    # script found nothing to change. Proved in Debian 13 with Xvfb and xfdesktop 4.20.1.
+    r, props = _run_desktop_look(tmp_path)
+    assert r.returncode == 0, r.stderr
+    images = {k: v for k, v in props.items() if k.endswith("/last-image")}
+    assert len(images) == 8                      # 2 screens x 4 workspaces (Xfce's default)
+    assert "/backdrop/screen0/monitorHDMI-1/workspace3/last-image" in images
+    assert set(images.values()) == {str(tmp_path / "wall-dusk.jpg")}
+    assert props["/backdrop/screen0/monitoreDP-1/workspace0/backdrop-cycle-enable"] == "true"
+    assert (tmp_path / ".config" / "bau" / "look-applied-v3").exists()
+    # Second login: the owner's own choice stays.
+    (tmp_path / "xfconf.db").write_text("")
+    _, again = _run_desktop_look(tmp_path)
+    assert again == {}
+
+
 @pytest.mark.skipif(not shutil.which("shellcheck"), reason="needs shellcheck")
 def test_shellcheck():
     r = subprocess.run(["shellcheck", str(DESKTOP)], capture_output=True, text=True)
