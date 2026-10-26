@@ -3,26 +3,42 @@
 # desktop (it changes every 10 minutes between the pictures in /usr/share/backgrounds/bau)
 # and the dark theme. After that it never touches your choices: change them in Settings.
 set -u
-# v2: the anime scenes replaced the inkblot pictures, so the new look is applied once more.
-mark="${XDG_CONFIG_HOME:-${HOME}/.config}/bau/look-applied-v2"
+# v3: v1 and v2 never took on a new Xfce desktop (see below), so the look is applied again.
+mark="${XDG_CONFIG_HOME:-${HOME}/.config}/bau/look-applied-v3"
 [[ -e ${mark} ]] && exit 0
-command -v xfconf-query >/dev/null || exit 0
-art=/usr/share/backgrounds/bau/wall-dusk.jpg
+command -v xfconf-query >/dev/null && command -v xrandr >/dev/null || exit 0
+art=${BAU_LOOK_ART:-/usr/share/backgrounds/bau/wall-dusk.jpg}
 [[ -f ${art} ]] || exit 0
 
 xfconf-query -c xsettings -p /Net/ThemeName -n -t string -s Adwaita-dark
 
-# The desktop names its screens only once it is running: wait for it (up to 30 s).
+# A new Xfce desktop (xfdesktop 4.20.1, Debian 13) shows its own default picture without
+# storing any picture setting, so there is nothing to change: tested 2026-10-26 in Debian
+# 13 with Xvfb, the old version of this script waited, found nothing and left the Xfce
+# mouse every time. So BAU writes the setting itself, for every screen RandR names
+# (xfdesktop's key is .../monitor<RandR name>/workspace<N>/last-image) and every
+# workspace, waiting up to 30 s for the desktop and the screens to be there.
 images=()
 for _ in $(seq 30); do
-  mapfile -t images < <(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep '/last-image$')
-  ((${#images[@]})) && break
+  if xfconf-query -c xfce4-desktop -l >/dev/null 2>&1; then
+    mapfile -t monitors < <(xrandr --listmonitors 2>/dev/null | awk 'NR > 1 {print $NF}')
+    ((${#monitors[@]})) && break
+  fi
   sleep 1
 done
-((${#images[@]})) || exit 0          # try again at the next login
-for p in "${images[@]}"; do
+((${#monitors[@]})) || exit 0        # no desktop or no screens yet: try at the next login
+spaces=$(xfconf-query -c xfwm4 -p /general/workspace_count 2>/dev/null || echo 4)
+[[ ${spaces} =~ ^[0-9]+$ ]] && ((spaces > 0)) || spaces=4
+for m in "${monitors[@]}"; do
+  for ((w = 0; w < spaces; w++)); do
+    images+=("/backdrop/screen0/monitor${m}/workspace${w}/last-image")
+  done
+done
+mapfile -t -O "${#images[@]}" images < <(xfconf-query -c xfce4-desktop -l 2>/dev/null \
+  | grep '/last-image$')
+for p in $(printf '%s\n' "${images[@]}" | sort -u); do
   base=${p%/last-image}
-  xfconf-query -c xfce4-desktop -p "${p}" -s "${art}"
+  xfconf-query -c xfce4-desktop -p "${p}" -n -t string -s "${art}"
   xfconf-query -c xfce4-desktop -p "${base}/image-style" -n -t int -s 5
   xfconf-query -c xfce4-desktop -p "${base}/backdrop-cycle-enable" -n -t bool -s true
   xfconf-query -c xfce4-desktop -p "${base}/backdrop-cycle-period" -n -t int -s 1
