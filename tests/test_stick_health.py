@@ -398,3 +398,24 @@ def test_the_card_is_ready_before_the_model_starts():
     unit = (CONF / "includes.chroot" / "etc" / "systemd" / "system" / "bau-llm.service").read_text()
     pre = unit.index("ExecStartPre=-+/usr/bin/nvidia-modprobe -c 0")
     assert pre < unit.index("ExecStart=/usr/local/bin/bau-llm-start")
+
+
+# llama.cpp b11747 (2026-10-26): each LLAMA_ARG_* BAU sets was found in that build's
+# common/arg.cpp before the switch. A new one must be checked the same way and added here;
+# a name llama-server does not know is silently ignored (e.g. CORS would be wide open).
+CHECKED_LLAMA_ARGS = {"LLAMA_ARG_CACHE_RAM", "LLAMA_ARG_CORS_ORIGINS", "LLAMA_ARG_DEVICE",
+                      "LLAMA_ARG_ENDPOINT_SLOTS", "LLAMA_ARG_REASONING", "LLAMA_ARG_THREADS"}
+
+
+def test_every_llama_setting_bau_uses_was_checked_in_the_pinned_build():
+    import re
+    root = Path(__file__).resolve().parents[1]
+    used = set()
+    for base in ("image/live-build/config/includes.chroot", "src/bau", "installer"):
+        for p in (root / base).rglob("*"):
+            if p.is_file() and p.suffix not in (".pyc", ".png", ".jpg", ".deb"):
+                used |= set(re.findall(r"LLAMA_ARG_[A-Z_]+", p.read_text(errors="ignore")))
+    assert used == CHECKED_LLAMA_ARGS
+    inside = (root / "image/inside.sh").read_text()
+    assert re.search(r"^LLAMA_TAG=b11747$", inside, re.M)
+    assert re.search(r"^LLAMA_COMMIT=f711c8f3038020d71f69b8ced09162b014fd7335$", inside, re.M)

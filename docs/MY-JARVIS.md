@@ -41,7 +41,7 @@ Both ways of running are supported:
 | §6-7 Controlled, encrypted persistence | `persistence-encryption=lukslabel`: live-boot opens only a LUKS2 container labelled `persistence` and never uses plain storage. `persistence.conf` lists exactly what persists. `jarvis-storage setup` creates it and never deletes a partition. |
 | §7 No unprotected substitute | `bau-live-init`: without unlocked encrypted storage it is LIMITED mode, where no keys are created and BAU services stay off |
 | §53 Boot menu | My Jarvis, limited mode, safe graphics, recovery, UEFI firmware settings, integrity check |
-| §23 Lightweight local model | Qwen2.5-1.5B-Instruct Q4_K_M, about 1.1 GB, Apache-2.0. Downloaded to the encrypted storage and pinned by SHA-256 (`bau models fetch`). Served by llama.cpp v0.6.0, which is built from pinned source with per-CPU backends. It must pass `bau models bench`, then the owner approves it. |
+| §23 Lightweight local model | Qwen2.5-1.5B-Instruct Q4_K_M, about 1.1 GB, Apache-2.0. Downloaded to the encrypted storage and pinned by SHA-256 (`bau models fetch`). Served by llama.cpp (build b11747 since 2026-10-26, v0.6.0 before), which is built from pinned source with per-CPU backends. It must pass `bau models bench`, then the owner approves it. |
 | §55-56 Image versioning and pipeline | `image/VERSION` and `image/build-live.sh` → ISO, `.sha256` and `.manifest.json` (git commit, kernel, llama.cpp, package list); `.github/workflows/build-live.yml` |
 | §57 Boot test | QEMU/OVMF test of the real image: boot, create storage, unlock, Jarvis answers, reboot, memory still there |
 

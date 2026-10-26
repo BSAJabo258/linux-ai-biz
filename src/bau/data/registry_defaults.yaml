@@ -381,6 +381,42 @@ model:
     chat_template_kwargs: {enable_thinking: false}
     notes: Not tested yet. Desktop only (needs the graphics card). Steps in
       docs/MODEL-LAB.md; approve only after `bau models lab` meets the bar on the desktop.
+  mellum2.1-12b:
+    model_id: mellum2.1-12b
+    name: Mellum2.1 12B-A2.5B Thinking (JetBrains) - coding candidate for the desktop, to be measured
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-26 (HF API): JetBrains/Mellum2.1-12B-A2.5B-Thinking, Apache-2.0,
+    # created 2026-09-20; 12B parameters, 2.5B working per token (64 experts, 8 active),
+    # 131,072 context. GGUF and SHA-256 from JetBrains/Mellum2.1-12B-A2.5B-Thinking-GGUF's
+    # tree. Its own table (2026-10): LiveCodeBench v6 82.0 and BFCL v4 62.3 against
+    # Qwen3.5-9B's 75.4 and 58.5, but SWE-bench Verified 47.0 against 50.0. A thinking
+    # model: it writes its reasoning first (BAU never speaks it), so it is slower per answer.
+    # Needs the stick's llama.cpp b11747 or newer (Mellum fixes of 15-16 October).
+    source: huggingface.co/JetBrains/Mellum2.1-12B-A2.5B-Thinking-GGUF
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: mellum2.1-12b
+    download:
+      url: https://huggingface.co/JetBrains/Mellum2.1-12B-A2.5B-Thinking-GGUF/resolve/main/Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf
+      file: Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf
+      size: 8071295264
+      sha256: ecc4d5b8107fc219e23c494b2d107552137637b6c6002ee713e0ba8af7fa2755
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.75
+    latency_ms: 6000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    notes: Not tested yet. Desktop (graphics card). Steps in docs/MODEL-LAB.md; approve only
+      after `bau models lab mellum2.1-12b --run-code` meets the bar on the desktop.
   qwen3.5-4b:
     model_id: qwen3.5-4b
     name: Qwen3.5-4B - best small brain for 8 GB CPU machines, with tool calling (llama.cpp)
