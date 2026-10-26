@@ -5,9 +5,14 @@ set -euo pipefail
 
 WORK=$1
 VERSION=${VERSION:?}
-# llama.cpp v0.6.0 (checked 2026-10-07: tag v0.6.0 -> this commit on github.com/ggml-org).
-LLAMA_TAG=v0.6.0
-LLAMA_COMMIT=d81235049384534c167caea52b85a694f6103d14
+# llama.cpp build b11747 (checked 2026-10-26 with git ls-remote: tag b11747 -> this commit on
+# github.com/ggml-org, 2026-10-20; reports "0.7.0-dev"). Newer than release v0.7.0
+# (2026-10-15), which lacks the Mellum fixes of 15-16 October; JetBrains names b11747 for
+# Mellum2.1's files. Before switching, BAU's model lab ran on it and on v0.6.0 with
+# Qwen3.5-4B: the same scores, the same speed; the stick's six LLAMA_ARG_* settings exist in
+# its common/arg.cpp, CORS and /slots stay closed, Vulkan works (docs/MODEL-LAB.md).
+LLAMA_TAG=b11747
+LLAMA_COMMIT=f711c8f3038020d71f69b8ced09162b014fd7335
 
 export DEBIAN_FRONTEND=noninteractive
 if [[ -f ${WORK}/extra-ca.crt ]]; then          # build machine's proxy only, not the image

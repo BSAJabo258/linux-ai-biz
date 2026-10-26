@@ -56,9 +56,10 @@ Pages: `Qwen/Qwen3.5-9B`, `unsloth/Qwen3.5-9B-GGUF`, `Qwen/Qwen3.8-27B`,
   stick's llama.cpp should load it, but only a run proves that. Whether it fits next to the
   desktop's own screen on the card, how fast it is, and how much 2- and 3-bit compression
   costs in right answers are exactly what the desktop test must measure.
-- **Later:** Qwen3.5-35B-A3B (part of it in normal memory); Mellum2.1 only after the
-  stick's llama.cpp is updated (its files need llama.cpp build b11747, 19 October 2026,
-  or newer, says its page).
+- **Also registered for the desktop test:** Mellum2.1 (`mellum2.1-12b`, 8.1 GB), for
+  coding. The stick's llama.cpp is now build b11747, which has the Mellum fixes of 15-16
+  October (JetBrains names b11747 for its speed-up "MTP" files).
+- **Later:** Qwen3.5-35B-A3B (part of it in normal memory).
 - **Not for this computer:** Qwen3.8-Flash-Next (125B; and its own "qwen-community"
   licence, not Apache).
 - **Laptop (8 GB, no graphics card):** Qwen3.5-4B stays the boss.

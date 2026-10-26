@@ -171,7 +171,9 @@ computer with an NVIDIA card.
 ## Tested so far (2026-10-25, not on the desktop yet)
 
 - The stick's llama.cpp (v0.6.0, d812350) built with its Vulkan part in a clean Debian 13:
-  9 minutes on 4 cores, `libggml-vulkan.so` made.
+  9 minutes on 4 cores, `libggml-vulkan.so` made. On 2026-10-26 the same for build b11747
+  (f711c8f), the stick's engine from now on: 7 minutes, Vulkan part made, "Vulkan0" through
+  lavapipe and the right answer, and the same model-lab scores as v0.6.0 (MODEL-LAB.md).
 - With no Vulkan loader it starts and lists no card. With a software Vulkan card (Mesa's
   lavapipe) it lists "Vulkan0" and answered "What is 7 times 8?" right through it.
 - Through `bau-llm-start` with no NVIDIA driver loaded, it set `LLAMA_ARG_DEVICE=none` and

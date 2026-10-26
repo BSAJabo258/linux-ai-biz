@@ -82,6 +82,8 @@ To go back: `sudo bau models use qwen3.5-9b` and `bau team set --boss qwen3.5-9b
 2. `bau models lab qwen3.5-9b --run-code`: the baseline.
 3. Qwen3.8-27B, 2-bit (9.8 GB, the likeliest to fit on the card), then 3-bit (10.9 GB, the
    estimate says it may spill into memory next to the screen): fetch, use, lab, compare.
+4. Mellum2.1 (`mellum2.1-12b`, 8.1 GB, for coding): fetch, use, `lab --run-code`, compare
+   with the 9B. It thinks before it answers, so expect it to be slower per answer.
 
 ## Tested so far (2026-10-26)
 
@@ -109,4 +111,16 @@ To go back: `sudo bau models use qwen3.5-9b` and `bau team set --boss qwen3.5-9b
 
   The first try at the 1.5B ran while its server was still loading and scored zero on
   everything; the lab now refuses that and saves nothing (proved on the next run).
+- The stick's engine moved from llama.cpp v0.6.0 to build b11747 (f711c8f, 2026-10-20)
+  after the same lab on both, Qwen3.5-4B, the stick's settings, 3 threads:
+
+  | | v0.6.0 | b11747 |
+  |---|---|---|
+  | Scores | reasoning 0.9, tools 1.0, JSON 1.0, coding 1.0, long 1.0 | the same, the same wrong answer |
+  | Time to first word | 1.29 s | 1.29 s |
+  | Words per second | 5.4 | 5.2 |
+  | Whole lab | 6 min 5 s | 5 min 57 s |
+
+  On b11747 a page from another website gets no CORS answer and `/slots` answers 501, as
+  before; with lavapipe it lists "Vulkan0" and answers right through it.
 - Not yet run on the desktop or the laptop, and no card was there to measure card memory.
