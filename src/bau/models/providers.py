@@ -383,6 +383,8 @@ class ScriptedProvider(Provider):
 
 def build(record: dict[str, Any]) -> Provider:
     """Instantiate a provider from a model-registry record."""
+    from ..localonly import check
+    check(record)                     # the owner's local-only switch: every model comes here
     kind = record.get("adapter", "local_http")
     if kind == "anthropic":
         return AnthropicProvider(model=record.get("api_model", "claude-opus-5-5"),

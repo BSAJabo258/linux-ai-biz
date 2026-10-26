@@ -158,7 +158,13 @@ computer with an NVIDIA card.
    It copies and checks the models, starts the 9B on the card, measures it with a real
    benchmark, and asks you before approving it and before making it the boss. On a
    computer without NVIDIA's driver loaded (the laptop) it leaves the 9B on the stick and
-   keeps the 4B.
+   keeps the 4B. When it asks about keys, you can skip them: with step 7 no model needs one.
+7. **Keep every model on this computer** (see [LOCAL-ONLY.md](LOCAL-ONLY.md)):
+
+   ```bash
+   bau privacy local-only
+   bau team set --boss qwen3.5-9b --specialist qwen3.5-9b --takeover ask
+   ```
 
 ## Tested so far (2026-10-25, not on the desktop yet)
 

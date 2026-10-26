@@ -16,6 +16,13 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 
 State: 632 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
+Latest (2026-10-26): code audit fixes merged (#93-#96); stick image
+[live-v0.1.0-f70153f](https://github.com/BSAJabo258/linux-ai-biz/releases/tag/live-v0.1.0-f70153f)
+(sha256 `c67e514d619fc32646aeff45053d5275a39405ec3fec0201520d2e96a2694f95`), not yet
+started on the desktop. Owner's decision: no cloud models, so local only
+(`bau privacy local-only`, `docs/LOCAL-ONLY.md`); candidate stronger local specialist for the
+desktop: Qwen3.5-35B-A3B, planned, needs a desktop run first.
+
 Overhaul check (2026-10-20, owner: "check everything before the next stick"). Ran: full
 suite, ruff, reg validate, secrets, shellcheck on all 25 shell scripts (incl. the image's
 own), every stick package and install.sh package against the trixie indexes (all exist;
