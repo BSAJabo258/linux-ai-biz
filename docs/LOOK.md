@@ -4,10 +4,11 @@ Your art sits behind Jarvis and Mission Control, and on the stick's desktop and 
 screen. It is "alive" in a way an 8 GB laptop can afford: no video wallpaper, so the AI
 model keeps the memory and the battery lasts.
 
-## Two anime scenes, painted live (the default)
+## Seven live scenes, painted live (the default)
 
-BAU paints two original anime-style scenes itself, so they never end and stay sharp
-(better than a looping GIF, which repeats every few seconds and goes blurry):
+BAU paints seven original scenes itself, each in its own style, so they never end and
+stay sharp (better than a looping GIF, which repeats every few seconds and goes blurry).
+Two are anime:
 
 - **Dusk:** a city at sunset: a big moon, stars that twinkle and a shooting star now and
   then, long clouds lit pink and gold from below, warm windows in the buildings, a red
@@ -21,10 +22,29 @@ BAU paints two original anime-style scenes itself, so they never end and stay sh
 
 Both women are grown-ups, seen from behind, the classic anime shot.
 
+Five more, added 2026-10-26, each a different world:
+
+- **Neon:** a cyberpunk city at night in the rain. Neon signs in pink, cyan, gold and
+  violet with glowing characters, some flickering; rain slanting down; the wet street
+  mirrors the signs and rings spread where drops land; a woman lit cyan at the edges.
+- **Aurora:** northern lights waving over snowy mountains, stars, pines on the shore and
+  a still lake that mirrors it all, rippling gently.
+- **Ocean:** golden hour at sea: the sun on the horizon, a glitter path that sparkles,
+  thin clouds lit from below, gulls flapping past, and a lighthouse on a cliff sweeping
+  its beam.
+- **Space:** a ringed planet with banded clouds and a moon going round it, in front of a
+  slowly turning nebula; stars at three depths, and a comet now and then.
+- **Synthwave:** an 80s sunset: a striped sun sinking behind neon-edged mountains, a
+  glowing grid floor racing toward you, palm trees swaying.
+
 Jarvis stays in one scene for about 40 seconds, then breathes it into his glass core and
-the other one unfurls out, like dusk turning into day. The petals and clouds move faster
-while he thinks. The desktop and the login screen show the same two scenes as still
-pictures (the desktop changes between them every 10 minutes).
+the next one unfurls out, like dusk turning into day. The petals and clouds move faster
+while he thinks. The desktop shows the same seven scenes as still pictures and changes
+between them every 10 minutes; the login screen shows dusk.
+
+The moving version runs in Jarvis, drawn by the graphics chip. The Xfce desktop itself
+can only show still pictures; a moving desktop is planned for the desktop computer (its
+graphics card can afford it), not the laptop.
 
 If your computer is set to reduce motion, the animation stops and the picture stays still.
 
@@ -58,7 +78,7 @@ part slightly as it moves, like looking through a window.
 ```bash
 bau look flow dusk summer gold  # only these pictures, in this order
 bau look flow all               # every picture there is
-bau look flow default           # back to the two anime scenes and your own pictures
+bau look flow default           # back to the seven live scenes and your own pictures
 bau look alive off              # one still picture instead
 ```
 
@@ -77,6 +97,11 @@ shows the still picture.
 bau look                 # what is in use, and the choices
 bau look set dusk        # the anime city at dusk (the default)
 bau look set summer      # the anime summer sky
+bau look set neon        # the rainy neon city
+bau look set aurora      # northern lights over a mirror lake
+bau look set ocean       # golden hour at sea, with a lighthouse
+bau look set space       # a ringed planet in a nebula
+bau look set synthwave   # the 80s neon sunset
 bau look set moon        # the moonlit inkblot one
 bau look set light       # the white BAU one
 bau look set watercolor  # the watercolour BAU one

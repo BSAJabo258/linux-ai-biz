@@ -64,8 +64,10 @@ only **staged**: it runs when you press **Confirm**.
 
 - **The glass mind.** A glass core in the middle bends the picture behind it like a lens. It
   breathes while Jarvis listens, glows while it thinks, and sends embers up while it speaks.
-- **Living scenes.** Two hand-painted anime scenes (*dusk* and *summer*) are drawn live on the
-  graphics card and melt into each other through the core about every 40 seconds. Add your
+- **Living scenes.** Seven hand-painted scenes, each its own style (anime *dusk* and
+  *summer*, a rainy *neon* city, an *aurora* over a mirror lake, an *ocean* at golden hour,
+  a ringed planet in *space*, a *synthwave* sunset), are drawn live on the graphics card and
+  melt into each other through the core about every 40 seconds. Add your
   own pictures with `bau look add`. On a slow or software-only graphics card the motion turns
   itself off and a still picture stays, so Jarvis never stutters.
 - **Lean on small models.** On a local model (Qwen on the laptop) Jarvis offers only its core

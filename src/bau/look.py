@@ -11,9 +11,11 @@ drawn at part resolution and a capped frame rate), starting with the chosen art.
 picks which pictures take part with ``bau look flow``; none picked means the default: the
 live anime scenes and the owner's own pictures.
 
-Live scenes (``LIVE``) are painted by the GPU in Jarvis and move (petals, clouds, stars,
-city lights); their ``.jpg`` is a still of the same scene for the desktop, the login
-screen, Mission Control and computers without WebGL.
+Live scenes (``LIVE``) are painted by the GPU in Jarvis and move: anime dusk and summer
+(petals, clouds, stars, city lights), a rainy neon city, northern lights over a mirror
+lake, a sea at golden hour with a lighthouse, a ringed planet in a nebula, and a synthwave
+sunset. Their ``.jpg`` is a still of the same scene (``scripts/render_scenes.py``) for the
+desktop, the login screen, Mission Control and computers without WebGL.
 """
 
 from __future__ import annotations
@@ -27,9 +29,9 @@ from typing import Any
 from .home import bau_home
 from .store import YamlStore
 
-SHIPPED = {"dusk": "dusk.jpg", "summer": "summer.jpg", "moon": "moon.jpg", "light": "light.jpg",
+LIVE = ("dusk", "summer", "neon", "aurora", "ocean", "space", "synthwave")
+SHIPPED = {**{n: f"{n}.jpg" for n in LIVE}, "moon": "moon.jpg", "light": "light.jpg",
            "watercolor": "watercolor.jpg", "gold": "gold.jpg", "earth": "earth.jpg"}
-LIVE = ("dusk", "summer")
 DEFAULT = "dusk"
 MAX_BYTES = 15 * 1024 * 1024
 TYPES = {b"\xff\xd8\xff": (".jpg", "image/jpeg"), b"\x89PNG\r\n\x1a\n": (".png", "image/png")}
