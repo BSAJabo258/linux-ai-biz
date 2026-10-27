@@ -131,7 +131,10 @@ computer with an NVIDIA card.
 1. **Before:** copy off anything on the D drive, write down the BitLocker key for C:, and
    turn off Windows Fast Startup (the list above).
 2. **Install BAU on the TOSHIBA drive** from the stick: start the computer from the stick and
-   choose **Install BAU on this laptop**. Pick the TOSHIBA DT01ACA100 (932 GB), never the
+   choose **Install BAU on this laptop**. If the screen goes gray and Windows starts instead
+   of the stick's menu (it happened on 2026-10-27; this fixed it): tap **F8** at the ASUS
+   logo and pick the line **UEFI: (the stick)**; if it still happens, in the firmware
+   (**Delete** at the logo) set **Boot > Secure Boot > OS Type** to **Other OS**, F10 to save. Pick the TOSHIBA DT01ACA100 (932 GB), never the
    Micron NVMe (that is Windows). If the screen stays black, start again and choose **Install BAU -
    safe graphics** in the stick's menu.
 3. **Start from the new drive** and log in. The internet is needed for the next step (the
@@ -149,7 +152,8 @@ computer with an NVIDIA card.
 5. **Check the card:** `nvidia-smi` shows the RTX 3060.
 6. **The desktop's boss model.** On the Windows side of the desktop (or any Windows
    computer), fill the 64 GB stick with `BAU-Pack-Make.cmd` (see [PACK.md](PACK.md)); it
-   now also carries Qwen3.5-9B (5.7 GB). Back on BAU, with the driver from step 4 running:
+   now also carries Qwen3.5-9B (5.7 GB) and its faster MTP version (5.9 GB, copied but not
+   started; GPU.md section 5). Back on BAU, with the driver from step 4 running:
 
    ```bash
    sudo bau pack install
