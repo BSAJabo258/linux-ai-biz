@@ -89,6 +89,9 @@ To go back: `sudo bau models use qwen3.5-9b` and `bau team set --boss qwen3.5-9b
    estimate says it may spill into memory next to the screen): fetch, use, lab, compare.
 4. Mellum2.1 (`mellum2.1-12b`, 8.1 GB, for coding): fetch, use, `lab --run-code`, compare
    with the 9B. It thinks before it answers, so expect it to be slower per answer.
+5. The 9B with its own draft head (`qwen3.5-9b-mtp`, 5.9 GB): fetch, use, lab, compare
+   with the 9B; then other draft lengths with `sudo bau models tune --draft N` and
+   `--tag` (see [GPU.md](GPU.md) section 5).
 
 ## Tested so far (2026-10-26)
 

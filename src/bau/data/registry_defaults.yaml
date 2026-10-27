@@ -313,6 +313,46 @@ model:
     chat_template_kwargs: {enable_thinking: false}
     notes: For the desktop's graphics card (docs/DESKTOP.md). On a processor only it is
       slow; bench it on the machine that will run it before approving.
+  qwen3.5-9b-mtp:
+    model_id: qwen3.5-9b-mtp
+    name: Qwen3.5-9B with its own draft head (MTP) - the 9B, guessing ahead to write faster; to be measured
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-27 (HF tree + README): unsloth/Qwen3.5-9B-MTP-GGUF keeps Qwen's own
+    # multi-token-prediction layer inside the file, so no second model is needed. README:
+    # --spec-type draft-mtp --spec-draft-n-max 6, about 1.5-2x faster writing (their claim),
+    # "-np > 1 and --mmproj are not yet supported with MTP". In llama.cpp since 16 May 2026,
+    # so in the stick's b11747. Speculative decoding checks every guessed word with the
+    # model itself: the answers are the model's own; only the speed changes.
+    source: huggingface.co/Qwen/Qwen3.5-9B (GGUF with MTP by unsloth/Qwen3.5-9B-MTP-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.5-9b-mtp
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.5-9B-MTP-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf
+      file: Qwen3.5-9B-MTP-Q4_K_M.gguf
+      size: 5868826976
+      sha256: e8dd94817e95d6c0939102049d068418269978377b13616c4726235e232841fe
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.75
+    latency_ms: 3000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    chat_template_kwargs: {enable_thinking: false}
+    # Draft length 3: on the 4B (processor, 2026-10-27) 3 was the best middle ground; 6
+    # made plain prose twice as slow. Change it with sudo bau models tune --draft N.
+    server_env: {LLAMA_ARG_SPEC_TYPE: draft-mtp, LLAMA_ARG_SPEC_DRAFT_N_MAX: "3",
+                 LLAMA_ARG_N_PARALLEL: "1"}
+    notes: For the desktop's card. Not measured on the card yet; compare with qwen3.5-9b in
+      bau models lab before using it (docs/GPU.md section 4).
   qwen3.8-27b-q2:
     model_id: qwen3.8-27b-q2
     name: Qwen3.8-27B UD-Q2_K_XL - candidate for the desktop's card, to be measured (bau models lab)
@@ -453,6 +493,42 @@ model:
     chat_template_kwargs: {enable_thinking: false}
     notes: Needs a llama.cpp with the qwen35 architecture (bench it first). Run with
       --ctx-size 8192 to 16384 on 8 GB; turn thinking off for routine steps.
+  qwen3.5-4b-mtp:
+    model_id: qwen3.5-4b-mtp
+    name: Qwen3.5-4B with its own draft head (MTP) - measured on a processor, mixed result
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-27: unsloth/Qwen3.5-4B-MTP-GGUF, same method as qwen3.5-9b-mtp.
+    # Measured 2026-10-27 on the stick's llama.cpp b11747, 3 processor threads: plain 4B
+    # 6.0 words/s; this file with draft 3: 9.4 on a list of numbers, 7.9 on code, 4.5 on
+    # free prose. On a processor, guessing costs as much as it saves for prose.
+    source: huggingface.co/Qwen/Qwen3.5-4B (GGUF with MTP by unsloth/Qwen3.5-4B-MTP-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.5-4b-mtp
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.5-4B-MTP-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf
+      file: Qwen3.5-4B-MTP-Q4_K_M.gguf
+      size: 2834975040
+      sha256: 3874209241c9a397e2f62cd3f70f80fd2dfbf0dfccb6838416bdb48a714e8630
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.65
+    latency_ms: 6000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    chat_template_kwargs: {enable_thinking: false}
+    server_env: {LLAMA_ARG_SPEC_TYPE: draft-mtp, LLAMA_ARG_SPEC_DRAFT_N_MAX: "3",
+                 LLAMA_ARG_N_PARALLEL: "1"}
+    notes: The laptop keeps the plain qwen3.5-4b (faster for Jarvis's everyday prose on a
+      processor). Here to measure on other machines.
   qwen3.5-0.8b:
     model_id: qwen3.5-0.8b
     name: Qwen3.5-0.8B - ultra-tiny local model (half a gigabyte) for the simplest steps

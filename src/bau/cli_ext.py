@@ -112,6 +112,24 @@ def cmd_models(a):
         AuditLog().append("model.served", who, {"model": a.model})
         _out({"serving": a.model, "next": f"wait a minute for it to load, then: "
               f"bau models lab {a.model}"})
+    elif a.models_cmd == "tune":
+        # The owner's speed settings for the model server (docs/GPU.md section 4). Root:
+        # /etc/bau is root's. Measure before and after: bau models lab MODEL --tag NAME.
+        from . import pack as P
+        if os.geteuid() != 0:
+            raise SystemExit("run with sudo: sudo bau models tune ...")
+        if not sys.stdin.isatty():
+            raise PermissionError("this action must be taken by a human at a terminal")
+        try:
+            now = P.tune(Path("/etc/bau"), P.run_cmd, draft=a.draft, kv=a.kv, reset=a.reset)
+        except ValueError as e:
+            print(f"tune: {e}", file=sys.stderr)
+            return EXIT_ERROR
+        who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
+        AuditLog().append("model.tuned", who, now)
+        _out({"settings": now or "llama.cpp's own defaults",
+              "next": "wait a minute for the model to load, then measure: "
+                      "bau models lab MODEL --tag NAME"})
     elif a.models_cmd == "compare":
         from .models import lab
         a_res, b_res = lab.latest(a.baseline, bau_home()), lab.latest(a.candidate, bau_home())
@@ -1439,6 +1457,12 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = ms.add_parser("use", help="sudo: the model server runs this downloaded model "
                       "(to test it); never approves it or makes it the boss")
     x.add_argument("model")
+    x = ms.add_parser("tune", help="sudo: speed settings for the model server: how far an "
+                      "MTP model guesses ahead, the KV cache's format (docs/GPU.md)")
+    x.add_argument("--draft", help="words an MTP model guesses ahead (1-16), or off")
+    x.add_argument("--kv", help="KV cache format: f16 (llama.cpp's default), q8_0 (half the "
+                   "memory), q4_0")
+    x.add_argument("--reset", action="store_true", help="forget earlier settings first")
     x = ms.add_parser("compare", help="two models' latest lab results side by side "
                       "(e.g. a compressed file against a bigger one)")
     x.add_argument("baseline")

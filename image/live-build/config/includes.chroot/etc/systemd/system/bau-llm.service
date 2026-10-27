@@ -31,6 +31,9 @@ EnvironmentFile=/etc/bau/llm.env
 # these files override settings made with Environment=", systemd.exec(5), systemd 257 in
 # Debian 13, read 2026-10-27).
 EnvironmentFile=-/etc/bau/llm-engine.env
+# The owner's speed settings (sudo bau models tune: draft length, KV cache format), read
+# last so they win over the model's own settings in llm.env.
+EnvironmentFile=-/etc/bau/llm-tune.env
 Environment=LD_LIBRARY_PATH=/opt/llama.cpp
 # bau-llm-start leaves one processor core free for the desktop and the Jarvis page (on every
 # core the model ran 30 times slower while the page was open, 2026-10-21).
