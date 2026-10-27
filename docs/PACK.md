@@ -1,7 +1,7 @@
 # The BAU Pack: AI models and keys for the laptop, on one USB stick
 
 The BAU laptop can run its AI on its own, with no internet, but the AI models (about
-6.5 GB) have to get onto it first. The BAU Pack carries them over on a USB stick, together
+6.5 GB for the laptop, 18 GB with the desktop's) have to get onto it first. The BAU Pack carries them over on a USB stick, together
 with your locked keys file if you made one (see [KEYS.md](KEYS.md)).
 
 Two steps: fill the stick on a Windows computer that has internet, then run one command on
@@ -11,6 +11,8 @@ the laptop.
 
 | Model | Size | Job |
 |---|---|---|
+| `qwen3.5-9b` | 5.7 GB | the desktop's boss, on its NVIDIA card (copied only there) |
+| `qwen3.5-9b-mtp` | 5.9 GB | the same 9B with its own draft head, to measure against it on the card ([GPU.md](GPU.md) section 5; copied only there, never started by the install) |
 | `qwen3.5-4b` | 2.7 GB | the boss: runs Jarvis and the agents, uses tools |
 | `qwen3-4b-heretic-content` | 2.5 GB | the thinker: uncensored ideas, sealed (no tools, never kids) |
 | `qwen2.5-1.5b-instruct` | 1.1 GB | the backup: small and fast |
@@ -28,7 +30,7 @@ used.
 
 ## 1. On the Windows computer: fill the stick
 
-You need a USB stick of 16 GB or more (the 64 GB one is fine), formatted **exFAT**. Not
+You need a USB stick of 32 GB or more (the 64 GB one is fine), formatted **exFAT**. Not
 FAT32: it cannot hold a file over 4 GB, and the desktop's model is 5.7 GB.
 
 1. **If the stick still holds a BAU installer image, or is FAT32, format it first.** This **erases**
@@ -45,7 +47,7 @@ FAT32: it cannot hold a file over 4 GB, and the desktop's model is 5.7 GB.
    (If Windows says *Windows protected your PC*: **More info**, then **Run anyway**.)
 5. It lists the USB sticks it sees. **Type the letter** of the one to fill (for example
    `E`). It never picks one for you, and never formats or erases anything.
-6. Type `y` to start. The download takes a while (about 12 GB). If it stops, double-click
+6. Type `y` to start. The download takes a while (about 18 GB). If it stops, double-click
    again: it carries on where it stopped, and skips files that are already done.
 7. When it says **The BAU Pack is ready**, eject the stick.
 

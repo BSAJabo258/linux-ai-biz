@@ -39,7 +39,7 @@ BASE = {"version": "1", "source": "test", "license": "Apache-2.0", "commercial_u
         "cost_out_per_mtok": 0, "status": "REGISTERED"}
 BLOBS = {"qwen3.5-4b": b"boss model bytes", "qwen3-4b-heretic-content": b"thinker bytes",
          "qwen2.5-1.5b-instruct": b"backup model bytes"}
-DESKTOP = {"qwen3.5-9b": b"desktop boss bytes"}
+DESKTOP = {"qwen3.5-9b": b"desktop boss bytes", "qwen3.5-9b-mtp": b"desktop mtp bytes"}
 
 
 def sha(b: bytes) -> str:
@@ -688,6 +688,20 @@ def test_the_9b_is_the_boss_only_where_the_nvidia_driver_is_loaded(tmp_path):
     _, _, out = do_install(tmp_path / "desktop", make_pack(tmp_path / "desktop", desktop=True),
                            Owner("Use", "Approve", "boss"), desktop=True, gpu=lambda: True)
     assert out["boss"] == "qwen3.5-9b" and "qwen3.5-9b" in out["copied"]
+
+
+def test_the_mtp_9b_is_copied_for_the_card_only_and_never_started(tmp_path):
+    _, _, out = do_install(tmp_path / "laptop", make_pack(tmp_path / "laptop", desktop=True),
+                           Owner("Use", "Approve", "boss"), desktop=True)
+    assert "NVIDIA" in out["skipped"]["qwen3.5-9b-mtp"]
+    home, etc, out = do_install(tmp_path / "desktop",
+                                make_pack(tmp_path / "desktop", desktop=True),
+                                Owner("Use", "Approve", "boss"), desktop=True,
+                                gpu=lambda: True)
+    assert "qwen3.5-9b-mtp" in out["copied"] and out["approved"] == ["qwen3.5-9b"]
+    assert "BAU_LLM_ALIAS=qwen3.5-9b\n" in (etc / "llm.env").read_text()
+    reg = CapabilityRegistry(home / "registry" / "capabilities.yaml").data["model"]
+    assert reg["qwen3.5-9b-mtp"]["status"] == "REGISTERED"     # bau models use finds it
 
 
 # ------------------------------------------------------------------ audit 2026-10-25
