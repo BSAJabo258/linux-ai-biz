@@ -135,6 +135,20 @@ def test_card_details_device_id_temperature_power_and_secure_boot(tmp_path):
     assert set(p["frameworks"]["python"]) == {"tensorflow", "torch", "tensorrt"}
 
 
+def test_secure_boot_is_read_from_the_firmware_without_mokutil(tmp_path):
+    # The stick has no mokutil (seen 2026-10-27): bau hw said null with Secure Boot on.
+    root = _root(tmp_path)
+    var = root / machine.SECURE_BOOT_VAR
+    var.parent.mkdir(parents=True, exist_ok=True)
+    none = lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("mokutil"))  # noqa: E731
+    var.write_bytes(bytes([6, 0, 0, 0, 1]))
+    assert machine._secure_boot(none, root) == "SecureBoot enabled"
+    var.write_bytes(bytes([6, 0, 0, 0, 0]))
+    assert machine._secure_boot(none, root) == "SecureBoot disabled"
+    var.unlink()
+    assert machine._secure_boot(none, root) is None
+
+
 def test_an_older_driver_that_lacks_a_field_says_unknown(tmp_path):
     old = "NVIDIA GeForce RTX 3060, 12288, 410, 11878, 550.163.01, 8.6, 0x250310DE, x, [N/A]\n"
     p = machine.profile(tmp_path, root=_root(tmp_path), run=_run(smi=old),

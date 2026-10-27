@@ -449,7 +449,8 @@ def _start(mid: str, rec: dict[str, Any], models: Path, etc: Path, run: Run,
     _owned_by_bau(env, 0o640)
     say(f"Starting {mid}...")
     said = run(["systemctl", "restart", "bau-llm.service"])
-    return "not found" not in said and "not loaded" not in said
+    # "(not available": no systemctl at all (a container) - say so instead of waiting 6 min.
+    return not any(w in said for w in ("not found", "not loaded", "(not available"))
 
 
 # The owner's speed settings (bau models tune), in their own file so changing the model

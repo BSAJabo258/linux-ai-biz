@@ -4,7 +4,7 @@
 #   sudo bau-llm-cuda build     # once: Debian's CUDA tools, then build (about 15 minutes)
 #   sudo bau-llm-cuda use cuda  # the model server runs on the CUDA engine
 #   sudo bau-llm-cuda use vulkan  # back to the stick's engine
-#   bau-llm-cuda status
+#   sudo bau-llm-cuda status  # (in /usr/local/sbin: only on sudo's path)
 # Which one is faster on this card is measured, not assumed: bau models lab ... --tag cuda.
 # Proved 2026-10-27 in a clean debian:trixie: nvidia-cuda-toolkit 12.4.131 (Debian's
 # non-free area; it brings g++-13 for nvcc) builds llama.cpp b11747 with -DGGML_CUDA=ON in

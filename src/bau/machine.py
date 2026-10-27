@@ -151,7 +151,19 @@ def _pci(root: Path) -> list[dict[str, str]]:
     return out
 
 
-def _secure_boot(run: Run) -> str | None:
+# The firmware's own SecureBoot variable: 4 attribute bytes, then 1 (on) or 0 (off). Any user
+# can read it; mokutil is not on the stick. Read 2026-10-27 in the stick image under Secure
+# Boot OVMF: "6 0 0 0 1".
+SECURE_BOOT_VAR = "sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+
+
+def _secure_boot(run: Run, root: Path = Path("/")) -> str | None:
+    try:
+        data = (root / SECURE_BOOT_VAR).read_bytes()
+        if len(data) == 5:
+            return "SecureBoot " + ("enabled" if data[4] == 1 else "disabled")
+    except OSError:
+        pass
     out, _ = _cmd(run, ["mokutil", "--sb-state"])
     return out.strip().splitlines()[0] if out and out.strip() else None
 
@@ -209,7 +221,7 @@ def profile(home: Path | None = None, root: Path = Path("/"), run: Run = subproc
             "system": _os(root), "cpu": _cpu(root, run), "memory": _memory(root),
             "gpu": _gpus(root, run), "engine": _engine(engine, run),
             "disk": _disk(home / "models"), "models": _models(home / "models"),
-            "secure_boot": _secure_boot(run), "frameworks": _frameworks(),
+            "secure_boot": _secure_boot(run, root), "frameworks": _frameworks(),
             "key_names": names()}
 
 

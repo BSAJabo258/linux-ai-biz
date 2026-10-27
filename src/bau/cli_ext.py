@@ -517,6 +517,16 @@ def cmd_usage(a):
     return EXIT_OK
 
 
+def _passphrase(name: str) -> str:
+    """Ctrl+D or Ctrl+C at the question is a plain "nothing imported", not a traceback
+    (seen 2026-10-27 in the import round trip)."""
+    from .keys import KeyFileError
+    try:
+        return getpass.getpass(f"Passphrase for {name}: ")
+    except (EOFError, KeyboardInterrupt):
+        raise KeyFileError("no passphrase given, so nothing was imported") from None
+
+
 def cmd_keys(a):
     from . import keys as K
     etc = Path(a.etc) if a.etc else K.ETC
@@ -526,7 +536,7 @@ def cmd_keys(a):
             return 0
         if not a.etc and os.geteuid() != 0:
             raise SystemExit("run with sudo: sudo bau keys import " + a.file)
-        passphrase = getpass.getpass(f"Passphrase for {Path(a.file).name}: ")
+        passphrase = _passphrase(Path(a.file).name)
         who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
         _out(K.import_file(Path(a.file), passphrase, etc, AuditLog(), who))
     except (K.KeyFileError, OSError) as e:
@@ -573,7 +583,7 @@ def cmd_pack(a):
         who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
         out = P.install(pack, home, Path(a.etc) if a.etc else Path("/etc/bau"), ask,
                         P.run_cmd, who, AuditLog(),
-                        read_pass=lambda: getpass.getpass("Passphrase for BAU-KEYS.enc: "))
+                        read_pass=lambda: _passphrase("BAU-KEYS.enc"))
         _out(out)
     except (P.PackError, OSError, ValueError) as e:
         raise SystemExit(f"bau pack: {e}") from None
