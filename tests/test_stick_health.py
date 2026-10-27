@@ -404,7 +404,12 @@ def test_the_card_is_ready_before_the_model_starts():
 # common/arg.cpp before the switch. A new one must be checked the same way and added here;
 # a name llama-server does not know is silently ignored (e.g. CORS would be wide open).
 CHECKED_LLAMA_ARGS = {"LLAMA_ARG_CACHE_RAM", "LLAMA_ARG_CORS_ORIGINS", "LLAMA_ARG_DEVICE",
-                      "LLAMA_ARG_ENDPOINT_SLOTS", "LLAMA_ARG_REASONING", "LLAMA_ARG_THREADS"}
+                      "LLAMA_ARG_ENDPOINT_SLOTS", "LLAMA_ARG_REASONING", "LLAMA_ARG_THREADS",
+                      # 2026-10-27, same build: --spec-type, --spec-draft-n-max, -np, -ctk,
+                      # -ctv; each also run there (draft-mtp drafted, q8_0 cache loaded).
+                      "LLAMA_ARG_SPEC_TYPE", "LLAMA_ARG_SPEC_DRAFT_N_MAX",
+                      "LLAMA_ARG_N_PARALLEL", "LLAMA_ARG_CACHE_TYPE_K",
+                      "LLAMA_ARG_CACHE_TYPE_V"}
 
 
 def test_every_llama_setting_bau_uses_was_checked_in_the_pinned_build():

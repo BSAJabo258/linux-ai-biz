@@ -412,16 +412,77 @@ def _register(home: Path, mid: str, rec: dict[str, Any]) -> None:
         reg.add("model", {**rec, "status": "REGISTERED"})
 
 
+# Settings a model's own record may pass to llama-server (names checked in llama.cpp
+# b11747's common/arg.cpp, the stick's engine, 2026-10-27). The MTP files carry their own
+# draft head: --spec-type draft-mtp, and unsloth's README says "-np > 1 ... not yet
+# supported with MTP" (unsloth/Qwen3.5-9B-MTP-GGUF, read 2026-10-27).
+SERVER_ENV = {"LLAMA_ARG_SPEC_TYPE", "LLAMA_ARG_SPEC_DRAFT_N_MAX", "LLAMA_ARG_N_PARALLEL"}
+SAFE_VALUE = re.compile(r"[A-Za-z0-9._-]{1,32}")
+
+
+def server_env(rec: dict[str, Any]) -> str:
+    """The record's ``server_env`` as env-file lines; anything else is refused, so a
+    registry entry can never point the server at another file, port or address."""
+    lines = []
+    for k, v in (rec.get("server_env") or {}).items():
+        if k not in SERVER_ENV or not SAFE_VALUE.fullmatch(str(v)):
+            raise PackError(f"server setting {k}={v} is not allowed")
+        lines.append(f"{k}={v}\n")
+    return "".join(lines)
+
+
 def _start(mid: str, rec: dict[str, Any], models: Path, etc: Path, run: Run,
            say: Callable[..., None]) -> bool:
+    extra = server_env(rec)
     etc.mkdir(parents=True, exist_ok=True)
     env = etc / "llm.env"
     env.write_text(f"BAU_LLM_MODEL={models / rec['download']['file']}\n"
-                   f"BAU_LLM_ALIAS={rec.get('api_model') or mid}\n")
+                   f"BAU_LLM_ALIAS={rec.get('api_model') or mid}\n" + extra)
     _owned_by_bau(env, 0o640)
     say(f"Starting {mid}...")
     said = run(["systemctl", "restart", "bau-llm.service"])
     return "not found" not in said and "not loaded" not in said
+
+
+# The owner's speed settings (bau models tune), in their own file so changing the model
+# keeps them; bau-llm.service reads it last, so it wins (docs/GPU.md section 4).
+TUNE = "llm-tune.env"
+KV_TYPES = ("f16", "q8_0", "q4_0")             # llama.cpp b11747 -ctk/-ctv values BAU offers
+
+
+def tune(etc: Path, run: Run, draft: str | None = None, kv: str | None = None,
+         reset: bool = False) -> dict[str, str]:
+    """Write /etc/bau/llm-tune.env and restart the model server. ``draft``: how many words
+    an MTP model guesses ahead (1-16), or "off". ``kv``: the memory format of the
+    model's working memory (f16 is llama.cpp's own default). Nothing else can be set."""
+    path = etc / TUNE
+    cur: dict[str, str] = {}
+    if path.exists() and not reset:
+        for line in path.read_text().splitlines():
+            k, _, v = line.partition("=")
+            if k in ("LLAMA_ARG_SPEC_TYPE", "LLAMA_ARG_SPEC_DRAFT_N_MAX",
+                     "LLAMA_ARG_CACHE_TYPE_K", "LLAMA_ARG_CACHE_TYPE_V"):
+                cur[k] = v
+    if draft == "off":
+        cur.pop("LLAMA_ARG_SPEC_DRAFT_N_MAX", None)
+        cur["LLAMA_ARG_SPEC_TYPE"] = "none"
+    elif draft is not None:
+        if not draft.isdigit() or not 1 <= int(draft) <= 16:
+            raise ValueError("--draft is a number from 1 to 16, or off")
+        cur.pop("LLAMA_ARG_SPEC_TYPE", None)
+        cur["LLAMA_ARG_SPEC_DRAFT_N_MAX"] = str(int(draft))
+    if kv is not None:
+        if kv not in KV_TYPES:
+            raise ValueError(f"--kv is one of {', '.join(KV_TYPES)}")
+        cur["LLAMA_ARG_CACHE_TYPE_K"] = cur["LLAMA_ARG_CACHE_TYPE_V"] = kv
+    etc.mkdir(parents=True, exist_ok=True)
+    if cur:
+        path.write_text("".join(f"{k}={v}\n" for k, v in sorted(cur.items())))
+        _owned_by_bau(path, 0o640)
+    elif path.exists():
+        path.unlink()
+    run(["systemctl", "restart", "bau-llm.service"])
+    return cur
 
 
 def _bench(home: Path, by: str, audit: Any) -> Callable[[str], dict[str, Any]]:
