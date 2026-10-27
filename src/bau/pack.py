@@ -41,9 +41,13 @@ PACK_DIR = "BAU-PACK"
 THINKER = "qwen3-4b-heretic-content"
 # The desktop's boss runs on its NVIDIA card (docs/DESKTOP.md); elsewhere it is not copied.
 DESKTOP_BOSS = "qwen3.5-9b"
+# The 9B with its own draft head (docs/GPU.md section 5): copied for the card only, to be
+# measured against the boss; never started or approved by the install.
+DESKTOP_MTP = "qwen3.5-9b-mtp"
+DESKTOP_MODELS = (DESKTOP_BOSS, DESKTOP_MTP)
 NVIDIA = Path("/proc/driver/nvidia/version")         # there once NVIDIA's driver is loaded
 BOSS_ORDER = (DESKTOP_BOSS, "qwen3.5-4b", "qwen2.5-1.5b-instruct")
-PACK_MODELS = (DESKTOP_BOSS, "qwen3.5-4b", THINKER, "qwen2.5-1.5b-instruct")
+PACK_MODELS = (DESKTOP_BOSS, DESKTOP_MTP, "qwen3.5-4b", THINKER, "qwen2.5-1.5b-instruct")
 # Where drives show up (a pack folder sits at the top of one): sticks the desktop opened,
 # drives opened by hand, and the ones `locate` opens read-only itself.
 SEARCH = ("/media/*/*", "/media/*", "/run/media/*/*", "/mnt", "/mnt/*", "/run/bau-pack/*")
@@ -301,7 +305,7 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
     found = scan(pack, recs, check_hash=False)
     if not gpu():
         for e in found:
-            if e["model_id"] == DESKTOP_BOSS and e["status"] == "ok":
+            if e["model_id"] in DESKTOP_MODELS and e["status"] == "ok":
                 e["status"] = ("for a computer with an NVIDIA card: run sudo bau-gpu-setup "
                                "first, restart, then this again (docs/DESKTOP.md)")
     need = 0
@@ -334,6 +338,10 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
         audit.append("pack.wifi", by, {"result": out["wifi"]})
 
     have = set(out["copied"]) | set(out["already"])
+    if DESKTOP_MTP in have:                 # so sudo bau models use can find it
+        _register(home, DESKTOP_MTP, recs[DESKTOP_MTP])
+        say(f"{DESKTOP_MTP} is copied, not started: measure it against {DESKTOP_BOSS} "
+            "first (docs/GPU.md section 5).")
     boss = next((m for m in BOSS_ORDER if m in have), None)
     if boss and ask(f"Use {boss} as the local model Jarvis runs on (starts it now)?"):
         _register(home, boss, recs[boss])
