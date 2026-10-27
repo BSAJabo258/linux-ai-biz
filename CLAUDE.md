@@ -110,6 +110,19 @@ Cheap checks that run on their own beat rereading. Before telling the owner anyt
   is the proof a package exists.
 - **Prove a new check catches the mistake:** plant the bad case once, see it fail, remove it.
 
+## Working habits
+
+Adapted from github.com/forrestchang/andrej-karpathy-skills (MIT, read 2026-10-27). Rule 4
+there (prove it) is already "Check yourself" above.
+
+- **Think before coding.** Say your assumptions. If a request can mean two things, ask or
+  name both; don't pick one silently. If something simpler would do, say so.
+- **Simplest thing that works.** Nothing the owner did not ask for: no extra features, no
+  settings "for later", no layers for one use, no handling for cases that cannot happen.
+- **Surgical changes.** Every changed line traces to the request. Don't reformat, rename
+  or "improve" code next to it. Remove only what your own change left unused; mention
+  other dead code instead of deleting it.
+
 ## Conventions
 
 - Before building something new, look for what others already built: `bau toolbox ask "..."`
