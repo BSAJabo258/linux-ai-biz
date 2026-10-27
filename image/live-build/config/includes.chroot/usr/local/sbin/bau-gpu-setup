@@ -39,6 +39,15 @@ if [[ -z ${card} ]]; then
   say "No NVIDIA graphics card found: nothing to do (BAU uses the processor)."; exit 1
 fi
 
+# Without the internet apt only warns, then says "Unable to locate package nvidia-driver"
+# (the owner's desktop, 2026-10-27). Say the real reason first.
+if ! getent hosts deb.debian.org >/dev/null 2>&1; then
+  say "No internet: this computer cannot reach deb.debian.org, where the driver comes from."
+  say "Plug in the network cable, or click the network icon (top right) and pick your"
+  say "Wi-Fi. Check with: ping -c 3 deb.debian.org   Then run this again."
+  exit 1
+fi
+
 say "NVIDIA graphics card found (${card})."
 say "This installs Debian's NVIDIA driver 550.163.01 and the newest Debian kernel, builds"
 say "the driver for this computer and signs it with this computer's own key. Then you"
