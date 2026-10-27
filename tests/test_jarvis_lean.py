@@ -143,6 +143,14 @@ def test_common_questions_get_their_facts_before_the_model_answers(tmp_path):
     c = lean(tmp_path, ["We have three."])
     c.ask("What tools do we already have for picking an answer?")
     assert "Outlines" in str(c.provider.calls[0]["messages"][-1]["content"])
+    # Real model, 2026-10-27: "the Governor watchdog" got the toolbox, and "post the latest
+    # video" got a kids-rule refusal without looking. Both now come with their facts.
+    d = lean(tmp_path, ["Nothing needs you."])
+    d.ask("What does the Governor watchdog say right now?")
+    assert "overall" in str(d.provider.calls[0]["messages"][-1]["content"])
+    e = lean(tmp_path, ["Nothing is queued."])
+    r = e.ask("Post the latest video to TikTok now.")
+    assert r.cards and r.cards[0]["tool"] == "publish_queue" and not r.pending
 
 
 def test_facts_first_is_only_for_local_models_and_only_read_tools(tmp_path):

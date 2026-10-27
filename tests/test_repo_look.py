@@ -63,6 +63,14 @@ def test_mission_control_has_the_jarvis_look_and_stays_accessible():
     assert "@import" not in page and "https://" not in page   # works offline on the laptop
 
 
+def test_mission_control_never_scrolls_sideways_on_a_phone():
+    # 2026-10-27, 390 px wide: Regulations was 812 px wide, Governor 437, Economics 392.
+    # Measured after the fix: every view fits; a wide table scrolls inside its card.
+    page = (resources.files("bau.ui") / "page.html").read_text()
+    assert ".wide, pre { overflow-x:auto; }" in page and "td { overflow-wrap:anywhere; }" in page
+    assert 'return el("div", { class: "wide" }, t);' in page    # every table() is wrapped
+
+
 # ------------------------------------------------------------------ the page, round two
 
 def facts():

@@ -225,3 +225,18 @@ def test_ships_with_openssl_and_is_explained():
     doc = (ROOT / "docs" / "KEYS.md").read_text()
     assert "BAU-Keys-Export.cmd" in doc and "sudo bau keys import" in doc
     assert "never" in doc.lower()
+
+
+def test_no_passphrase_is_a_plain_message_not_a_traceback(monkeypatch, tmp_path):
+    # 2026-10-27: Ctrl+D at the passphrase question ended in an EOFError traceback.
+    import argparse
+
+    from bau import cli_ext
+    def eof(prompt=""):
+        raise EOFError
+    monkeypatch.setattr("getpass.getpass", eof)
+    a = argparse.Namespace(keys_cmd="import", file=str(tmp_path / "BAU-KEYS.enc"),
+                           etc=str(tmp_path / "etc"))
+    with pytest.raises(SystemExit, match="no passphrase given, so nothing was imported"):
+        cli_ext.cmd_keys(a)
+    assert not (tmp_path / "etc").exists()

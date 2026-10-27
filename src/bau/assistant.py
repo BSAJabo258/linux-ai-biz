@@ -71,7 +71,8 @@ How you act:
   done until a later message tells you the owner confirmed it.
 - Kids videos go only to YouTube, marked made for kids, after the owner has watched
   them. Never suggest posting child-directed videos to TikTok or other 13+ platforms;
-  if the owner asks for that, say plainly that kids videos only go to YouTube.
+  if the owner asks to post a kids video there, say plainly that kids videos only go to
+  YouTube. Other videos follow the posting rule above.
 - Approving is never yours, and never offer to do it: money, commercial email sends,
   legal decisions, turning on a model ("bau models bench <id>", then "bau set-status
   model <id> APPROVED"), or anything else that needs the owner's sign-off. Say it is
@@ -141,8 +142,12 @@ NUDGE = "(Go ahead: call the tool now instead of saying you will.)"
 GROUND = (
     (re.compile(r"\b(cost|costs|spend|spent|usage|tokens|how much .{0,30}model)", re.I),
      "usage_today", lambda q: {}),
-    (re.compile(r"\b(broken|status|waiting for me|attention|anything wrong|health)", re.I),
+    (re.compile(r"\b(broken|status|waiting for me|attention|anything wrong|health|watchdog|"
+                r"governor)", re.I),
      "system_status", lambda q: {}),
+    # The real model, asked to post, guessed a kids video (2026-10-27): show it the queue.
+    (re.compile(r"\b(post|publish|upload)\w*\b.{0,40}\b(videos?|clips?|tiktok|youtube)\b",
+                re.I), "publish_queue", lambda q: {}),
     (re.compile(r"\b(tools?|repos?|open.source|librar(y|ies)|already have)\b", re.I),
      "toolbox", lambda q: {"question": q}),
     (re.compile(r"\b(remember|last time|we decided|earlier|my notes)\b", re.I),

@@ -70,6 +70,9 @@ section::after { content:""; position:absolute; right:22px; bottom:-1px; width:1
 table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
 th { font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); font-weight:600; }
 th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+/* Long ids and items wrap, so a phone never scrolls the page sideways (seen 2026-10-27). */
+td { overflow-wrap:anywhere; }
+.wide, pre { overflow-x:auto; }   /* a table too wide for a phone scrolls inside its card */
 tbody tr:hover td { background:rgba(63,214,255,.06); }
 .badge { display:inline-block; min-width:5.5em; font-weight:700; letter-spacing:.12em; }
 .GREEN{color:var(--green); text-shadow:0 0 10px rgba(70,242,164,.35)}
@@ -146,7 +149,7 @@ function table(rows, cols) {
     if (c === "color") td.append(el("span", { class: "badge " + v }, v));
     else td.append(typeof v === "object" ? JSON.stringify(v) : (v ?? ""));
     tr.append(td); }); body.append(tr); });
-  t.append(body); return t;
+  t.append(body); return el("div", { class: "wide" }, t);
 }
 const TYPE_COLOR = { workflow: "var(--green)", team: "var(--focus)", role: "var(--focus)",
   agent: "var(--yellow)", model: "var(--orange)", governance: "var(--red)", regulation: "var(--red)",

@@ -25,7 +25,24 @@ Stick image
 (sha256 `5a612283628d4476998e5678e5392653fdbf40ba3a3618c8890fc4f9c8079d90`): it reaches its
 menu in a Secure Boot virtual PC (OVMF, Microsoft keys). On the desktop it first went gray
 and back to Windows; the owner got it to start after the F8 / Secure Boot OS Type steps
-(docs/DESKTOP.md step 2). Not yet installed on the desktop. Owner's decision: no cloud models, so local only
+(docs/DESKTOP.md step 2). Not yet installed on the desktop.
+
+Full test run (2026-10-27, owner: "test everything"). Ran: the suite as root and as a normal
+user (all 841 run between them); the released stick in a Secure Boot VM to the desktop (BAU
+art on screen, no failed services); the Docker test drive (selftest, Governor tick) and a
+browser through all 9 Mission Control views and all 22 Jarvis parts at desktop and phone
+width; qwen3.5-4b fetched by `bau models fetch`, served by the stick's start script, `bau
+models bench` (answers, uses a tool) and Jarvis on it; the Windows pack script (real
+PowerShell, real model, the 7 Debian Wi-Fi files from Debian) into `bau pack check` and
+`bau pack install` as root; keys export (sh) -> import as root; the payload build (257
+files, checksums OK); `--help` of all 210 bau commands and the 56 that need no input.
+Fixed (each with a test that fails without it): `bau hw` reads Secure Boot from the
+firmware (the stick has no mokutil); Mission Control scrolled sideways on a phone; Jarvis on
+the real model answered "the Governor watchdog" from the toolbox and refused a plain post as
+a kids video (both now get their facts first); Ctrl+D at a passphrase was a traceback; no
+systemctl waited 6 minutes; docs said `bau-llm-cuda status` without sudo (it is in sbin).
+Not run here: encrypted storage and the disk install on the VM (TCG too slow, tested
+before), anything on the RTX 3060. Owner's decision: no cloud models, so local only
 (`bau privacy local-only`, `docs/LOCAL-ONLY.md`); candidate stronger local specialist for the
 desktop: Qwen3.5-35B-A3B, planned, needs a desktop run first.
 

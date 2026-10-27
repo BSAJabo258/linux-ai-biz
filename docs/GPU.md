@@ -55,7 +55,7 @@ bau models compare qwen3.5-9b qwen3.5-9b@cuda
 ```
 
 Keep whichever is faster with the same right answers. Back to the stick's engine at any
-time: `sudo bau-llm-cuda use vulkan`. `bau-llm-cuda status` says which one runs.
+time: `sudo bau-llm-cuda use vulkan`. `sudo bau-llm-cuda status` says which one runs.
 
 How it is built: Debian 13's own `nvidia-cuda-toolkit` 12.4.131 (from Debian's non-free
 area, which `bau-gpu-setup` already turned on), the same llama.cpp commit as the stick

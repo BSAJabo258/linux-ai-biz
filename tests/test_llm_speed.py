@@ -34,6 +34,14 @@ def test_an_mtp_model_starts_with_its_draft_head_on(tmp_path):
                        "LLAMA_ARG_SPEC_DRAFT_N_MAX=3", "LLAMA_ARG_N_PARALLEL=1"]
 
 
+def test_no_service_manager_is_said_at_once(tmp_path):
+    # 2026-10-27, pack install in a container: no systemctl, and it waited 6 minutes.
+    ok = pack._start("m", _reg()["qwen3.5-4b"], tmp_path / "models", tmp_path / "etc",
+                     lambda c: "(not available: [Errno 2] No such file: 'systemctl')",
+                     lambda *a: None)
+    assert ok is False
+
+
 def test_a_plain_model_gets_only_its_file_and_name(tmp_path):
     _start(tmp_path, _reg()["qwen3.5-9b"])
     assert len((tmp_path / "etc" / "llm.env").read_text().splitlines()) == 2
