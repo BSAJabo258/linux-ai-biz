@@ -18,7 +18,7 @@ PACKAGES = ["linux-image-amd64", "linux-headers-amd64", "nvidia-kernel-dkms", "n
 
 
 def fake_machine(tmp_path, nvidia=True, secure_boot=True, enrolled=False, live=False,
-                 nonfree=True, pending=False):
+                 nonfree=True, pending=False, online=True):
     bin_ = tmp_path / "bin"
     bin_.mkdir()
     log = tmp_path / "calls.log"
@@ -29,6 +29,7 @@ def fake_machine(tmp_path, nvidia=True, secure_boot=True, enrolled=False, live=F
         f.chmod(0o755)
 
     cmd("id", 'echo 0')
+    cmd("getent", "echo '151.101.2.132 deb.debian.org'" if online else "exit 2")
     cmd("apt-get", "exit 0")
     cmd("apt-cache", "echo 'nvidia-driver:'; echo '  Candidate: 550.163.01-2'" if nonfree
         else "echo 'nvidia-driver:'; echo '  Candidate: (none)'")
@@ -136,3 +137,12 @@ def test_the_script_is_on_the_stick_and_runnable():
     hook = (SCRIPT.parents[4] / "hooks" / "live" / "0500-bau.hook.chroot").read_text()
     assert "/usr/local/sbin/bau-gpu-setup" in hook
     assert os.access(SCRIPT, os.X_OK)
+
+
+def test_no_internet_is_said_plainly_before_anything_runs(tmp_path):
+    # The owner's desktop, 2026-10-27: offline, apt only warned and then said "Unable to
+    # locate package nvidia-driver" four times.
+    env, log = fake_machine(tmp_path, online=False)
+    r = run(env, "y\n")
+    assert r.returncode != 0 and "No internet" in r.stdout and "network cable" in r.stdout
+    assert not any(c.startswith("apt-get") for c in calls(log))
