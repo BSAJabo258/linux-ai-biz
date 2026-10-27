@@ -79,11 +79,12 @@ def cmd_models(a):
         from .models.providers import ProviderError
         try:
             res = lab.record(a.model, f"human:{getpass.getuser()}", audit=AuditLog(),
-                             run_code=a.run_code, long_context=not a.no_long)
+                             run_code=a.run_code, long_context=not a.no_long,
+                             repeat=a.repeat, tag=a.tag)
         except KeyError:
             print(f"model {a.model} not registered", file=sys.stderr)
             return EXIT_ERROR
-        except (PermissionError, ProviderError) as e:
+        except (PermissionError, ProviderError, ValueError) as e:
             print(f"lab: {e}", file=sys.stderr)
             return EXIT_BLOCKED
         _out(res if a.full else {k: v for k, v in res.items() if k != "details"})
@@ -114,6 +115,7 @@ def cmd_models(a):
     elif a.models_cmd == "compare":
         from .models import lab
         a_res, b_res = lab.latest(a.baseline, bau_home()), lab.latest(a.candidate, bau_home())
+        # MODEL@TAG names a tagged run (e.g. qwen3.5-9b@cuda)
         missing = [m for m, r in ((a.baseline, a_res), (a.candidate, b_res)) if r is None]
         if missing:
             print(f"no lab result yet for {', '.join(missing)}: bau models lab MODEL",
@@ -1429,6 +1431,10 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--run-code", action="store_true",
                    help="also run the model's two small code fixes, in a locked-down Python")
     x.add_argument("--no-long", action="store_true", help="skip the long-prompt part")
+    x.add_argument("--repeat", type=int, default=1,
+                   help="run it this many times: middle value, range and failed runs")
+    x.add_argument("--tag", help="name this setup (e.g. cuda): stored as MODEL@TAG for "
+                   "bau models compare")
     x.add_argument("--full", action="store_true", help="show every answer")
     x = ms.add_parser("use", help="sudo: the model server runs this downloaded model "
                       "(to test it); never approves it or makes it the boss")

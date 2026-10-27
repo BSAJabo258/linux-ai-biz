@@ -167,6 +167,7 @@ computer with an NVIDIA card.
    ```
 8. **Measure, then try stronger models:** `bau hw`, then the steps in
    [MODEL-LAB.md](MODEL-LAB.md) (the 9B as the baseline, then Qwen3.8-27B).
+9. **Try the CUDA engine** and keep it only if it is faster: [GPU.md](GPU.md).
 
 ## Tested so far (2026-10-25, not on the desktop yet)
 

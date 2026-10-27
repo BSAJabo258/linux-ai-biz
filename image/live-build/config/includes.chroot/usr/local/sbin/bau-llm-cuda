@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# A second model engine for the desktop's NVIDIA card (docs/GPU.md): llama.cpp built with
+# NVIDIA's CUDA instead of Vulkan, kept beside the stick's engine and never replacing it.
+#   sudo bau-llm-cuda build     # once: Debian's CUDA tools, then build (about 15 minutes)
+#   sudo bau-llm-cuda use cuda  # the model server runs on the CUDA engine
+#   sudo bau-llm-cuda use vulkan  # back to the stick's engine
+#   bau-llm-cuda status
+# Which one is faster on this card is measured, not assumed: bau models lab ... --tag cuda.
+# Proved 2026-10-27 in a clean debian:trixie: nvidia-cuda-toolkit 12.4.131 (Debian's
+# non-free area; it brings g++-13 for nvcc) builds llama.cpp b11747 with -DGGML_CUDA=ON in
+# 14 minutes on 4 cores; libggml-cuda.so needs libcudart.so.12 and libcublas.so.12 (from
+# the toolkit) and libcuda.so.1 (from NVIDIA's driver, bau-gpu-setup). Same source commit as
+# the stick's engine (/opt/llama.cpp/VERSION). Every install waits for the owner's y.
+set -euo pipefail
+
+LIVE=${BAU_LIVE_MEDIUM:-/run/live/medium}
+NVPROC=${BAU_NVIDIA_PROC:-/proc/driver/nvidia/version}
+VERSION=${BAU_LLAMA_VERSION:-/opt/llama.cpp/VERSION}
+DEST=${BAU_CUDA_DIR:-/opt/llama.cpp-cuda}
+ENGINE_ENV=${BAU_ENGINE_ENV:-/etc/bau/llm-engine.env}
+WORK=${BAU_BUILD_DIR:-/var/tmp/bau-llm-cuda}
+PACKAGES=(nvidia-cuda-toolkit cmake build-essential git ca-certificates libssl-dev)
+
+say() { printf '%s\n' "$*"; }
+need_root() {
+  if [[ $(id -u) -ne 0 ]]; then say "Run it with sudo: sudo bau-llm-cuda $*"; exit 1; fi
+}
+
+status() {
+  if [[ -x ${DEST}/llama-server ]]; then say "CUDA engine: built (${DEST})"
+  else say "CUDA engine: not built (sudo bau-llm-cuda build)"; fi
+  if [[ -f ${ENGINE_ENV} ]] && grep -q "${DEST}" "${ENGINE_ENV}"; then
+    say "The model server uses: cuda"
+  else
+    say "The model server uses: vulkan (the stick's engine)"
+  fi
+}
+
+build() {
+  need_root build
+  if [[ -d ${LIVE} ]]; then
+    say "This is the live stick: the engine would be gone at the next restart."; exit 1
+  fi
+  if [[ ! -r ${NVPROC} ]]; then
+    say "NVIDIA's driver is not running: first sudo bau-gpu-setup, restart, then this."
+    exit 1
+  fi
+  read -r tag commit < "${VERSION}" || { say "Cannot read ${VERSION}."; exit 1; }
+  [[ ${commit} =~ ^[0-9a-f]{40}$ ]] || { say "No pinned commit in ${VERSION}."; exit 1; }
+  cap=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 || true)
+  arch=${cap//./}
+  [[ ${arch} =~ ^[0-9]{2,3}$ ]] || { say "Could not read the card's compute level."; exit 1; }
+  say "This installs Debian's CUDA tools (nvidia-cuda-toolkit, a few GB) and builds the"
+  say "model engine llama.cpp ${tag} for this card (compute ${cap}) into ${DEST}."
+  say "The stick's engine stays as it is. It needs the internet and about 15 minutes."
+  read -r -p "Go ahead? Type y and Enter (anything else: no): " answer || answer=""
+  if [[ ${answer} != y ]]; then say "Nothing was changed."; exit 1; fi
+
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -q
+  if ! apt-cache policy nvidia-cuda-toolkit | grep -q 'Candidate: [0-9]'; then
+    say "Debian's non-free area is not enabled: run sudo bau-gpu-setup first."; exit 1
+  fi
+  apt-get install -y -q --no-install-recommends "${PACKAGES[@]}"
+  rm -rf "${WORK}" && mkdir -p "${WORK}"
+  git clone --quiet --depth 1 --branch "${tag}" https://github.com/ggml-org/llama.cpp \
+    "${WORK}/src"
+  if [[ $(git -C "${WORK}/src" rev-parse HEAD) != "${commit}" ]]; then
+    say "llama.cpp ${tag} is not commit ${commit}: refusing."; exit 1
+  fi
+  cmake -S "${WORK}/src" -B "${WORK}/build" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+    -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_CUDA=ON \
+    -DCMAKE_CUDA_ARCHITECTURES="${arch}" -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+    -DLLAMA_BUILD_SERVER=ON >/dev/null
+  cmake --build "${WORK}/build" --target llama-server -j "$(nproc)" >/dev/null
+  [[ -f ${WORK}/build/bin/libggml-cuda.so ]] || { say "Built without CUDA: refusing."; exit 1; }
+  rm -rf "${DEST}.new" && mkdir -p "${DEST}.new"
+  cp -a "${WORK}"/build/bin/llama-server "${WORK}"/build/bin/*.so* "${DEST}.new/"
+  cp "${WORK}/src/LICENSE" "${DEST}.new/LICENSE"
+  printf '%s %s cuda %s\n' "${tag}" "${commit}" "${arch}" > "${DEST}.new/VERSION"
+  rm -rf "${DEST}" && mv "${DEST}.new" "${DEST}"
+  rm -rf "${WORK}"
+  say "Built: ${DEST}. Measure both engines (docs/GPU.md), then: sudo bau-llm-cuda use cuda"
+}
+
+use() {
+  need_root use "$1"
+  case $1 in
+    cuda)
+      [[ -x ${DEST}/llama-server ]] || { say "Not built yet: sudo bau-llm-cuda build"; exit 1; }
+      mkdir -p "${ENGINE_ENV%/*}"
+      printf 'BAU_LLAMA_SERVER=%s/llama-server\nLD_LIBRARY_PATH=%s\n' "${DEST}" "${DEST}" \
+        > "${ENGINE_ENV}"
+      chmod 0644 "${ENGINE_ENV}" ;;
+    vulkan) rm -f "${ENGINE_ENV}" ;;
+    *) say "use cuda or use vulkan"; exit 1 ;;
+  esac
+  systemctl restart bau-llm.service || true
+  say "The model server now uses: $1. Wait a minute for it to load."
+}
+
+case ${1:-status} in
+  build) build ;;
+  use) use "${2:-}" ;;
+  status) status ;;
+  *) say "bau-llm-cuda build | use cuda | use vulkan | status"; exit 1 ;;
+esac

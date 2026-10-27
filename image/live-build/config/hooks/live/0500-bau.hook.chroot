@@ -64,7 +64,7 @@ systemctl enable bau-usb-guard.service
 chmod 0755 /usr/local/sbin/bau-health-console
 
 # The desktop's NVIDIA driver, run by the owner on the installed desktop (docs/DESKTOP.md).
-chmod 0755 /usr/local/sbin/bau-gpu-setup
+chmod 0755 /usr/local/sbin/bau-gpu-setup /usr/local/sbin/bau-llm-cuda
 systemctl enable bau-health-console.service
 
 chmod 0755 /usr/local/sbin/bau-live-init /usr/local/bin/jarvis-setup /opt/llama.cpp/llama-server

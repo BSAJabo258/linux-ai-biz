@@ -37,7 +37,10 @@ ENGINE = Path("/opt/llama.cpp")
 KEEP_FREE = 3 * GiB // 2
 # The model engine's own buffers plus an 8K context on top of the file (estimate).
 ENGINE_MARGIN = 1 * GiB
-GPU_QUERY = "name,memory.total,memory.used,memory.free,driver_version,compute_cap"
+GPU_QUERY = ("name,memory.total,memory.used,memory.free,driver_version,compute_cap,"
+             "pci.device_id,pci.bus_id,temperature.gpu,power.draw,power.limit,"
+             "utilization.gpu,pstate")
+ENGINES = {"vulkan": Path("/opt/llama.cpp"), "cuda": Path("/opt/llama.cpp-cuda")}
 
 Run = Callable[..., Any]
 
@@ -112,8 +115,17 @@ def _gpus(root: Path, run: Run) -> dict[str, Any]:
 
         def mib(x: str) -> int | None:
             return int(float(x)) * MiB if x.replace(".", "", 1).isdigit() else None
+        def num(i: int, f: list[str] = f) -> float | None:   # "[N/A]" or missing: unknown
+            try:
+                return float(f[i])
+            except (IndexError, ValueError):
+                return None
         cards.append({"name": f[0], "memory_total": mib(f[1]), "memory_used": mib(f[2]),
-                      "memory_free": mib(f[3]), "driver": f[4], "compute_cap": f[5]})
+                      "memory_free": mib(f[3]), "driver": f[4], "compute_cap": f[5],
+                      "pci_device_id": f[6] if len(f) > 6 else None,
+                      "pci_bus_id": f[7] if len(f) > 7 else None,
+                      "temperature_c": num(8), "power_w": num(9), "power_limit_w": num(10),
+                      "utilization_pct": num(11), "pstate": f[12] if len(f) > 12 else None})
     head, _ = _cmd(run, ["nvidia-smi"]) if cards else (None, None)
     cuda = next((ln.split("CUDA Version:")[1].strip(" |\n").split()[0]
                  for ln in (head or "").splitlines() if "CUDA Version:" in ln), None)
@@ -122,8 +134,37 @@ def _gpus(root: Path, run: Run) -> dict[str, Any]:
         note = ("an NVIDIA card is in this computer, but its memory is unknown until "
                 "NVIDIA's driver runs (`sudo bau-gpu-setup`)" + (f"; {why}" if why else ""))
     return {"nvidia_card": present or bool(cards), "nvidia_driver_loaded": driver,
-            "cards": cards, "driver_cuda": cuda,
+            "cards": cards, "pci": _pci(root), "driver_cuda": cuda,
             "cuda_toolkit": bool(shutil.which("nvcc")), "note": note}
+
+
+def _pci(root: Path) -> list[dict[str, str]]:
+    """Every NVIDIA graphics device by its PCI address and IDs (from sysfs: read without
+    NVIDIA's driver, and the exact ID any hardware-specific tool must match)."""
+    out = []
+    for dev in sorted((root / "sys/bus/pci/devices").glob("*")):
+        ids = {k: (_read(dev / k) or "").strip().removeprefix("0x")
+               for k in ("vendor", "device", "class", "subsystem_vendor", "subsystem_device")}
+        if ids["vendor"] == "10de" and ids["class"].startswith("03"):
+            out.append({"address": dev.name, "id": f"{ids['vendor']}:{ids['device']}",
+                        "subsystem": f"{ids['subsystem_vendor']}:{ids['subsystem_device']}"})
+    return out
+
+
+def _secure_boot(run: Run) -> str | None:
+    out, _ = _cmd(run, ["mokutil", "--sb-state"])
+    return out.strip().splitlines()[0] if out and out.strip() else None
+
+
+def _frameworks() -> dict[str, Any]:
+    """Which AI frameworks and model engines are here (found, never imported or run)."""
+    import importlib.util
+    return {"python": {m: importlib.util.find_spec(m) is not None
+                       for m in ("tensorflow", "torch", "tensorrt")},
+            "llama_cpp_engines": {k: (v / "llama-server").exists() for k, v in ENGINES.items()},
+            "cudnn": any(Path(d).glob("libcudnn.so*") for d in
+                         ("/usr/lib/x86_64-linux-gnu", "/usr/local/cuda/lib64")
+                         if Path(d).is_dir())}
 
 
 def _engine(engine: Path, run: Run) -> dict[str, Any]:
@@ -168,6 +209,7 @@ def profile(home: Path | None = None, root: Path = Path("/"), run: Run = subproc
             "system": _os(root), "cpu": _cpu(root, run), "memory": _memory(root),
             "gpu": _gpus(root, run), "engine": _engine(engine, run),
             "disk": _disk(home / "models"), "models": _models(home / "models"),
+            "secure_boot": _secure_boot(run), "frameworks": _frameworks(),
             "key_names": names()}
 
 
@@ -218,8 +260,13 @@ def summary(prof: dict[str, Any]) -> dict[str, Any]:
         "memory_gb": {"total": gb(mem.get("total")), "free": gb(mem.get("available"))},
         "graphics_card": [{"name": c["name"], "card_memory_gb": gb(c.get("memory_total")),
                            "card_memory_free_gb": gb(c.get("memory_free")),
-                           "driver": c.get("driver")} for c in gpu.get("cards") or []]
+                           "driver": c.get("driver"), "compute_cap": c.get("compute_cap"),
+                           "temperature_c": c.get("temperature_c"), "power_w": c.get("power_w"),
+                           "busy_pct": c.get("utilization_pct")}
+                          for c in gpu.get("cards") or []]
         or gpu.get("note") or "no NVIDIA card found",
+        "pci_ids": [d["id"] for d in gpu.get("pci") or []],
+        "secure_boot": prof.get("secure_boot"),
         "model_engine": prof.get("engine"),
         "disk_free_gb": gb((prof.get("disk") or {}).get("free")),
         "models_here": [m["file"] for m in prof.get("models") or []],
