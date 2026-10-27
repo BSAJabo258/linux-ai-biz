@@ -128,7 +128,7 @@ The whole lab on the MTP 4B (guessing 3 ahead) gave the same scores as the plain
 took 10 minutes instead of 6 and the first word came after 1.9 s instead of 1.3 s.
 
 So: on a processor, guessing pays on predictable text (lists, code, forms) and costs on
-free prose, where most guesses are wrong (19 of 100 kept at 6 ahead). The laptop keeps
+free prose, where most guesses are wrong (about 1 in 5 kept at 6 ahead). The laptop keeps
 the plain 4B. On the card, checking guesses costs much less time, which is why it is
 worth measuring there; unsloth says about 1.5 to 2 times faster (their claim, not
 measured here). Unsloth's README also says MTP serves one conversation at a time
@@ -146,8 +146,8 @@ bau models compare qwen3.5-9b qwen3.5-9b@kv8
 ```
 
 Measured here (the 4B, 16K context): the same speed (6.0 words per second) and its KV
-cache went from 512 MB to 272 MB. Qwen3.5 keeps these notes in only 8 of its layers, so
-the saving is small at the stick's 8K context.
+cache went from 512 MB to 272 MB. The 4B keeps these notes in only 8 of its layers, so
+the saving is small at the stick's 8K context (the 9B not measured yet).
 Use it only when long prompts run out of card memory; `sudo bau models tune --kv f16`
 goes back. `sudo bau models tune --reset` forgets every tune setting.
 

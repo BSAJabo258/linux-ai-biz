@@ -1461,7 +1461,7 @@ def register(sub: argparse._SubParsersAction) -> None:
                       "MTP model guesses ahead, the KV cache's format (docs/GPU.md)")
     x.add_argument("--draft", help="words an MTP model guesses ahead (1-16), or off")
     x.add_argument("--kv", help="KV cache format: f16 (llama.cpp's default), q8_0 (half the "
-                   "memory), q4_0")
+                   "memory)")
     x.add_argument("--reset", action="store_true", help="forget earlier settings first")
     x = ms.add_parser("compare", help="two models' latest lab results side by side "
                       "(e.g. a compressed file against a bigger one)")

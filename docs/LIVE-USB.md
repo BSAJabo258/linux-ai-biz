@@ -42,7 +42,8 @@ for your encrypted storage.
    Choose the USB stick (sometimes shown as "UEFI: <stick name>").
 3. The My Jarvis menu appears. Choose **My Jarvis**.
 
-If the PC refuses to start from USB, turn off *Secure Boot* in the firmware settings, or
+If the PC refuses to start from USB (on the ASUS desktop: a gray screen, then Windows), turn
+off *Secure Boot* in the firmware settings (ASUS: *Secure Boot > OS Type > Other OS*), or
 choose *Utilities... > UEFI Firmware Settings* from the My Jarvis menu to get there.
 
 ## 3. First start: setup

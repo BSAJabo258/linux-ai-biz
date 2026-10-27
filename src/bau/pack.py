@@ -455,7 +455,7 @@ def _start(mid: str, rec: dict[str, Any], models: Path, etc: Path, run: Run,
 # The owner's speed settings (bau models tune), in their own file so changing the model
 # keeps them; bau-llm.service reads it last, so it wins (docs/GPU.md section 4).
 TUNE = "llm-tune.env"
-KV_TYPES = ("f16", "q8_0", "q4_0")             # llama.cpp b11747 -ctk/-ctv values BAU offers
+KV_TYPES = ("f16", "q8_0")    # llama.cpp b11747 -ctk/-ctv values, both run there 2026-10-27
 
 
 def tune(etc: Path, run: Run, draft: str | None = None, kv: str | None = None,

@@ -16,10 +16,16 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 
 State: 632 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
-Latest (2026-10-26): code audit fixes merged (#93-#96); stick image
-[live-v0.1.0-f70153f](https://github.com/BSAJabo258/linux-ai-biz/releases/tag/live-v0.1.0-f70153f)
-(sha256 `c67e514d619fc32646aeff45053d5275a39405ec3fec0201520d2e96a2694f95`), not yet
-started on the desktop. Owner's decision: no cloud models, so local only
+Latest (2026-10-27): merged #97-#105: the stick's llama.cpp is b11747; desktop art fixed
+(Xfce's own picture no longer shows); seven live scenes; GPU work (`bau hw` card details,
+lab `--repeat`/`--tag`, `sudo bau-llm-cuda`, docs/GPU.md); speed settings (MTP files,
+`sudo bau models tune`); the pack carries the 9B MTP file; CLAUDE.md "Working habits".
+Stick image
+[live-v0.1.0-76bc200](https://github.com/BSAJabo258/linux-ai-biz/releases/tag/live-v0.1.0-76bc200)
+(sha256 `5a612283628d4476998e5678e5392653fdbf40ba3a3618c8890fc4f9c8079d90`): it reaches its
+menu in a Secure Boot virtual PC (OVMF, Microsoft keys). On the desktop it first went gray
+and back to Windows; the owner got it to start after the F8 / Secure Boot OS Type steps
+(docs/DESKTOP.md step 2). Not yet installed on the desktop. Owner's decision: no cloud models, so local only
 (`bau privacy local-only`, `docs/LOCAL-ONLY.md`); candidate stronger local specialist for the
 desktop: Qwen3.5-35B-A3B, planned, needs a desktop run first.
 

@@ -68,7 +68,8 @@ def test_tune_writes_the_owners_settings_and_restarts(tmp_path):
 
 
 @pytest.mark.parametrize("kw", [{"draft": "0"}, {"draft": "17"}, {"draft": "3; rm"},
-                                {"kv": "q8_0\nLLAMA_ARG_HOST=0.0.0.0"}, {"kv": "f32"}])
+                                {"kv": "q8_0\nLLAMA_ARG_HOST=0.0.0.0"}, {"kv": "f32"},
+                                {"kv": "q4_0"}])
 def test_tune_refuses_anything_else(tmp_path, kw):
     with pytest.raises(ValueError):
         pack.tune(tmp_path, lambda c: "", **kw)
