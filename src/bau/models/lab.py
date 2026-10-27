@@ -129,21 +129,48 @@ def run_function(code: str, test: str) -> tuple[bool, str]:
 
 # ---------------------------------------------------------------- watching memory
 class Peaks:
-    """The card's peak memory while the lab runs (nvidia-smi every half second)."""
+    """What the card did while the lab ran (nvidia-smi every half second): peak memory,
+    the hottest and the highest power draw, and how busy it was on average."""
+
+    QUERY = "memory.used,temperature.gpu,power.draw,utilization.gpu"
 
     def __init__(self, run: Callable[..., Any] = subprocess.run):
         self.run, self.vram, self._stop = run, None, threading.Event()
+        self.temp = self.power = None
+        self.busy: list[float] = []
         self._t = threading.Thread(target=self._loop, daemon=True)
 
     def _sample(self) -> None:
         try:
-            p = self.run(["nvidia-smi", "--query-gpu=memory.used",
+            p = self.run(["nvidia-smi", f"--query-gpu={self.QUERY}",
                           "--format=csv,noheader,nounits"], capture_output=True, text=True,
                          timeout=5)
-            used = max(int(float(x)) for x in p.stdout.split()) << 20
-            self.vram = max(self.vram or 0, used)
-        except (OSError, ValueError, subprocess.TimeoutExpired):
-            pass
+            rows = [[x.strip() for x in ln.split(",")] for ln in p.stdout.splitlines() if ln]
+        except (OSError, subprocess.TimeoutExpired):
+            return
+
+        def top(i: int) -> float | None:
+            vals = []
+            for r in rows:
+                try:
+                    vals.append(float(r[i]))
+                except (IndexError, ValueError):          # "[N/A]" on some cards
+                    pass
+            return max(vals) if vals else None
+        used, temp, power, busy = top(0), top(1), top(2), top(3)
+        if used is not None:
+            self.vram = max(self.vram or 0, int(used) << 20)
+        if temp is not None:
+            self.temp = max(self.temp or temp, temp)
+        if power is not None:
+            self.power = max(self.power or power, power)
+        if busy is not None:
+            self.busy.append(busy)
+
+    def card(self) -> dict[str, Any]:
+        return {"peak_temperature_c": self.temp, "peak_power_w": self.power,
+                "average_busy_pct": round(sum(self.busy) / len(self.busy), 1)
+                if self.busy else None}
 
     def _loop(self) -> None:
         while not self._stop.wait(0.5):
@@ -322,6 +349,7 @@ class Lab:
             "time_to_first_word_ms": round(sorted(first)[len(first) // 2]) if first else None,
             "words_per_second": round(sorted(speed)[len(speed) // 2], 1) if speed else None,
             "peak_card_memory": pk.vram, "peak_server_memory": server_peak_ram(proc),
+            **pk.card(),
             "details": parts,
         }
 
@@ -356,36 +384,67 @@ def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
         "speed": {m["model"]: {"words_per_second": m.get("words_per_second"),
                                "time_to_first_word_ms": m.get("time_to_first_word_ms"),
                                "peak_card_memory": m.get("peak_card_memory"),
-                               "peak_server_memory": m.get("peak_server_memory")}
+                               "peak_server_memory": m.get("peak_server_memory"),
+                               "peak_temperature_c": m.get("peak_temperature_c"),
+                               "peak_power_w": m.get("peak_power_w"),
+                               "average_busy_pct": m.get("average_busy_pct")}
                   for m in (a, b)},
         "answers_that_differ": {k: same_rows(k) for k in parts if same_rows(k)},
     }
 
 
+def spread(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Several runs of the same lab: the middle value and the range of each speed and
+    score, and how many runs failed, so one lucky or unlucky run does not decide."""
+    def rng(key: str) -> dict[str, Any] | None:
+        vals = sorted(r[key] for r in runs if r.get(key) is not None)
+        if not vals:
+            return None
+        return {"median": vals[len(vals) // 2], "low": vals[0], "high": vals[-1]}
+    parts = sorted({k for r in runs for k in r["scores"]})
+    return {"runs": len(runs), "failed_runs": sum(1 for r in runs if r["errors"]),
+            "words_per_second": rng("words_per_second"),
+            "time_to_first_word_ms": rng("time_to_first_word_ms"),
+            "scores": {k: sorted(r["scores"].get(k) for r in runs
+                                 if r["scores"].get(k) is not None) for k in parts}}
+
+
 def record(model_id: str, actor: str, home: Path | None = None, audit: Any = None,
            run_code: bool = False, long_context: bool = True,
-           provider: Provider | None = None) -> dict[str, Any]:
-    """Run the lab on a registered model, store the result, put its summary on the record.
-    Never approves (the owner's ``bau set-status``)."""
+           provider: Provider | None = None, repeat: int = 1,
+           tag: str | None = None) -> dict[str, Any]:
+    """Run the lab on a registered model (``repeat`` times), store the result, put its
+    summary on the record. ``tag`` names the setup, e.g. "cuda" for the same model on
+    another engine: the result is stored as MODEL@TAG, so ``compare`` can set them side by
+    side. Never approves (the owner's ``bau set-status``)."""
     from ..audit import AuditLog
     from ..home import bau_home
     from ..registry import CapabilityRegistry
     from .providers import build
+    if tag is not None and not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,30}", tag):
+        raise ValueError("a tag is a short name: letters, digits, dot, dash")
     home = home or bau_home()
     reg = CapabilityRegistry(home / "registry" / "capabilities.yaml")
     rec = reg.data["model"].get(model_id)
     if rec is None:
         raise KeyError(f"model {model_id} not registered")
-    res = Lab(provider or build(rec), rec, run_code=run_code, long_context=long_context).run()
+    p = provider or build(rec)
+    runs = [Lab(p, rec, run_code=run_code, long_context=long_context).run()
+            for _ in range(max(1, repeat))]
+    res = runs[len(runs) // 2] if len(runs) > 1 else runs[0]
+    if len(runs) > 1:
+        res = {**res, "repeat": spread(runs)}
+    if tag:
+        res = {**res, "model": f"{model_id}@{tag}", "tag": tag}
     path = save(res, home)
     fresh = CapabilityRegistry(reg.path)       # only our result is ours to write
-    if model_id in fresh.data["model"]:
+    if model_id in fresh.data["model"] and not tag:
         fresh.data["model"][model_id]["lab"] = {
             k: res[k] for k in ("at", "suite", "scores", "meets_bar", "short_of_bar",
                                 "words_per_second", "time_to_first_word_ms",
                                 "peak_card_memory", "peak_server_memory")}
         fresh.save()
     (audit or AuditLog(home / "audit" / "chain.jsonl")).append(
-        "model.lab", actor, {"model": model_id, "scores": res["scores"],
+        "model.lab", actor, {"model": res["model"], "scores": res["scores"],
                              "meets_bar": res["meets_bar"], "file": str(path)})
     return {**res, "saved": str(path)}

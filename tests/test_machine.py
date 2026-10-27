@@ -7,7 +7,9 @@ from bau import machine
 
 GiB = 1 << 30
 # The desktop's check report (2026-10-23): 16 GB, RTX 3060 12 GB.
-SMI = "NVIDIA GeForce RTX 3060, 12288, 410, 11878, 550.163.01, 8.6\n"
+# The device ID below is example data, not a fact about the owner's card.
+SMI = ("NVIDIA GeForce RTX 3060, 12288, 410, 11878, 550.163.01, 8.6, 0x250310DE, "
+       "00000000:01:00.0, 41, 17.52, 170.00, 3, P8\n")
 
 
 def _root(tmp_path, nvidia=True, driver=True, mem_kb=16 * 1024 * 1024, avail_kb=None):
@@ -25,6 +27,9 @@ def _root(tmp_path, nvidia=True, driver=True, mem_kb=16 * 1024 * 1024, avail_kb=
     dev.mkdir(parents=True)
     (dev / "vendor").write_text("0x10de\n" if nvidia else "0x8086\n")
     (dev / "class").write_text("0x030000\n")
+    (dev / "device").write_text("0x2503\n")
+    (dev / "subsystem_vendor").write_text("0x1043\n")
+    (dev / "subsystem_device").write_text("0x87f3\n")
     return r
 
 
@@ -36,6 +41,8 @@ def _run(smi=SMI):
             out = smi if any(a.startswith("--query-gpu") for a in args) else \
                 "| NVIDIA-SMI 550.163.01   Driver Version: 550.163.01   CUDA Version: 12.4 |\n"
             return subprocess.CompletedProcess(args, 0, out, "")
+        if args[0] == "mokutil":
+            return subprocess.CompletedProcess(args, 0, "SecureBoot enabled\n", "")
         if args[0] == "lscpu":
             return subprocess.CompletedProcess(args, 0, "# core,socket\n0,0\n0,0\n1,0\n", "")
         raise FileNotFoundError(args[0])
@@ -112,3 +119,26 @@ def test_fetch_refuses_when_the_disk_is_too_small(tmp_path, monkeypatch, capsys)
                                                dir=str(tmp_path / "m")))
     assert rc != 0 and not called
     assert "not enough free disk space" in capsys.readouterr().err
+
+
+def test_card_details_device_id_temperature_power_and_secure_boot(tmp_path):
+    p = machine.profile(tmp_path, root=_root(tmp_path), run=_run(), engine=tmp_path / "no")
+    card = p["gpu"]["cards"][0]
+    assert card["temperature_c"] == 41 and card["power_w"] == 17.52
+    assert card["power_limit_w"] == 170 and card["utilization_pct"] == 3
+    assert card["pstate"] == "P8" and card["pci_bus_id"] == "00000000:01:00.0"
+    assert p["gpu"]["pci"] == [{"address": "0000:01:00.0", "id": "10de:2503",
+                                "subsystem": "1043:87f3"}]
+    assert p["secure_boot"] == "SecureBoot enabled"
+    s = machine.summary(p)
+    assert s["pci_ids"] == ["10de:2503"] and s["graphics_card"][0]["temperature_c"] == 41
+    assert set(p["frameworks"]["python"]) == {"tensorflow", "torch", "tensorrt"}
+
+
+def test_an_older_driver_that_lacks_a_field_says_unknown(tmp_path):
+    old = "NVIDIA GeForce RTX 3060, 12288, 410, 11878, 550.163.01, 8.6, 0x250310DE, x, [N/A]\n"
+    p = machine.profile(tmp_path, root=_root(tmp_path), run=_run(smi=old),
+                        engine=tmp_path / "no")
+    card = p["gpu"]["cards"][0]
+    assert card["temperature_c"] is None and card["power_w"] is None
+    assert card["memory_total"] == 12 * GiB

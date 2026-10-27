@@ -59,6 +59,11 @@ no hidden names); it runs in a separate Python with no settings, nothing it can 
 bau models compare qwen3.5-9b qwen3.8-27b-q2      # the first is the baseline
 ```
 
+Add `--repeat 3` to run the lab three times (middle value and range) and `--tag NAME` to
+keep a setup apart, e.g. the same model on the CUDA engine (`--tag cuda`, compared as
+`qwen3.5-9b@cuda`; see [GPU.md](GPU.md)). The lab also records the card's highest
+temperature and power draw and how busy it was.
+
 It shows each part's score for both, their speed and memory, and every question one got
 right and the other wrong. This is also how you see what compression costs: run the lab
 on the 2-bit and the 3-bit file of the same model and compare them.

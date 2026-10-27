@@ -26,6 +26,11 @@ Environment=LLAMA_ARG_CORS_ORIGINS=localhost
 Environment=LLAMA_ARG_ENDPOINT_SLOTS=false
 # BAU_LLM_MODEL (path to the .gguf) and BAU_LLM_ALIAS, written by jarvis-setup.
 EnvironmentFile=/etc/bau/llm.env
+# The engine: the stick's (Vulkan) unless sudo bau-llm-cuda use cuda wrote this file; it
+# sets BAU_LLAMA_SERVER and LD_LIBRARY_PATH, which win over the lines here ("Settings from
+# these files override settings made with Environment=", systemd.exec(5), systemd 257 in
+# Debian 13, read 2026-10-27).
+EnvironmentFile=-/etc/bau/llm-engine.env
 Environment=LD_LIBRARY_PATH=/opt/llama.cpp
 # bau-llm-start leaves one processor core free for the desktop and the Jarvis page (on every
 # core the model ran 30 times slower while the page was open, 2026-10-21).

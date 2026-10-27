@@ -140,6 +140,33 @@ def test_peak_server_memory_is_read_from_proc(tmp_path):
     assert lab.server_peak_ram(tmp_path) == 6_000_000 * 1024
 
 
+def test_card_peak_temperature_power_and_load_are_sampled():
+    import subprocess
+    rows = iter(["410, 40, 30.5, 2\n", "9800, 71, 165.2, 98\n"] +
+                ["9000, 65, [N/A], 90\n"] * 50)
+    fake = lambda *a, **k: subprocess.CompletedProcess(a, 0, next(rows), "")  # noqa: E731
+    with lab.Peaks(fake) as p:
+        p._sample()
+    assert p.vram == 9800 << 20
+    card = p.card()
+    assert card["peak_temperature_c"] == 71 and card["peak_power_w"] == 165.2
+    assert 2 < card["average_busy_pct"] <= 98
+
+
+def test_repeat_gives_the_middle_and_the_range_and_tag_keeps_setups_apart(tmp_path):
+    from bau.runtime import seed_registry
+    seed_registry(tmp_path)
+    res = lab.record("qwen3.5-9b", "human:owner", home=tmp_path, provider=Fake(),
+                     long_context=False, repeat=3, tag="cuda")
+    assert res["model"] == "qwen3.5-9b@cuda" and res["repeat"]["runs"] == 3
+    assert res["repeat"]["failed_runs"] == 0
+    assert res["repeat"]["words_per_second"] == {"median": 50.0, "low": 50.0, "high": 50.0}
+    assert lab.latest("qwen3.5-9b@cuda", tmp_path)["tag"] == "cuda"
+    assert lab.latest("qwen3.5-9b", tmp_path) is None          # the untagged one stays apart
+    with pytest.raises(ValueError):
+        lab.record("qwen3.5-9b", "human:owner", home=tmp_path, provider=Fake(), tag="../x")
+
+
 def test_card_peak_is_sampled():
     import subprocess
     used = iter(["410\n", "9800\n"] + ["9000\n"] * 50)
