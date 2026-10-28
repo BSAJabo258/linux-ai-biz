@@ -30,7 +30,7 @@ as_user() {
 
 # Packages the stick needs for sound and Bluetooth audio that a recommends-off build skipped
 # before 2026-10 (see image/live-build/config/package-lists/my-jarvis.list.chroot).
-SOUND_PACKAGES="alsa-ucm-conf alsa-topology-conf libspa-0.2-bluetooth firmware-sof-signed"
+SOUND_PACKAGES="alsa-ucm-conf alsa-topology-conf libspa-0.2-bluetooth firmware-sof-signed dbus-user-session rtkit"
 
 kernel_log() {
   dmesg 2>/dev/null || journalctl -k -b --no-pager 2>/dev/null || true

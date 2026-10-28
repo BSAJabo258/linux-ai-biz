@@ -49,6 +49,13 @@ alsa-utils
 # hardware work"), and PipeWire's Bluetooth audio (headphones and speakers).
 alsa-ucm-conf
 alsa-topology-conf
+# PipeWire never started on the stick (VM with an Intel HD Audio card, 2026-10-28): its user
+# service "Requires=pipewire.socket dbus.service", and the user dbus.service comes only with
+# dbus-user-session, which pipewire-bin merely Recommends (with rtkit, which gives the sound
+# real-time priority so it does not crackle while the model runs). Installed by hand in that
+# VM, PipeWire started and listed "Built-in Audio Analog Stereo".
+dbus-user-session
+rtkit
 libspa-0.2-bluetooth
 pavucontrol
 bluez

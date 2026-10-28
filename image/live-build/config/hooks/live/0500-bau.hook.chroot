@@ -20,6 +20,13 @@ rm -rf /opt/bau/wheels
 art="$(/opt/bau/venv/bin/python -c 'from importlib import resources; print(resources.files("bau.ui") / "art")')"
 install -d /usr/share/backgrounds/bau
 install -m 0644 "${art}"/wall-*.jpg /usr/share/backgrounds/bau/
+# The volume control in the top bar: installed (xfce4-pulseaudio-plugin) but not in Xfce
+# 4.20's default panel (Debian 13's /etc/xdg/xfce4/panel/default.xml, read 2026-10-28). New
+# logins (the installed laptop's or desktop's first one included) get it beside the tray.
+panel=/etc/xdg/xfce4/panel/default.xml
+sed -i 's|^        <value type="int" value="6"/>$|&\n        <value type="int" value="19"/>|' "${panel}"
+sed -i 's|^    <property name="plugin-18" type="string" value="directorymenu"/>$|&\n    <property name="plugin-19" type="string" value="pulseaudio"/>|' "${panel}"
+grep -q 'value="pulseaudio"' "${panel}" && grep -q '<value type="int" value="19"/>' "${panel}"
 chmod 0755 /usr/local/bin/bau-look-desktop /usr/local/bin/bau-install-to-disk \
   /usr/local/bin/bau-llm-start
 ln -sf /opt/bau/venv/bin/bau /usr/local/bin/bau

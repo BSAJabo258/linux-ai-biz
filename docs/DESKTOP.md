@@ -149,6 +149,19 @@ computer with an NVIDIA card.
    With Secure Boot on, it asks you for a one-time password. Restart with
    `sudo systemctl reboot`; on the blue screen choose **Enroll MOK**, Continue, Yes, the
    password, OK.
+
+   **No internet (or Wi-Fi that keeps dropping)?** The BAU Pack carries the driver too
+   (`BAU-PACK/nvidia`, made by `BAU-Pack-Make.cmd` since 2026-10-28). Plug in the pack stick,
+   open it once in the file manager, and run the copy of the setup that is on the stick:
+
+   ```bash
+   sudo bash /media/$USER/*/BAU-PACK/nvidia/bau-gpu-setup
+   ```
+
+   It checks every file against the fingerprints it carries, then installs the same driver
+   without the internet, built for the stick's Linux (6.12.113). Tested 2026-10-28 on the
+   stick's own system with the network off: the driver built and was signed. Not yet run on
+   your desktop.
 5. **Check the card:** `nvidia-smi` shows the RTX 3060.
 6. **The desktop's boss model.** On the Windows side of the desktop (or any Windows
    computer), fill the 64 GB stick with `BAU-Pack-Make.cmd` (see [PACK.md](PACK.md)); it
@@ -172,6 +185,35 @@ computer with an NVIDIA card.
 8. **Measure, then try stronger models:** `bau hw`, then the steps in
    [MODEL-LAB.md](MODEL-LAB.md) (the 9B as the baseline, then Qwen3.8-27B).
 9. **Try the CUDA engine** and keep it only if it is faster: [GPU.md](GPU.md).
+
+## Already installed from an older stick? Sound and Wi-Fi (2026-10-28)
+
+Sticks built after 2026-10-28 do these by themselves. On a desktop installed before:
+
+1. **Sound** (no sound at all, no volume icon): the sound server could not start because
+   one package was missing. With the internet (a cable is the surest):
+
+   ```bash
+   sudo apt install dbus-user-session rtkit
+   ```
+
+   Log out and back in. Then add the volume control to the top bar: right-click the top
+   bar, **Panel > Add New Items**, pick **PulseAudio Plugin**, **Add**. If the sound goes to
+   the monitor instead of your speakers, pick the output in `pavucontrol` (Output Devices).
+2. **Wi-Fi that joins and drops out** (the MediaTek card): turn its power saving off.
+
+   ```bash
+   printf '[connection-bau-mt7921]\nmatch-device=driver:mt7921e\nwifi.powersave=2\n' | sudo tee /etc/NetworkManager/conf.d/bau-mt7921-powersave.conf
+   sudo systemctl restart NetworkManager
+   ```
+
+   Then pick your Wi-Fi again. If it still drops, send a photo of
+   `journalctl -b -u NetworkManager --no-pager | tail -30`.
+
+Tested 2026-10-28 on the stick's own system: in a virtual PC with an Intel HD Audio card,
+PipeWire failed ("Unit dbus.service" missing) until `dbus-user-session` was installed, then
+listed "Built-in Audio Analog Stereo"; a new user's top bar gets the volume control;
+NetworkManager 1.52.1 reads the Wi-Fi setting. Not yet run on your desktop.
 
 ## Tested so far (2026-10-25, not on the desktop yet)
 

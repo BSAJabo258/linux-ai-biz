@@ -421,6 +421,12 @@ def test_windows_make_downloads_verifies_and_deletes_bad_files(tmp_path):
     deb.write_bytes(b"deb bytes")
     zipfile = src / "main.zip"
     zipfile.write_bytes(b"PK zip")
+    nvdeb = src / "nvidia-driver.deb"
+    nvdeb.write_bytes(b"nv bytes")
+    nv = {"Name": "nvidia-driver", "File": "nvidia-driver.deb", "Size": 8,
+          "Sha256": sha(b"nv bytes"), "Urls": [nvdeb.as_uri()]}
+    setup = src / "bau-gpu-setup"
+    setup.write_text("#!/bin/bash\n")
     good_model = {"Id": "good", "File": "good.gguf", "Url": good.as_uri(), "Size": 10,
                   "Sha256": sha(b"good model")}
     wifi = {"Name": "wpasupplicant", "File": "wpa.deb", "Size": 9, "Sha256": sha(b"deb bytes"),
@@ -430,7 +436,7 @@ def test_windows_make_downloads_verifies_and_deletes_bad_files(tmp_path):
         "Models": [good_model,
                    {"Id": "bad", "File": "bad.gguf", "Url": bad.as_uri(), "Size": 19,
                     "Sha256": sha(b"something else")}],
-        "Debs": [wifi], "BauZip": zipfile.as_uri()}))
+        "Debs": [wifi], "BauZip": zipfile.as_uri(), "Nvidia": [nv], "GpuSetup": setup.as_uri()}))
     stick = tmp_path / "stick"
     stick.mkdir()
     cmd = ["pwsh", "-NoProfile", "-NonInteractive", "-File", str(PS1), "-Target", str(stick),
@@ -444,11 +450,16 @@ def test_windows_make_downloads_verifies_and_deletes_bad_files(tmp_path):
     assert (pack / "wifi" / "wpa.deb").read_bytes() == b"deb bytes"
     assert (pack / "wifi" / "SHA256SUMS").read_text() == f"{sha(b'deb bytes')}  wpa.deb\n"
     assert (pack / "bau-main.zip").read_bytes() == b"PK zip"
+    # The desktop's driver without the internet (2026-10-28), with the newest setup script.
+    assert (pack / "nvidia" / "nvidia-driver.deb").read_bytes() == b"nv bytes"
+    assert (pack / "nvidia" / "KERNEL").read_text() == "6.12.113+deb13-amd64\n"
+    assert (pack / "nvidia" / "bau-gpu-setup").read_text() == "#!/bin/bash\n"
     readme = (pack / "README.txt").read_text()
     assert "sudo bau pack install" in readme and "sudo apt install ./*.deb" in readme
 
     manifest.write_text(json.dumps({"Models": [good_model], "Debs": [wifi],
-                                    "BauZip": zipfile.as_uri()}))
+                                    "BauZip": zipfile.as_uri(), "Nvidia": [nv],
+                                    "GpuSetup": setup.as_uri()}))
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "already" in r.stdout
