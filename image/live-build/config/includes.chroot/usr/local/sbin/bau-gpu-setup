@@ -17,7 +17,92 @@ SOURCES=${BAU_APT_SOURCES:-/etc/apt/sources.list.d/bau-nonfree.sources}
 PACKAGES=(linux-image-amd64 linux-headers-amd64 nvidia-kernel-dkms nvidia-driver
           nvidia-vulkan-icd mokutil)
 
+# Without the internet: the same driver from the BAU Pack (BAU-PACK/nvidia, made on Windows by
+# bau-pack-make.ps1). Resolved 2026-10-28 with apt on the stick's own system (live-v0.1.0-76bc200)
+# for its kernel, and installed from exactly these files with the network off: dkms built
+# nvidia-current 550.163.01 and signed it. Every file is checked against this list, never
+# against a list on the stick.
+OFFLINE_KERNEL="6.12.113+deb13-amd64"
+OFFLINE_PINS=(
+  "fa8f7b1eaa63d5c87141c9244131b5ae56f92272ee2971dfe22a81442a15ae5d  linux-headers-6.12.113+deb13-common_6.12.113-1_all.deb"
+  "f7a65a8f794fc2cd70e35749e212da654bc5157ea525f7bf67412f417cd5d0c9  linux-kbuild-6.12.113+deb13_6.12.113-1_amd64.deb"
+  "99762af0e483c3309d3ab12bc755d017c7f4c4d126725b4d41a03c6cb95f88b3  linux-headers-6.12.113+deb13-amd64_6.12.113-1_amd64.deb"
+  "9803ce7e35738b8416b223d5c142c2d45545041b22729ae984e0e2cbe6e14db1  update-glx_1.2.2_amd64.deb"
+  "a72c331f3bd6b2acb4fa75428af4a7ce37e23a0f333e5bf34c05da77fbc1a5e1  glx-alternative-mesa_1.2.2_amd64.deb"
+  "b095e1b688f0a648b1b3403b3e20264000b3ccf09e30fad97b45abdc4e2c4347  nvidia-installer-cleanup_20240109+1_amd64.deb"
+  "7548ef0f58d2ff3ac1ecdb019c6581caf9ee9ea5e2eb23e7f5195e6aa8dff165  glx-diversions_1.2.2_amd64.deb"
+  "843665145b3a76260ae715567bbabca209f08a98420e33a1abdcf49992060f21  glx-alternative-nvidia_1.2.2_amd64.deb"
+  "046170d65cad8fbe1babdc18261ace399fde3597378c617b5a3bd8ed0d10951c  nvidia-legacy-check_550.163.01-2_amd64.deb"
+  "39ec2e4872ec620cccac54dd7162834ce3ee2e77bf5c1d38e2dab32467c2b050  nvidia-alternative_550.163.01-2_amd64.deb"
+  "f2b89aa2c51c0ff52c647e6466c3911f33664c2fecb0c9dc0c69580690725e41  libnvidia-glvkspirv_550.163.01-2_amd64.deb"
+  "f058804c64345d205e9350d31584bff1e60494a97b7a9af3c486513998d46ec2  libnvidia-gpucomp_550.163.01-2_amd64.deb"
+  "15e5dd1929a6ef0ec3434318259221c0494e060b9fda131fa353d03a1f310bfb  libnvidia-eglcore_550.163.01-2_amd64.deb"
+  "d0ddaeb5aa552757e6423cad2fa4829f10dd8b771688d84fae19f799d094e983  libnvidia-glcore_550.163.01-2_amd64.deb"
+  "79d35284eef1a06431b78b806403e6b4373dfac09540a085f2764ceccc1c9199  libglx-nvidia0_550.163.01-2_amd64.deb"
+  "a7a3db2620c022e90e8b5d1e367b8bafbe8c1ad5017abdc6bc90c47000967811  libgl1-nvidia-glvnd-glx_550.163.01-2_amd64.deb"
+  "9ff6897c2b6b936966bfb0ba63e987a9aa3d22c5eeaf98365dc18b127cc6afc0  nvidia-egl-common_550.163.01-2_amd64.deb"
+  "24d34b57e07b5cc3bb9ca174d6101e007430c4a413bfa607178f9ccceac92877  libnvidia-egl-wayland1_1%3a1.1.18-1_amd64.deb"
+  "e6a491ba403d9cf106c66cd3c3a75c7301578a64db5fe989c93e25e740412656  libegl-nvidia0_550.163.01-2_amd64.deb"
+  "014f9958e712bcc519335c23ce42ed75cc33648cb94497e400c792c761dd6e37  nvidia-egl-icd_550.163.01-2_amd64.deb"
+  "2974212d6be2d74824d414645b85dcafc71556d1a3b28524851c84db1a4727ed  nvidia-driver-libs_550.163.01-2_amd64.deb"
+  "01c1b67d511d7f52c6aa60e14ed56a8eb725d5dc85784a08214d6cb0f4fd1f89  libnvidia-ml1_550.163.01-2_amd64.deb"
+  "de9051d74584c8f93bd320fa1cfddfe91d55de45d94e076a4ec99b36aecf7574  nvidia-driver-bin_550.163.01-2_amd64.deb"
+  "5523a2b2230f6ea46c35442a4a750dd35338a38ec56ba7afb53571ae36266e3d  nvidia-support_20240109+1_amd64.deb"
+  "e610838d217e690c29eda630193aa4a2d2d45ef663e3f527c6efe16df06c0d71  xserver-xorg-video-nvidia_550.163.01-2_amd64.deb"
+  "bd22a89a993cdcf5528a956681ce070c43112924b0ff91de360efcf6ecf7b18c  nvidia-vdpau-driver_550.163.01-2_amd64.deb"
+  "e07e243f33cf7066737e3f556f3325a5e57199a9549a93f2158eec3921ea0beb  firmware-nvidia-gsp_550.163.01-2_amd64.deb"
+  "18b0c696ea7b8ac1f4725b89b0dab662b587a253ef730b8c2c5ca3911d5cb920  nvidia-kernel-common_20240109+1_amd64.deb"
+  "86258a704cbac1d2a064679140c9494e5585ce6bf56febb7a77939e3e06c7ec8  nvidia-modprobe_570.133.07-1_amd64.deb"
+  "e6c652d5a006e08855e602f7b45a4d5f3c2f5199acc1918c6da7fb6c144739dd  nvidia-kernel-support_550.163.01-2_amd64.deb"
+  "b41eaeb4879091023f8c1a058510844a244d3d0bd0f437e0e05d58213e36fd9f  libdpkg-perl_1.22.22_all.deb"
+  "6b5fbe71f0fc41e85919bc4b3c514e6c47577c5005dbf1f5af6e4a49cc221aab  bzip2_1.0.8-6_amd64.deb"
+  "80c46a0085b33acc74bf451fddb6a70cb43d4ebcc4a873aec04d8d0a63ffc630  patch_2.8-2_amd64.deb"
+  "70a9709e665383b06068ccd423d62ea191b65355f318a25565dbf324b254cec6  make_4.4.1-2_amd64.deb"
+  "38f625dfdc582717029ac3a3e97c51d994ec2e7a0e9b230c6b44e40d1276311f  libsframe1_2.44-3_amd64.deb"
+  "002da5d23f8757dee97a2c0a40e0e1d4d85a43da094488ee2ee7068d4d3691f9  binutils-common_2.44-3_amd64.deb"
+  "4f4664c8a8f0ad0c8631c39fab02e3d8d86ccc6f4436a1d59f059dbcb0492679  libbinutils_2.44-3_amd64.deb"
+  "0d36d0bde85c467ac6735dded08e19dd30ae1369e3908b9eb48ccc0d6ff66648  libgprofng0_2.44-3_amd64.deb"
+  "e280b2be3db6e584500e865c251605b95c346767d87ccb2524e44992048fc657  libctf-nobfd0_2.44-3_amd64.deb"
+  "120cafcd93132a276fa92a8fb4cf39b23d14e5a3e348f4f5580638d71ca95ac5  libctf0_2.44-3_amd64.deb"
+  "e6741ce95ff0f7a131c8d9faa3528ccbbc453078bbc62a97da81340ed7462c53  binutils-x86-64-linux-gnu_2.44-3_amd64.deb"
+  "6bc08c02539ba53b5e748142397144c499f9b20b5fa9bb56431545db124addeb  binutils_2.44-3_amd64.deb"
+  "6d4020421740a70e1fb9c41b07f8bb8306d93aef6fea1a8ce11a1f839921f414  dpkg-dev_1.22.22_all.deb"
+  "6840d049df96419be706d135bcba4355e08864b0794977a616db16330871d412  dkms_3.2.2-1~deb13u1_all.deb"
+  "729d17210de2a407c27b33d1811a72502483d189251dafd718e453b0c4e40107  nvidia-kernel-dkms_550.163.01-2_amd64.deb"
+  "198033cf94ebf7d6428f231bad3020342fe353ff0d56665414a7318277b9af79  nvidia-driver_550.163.01-2_amd64.deb"
+  "2d587e3bfba4aec701946b7ba0c1640b97b6d8dd0a34ba1c70ae85261ecedefa  libcc1-0_14.2.0-19_amd64.deb"
+  "febdb3c528cde1a3abe952e17a1d3cfa7ccaca5b6f506d983d34385dad199490  libitm1_14.2.0-19_amd64.deb"
+  "771899ade7310fe31aa538a509354c33d62bbe4e408b4e5fc1e513988dc42645  libasan8_14.2.0-19_amd64.deb"
+  "a0df07da76287a45e665d584363dc2a6a1c4e240aee41b8bbc0f67cdff97cd68  liblsan0_14.2.0-19_amd64.deb"
+  "529d7f68227d16975076c5f842e8b687faea1b5df8e0dcf62e436d5402844ca5  libtsan2_14.2.0-19_amd64.deb"
+  "9205a1bef7d6a52ffc06548e0cde169ff303e688c12d9be3a98f734449077e22  libubsan1_14.2.0-19_amd64.deb"
+  "2cdaf797cad8ac30a964ab081370682dd065ae1b0305a0be9d8e0e14cd0657d7  libhwasan0_14.2.0-19_amd64.deb"
+  "f5b51cf0ece3ec3bb7494d0cdbff3ce715ae00cfb2b6ed787f7db91319d64a7b  libquadmath0_14.2.0-19_amd64.deb"
+  "ca6f2d36d96b19b3eb71405b0b80134d8c89380b02204a2512e5c58ceb090628  libgcc-14-dev_14.2.0-19_amd64.deb"
+  "a17ef039f1ba482051c3efb5c2c24070002e60dd0bd09fd456ec31481a11b725  gcc-14-x86-64-linux-gnu_14.2.0-19_amd64.deb"
+  "21500408b5019d8d29f70ce58488e2eea469a1adb4b5fd7db45e819b5efcac4e  gcc-14_14.2.0-19_amd64.deb"
+  "34bfb96ca9422af293aeac800438682112b4019adc5ed25728bc35dff4ad4ca4  libefivar1t64_38-3.1+b1_amd64.deb"
+  "78e6197dbf5cbf13813076369e9589f81591d28bbe2638526a131b6db5e3b7c0  libnvidia-rtcore_550.163.01-2_amd64.deb"
+  "08b8b559ab1707dc146880d329f1e96f011788a18d6d3dc7159accd488ae2712  pahole_1.30-1_amd64.deb"
+  "1918fd2775b06e35429a06c59586d548bcccd6c544684799a22ae532a8bb83e4  mokutil_0.7.2-1_amd64.deb"
+  "68131339e5df5553e14b29f6d25947cb448b2d9ce390297b705b557920efa787  nvidia-vulkan-common_550.163.01-2_amd64.deb"
+  "5da88f6434706800a0c0b6c5c8d723af6e3251c8f9bc522da548dbb9b6389267  nvidia-vulkan-icd_550.163.01-2_amd64.deb"
+)
+
+# Tests only: another pin list (sudo clears the environment, so a real run uses the one above).
+if [[ -n ${BAU_OFFLINE_PINS:-} ]]; then mapfile -t OFFLINE_PINS < "${BAU_OFFLINE_PINS}"; fi
+
 say() { printf '%s\n' "$*"; }
+
+find_pack() {
+  local d
+  for d in "${BAU_NVIDIA_PACK:-}" "$(dirname "$(readlink -f "$0")")" /media/*/*/BAU-PACK/nvidia \
+           /media/*/BAU-PACK/nvidia /run/media/*/*/BAU-PACK/nvidia /mnt/BAU-PACK/nvidia \
+           /mnt/*/BAU-PACK/nvidia; do
+    if [[ -n ${d} && -f ${d}/KERNEL ]]; then printf '%s\n' "${d}"; return 0; fi
+  done
+  return 1
+}
 
 if [[ $(id -u) -ne 0 ]]; then
   say "Run it with sudo: sudo bau-gpu-setup"; exit 1
@@ -40,24 +125,49 @@ if [[ -z ${card} ]]; then
 fi
 
 # Without the internet apt only warns, then says "Unable to locate package nvidia-driver"
-# (the owner's desktop, 2026-10-27). Say the real reason first.
+# (the owner's desktop, 2026-10-27). Use the pack's copy, or say the real reason.
+offline=""
 if ! getent hosts deb.debian.org >/dev/null 2>&1; then
-  say "No internet: this computer cannot reach deb.debian.org, where the driver comes from."
-  say "Plug in the network cable, or click the network icon (top right) and pick your"
-  say "Wi-Fi. Check with: ping -c 3 deb.debian.org   Then run this again."
-  exit 1
+  offline=$(find_pack) || {
+    say "No internet: this computer cannot reach deb.debian.org, where the driver comes from."
+    say "Either plug in the network cable (or pick your Wi-Fi) and run this again, or plug in"
+    say "a BAU Pack stick made with the newest bau-pack-make.ps1: it carries the driver."
+    exit 1
+  }
+  if [[ $(uname -r) != "${OFFLINE_KERNEL}" ]]; then
+    say "The driver on the stick is built for Linux ${OFFLINE_KERNEL}; this computer runs"
+    say "$(uname -r). Connect to the internet (cable or Wi-Fi) and run this again."
+    exit 1
+  fi
+  if ! (cd "${offline}" && printf '%s\n' "${OFFLINE_PINS[@]}" | sha256sum -c --quiet --strict \
+        >/dev/null 2>&1); then
+    say "The driver files on the stick are missing or damaged (${offline}). Make the pack"
+    say "again on Windows (bau-pack-make.ps1), then run this again. Nothing was changed."
+    exit 1
+  fi
 fi
 
 say "NVIDIA graphics card found (${card})."
-say "This installs Debian's NVIDIA driver 550.163.01 and the newest Debian kernel, builds"
-say "the driver for this computer and signs it with this computer's own key. Then you"
-say "restart. It needs the internet and takes a few minutes."
+if [[ -n ${offline} ]]; then
+  say "No internet, so it uses the driver files on the stick (${offline}): Debian's NVIDIA"
+  say "driver 550.163.01, built for this computer's Linux and signed with this computer's own"
+  say "key. Then you restart. It takes a few minutes."
+else
+  say "This installs Debian's NVIDIA driver 550.163.01 and the newest Debian kernel, builds"
+  say "the driver for this computer and signs it with this computer's own key. Then you"
+  say "restart. It needs the internet and takes a few minutes."
+fi
 read -r -p "Go ahead? Type y and Enter (anything else: no): " answer || answer=""
 if [[ ${answer} != y ]]; then
   say "Nothing was changed."; exit 1
 fi
 
 export DEBIAN_FRONTEND=noninteractive
+if [[ -n ${offline} ]]; then
+  files=()
+  for p in "${OFFLINE_PINS[@]}"; do files+=("${offline}/${p##* }"); done
+  apt-get install -y -q --no-install-recommends "${files[@]}"
+else
 apt-get update -q
 if ! apt-cache policy nvidia-driver | grep -q 'Candidate: [0-9]'; then
   say "Adding Debian's contrib, non-free and non-free-firmware areas (${SOURCES})..."
@@ -78,6 +188,7 @@ EOF
   apt-get update -q
 fi
 apt-get install -y -q "${PACKAGES[@]}"
+fi
 
 sb=$(mokutil --sb-state 2>&1 || true)
 if [[ ${sb} == *"SecureBoot enabled"* ]]; then

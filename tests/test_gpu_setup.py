@@ -146,3 +146,62 @@ def test_no_internet_is_said_plainly_before_anything_runs(tmp_path):
     r = run(env, "y\n")
     assert r.returncode != 0 and "No internet" in r.stdout and "network cable" in r.stdout
     assert not any(c.startswith("apt-get") for c in calls(log))
+
+
+def offline_pack(tmp_path, env, files=None, kernel="6.12.113+deb13-amd64"):
+    import hashlib
+    pack = tmp_path / "stick" / "BAU-PACK" / "nvidia"
+    pack.mkdir(parents=True)
+    (pack / "KERNEL").write_text("6.12.113+deb13-amd64\n")
+    files = files or {"nvidia-driver_550.163.01-2_amd64.deb": b"driver",
+                      "dkms_3.2.2-1~deb13u1_all.deb": b"dkms"}
+    pins = tmp_path / "pins"
+    pins.write_text("".join(f"{hashlib.sha256(v).hexdigest()}  {k}\n" for k, v in files.items()))
+    for k, v in files.items():
+        (pack / k).write_bytes(v)
+    bin_ = Path(env["PATH"].split(":")[0])
+    (bin_ / "uname").write_text(f"#!/bin/sh\necho {kernel}\n")
+    (bin_ / "uname").chmod(0o755)
+    return {**env, "BAU_NVIDIA_PACK": str(pack), "BAU_OFFLINE_PINS": str(pins)}, pack
+
+
+def test_offline_the_driver_comes_from_the_pack_checked_against_the_pins(tmp_path):
+    # 2026-10-28: the desktop's Wi-Fi kept dropping, so the pack carries the driver. The real
+    # files were installed this way on the stick's own system with the network off.
+    env, log = fake_machine(tmp_path, online=False)
+    env, pack = offline_pack(tmp_path, env)
+    r = run(env, "y\n")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "uses the driver files on the stick" in r.stdout
+    inst = [c for c in calls(log) if c.startswith("apt-get")]
+    assert inst and all("update" not in c for c in inst)              # nothing from the internet
+    assert f"{pack}/nvidia-driver_550.163.01-2_amd64.deb" in inst[0]
+    assert "linux-image-amd64" not in inst[0]                         # no new kernel offline
+
+
+def test_offline_a_damaged_file_or_another_kernel_changes_nothing(tmp_path):
+    env, log = fake_machine(tmp_path, online=False)
+    env, pack = offline_pack(tmp_path, env)
+    (pack / "dkms_3.2.2-1~deb13u1_all.deb").write_bytes(b"swapped")
+    r = run(env, "y\n")
+    assert r.returncode != 0 and "missing or damaged" in r.stdout
+    assert not any(c.startswith("apt-get") for c in calls(log))
+    (tmp_path / "k").mkdir()
+    env2, log2 = fake_machine(tmp_path / "k", online=False)
+    env2, _ = offline_pack(tmp_path / "k", env2, kernel="6.12.120+deb13-amd64")
+    r = run(env2, "y\n")
+    assert r.returncode != 0 and "built for Linux 6.12.113" in r.stdout
+    assert not any(c.startswith("apt-get") for c in calls(log2))
+
+
+def test_the_script_and_the_windows_pack_pin_the_same_driver_files():
+    import re
+    ps1 = (ROOT / "installer" / "bau-pack-make.ps1").read_text()
+    win = set(re.findall(r'File = "([^"]+)"; Archive = "[^"]+"; Pool = "[^"]+"; Size = \d+; '
+                         r'Sha256 = "([0-9a-f]{64})"', ps1))
+    script = SCRIPT.read_text()
+    block = script.split("OFFLINE_PINS=(", 1)[1].split(")", 1)[0]
+    pins = {(f, h) for h, f in re.findall(r'"([0-9a-f]{64})  ([^"]+)"', block)}
+    assert len(pins) == 63 and pins == win
+    assert '$BauNvidiaKernel = "6.12.113+deb13-amd64"' in ps1
+    assert 'OFFLINE_KERNEL="6.12.113+deb13-amd64"' in script

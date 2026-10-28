@@ -262,6 +262,15 @@ def test_stick_carries_sound_routing_and_bluetooth_audio():
         assert pkg in LISTED, pkg
 
 
+def test_the_sound_server_can_start_and_has_a_volume_control():
+    # 2026-10-28, the stick in a VM with an Intel HD Audio card: "pipewire.socket: Failed to
+    # queue service startup job: Unit dbus.service ...", so no sound at all; and no volume
+    # icon, because Xfce 4.20's default panel has no pulseaudio plugin.
+    assert {"dbus-user-session", "rtkit"} <= LISTED
+    hook = (CONF / "hooks" / "live" / "0500-bau.hook.chroot").read_text()
+    assert 'value="pulseaudio"' in hook and "/etc/xdg/xfce4/panel/default.xml" in hook
+
+
 # ------------------------------------------------------------------ memory on the live stick
 # The owner's stick in a VM (2026-10-20): "/" is a 3.7 GB RAM overlay; filling it stopped
 # even a 94 KB install ("not enough free space in /var/cache/apt/archives").
@@ -424,3 +433,13 @@ def test_every_llama_setting_bau_uses_was_checked_in_the_pinned_build():
     inside = (root / "image/inside.sh").read_text()
     assert re.search(r"^LLAMA_TAG=b11747$", inside, re.M)
     assert re.search(r"^LLAMA_COMMIT=f711c8f3038020d71f69b8ced09162b014fd7335$", inside, re.M)
+
+
+def test_the_desktops_wifi_card_keeps_power_saving_off():
+    # The owner's MT7921 joined and dropped out (2026-10-27/28). Only that driver: the
+    # laptop's Intel card keeps its default. NetworkManager 1.52.1 on the stick's own system
+    # printed this section with --print-config.
+    conf = (CONF / "includes.chroot" / "etc" / "NetworkManager" / "conf.d"
+            / "bau-mt7921-powersave.conf").read_text()
+    lines = [x for x in conf.splitlines() if x and not x.startswith("#")]
+    assert lines == ["[connection-bau-mt7921]", "match-device=driver:mt7921e", "wifi.powersave=2"]

@@ -22,7 +22,10 @@ It also carries:
   first stick images were built without them, so a laptop installed from one cannot join
   any Wi-Fi network, even though the drivers and firmware for its Wi-Fi card are there;
 - **the latest BAU** (`bau-main.zip`), so a laptop installed from an older stick gets the
-  `bau pack` command.
+  `bau pack` command;
+- **the desktop's NVIDIA driver** (`nvidia` folder, about 190 MB: 63 Debian files and the
+  newest `bau-gpu-setup`), so the desktop can install it without the internet
+  ([DESKTOP.md](DESKTOP.md) step 4).
 
 Each model and Wi-Fi file is checked against the SHA-256 fingerprint BAU has on record when
 it is downloaded, and again on the laptop. A file that does not match is deleted, never
