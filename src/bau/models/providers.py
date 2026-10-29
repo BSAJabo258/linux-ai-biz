@@ -86,21 +86,27 @@ class AnthropicProvider(Provider):
             client = anthropic.Anthropic()
         self.client = client
 
+    # The API refuses a request with more than 20 strict tools (400 on the desktop,
+    # 2026-10-28: "Too many strict tools (36). The maximum number of strict tools supported
+    # is 20."); Jarvis offers more, so only the first 20 are strict.
+    MAX_STRICT_TOOLS = 20
+
     @staticmethod
-    def _tool(t: ToolSpec) -> dict[str, Any]:
+    def _tool(t: ToolSpec, strict: bool = True) -> dict[str, Any]:
         schema = dict(t.input_schema)
         schema.setdefault("type", "object")
         schema.setdefault("additionalProperties", False)
         schema.setdefault("required", list(schema.get("properties", {})))
         return {"name": t.name, "description": t.description, "input_schema": schema,
-                "strict": True}
+                "strict": strict}
 
     def complete(self, system, messages, tools=None, max_tokens=16000):
         kwargs: dict[str, Any] = dict(
             model=self.model, max_tokens=max_tokens, system=system, messages=messages,
             output_config={"effort": self.effort})
         if tools:
-            kwargs["tools"] = [self._tool(t) for t in tools]
+            kwargs["tools"] = [self._tool(t, i < self.MAX_STRICT_TOOLS)
+                               for i, t in enumerate(tools)]
         if self.fallbacks:
             resp = self.client.beta.messages.create(
                 betas=["server-side-fallback-2026-07-01"],
