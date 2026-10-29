@@ -56,6 +56,13 @@ alsa-topology-conf
 # VM, PipeWire started and listed "Built-in Audio Analog Stereo".
 dbus-user-session
 rtkit
+# Jarvis's voice without an ElevenLabs key is Firefox's own (speechSynthesis), which needs
+# Speech Dispatcher (support.mozilla.org "Speech Dispatcher required for SpeechSynthesis
+# API"). On the desktop, 2026-10-28, Debian 13: Jarvis silent; Speech Dispatcher 0.12.0-5
+# with espeak-ng gave only the "dummy" voice (spd-say -L); the espeak-ng voices came only
+# with its espeak-ng output module (0.12.0-5, the package below).
+speech-dispatcher
+speech-dispatcher-espeak-ng
 libspa-0.2-bluetooth
 pavucontrol
 bluez

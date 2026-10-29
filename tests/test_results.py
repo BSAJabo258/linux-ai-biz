@@ -19,7 +19,7 @@ from bau.audit import AuditLog
 from bau.economics import Ledger
 from bau.store import JsonlStore
 
-TODAY = dt.date.today().isoformat()
+TODAY = dt.datetime.now(dt.UTC).date().isoformat()          # results.py asks in UTC
 POSTED = (dt.datetime.now(dt.UTC) - dt.timedelta(days=5)).isoformat()
 
 
