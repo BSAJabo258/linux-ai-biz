@@ -98,6 +98,7 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
              "clip_prompt": "producer", "plan_episode": "producer",
+             "creator_batch": "producer",
              "toolbox": "scout", "capability_map": "scout", "open_source_watch": "scout",
              "world_watch": "godseye", "web_search": "scout", "read_page": "scout",
              "video_clips": "studio", "make_video": "studio",
@@ -374,6 +375,15 @@ class Assistant:
                  _schema({"workspace": {"type": "string"}, "episode": {"type": "string"},
                           "format": {"type": "string"}, "seconds": {"type": "integer"}},
                          ["workspace", "episode", "format"]), self.t_plan_episode, kind="act"),
+            Tool("creator_batch", "Draft a batch of consistent posts for a fictional adult "
+                 "virtual creator profile in BAU_HOME/creators. Requires an owner-created and "
+                 "validated profile. Returns identity-locked sfw visual prompts and caption "
+                 "briefs; does not generate media or publish. Explicit adult batches are the "
+                 "owner's own command (bau creator batch --tier explicit), never this tool. "
+                 "Pass the profile id, theme, platform and optional post count.",
+                 _schema({"creator": {"type": "string"}, "theme": {"type": "string"},
+                          "platform": {"type": "string"}, "count": {"type": "integer"}},
+                         ["creator", "theme", "platform"]), self.t_creator_batch),
             Tool("draft_stage", "Draft the next stage of one episode (only the files that "
                  "stage lists are read; only its output folder is written). The stage folder "
                  "says which brain drafts it: small (free local model), strong (Claude) or "
@@ -770,6 +780,18 @@ class Assistant:
         from .series import Series
         ws = W.open_ws(workspace, self.home)
         return Series(ws).plan(W.find_episode(ws, episode), format, int(seconds))
+
+    def t_creator_batch(self, creator: str, theme: str, platform: str,
+                        count: int = 7) -> dict[str, Any]:
+        from .virtual_creator import CreatorError, VirtualCreator
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,30}", creator):
+            raise ValueError("creator id must be lowercase letters, digits, and hyphens")
+        path = self.home / "creators" / f"{creator}.yaml"
+        try:
+            batch = VirtualCreator(path).batch(theme, platform, int(count), tier="sfw")
+        except CreatorError as exc:
+            raise ValueError(str(exc)) from exc
+        return batch
 
     def t_draft_stage(self, workspace: str, episode: str, brain: str = "") -> dict[str, Any]:
         from . import brains
