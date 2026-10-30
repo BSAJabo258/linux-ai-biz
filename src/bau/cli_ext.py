@@ -470,6 +470,44 @@ def cmd_series(a):
     return EXIT_OK
 
 
+def cmd_creator(a):
+    from .home import shipped_data
+    from .virtual_creator import CreatorError, VirtualCreator, write_markdown
+
+    if a.creator_cmd == "init":
+        import shutil
+        dst = Path(a.out)
+        if dst.exists():
+            raise ValueError(f"{dst} already exists; choose another path")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(shipped_data() / "virtual_creator_profile.example.yaml", dst)
+        _out({"profile": str(dst), "next": f"edit the profile, then run `bau creator check {dst}`"})
+        return EXIT_OK
+    creator = VirtualCreator(Path(a.profile))
+    if a.creator_cmd == "check":
+        problems = creator.problems()
+        _out({"profile": str(a.profile), "id": creator.profile.get("id"),
+              "problems": problems})
+        return EXIT_OK if not problems else EXIT_BLOCKED
+    if a.out and "workspaces" in Path(a.out).resolve().parts:
+        raise ValueError("keep creator batches out of workspaces (the kids channel lives there)")
+    try:
+        batch = creator.batch(a.theme, a.platform, a.count, tier=a.tier)
+    except CreatorError as exc:
+        raise ValueError(str(exc)) from exc
+    text = write_markdown(batch)
+    if a.out:
+        out = Path(a.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        _out({"batch": str(out), "posts": len(batch["posts"]), "platform": a.platform,
+              "tier": a.tier,
+              "notice": batch["notice"]})
+    else:
+        print(text)
+    return EXIT_OK
+
+
 def cmd_toolbox(a):
     from .toolbox import Toolbox
     tb = Toolbox()
@@ -1686,6 +1724,24 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("formats", help="the story formats")
     x.add_argument("workspace", nargs="?")
     s.set_defaults(fn=cmd_series)
+
+    s = sub.add_parser("creator", help="fictional adult virtual-model content drafts")
+    w = s.add_subparsers(dest="creator_cmd", required=True)
+    x = w.add_parser("init", help="copy a starter fictional adult creator profile")
+    x.add_argument("--out", required=True, help="new YAML profile path")
+    x = w.add_parser("check", help="validate age, identity, disclosure, and platform rules")
+    x.add_argument("profile")
+    x = w.add_parser("batch", help="draft a consistent multi-post content batch")
+    x.add_argument("profile")
+    x.add_argument("theme")
+    x.add_argument("--platform", required=True,
+                   choices=["instagram", "tiktok", "youtube", "x", "fanvue", "patreon",
+                            "other"])
+    x.add_argument("--count", type=int, default=7)
+    x.add_argument("--tier", choices=["sfw", "explicit"], default="sfw",
+                   help="explicit: adult platforms only (fanvue), needs explicit_boundaries")
+    x.add_argument("--out", help="write Markdown to a file instead of stdout")
+    s.set_defaults(fn=cmd_creator)
 
     s = sub.add_parser("toolbox", help="researched open-source tools; ask before guessing")
     w = s.add_subparsers(dest="toolbox_cmd", required=True)
