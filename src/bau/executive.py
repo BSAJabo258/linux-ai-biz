@@ -14,6 +14,9 @@ What it does not do, deliberately:
 * no verification of an adapter's result, no retries, no background workers;
 * no implicit persistence: the default store is in memory and writes nothing.
   Pass ``jobs.JobStore`` explicitly for durable checkpoints.
+
+This update adds explicit trust categories to the task contract so tasks are
+routed only through the intended sovereign / external capability lanes.
 """
 
 from __future__ import annotations
@@ -31,6 +34,17 @@ from .jobs import Job, JobStore
 
 APPROVAL_RISKS = {"HIGH", "CRITICAL"}
 DISPATCHABLE = {"PENDING", "INTERRUPTED"}
+VALID_CATEGORIES = {
+    "LOCAL_SOVEREIGN_RUNTIME",
+    "LOCAL_MODEL_EXECUTION",
+    "DISCOVERY_AND_RESEARCH",
+    "EXTERNAL_SERVICE_ADAPTERS",
+    "BROWSER_AND_WEB_INTERACTION",
+    "PUBLISHING_AND_INTERNET_ACTIONS",
+    "HUMAN_APPROVAL_REQUIRED",
+    "AUDIT_AND_EVIDENCE",
+}
+PUBLISHING_CATEGORIES = {"PUBLISHING_AND_INTERNET_ACTIONS", "HUMAN_APPROVAL_REQUIRED"}
 
 
 @dataclass
@@ -40,6 +54,10 @@ class TaskContract:
     Fields mirror the existing ``jobs.Job`` so the contract can be persisted
     without a second model. They are declarations, not authority: ``tools`` and
     ``budget_usd`` are recorded, not enforced here.
+
+    ``category`` declares the trust lane this task belongs to. The controller
+    checks it before dispatch so a local sovereign task cannot silently become a
+    publishing task or external action without an explicit approval path.
     """
 
     mission_id: str
@@ -49,17 +67,25 @@ class TaskContract:
     tools: list[str] = field(default_factory=list)
     budget_usd: float = 0.0
     risk: str = "LOW"
+    category: str = "LOCAL_SOVEREIGN_RUNTIME"
 
     @property
     def needs_approval(self) -> bool:
-        return self.risk in APPROVAL_RISKS
+        return self.risk in APPROVAL_RISKS or self.category in PUBLISHING_CATEGORIES
 
     @classmethod
     def from_job(cls, job: Job) -> TaskContract:
         """Rebuild the contract from the persisted job (the source of truth)."""
-        return cls(mission_id=job.mission_id, objective=job.objective, agent=job.agent,
-                   model=job.model, tools=list(job.tools), budget_usd=job.budget_usd,
-                   risk=job.risk)
+        return cls(
+            mission_id=job.mission_id,
+            objective=job.objective,
+            agent=job.agent,
+            model=job.model,
+            tools=list(job.tools),
+            budget_usd=job.budget_usd,
+            risk=job.risk,
+            category=getattr(job, "category", "LOCAL_SOVEREIGN_RUNTIME"),
+        )
 
 
 class JobBackend(Protocol):
@@ -109,6 +135,10 @@ class ExecutiveController:
     ``store`` and ``adapters`` are injected. With no store the controller uses
     ``InMemoryJobStore`` and creates no directories; with no adapters registered
     every dispatch raises ``KeyError``.
+
+    The category and approval gate are enforced here so the system remains in the
+    intended sovereign / external trust lane. The UI is a presentation layer; it
+    never becomes the authority that decides whether a task may run.
     """
 
     def __init__(self, store: JobBackend | None = None,
@@ -116,11 +146,8 @@ class ExecutiveController:
                  hold: Callable[[], str | None] | None = None):
         self.store: JobBackend = store if store is not None else InMemoryJobStore()
         self.adapters = adapters if adapters is not None else AdapterRegistry()
-        # Inject governor.hold_reason (or an equivalent) to honour a HOLD. When
-        # omitted the controller does not read BAU_HOME at all.
         self.hold = hold if hold is not None else (lambda: None)
 
-    # ------------------------------------------------------------ tasks
     def validate_task(self, contract: TaskContract) -> list[str]:
         """Return the reasons a contract is invalid; an empty list means valid."""
         errors: list[str] = []
@@ -129,10 +156,12 @@ class ExecutiveController:
             if not isinstance(value, str) or not value.strip():
                 errors.append(f"{name} must be a non-empty string")
         if contract.model is not None and (not isinstance(contract.model, str)
-                                           or not contract.model.strip()):
+                                            or not contract.model.strip()):
             errors.append("model must be a non-empty string or None")
         if contract.risk not in blast.LEVELS:
             errors.append(f"risk must be one of {blast.LEVELS}")
+        if contract.category not in VALID_CATEGORIES:
+            errors.append(f"category must be one of {sorted(VALID_CATEGORIES)}")
         budget = contract.budget_usd
         if isinstance(budget, bool) or not isinstance(budget, (int, float)) \
                 or not math.isfinite(budget) or budget < 0:
@@ -152,7 +181,9 @@ class ExecutiveController:
         job = self.store.create(
             contract.mission_id, contract.objective, contract.agent, [],
             model=contract.model, tools=list(contract.tools),
-            budget_usd=contract.budget_usd, risk=contract.risk)
+            budget_usd=contract.budget_usd, risk=contract.risk,
+            category=contract.category,
+        )
         if contract.needs_approval:
             job.status = "WAITING_FOR_APPROVAL"
             job.next_action = "a human must approve this task before it can run"
@@ -177,7 +208,6 @@ class ExecutiveController:
         self.store.checkpoint(job)
         return job
 
-    # ------------------------------------------------------------ execution
     def dispatch(self, task_id: str, adapter_id: str,
                  approval_ref: str | None = None) -> ExecutionResult:
         """Run one adapter for a task and record the outcome on the job.
@@ -186,6 +216,9 @@ class ExecutiveController:
         controller records the reference; it cannot verify it, so the caller
         must supply one only after a human approved (for example after
         ``bau approve``). An unknown adapter leaves the task untouched.
+
+        ``category`` is also enforced here: publishing actions cannot run without a
+        human approval reference, even when the adapter itself is otherwise valid.
         """
         job = self.store.load(task_id)
         if job.status in jobs.TERMINAL:
@@ -199,6 +232,13 @@ class ExecutiveController:
         elif job.status not in DISPATCHABLE:
             raise ValueError(f"task {task_id} is {job.status}; "
                              f"only {sorted(DISPATCHABLE)} can run")
+
+        category = getattr(job, "category", "LOCAL_SOVEREIGN_RUNTIME")
+        if category in PUBLISHING_CATEGORIES and not approval_ref:
+            raise PermissionError(
+                f"task {task_id} is in category {category}; a human approval reference is required"
+            )
+
         held = self.hold()
         if held:
             raise PermissionError(f"BAU is on HOLD ({held}); a human must release it")
@@ -219,7 +259,6 @@ class ExecutiveController:
             failed = self.store.load(task_id)
             failed.errors.append(error)
             if failed.status == "CANCELLED":
-                # A cancel recorded during the run stands, as on the normal path.
                 failed.next_action = "cancelled; the adapter then raised an error"
             else:
                 failed.status = "FAILED"
@@ -231,7 +270,6 @@ class ExecutiveController:
         done.artifacts.extend(result.artifacts)
         done.errors.extend(result.errors)
         if done.status == "CANCELLED":
-            # A cancel recorded during the run wins over the adapter's own status.
             done.next_action = "cancelled cooperatively; the adapter stopped"
         else:
             done.status = result.status
@@ -249,3 +287,6 @@ class ExecutiveController:
     def register(self, adapter: AdapterBase) -> None:
         """Shortcut for ``controller.adapters.register(adapter)``."""
         self.adapters.register(adapter)
+
+
+__all__ = ["ExecutiveController", "InMemoryJobStore", "TaskContract"]
