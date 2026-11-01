@@ -132,7 +132,7 @@ def test_promote_refuses_skipping(tmp_path):
     rec = promote(f, "eu-ai-act-art50", "ACTIVE", "counsel", ON)
     assert rec["reviewed_by"] == "counsel"
     with pytest.raises(RegistryError):
-        promote(f, "us-ca-ab1609-chatbot", "ACTIVE", "counsel", ON)
+        promote(f, "eu-ai-act-high-risk", "ACTIVE", "counsel", ON)
 
 
 def test_regulation_watch_flags_changed_sources(tmp_path, engine):
