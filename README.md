@@ -269,6 +269,7 @@ How the *My Jarvis OS* spec maps onto this repository, and the build order:
 |---|---|
 | [docs/STUDIO.md](docs/STUDIO.md) | Make AI video clips (Higgsfield) inside a budget you set; priced first, made only on your Confirm |
 | [docs/VIRTUAL-CREATOR.md](docs/VIRTUAL-CREATOR.md) | The virtual creator: one fictional adult persona, the same look in every post; sfw for Instagram and TikTok, explicit for Fanvue |
+| [docs/UPDATES.md](docs/UPDATES.md) | Automatic nightly updates on your desktop: tested builds only, goes back by itself if one fails |
 | [docs/PICTURES.md](docs/PICTURES.md) | Pictures made on your own desktop (its graphics card): set it up once, then `bau creator draw` |
 | [docs/WEEK.md](docs/WEEK.md) | A week of posts with one click: one card shows every post, you confirm once, Ayrshare posts each with the AI label |
 | [docs/CREATOR-RULES.md](docs/CREATOR-RULES.md) | The rules for your creator business (Michigan, federal, Fanvue, Instagram, TikTok), read on their official pages, and the questions still open for a lawyer or accountant |

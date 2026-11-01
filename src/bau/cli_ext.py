@@ -648,6 +648,24 @@ def cmd_look(a):
     return 0
 
 
+def cmd_update(a):
+    from . import update as U
+    if a.update_cmd in (None, "status"):
+        _out(U.status())
+        return 0
+    if os.geteuid() != 0:
+        raise SystemExit(f"bau update {a.update_cmd}: run it with sudo")
+    if a.update_cmd in ("auto", "off"):
+        who = _human()
+        U.set_mode(a.update_cmd, U.CONF)
+        AuditLog().append("update.mode", who, {"mode": a.update_cmd})
+        _out(U.status())
+        return 0
+    out = U.run(audit=lambda ev: AuditLog().append(ev[0], "bau-update", ev[1]))
+    _out(out)
+    return 0 if out["result"] in ("off", "up to date", "installed", "no answer") else 1
+
+
 def cmd_team(a):
     from . import team as T
     try:
@@ -1738,6 +1756,15 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("file")
     x.add_argument("--name", help="what to call it (default: the file's name)")
     s.set_defaults(fn=cmd_look)
+
+    s = sub.add_parser("update", help="automatic nightly updates on this computer "
+                                      "(docs/UPDATES.md)")
+    w = s.add_subparsers(dest="update_cmd")
+    w.add_parser("status", help="on or off, the build installed, what happened last")
+    w.add_parser("now", help="root: check for a tested update and install it now")
+    w.add_parser("auto", help="you, with sudo: install tested updates by themselves each night")
+    w.add_parser("off", help="you, with sudo: stop automatic updates")
+    s.set_defaults(fn=cmd_update)
 
     s = sub.add_parser("team", help="who runs the show: boss, thinker, specialist (docs/TEAM.md)")
     w = s.add_subparsers(dest="team_cmd")
