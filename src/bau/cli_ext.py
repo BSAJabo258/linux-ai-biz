@@ -449,27 +449,6 @@ def cmd_scout(a):
 
 # ------------------------------------------------------------------ video studio
 
-def cmd_series(a):
-    from . import workspace as W
-    from .series import Series
-    if a.series_cmd == "formats":
-        ws_dir = W.open_ws(a.workspace) if a.workspace else Path(".")
-        _out({k: v["about"] for k, v in Series(ws_dir).formats().items()})
-        return EXIT_OK
-    ws = W.open_ws(a.workspace)
-    sr = Series(ws)
-    if a.series_cmd == "check":
-        probs = sr.problems()
-        _out({"characters": sorted(sr.chars), "problems": probs})
-        return EXIT_OK if not probs else EXIT_BLOCKED
-    if a.series_cmd == "prompt":
-        print(sr.prompt(a.scene, a.cast.split(",")))
-        return EXIT_OK
-    cast = a.cast.split(",") if a.cast else None
-    _out(sr.plan(W.find_episode(ws, a.episode), a.format, a.seconds, cast))
-    return EXIT_OK
-
-
 def cmd_creator(a):
     from .home import shipped_data
     from .virtual_creator import CreatorError, VirtualCreator, write_markdown
@@ -489,8 +468,6 @@ def cmd_creator(a):
         _out({"profile": str(a.profile), "id": creator.profile.get("id"),
               "problems": problems})
         return EXIT_OK if not problems else EXIT_BLOCKED
-    if a.out and "workspaces" in Path(a.out).resolve().parts:
-        raise ValueError("keep creator batches out of workspaces (the kids channel lives there)")
     try:
         batch = creator.batch(a.theme, a.platform, a.count, tier=a.tier)
     except CreatorError as exc:
@@ -712,26 +689,6 @@ def cmd_agents(a):
     return EXIT_OK
 
 
-def cmd_results(a):
-    from .results import Results
-    r = Results(audit=AuditLog())
-    if a.res_cmd == "link":
-        clips = [c.strip() for c in (a.clips or "").split(",") if c.strip()]
-        try:
-            _out(r.link(a.platform, a.item, f"cli:{getpass.getuser()}", clips=clips,
-                        episode=a.episode or ""))
-        except ValueError as e:
-            print(f"bau: {e}", file=sys.stderr)
-            return EXIT_ERROR
-        return EXIT_OK
-    if a.res_cmd == "refresh":
-        out = r.refresh(force=a.force, by=f"cli:{getpass.getuser()}")
-        _out({**r.report(), "refresh": out})
-        return EXIT_OK
-    _out(r.report())
-    return EXIT_OK
-
-
 def cmd_video(a):
     from .assistant import load_env_file
     from .media.higgsfield import HiggsfieldError
@@ -775,8 +732,8 @@ def cmd_ws(a):
             _out(W.templates())
         elif a.ws_cmd == "create":
             ws = W.create(a.template, a.name)
-            _out({"workspace": str(ws), "next": f"fill in {ws / '_shared' / 'series-bible.md'} "
-                  f"(questions in setup/questionnaire.md), then: bau ws episode {ws.name} "
+            _out({"workspace": str(ws), "next": f"fill in {ws / '_shared'} (questions in "
+                  f"setup/questionnaire.md), then: bau ws episode {ws.name} "
                   '"your idea"'})
         elif a.ws_cmd == "episode":
             ws = W.open_ws(a.name)
@@ -1376,62 +1333,17 @@ def _previewer():
         os.environ.get("DISPLAY") else None
 
 
-def cmd_youtube(a):
-    from . import youtube
-    q = youtube.YouTubeQueue()
-    if a.yt_cmd == "login":
-        _human()
-        client = youtube.YouTubeClient()
-        youtube.login(client, port=a.port)
-        ch = client.channel()
-        AuditLog().append("youtube.connected", _human(), {})
-        _out({"connected": ch["title"], "handle": ch.get("handle")})
-    elif a.yt_cmd == "logout":
-        youtube.TokenStore().clear()
-        _out({"connected": None})
-    elif a.yt_cmd == "add":
-        desc = Path(a.description_file).read_text() if a.description_file else a.description
-        item = q.add(Path(a.video), a.title, f"human:{getpass.getuser()}", desc or "",
-                     [t for t in (a.tags or "").split(",") if t.strip()], kids=a.kids,
-                     licensed=a.licensed, paid_promotion=a.paid_promotion,
-                     category_id=a.category, is_aigc=False if a.not_ai else None,
-                     engine=_engine())
-        _out(asdict(item))
-        return EXIT_OK if item.checks["ok"] else EXIT_BLOCKED
-    elif a.yt_cmd == "queue":
-        _out([{"item_id": i.item_id, "title": i.title, "kids": i.kids, "status": i.status,
-               "ok": i.checks.get("ok"), "problems": i.checks.get("problems"),
-               "warnings": i.checks.get("warnings")}
-              for i in (q.items() if a.all else q.pending())])
-    elif a.yt_cmd == "review":
-        done = youtube.review(q, youtube.YouTubeClient(), _human(), preview=_previewer())
-        _out([{"item_id": i.item_id, "status": i.status, "result": i.result} for i in done])
-    elif a.yt_cmd == "status":
-        client = youtube.YouTubeClient()
-        out = []
-        for i in q.items():
-            if i.video_id:
-                i.result = {**i.result, **client.status(i.video_id)}
-                q.save(i)
-            out.append({"item_id": i.item_id, "status": i.status, "youtube": i.result})
-        _out(out)
-    return EXIT_OK
-
-
 def cmd_publish(a):
     from .publishing import ADAPTERS, Hub
     hub = Hub()
     if a.pub_cmd == "platforms":
-        _out([{"platform": k, "label": v.label, "kids": v.allows_kids,
-               "note": v.kids_note or None} for k, v in ADAPTERS.items()])
+        _out([{"platform": k, "label": v.label} for k, v in ADAPTERS.items()])
     elif a.pub_cmd == "queue":
         _out(hub.pending())
     elif a.pub_cmd == "add":
         desc = Path(a.description_file).read_text() if a.description_file else a.description
         out = hub.queue(Path(a.video), [p.strip() for p in a.to.split(",") if p.strip()],
                         f"human:{getpass.getuser()}", title=a.title, description=desc or "",
-                        tags=[t for t in (a.tags or "").split(",") if t.strip()], kids=a.kids,
-                        licensed=a.licensed, paid_promotion=a.paid_promotion,
                         is_aigc=False if a.not_ai else None, engine=_engine())
         _out(out)
         return EXIT_OK if all(r.get("ok", True) for r in out) else EXIT_BLOCKED
@@ -1646,7 +1558,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("brains", help="which model is each brain (small, strong, content)")
     x.add_argument("--small", help="you: the free local model for routine steps")
     x.add_argument("--strong", help="you: the model for steps that need judgement")
-    x.add_argument("--content", help="you: a content-lane model (text only, never kids)")
+    x.add_argument("--content", help="you: a content-lane model (text only, never minors)")
     x = w.add_parser("run", help="draft the next stage with the brain its folder names")
     x.add_argument("name")
     x.add_argument("episode")
@@ -1707,23 +1619,6 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--top", type=int, default=20)
     s.set_defaults(fn=cmd_video)
 
-    s = sub.add_parser("series", help="kids series: same characters and look in every clip")
-    w = s.add_subparsers(dest="series_cmd", required=True)
-    x = w.add_parser("check", help="are the character and style sheets filled in?")
-    x.add_argument("workspace")
-    x = w.add_parser("prompt", help="a clip prompt with the characters locked in")
-    x.add_argument("workspace")
-    x.add_argument("scene")
-    x.add_argument("--cast", required=True, help="character ids, e.g. pip,mo")
-    x = w.add_parser("plan", help="an episode's clips from a story format")
-    x.add_argument("workspace")
-    x.add_argument("episode")
-    x.add_argument("--format", required=True)
-    x.add_argument("--seconds", type=int, default=60)
-    x.add_argument("--cast", help="character ids (default: all)")
-    x = w.add_parser("formats", help="the story formats")
-    x.add_argument("workspace", nargs="?")
-    s.set_defaults(fn=cmd_series)
 
     s = sub.add_parser("creator", help="fictional adult virtual-model content drafts")
     w = s.add_subparsers(dest="creator_cmd", required=True)
@@ -1735,8 +1630,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("profile")
     x.add_argument("theme")
     x.add_argument("--platform", required=True,
-                   choices=["instagram", "tiktok", "youtube", "x", "fanvue", "patreon",
-                            "other"])
+                   choices=["instagram", "tiktok", "fanvue"])
     x.add_argument("--count", type=int, default=7)
     x.add_argument("--tier", choices=["sfw", "explicit"], default="sfw",
                    help="explicit: adult platforms only (fanvue), needs explicit_boundaries")
@@ -1837,16 +1731,6 @@ def register(sub: argparse._SubParsersAction) -> None:
                    help="you choose; leave out to see the current choice")
     s.set_defaults(fn=cmd_privacy)
 
-    s = sub.add_parser("results", help="how posted videos are doing: views, earnings, profit")
-    w = s.add_subparsers(dest="res_cmd")
-    x = w.add_parser("refresh", help="read the latest numbers from YouTube and TikTok")
-    x.add_argument("--force", action="store_true", help="even if read in the last hour")
-    x = w.add_parser("link", help="tie a posted video to the clips it used and its episode")
-    x.add_argument("platform", choices=["youtube", "tiktok"])
-    x.add_argument("item", help="the queue item id (bau results lists them)")
-    x.add_argument("--clips", help="studio clip ids, comma-separated (bau video clips)")
-    x.add_argument("--episode", help="workspace/episode, e.g. kids-channel/ep-001")
-    s.set_defaults(fn=cmd_results)
 
     s = sub.add_parser("factory", help="business factories")
     fs = s.add_subparsers(dest="fac_cmd", required=True)
@@ -2068,41 +1952,20 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--out")
     s.set_defaults(fn=cmd_brain)
 
-    s = sub.add_parser("youtube", help="review-and-upload to YouTube, made-for-kids built in")
-    yt = s.add_subparsers(dest="yt_cmd", required=True)
-    x = yt.add_parser("login", help="connect your YouTube channel (opens Google sign-in)")
-    x.add_argument("--port", type=int, default=3456)
-    yt.add_parser("logout")
-
     def video_args(x, many=False):
         x.add_argument("video")
         x.add_argument("--title", required=True)
         x.add_argument("--description", default="")
         x.add_argument("--description-file")
-        x.add_argument("--tags", help="comma-separated")
-        x.add_argument("--kids", action="store_true",
-                       help="made for kids: runs the kids checks and sets the audience")
-        x.add_argument("--licensed", action="store_true",
-                       help="you hold a licence for any third-party characters used")
-        x.add_argument("--paid-promotion", action="store_true")
         x.add_argument("--not-ai", action="store_true", help="only for human-made videos")
-    x = yt.add_parser("add", help="queue a finished video for review")
-    video_args(x)
-    x.add_argument("--category", help="1 Film & Animation, 10 Music, 24 Entertainment, "
-                   "27 Education")
-    x = yt.add_parser("queue")
-    x.add_argument("--all", action="store_true")
-    yt.add_parser("review", help="review queued videos; your 'y' uploads")
-    yt.add_parser("status", help="refresh processing status of uploaded videos")
-    s.set_defaults(fn=cmd_youtube)
 
-    s = sub.add_parser("publish", help="one video to several platforms (YouTube, TikTok...)")
+    s = sub.add_parser("publish", help="one video to several platforms (TikTok...)")
     ps = s.add_subparsers(dest="pub_cmd", required=True)
     ps.add_parser("platforms", help="platforms BAU can publish to")
     ps.add_parser("queue", help="everything waiting for review, all platforms")
     x = ps.add_parser("add", help="queue one video to several platforms")
     video_args(x)
-    x.add_argument("--to", required=True, help="comma-separated, e.g. youtube,tiktok")
+    x.add_argument("--to", required=True, help="comma-separated, e.g. tiktok")
     s.set_defaults(fn=cmd_publish)
 
     s = sub.add_parser("tiktok", help="review-and-post to TikTok (your click posts it)")

@@ -11,7 +11,7 @@ from importlib import resources
 
 import pytest
 from test_scout import REQ, FakeGitHub, item
-from test_workspace import BIBLE
+from test_workspace import PERSONA, VOICE
 
 from bau import workspace as W
 from bau.accessibility import lint_html
@@ -31,9 +31,10 @@ def make(home, script=None, **clients):
 
 
 def with_episode(home):
-    ws = W.create("kids-channel", home=home)
-    (ws / "_shared" / "series-bible.md").write_text(BIBLE)
-    return ws, W.new_episode(ws, "Pip learns to share berries")
+    ws = W.create("creator-week", home=home)
+    (ws / "_shared" / "persona.md").write_text(PERSONA)
+    (ws / "_shared" / "voice.md").write_text(VOICE)
+    return ws, W.new_episode(ws, "Autumn city coffee week")
 
 
 @pytest.fixture
@@ -93,7 +94,7 @@ def test_activity_feed_orders_events_and_knows_what_is_busy():
 
 
 def test_every_tool_run_shows_on_its_node(tmp_path):
-    a = make(tmp_path, ["# Pip shares\nLearning goal: sharing."])
+    a = make(tmp_path, ["Mon instagram sfw: latte by the window\n"])
     ws, ep = with_episode(tmp_path)
     a._run_tool("draft_stage", {"workspace": ws.name, "episode": ep.name})
     a._run_tool("draft_stage", {"workspace": "nope", "episode": "x"})
@@ -166,19 +167,20 @@ def test_models_panel_tests_a_model_but_never_approves_it(tmp_path, server, monk
 
 def test_producer_panel_reads_and_edits_a_draft_and_editing_voids_the_check(
         tmp_path, server):
-    a = make(tmp_path, ["# Pip shares\nLearning goal: sharing."])
+    a = make(tmp_path, ["Mon instagram sfw: latte by the window\n"])
     ws, ep = with_episode(tmp_path)
     url = server(a)
     q = f"workspace={ws.name}&episode={ep.name}&stage=01"
     assert call(url, f"/api/ws/stage?{q}")[1]["error"]          # nothing drafted yet
     a._run_tool("draft_stage", {"workspace": ws.name, "episode": ep.name})
     code, st = call(url, f"/api/ws/stage?{q}")
-    assert st["file"] == "pitch.md" and "Pip shares" in st["text"] and not st["checked"]
+    assert st["file"] == "plan.md" and "latte by the window" in st["text"] and not st["checked"]
     W.check(ws, ep, "01", "human:owner")
+    edited = "Mon instagram sfw: latte. Edited.\n"
     code, r = call(url, "/api/ws/stage", {"workspace": ws.name, "episode": ep.name,
-                                          "stage": "01", "text": "# Pip shares\nEdited.\n"})
-    assert r["saved"] == "pitch.md" and not r["checked"]          # edit voids the check
-    assert (W.contracts(ep)[0].out_dir / "pitch.md").read_text() == "# Pip shares\nEdited.\n"
+                                          "stage": "01", "text": edited})
+    assert r["saved"] == "plan.md" and not r["checked"]          # edit voids the check
+    assert (W.contracts(ep)[0].out_dir / "plan.md").read_text() == edited
     events = [x["event"] for x in AuditLog(tmp_path / "audit" / "chain.jsonl").records()]
     assert "workspace.edited" in events
     for bad in ({"stage": "../../x"}, {"stage": "02"}, {"text": "x" * 210_000},
@@ -190,13 +192,12 @@ def test_producer_panel_reads_and_edits_a_draft_and_editing_voids_the_check(
 def test_owner_writes_the_review_stage_on_screen(tmp_path, server):
     a = make(tmp_path)
     ws, ep = with_episode(tmp_path)
-    for c in W.contracts(ep)[:5]:                                 # stages 01-05 done
-        (c.out_dir / c.outputs[0]).write_text("Title: Pip\nDescription: d\nTags: t\n"
-                                              if c.stage.startswith("05") else "# ok\n")
+    for c in W.contracts(ep)[:3]:                                 # stages 01-03 done
+        (c.out_dir / c.outputs[0]).write_text("# ok\n")
         W.check(ws, ep, c.stage[:2], "human:owner")
     url = server(a)
     code, r = call(url, "/api/ws/stage", {"workspace": ws.name, "episode": ep.name,
-                                          "stage": "06", "text": "Watched it all. File: v.mp4"})
+                                          "stage": "04", "text": "Saw every post. Files: week1/"})
     assert r["saved"] == "review.md"
 
 

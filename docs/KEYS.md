@@ -60,7 +60,7 @@ the files stays as it is.
 - A wrong passphrase changes nothing; just run it again.
 - New keys still need your approval where BAU asks for it. For example a model is only
   used after `bau set-status model ... APPROVED`, and YouTube or TikTok still need
-  `bau youtube login` / `bau tiktok login`.
+  `bau tiktok login`.
 - The file is locked with AES-256 in openssl's standard format (PBKDF2-SHA256, 600,000
   rounds). If your Mac says its openssl is too old, install a new one with
   `brew install openssl` and run the script again.

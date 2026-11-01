@@ -6,8 +6,7 @@ publish posts, or claim that a platform or jurisdiction's rules have been satisf
 Two tiers: ``sfw`` works for every platform; ``explicit`` only for adult platforms with
 age-verified audiences (``EXPLICIT_PLATFORMS``) and only when the owner has written the
 profile's own ``explicit_boundaries``. Explicit batches are marked for the local content lane
-model (docs/VIRTUAL-CREATOR.md); Jarvis's tool asks for ``sfw`` only. Profiles and batches
-never live inside a workspace, where the kids channel is.
+model (docs/VIRTUAL-CREATOR.md); Jarvis's tool asks for ``sfw`` only.
 """
 
 from __future__ import annotations
@@ -22,18 +21,24 @@ import yaml
 PROFILE_SCHEMA = "bau.virtual-creator/v1"
 MAX_BATCH = 30
 ID = re.compile(r"^[a-z][a-z0-9-]{0,30}$")
-PLATFORMS = ("instagram", "tiktok", "youtube", "x", "fanvue", "patreon", "other")
-# Platforms where the owner may plan explicit adult content. Mainstream platforms
-# (Instagram, TikTok, YouTube, X, Patreon) only ever get the sfw tier.
+# The owner's platforms (2026-10-31): Instagram and TikTok get the sfw tier only.
+PLATFORMS = ("instagram", "tiktok", "fanvue")
+# Platforms where the owner may plan explicit adult content.
 EXPLICIT_PLATFORMS = ("fanvue",)
 TIERS = ("sfw", "explicit")
 SHOT_TYPES = ("portrait", "lifestyle", "behind-the-scenes", "story", "short-video")
+# Also the old kids-channel list's terms (2026-10-31), so nothing it caught gets through:
+# toddlers, preschool, nursery, "little ones", plural ages, "ages 2-4", "aged 5". Ages count
+# only under 18, so an adult persona's "27-year-old" passes; "baby" stays out (adult slang).
 MINOR_REFERENCE = re.compile(
     r"\b(?:child(?:ren)?|kid(?:s)?|teen(?:ager)?s?|minor(?:s)?|underage|schoolgirl|"
     r"schoolboy|high[- ]school|middle[- ]school|freshman|barely[- ]legal|jailbait|loli|"
     r"lolita|shota|young[- ]looking|little[- ]girl|little[- ]boy|petite[- ]teen|"
-    r"student[- ]uniform|babysitter)\b|\b(?:1[0-9]|[0-9])\s*[- ]?"
-    r"year[- ]old\b", re.IGNORECASE)
+    r"student[- ]uniform|babysitter|toddlers?|infants?|preschool\w*|nursery|kindergarten\w*|"
+    r"little ones|under[- ]1[0-8])\b|"
+    r"\b(?:1[0-9]|[0-9])\s*[- ]?(?:year|yr)s?[- ]?olds?\b|"
+    r"\bages? (?:1[0-7]|[0-9])\b(?:\s*(?:-|to|–)\s*\d{1,2})?|\baged (?:1[0-7]|[0-9])\b",
+    re.IGNORECASE)
 
 
 class CreatorError(ValueError):
@@ -92,9 +97,6 @@ class VirtualCreator:
                 problems.append("explicit_boundaries must list the owner's explicit-tier limits")
             elif any(MINOR_REFERENCE.search(item) for item in explicit):
                 problems.append("explicit_boundaries must not describe content involving minors")
-        if "workspaces" in self.profile_path.resolve().parts:
-            problems.append("keep creator profiles out of workspaces (the kids channel lives "
-                            "there); use BAU_HOME/creators")
         platform_rules = p.get("platform_rules", {})
         if not isinstance(platform_rules, dict):
             problems.append("platform_rules must map platform names to owner-reviewed rules")

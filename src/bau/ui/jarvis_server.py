@@ -47,8 +47,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
     # GitHub wants requests one at a time, so one search or inspection at a time; testing
     # a model has its own lane. Neither holds up the conversation.
     lanes = {"scout": threading.Lock(), "models": threading.Lock(),
-             "studio": threading.Lock(), "godseye": threading.Lock(),
-             "results": threading.Lock()}
+             "studio": threading.Lock(), "godseye": threading.Lock()}
     jobs: dict[str, dict[str, Any]] = {}  # slow answers the page is checking back on
     last_overview: dict[str, Any] = {}    # served while a model turn holds the lock
 
@@ -237,8 +236,6 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     q.get("q", ""))))
             elif path == "/api/usage":
                 self._json(200, screen.usage_summary(assistant))
-            elif path == "/api/results":
-                self._json(200, screen.results_summary(assistant))
             elif path == "/api/studio":
                 self._json(*answer(lambda: screen.studio_summary(assistant), lanes["studio"]))
             elif path.startswith("/api/studio/clip/"):
@@ -353,10 +350,6 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
             elif self.path == "/api/godseye":
                 self._json(*answer(lambda: screen.godseye_screen(assistant, data),
                                    lanes["godseye"]))
-            elif self.path == "/api/results/refresh":
-                force = bool(data.get("force"))
-                self._json(*answer(lambda: screen.results_summary(assistant, True, force),
-                                   lanes["results"]))
             elif self.path == "/api/studio/stage":
                 # Prices the clip and puts it on screen; only the owner's Confirm starts it.
                 self._json(*answer(lambda: screen.studio_stage(assistant, data),

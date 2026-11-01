@@ -57,10 +57,9 @@ bau creator batch "$BAU_HOME/creators/aria.yaml" "evening in" \
 ```
 
 Explicit prompts are marked for the local content lane model (local only, no tools, never
-kids). Jarvis only drafts `sfw` batches; explicit ones are always your own command. In every
-tier, youth-coded words ("barely legal", "schoolgirl", any age under 18, and others) are
-refused, and profiles or batches cannot be saved inside `workspaces/`, where the kids channel
-lives.
+minors). Jarvis only drafts `sfw` batches; explicit ones are always your own command. In
+every tier, youth-coded words ("barely legal", "schoolgirl", any age under 18, and others)
+are refused.
 
 The batch includes an identity lock, distinct visual prompts, caption briefs that disclose
 the AI persona, and a review checklist for every post. It does not call an image/video
@@ -73,5 +72,6 @@ Jarvis can also return a batch in conversation when the profile is saved as
 `$BAU_HOME/creators/<id>.yaml`, for example: “Draft seven Instagram posts for Aria about
 autumn city fashion.” The starter profile id is `aria`.
 
-The existing `kids-channel` workspace and its child-directed checks remain separate. Do
-not put this adult workflow in a kids workspace.
+To plan a whole week stage by stage, with your check on each stage, use the
+`creator-week` workspace: `bau ws create creator-week`, then `bau ws episode creator-week
+"this week's theme"` (docs/WORKSPACES.md). Its `no_minors` check runs on every drafted stage.

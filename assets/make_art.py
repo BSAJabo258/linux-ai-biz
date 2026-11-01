@@ -168,11 +168,11 @@ def facts() -> dict[str, int]:
     sys.path.insert(0, str(HERE.parent / "src"))
     from bau.policy import PolicyEngine
     from bau.regulations import Registry
-    from bau.series import Series
     from bau.toolbox import Toolbox
+    from bau.virtual_creator import PLATFORMS
     reg = Registry.load()
     return {"regulations": len(reg.regs), "policies": len(PolicyEngine.load(reg).policies),
-            "tools": len(Toolbox().entries), "formats": len(Series(HERE.parent).formats())}
+            "tools": len(Toolbox().entries), "platforms": len(PLATFORMS)}
 
 
 def stats(theme: str) -> str:
@@ -181,7 +181,7 @@ def stats(theme: str) -> str:
     tiles = [(f["regulations"], "REGULATIONS TRACKED", "each awaiting counsel review"),
              (f["policies"], "POLICY RULES", "PASS · REVIEW · BLOCK"),
              (f["tools"], "RESEARCHED TOOLS", "in the toolbox, with sources"),
-             (f["formats"], "STORY FORMATS", "for the kids series engine"),
+             (f["platforms"], "PLATFORMS", "Fanvue · Instagram · TikTok"),
              (0, "APPROVALS BY AI", "money and legal: humans only")]
     w, h, tw = 1280, 210, 232
     gap = (w - 5 * tw) / 6
@@ -204,7 +204,7 @@ def stats(theme: str) -> str:
      viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-labelledby="t d">
 <title id="t">BAU in numbers</title>
 <desc id="d">{f['regulations']} regulations tracked, {f['policies']} policy rules,
-{f['tools']} researched tools, {f['formats']} story formats, 0 approvals by AI.</desc>
+{f['tools']} researched tools, {f['platforms']} platforms, 0 approvals by AI.</desc>
 <style>
 .tile {{ animation: glow 4s ease-in-out infinite; }}
 @keyframes glow {{ 50% {{ opacity: .82; }} }}
@@ -224,11 +224,10 @@ SESSION = [
     (" ", "DeepEval      evals            Apache-2.0   claimed"),
     (" ", "Context7      docs-grounding   MIT          claimed"),
     (" ", "LlamaIndex    grounding        MIT          claimed"),
-    ("$", "bau series plan kids-channel ep-001 --format problem-song-solution"),
-    (" ", "1  hook    5s  Pip notices a small problem."),
-    (" ", "2  try    13s  Pip tries to fix it alone..."),
-    (" ", "3  help    9s  Mo comes to help Pip... (part 1 of 2)"),
-    ("~", "6 clips · 60 s · every prompt carries the same character lock"),
+    ("$", 'bau creator batch aria.yaml "autumn city fashion" --platform instagram'),
+    (" ", "Identity lock: Aria Vale is a fictional 25-year-old adult virtual creator."),
+    (" ", "Post 1: portrait  ·  Tier: sfw  ·  caption with AI-persona disclosure"),
+    ("~", "7 posts · every prompt carries the same identity lock"),
     ("$", "bau usage"),
     (" ", "today    32,850 tokens · 9 calls · $0.00"),
     ("!", "98% of your daily token limit"),
@@ -263,7 +262,7 @@ def terminal(theme: str) -> str:
     return f"""<svg xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-labelledby="t d">
 <title id="t">BAU at the terminal</title>
-<desc id="d">Four commands: asking the toolbox, planning a kids episode, checking usage,
+<desc id="d">Four commands: asking the toolbox, drafting a creator batch, checking usage,
 choosing the living art.</desc>
 <style>
 .ln {{ animation-duration: {cycle}s; animation-iteration-count: infinite;

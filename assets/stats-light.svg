@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 1280 210" width="1280" height="210" role="img" aria-labelledby="t d">
 <title id="t">BAU in numbers</title>
-<desc id="d">49 regulations tracked, 65 policy rules,
-100 researched tools, 4 story formats, 0 approvals by AI.</desc>
+<desc id="d">49 regulations tracked, 59 policy rules,
+100 researched tools, 3 platforms, 0 approvals by AI.</desc>
 <style>
 .tile { animation: glow 4s ease-in-out infinite; }
 @keyframes glow { 50% { opacity: .82; } }
@@ -41,7 +41,7 @@
         fill-opacity="0.85" stroke="#0a78a8" stroke-opacity=".4"/>
   <path d="M286.0 28h54" stroke="#0a78a8" stroke-width="3" stroke-linecap="round"/>
   <text x="388.0" y="104" text-anchor="middle" font-size="58" font-weight="700"
-        fill="#0a78a8" class="num">65</text>
+        fill="#0a78a8" class="num">59</text>
   <text x="388.0" y="138" text-anchor="middle" font-size="14" font-weight="700"
         letter-spacing="1.6" fill="#08263a">POLICY RULES</text>
   <text x="388.0" y="162" text-anchor="middle" font-size="14"
@@ -63,11 +63,11 @@
         fill-opacity="0.85" stroke="#0a78a8" stroke-opacity=".4"/>
   <path d="M790.0 28h54" stroke="#0a78a8" stroke-width="3" stroke-linecap="round"/>
   <text x="892.0" y="104" text-anchor="middle" font-size="58" font-weight="700"
-        fill="#0a78a8" class="num">4</text>
+        fill="#0a78a8" class="num">3</text>
   <text x="892.0" y="138" text-anchor="middle" font-size="14" font-weight="700"
-        letter-spacing="1.6" fill="#08263a">STORY FORMATS</text>
+        letter-spacing="1.6" fill="#08263a">PLATFORMS</text>
   <text x="892.0" y="162" text-anchor="middle" font-size="14"
-        fill="#3f5f72">for the kids series engine</text>
+        fill="#3f5f72">Fanvue · Instagram · TikTok</text>
 </g>
 <g class="tile" style="animation-delay:1.6s">
   <rect x="1028.0" y="28" width="232" height="154" rx="14" fill="#ffffff"

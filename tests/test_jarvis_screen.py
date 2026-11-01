@@ -6,7 +6,7 @@ import urllib.error
 import urllib.request
 
 import pytest
-from test_workspace import BIBLE
+from test_workspace import PERSONA, VOICE
 
 from bau import workspace as W
 from bau.assistant import Assistant, Voice
@@ -28,20 +28,21 @@ def nodes(a):
 
 
 def with_episode(home):
-    ws = W.create("kids-channel", home=home)
-    (ws / "_shared" / "series-bible.md").write_text(BIBLE)
-    return ws, W.new_episode(ws, "Pip learns to share berries")
+    ws = W.create("creator-week", home=home)
+    (ws / "_shared" / "persona.md").write_text(PERSONA)
+    (ws / "_shared" / "voice.md").write_text(VOICE)
+    return ws, W.new_episode(ws, "Autumn city coffee week")
 
 
 def test_fresh_system_shows_every_part_and_never_claims_unmeasured_green(tmp_path):
     n = nodes(make(tmp_path))
     for nid in ("chief", "producer", "publisher", "strategist", "researcher", "compliance",
-                "finance", "watchdog", "models", "memory", "audit", "email", "youtube"):
+                "finance", "watchdog", "models", "memory", "audit", "email", "tiktok"):
         assert nid in n
     assert n["models"]["state"] == "bad" and "plain mode" in n["models"]["summary"]
     assert n["producer"]["state"] == "idle" and n["finance"]["state"] == "idle"
     assert all(n[c]["state"] == "off" for c in ("email", "drive", "calendar", "crm",
-                                                "youtube", "tiktok"))
+                                                "tiktok"))
     assert n["audit"]["state"] == "ok"
 
 
@@ -53,7 +54,7 @@ def test_a_broken_source_shows_red_with_its_error(tmp_path):
 
 
 def test_episode_node_offers_draft_then_owner_check(tmp_path):
-    a = make(tmp_path, ["# Pip shares\nLearning goal: sharing."])
+    a = make(tmp_path, ["Mon instagram sfw: latte by the window\n"])
     ws, ep = with_episode(tmp_path)
     prod = nodes(a)["producer"]
     assert prod["detail"]["episodes"][0]["next"] == {"action": "draft", "stage": "01"}
@@ -62,7 +63,7 @@ def test_episode_node_offers_draft_then_owner_check(tmp_path):
     prod = nodes(a)["producer"]
     assert prod["state"] == "warn" and prod["detail"]["episodes"][0]["next"]["action"] == "check"
     card = a.stage_check(ws.name, ep.name, "01")
-    assert "Pip shares" in card["summary"] and card["tool"] == "check_stage"
+    assert "latte by the window" in card["summary"] and card["tool"] == "check_stage"
     assert not W.is_checked(W.contracts(ep)[0])                  # nothing until Confirm
     assert a.confirm(card["id"], True, "human:owner")["done"]
     assert W.is_checked(W.contracts(ep)[0])
@@ -99,7 +100,7 @@ def call(url, path, body=None, key="k123"):
 
 def test_screen_endpoints_draft_and_stage_checks_behind_the_key(tmp_path):
     from bau.ui.jarvis_server import serve
-    a = make(tmp_path, ["# Pip shares\nLearning goal: sharing."])
+    a = make(tmp_path, ["Mon instagram sfw: latte by the window\n"])
     ws, ep = with_episode(tmp_path)
     srv, _ = serve(a, Voice(tmp_path), 0, key="k123")
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -112,7 +113,7 @@ def test_screen_endpoints_draft_and_stage_checks_behind_the_key(tmp_path):
                                           "stage": "01"})
         assert "not written yet" in r["error"]
         code, r = call(url, "/api/draft", {"workspace": ws.name, "episode": ep.name})
-        assert code == 200 and not r["error"] and r["result"]["stage"] == "01_pitch"
+        assert code == 200 and not r["error"] and r["result"]["stage"] == "01_plan"
         # The owner's check comes back with the draft: the page pops it up at once.
         assert r["pending"][0]["tool"] == "check_stage"
         assert r["pending"][0]["id"] == r["result"]["pending_id"]
@@ -120,7 +121,7 @@ def test_screen_endpoints_draft_and_stage_checks_behind_the_key(tmp_path):
                                           "stage": "01"})
         pid = r["pending"][0]["id"]
         code, r = call(url, "/api/confirm", {"id": pid, "approve": True})
-        assert r["done"] and r["result"]["checked"] == "01_pitch"
+        assert r["done"] and r["result"]["checked"] == "01_plan"
     finally:
         srv.shutdown()
 

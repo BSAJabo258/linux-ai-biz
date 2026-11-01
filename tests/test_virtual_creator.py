@@ -27,7 +27,7 @@ def test_explicit_needs_owner_boundaries_and_an_adult_platform(tmp_path):
     with pytest.raises(CreatorError, match="explicit_boundaries"):
         VirtualCreator(_profile(tmp_path)).batch("evening", "fanvue", tier="explicit")
     vc = VirtualCreator(_profile(tmp_path, explicit_boundaries=["adults only, consenting"]))
-    for platform in ("instagram", "tiktok", "youtube", "x", "patreon"):
+    for platform in ("instagram", "tiktok"):
         with pytest.raises(CreatorError, match="adult platforms"):
             vc.batch("evening", platform, tier="explicit")
     batch = vc.batch("evening", "fanvue", 2, tier="explicit")
@@ -45,12 +45,13 @@ def test_youth_coded_words_are_refused_in_every_tier(tmp_path, word):
     assert any("minors" in p for p in bad.problems())
 
 
-def test_profiles_stay_out_of_workspaces(tmp_path):
-    path = _profile(tmp_path)
-    inside = tmp_path / "workspaces" / "kids-channel" / "aria.yaml"
-    inside.parent.mkdir(parents=True)
-    inside.write_text(path.read_text())
-    assert any("workspaces" in p for p in VirtualCreator(inside).problems())
+def test_only_the_owners_three_platforms(tmp_path):
+    # The owner's choice (2026-10-31): Fanvue (explicit), Instagram and TikTok (sfw).
+    from bau.virtual_creator import EXPLICIT_PLATFORMS, PLATFORMS
+    assert PLATFORMS == ("instagram", "tiktok", "fanvue") and EXPLICIT_PLATFORMS == ("fanvue",)
+    vc = VirtualCreator(_profile(tmp_path))
+    with pytest.raises(CreatorError):
+        vc.batch("evening", "youtube")
 
 
 def test_jarvis_tool_only_drafts_sfw(tmp_path):
