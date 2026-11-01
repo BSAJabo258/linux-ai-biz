@@ -31,6 +31,7 @@ import json
 import os
 import re
 import secrets
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -132,6 +133,12 @@ LEAN_NOTE = ("You see a few tools in full. tool_menu lists the others in one lin
              "(tool_menu with a name shows one in full); run any of them with use_tool. "
              "Before saying something doesn't exist, look: toolbox, recall, tool_menu.")
 META_TOOLS = ("tool_menu", "use_tool")
+# Harness step 1 (docs/HARNESS-MAP.md): Jarvis's read and act tools run through the Universal
+# Gateway as agent "jarvis". These reach the internet directly, so network trust applies to
+# them (world_watch is not here: offline it still answers from its 5-minute cache).
+# hold_everything only makes BAU safer, so it runs on HOLD.
+NETWORK_TOOLS = {"web_search", "read_page", "find_tools", "video_clips"}
+SAFE_ON_HOLD = {"hold_everything"}
 # Where a menu line ends: the first sentence ("e.g. the creator" is not a sentence end).
 SENTENCE_END = re.compile(r"(?<![.\s][a-z])\.\s+(?=[A-Z])")
 # Small models often announce a lookup ("Let me search...") and stop without doing it.
@@ -142,6 +149,8 @@ NUDGE = "(Go ahead: call the tool now instead of saying you will.)"
 # asked to remember searched instead and said it had saved it (real-model check 2026-11-01).
 REMEMBER_CMD = re.compile(r"^\W*(?:please\W+|jarvis\W+|hey jarvis\W+)*remember\W+(?:that\W+)?"
                           r"(.{3,})", re.I | re.S)
+WEEK_CMD = re.compile(r"\b(?:schedule|post|publish)\b.{0,20}\bweek\W+([a-z0-9][a-z0-9._-]{0,60}"
+                      r"[a-z0-9])", re.I)
 # Facts first: for the common questions a local model is handed the answer's facts with the
 # question (plain matching, no model), so it only has to say them. Read tools only.
 GROUND = (
@@ -216,7 +225,8 @@ def _schema(props: dict[str, Any] | None = None, required: list[str] | None = No
 class Assistant:
     def __init__(self, home: Path | None = None, provider: Provider | None = None,
                  model: dict[str, Any] | None = None, owner: str = "human:owner",
-                 audit: AuditLog | None = None, clients: dict[str, Any] | None = None):
+                 audit: AuditLog | None = None, clients: dict[str, Any] | None = None,
+                 trust: Callable[[], Any] | None = None):
         self.home = home or bau_home()
         self.dir = self.home / "jarvis"
         self.dir.mkdir(parents=True, exist_ok=True)
@@ -233,6 +243,7 @@ class Assistant:
         self.last_model = ""                  # the model that gave the last answer
         self._continuity: str | None = None   # earlier conversation, read once per session
         self.tools = {t.name: t for t in self._tools()}
+        self.gateway, self.caps = self._gateway(trust)
         from .activity import Activity
         self.activity = Activity()            # what the screen shows as live work
         # Started only by the owner from the screen; never offered to a model.
@@ -240,6 +251,39 @@ class Assistant:
             "check_stage", "The owner checks a stage they have read.",
             _schema({"workspace": {"type": "string"}, "episode": {"type": "string"},
                      "stage": {"type": "string"}}), self.t_check_stage, kind="confirm")}
+
+    def _gateway(self, trust: Callable[[], Any] | None) -> tuple[Any, dict[str, str]]:
+        """The same gateway the agents use: HOLD, permissions, network trust, budget and the
+        audit chain now apply to every read and act tool of Jarvis's."""
+        from . import network
+        from .economics import Budgets, Ledger
+        from .gateway import Gateway, Handler
+        from .governor import hold_reason
+        home = self.home
+        ask = trust or (lambda: network.TrustPolicy(
+            home / "security" / "networks.yaml").classify(network.detect()))
+        seen: dict[str, Any] = {}
+
+        def trust_now() -> Any:           # the probes take seconds offline: once a minute
+            if time.monotonic() - seen.get("at", -1e9) > 60:
+                seen.update(at=time.monotonic(), trust=ask())
+            return seen["trust"]
+
+        gw = Gateway(audit=self.audit, ledger=Ledger(home),
+                     budgets=Budgets.load(home / "config" / "budgets.yaml"),
+                     trust=trust_now, hold=lambda: hold_reason(home))
+        caps = {}
+        for t in self.tools.values():
+            if t.kind == "confirm" or t.name in META_TOOLS:
+                continue                  # staged for the owner / only dispatch to others
+            cap = f"{'inspect' if t.kind == 'read' else 'change'}.jarvis.{t.name}"
+            level = "READ_ONLY" if t.kind == "read" else "LOW_RISK"
+            net = t.name in NETWORK_TOOLS
+            gw.register(cap, Handler(t.fn, level, needs_network=net, local=not net,
+                                     safe_on_hold=t.name in SAFE_ON_HOLD,
+                                     description=t.description[:200]))
+            caps[t.name] = cap
+        return gw, caps
 
     # -------------------------------------------------------------- tools
     def _tools(self) -> list[Tool]:
@@ -396,6 +440,12 @@ class Assistant:
                  _schema({"platform": {"type": "string", "enum": sorted(ADAPTERS)},
                           "item_id": {"type": "string"}}),
                  self.t_post_video, kind="confirm", stage=self._post_card),
+            Tool("schedule_week", "Put a week of the creator's posts (a plan in "
+                 "BAU_HOME/weeks) on the owner's screen as one card. The owner reads every "
+                 "post, picks TikTok's visibility and confirms once; Ayrshare then posts each "
+                 "on its day with the AI label. You cannot schedule or choose for them.",
+                 _schema({"week": {"type": "string"}}),
+                 self.t_schedule_week, kind="confirm", stage=self._week_card),
             Tool("tool_menu", "Your other tools, one line each. Give a name to see that "
                  "tool in full (what it does and its inputs).",
                  _schema({"name": {"type": "string"}}, []), self.t_tool_menu),
@@ -621,7 +671,9 @@ class Assistant:
         return {"agent": name, "status": out["status"], "report": out["final_text"],
                 "tools_used": [c["capability"] for c in out["tool_calls"] if c.get("ok")],
                 "denied": [c for c in out["tool_calls"] if not c.get("ok")][:5],
-                "cost_usd": out["cost_usd"], "supervision": out.get("supervision") or {}}
+                # already in the ledger from the agent's own run: not "cost_usd", which
+                # the gateway would bill a second time
+                "spent_usd": out["cost_usd"], "supervision": out.get("supervision") or {}}
 
     def t_ask_thinker(self, question: str, material: str = "") -> dict[str, Any]:
         from . import team
@@ -845,6 +897,17 @@ class Assistant:
         Governor(self.home, audit=self.audit, systemctl="").release(self.owner)
         return {"hold": None}
 
+    def _week_card(self, week: str) -> dict[str, Any]:
+        from . import week as W
+        try:
+            return W.stage(self.home, week)
+        except W.WeekError as e:
+            raise ValueError(str(e)) from e
+
+    def t_schedule_week(self, week: str, tiktok_visibility: str = "") -> dict[str, Any]:
+        from . import week as W
+        return W.send(self.home, week, tiktok_visibility, W.client(), self.owner)
+
     def _post_card(self, platform: str, item_id: str) -> dict[str, Any]:
         return self.hub().adapter(platform).card(item_id)
 
@@ -874,15 +937,23 @@ class Assistant:
                     "note": "Shown on the owner's screen. Nothing has happened yet."}, False
         node = TOOL_NODE.get(name, "chief")
         self.activity.emit(node, "start", TOOL_WORDS.get(name, name.replace("_", " ")))
+        from .gateway import CallRequest, GatewayDenied
         try:
-            out = tool.fn(**args)
+            if name in self.caps:
+                out = self.gateway.invoke(CallRequest("jarvis", self.caps[name], args))
+            else:
+                out = tool.fn(**args)
+        except GatewayDenied as e:
+            self.activity.emit(node, "error", f"{name}: not run ({e.step})")
+            return {"error": f"not run: {e.reason}"[:400]}, True
         except TypeError as e:
             self.activity.emit(node, "error", f"{name}: bad arguments")
             return {"error": f"bad arguments for {name}: {e}"}, True
         except Exception as e:  # report, never hide
             self.activity.emit(node, "error", f"{type(e).__name__}: {e}"[:200])
             return {"error": f"{type(e).__name__}: {e}"[:400]}, True
-        self.audit.append("jarvis.tool", "jarvis", {"tool": name, "kind": tool.kind})
+        if name not in self.caps:         # the gateway already wrote its own row
+            self.audit.append("jarvis.tool", "jarvis", {"tool": name, "kind": tool.kind})
         self.activity.emit(node, "done", TOOL_WORDS.get(name, name.replace("_", " ")) + ": done")
         return out, False
 
@@ -1073,6 +1144,7 @@ class Assistant:
         model = self.metered()
         start = len(self.messages)
         cards: list[dict[str, Any]] = []
+        staged: list[str] = []
         if self.lean and (m := REMEMBER_CMD.match(user_text)):
             note = m.group(1).strip()
             out, err = self._run_tool("remember", {"title": note[:60], "note": note})
@@ -1082,8 +1154,18 @@ class Assistant:
                           f"\n\n(Saving it failed: {str(out)[:200]}. Say so plainly.)")
         elif self.lean:
             user_text = self._ground(user_text, cards)
+            # Naming a week plan that exists puts its card up at once: the small model did not
+            # find schedule_week in its menu (real run, 2026-11-01). Staging changes nothing.
+            m = WEEK_CMD.search(user_text)
+            if m and (self.home / "weeks" / f"{m.group(1)}.yaml").is_file():
+                out, err = self._run_tool("schedule_week", {"week": m.group(1)})
+                if not err and out.get("pending_id"):
+                    staged.append(out["pending_id"])
+                    user_text += (f"\n\n(The week {m.group(1)} is already on the owner's screen "
+                                  "as one card waiting for their confirmation. Say so briefly.)")
+                else:
+                    user_text += f"\n\n(Showing that week failed: {str(out)[:300]}. Say why.)"
         self.messages.append({"role": "user", "content": user_text})
-        staged: list[str] = []
         final = ""
         nudged = False
         for _ in range(max_steps):
@@ -1192,8 +1274,10 @@ class Assistant:
             self._log("jarvis", msg)
             return Reply(msg, pending=[p.public()], mode="plain")
         if re.search(r"\b(hold|freeze|stop everything|pause everything)\b", t):
-            out, _ = self._run_tool("hold_everything", {"reason": text[:120]})
-            msg = "Done. Everything's on hold; only read-only work runs until you release it."
+            out, err = self._run_tool("hold_everything", {"reason": text[:120]})
+            msg = ("Done. Everything's on hold; only read-only work runs until you release it."
+                   if not err else f"I couldn't put BAU on hold: {out.get('error')}. "
+                   "Run `bau governor hold` in a terminal.")
             self._log("jarvis", msg)
             return Reply(msg, [{"tool": "hold_everything", "data": out}], mode="plain")
         # Before the routes: "what did the video transcripts say" is not the publish queue.

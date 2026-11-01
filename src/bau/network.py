@@ -61,7 +61,7 @@ class NetworkFacts:
 
 def detect() -> NetworkFacts:
     """Best-effort local detection; anything not determinable stays None."""
-    online = _reachable("1.1.1.1", 53)
+    online = is_online()
     ssid = None
     if shutil.which("iwgetid"):
         r = subprocess.run(["iwgetid", "-r"], capture_output=True, text=True, check=False)
@@ -89,6 +89,15 @@ def detect() -> NetworkFacts:
         pass
     return NetworkFacts(online=online, wifi_ssid=ssid, gateway_mac=gw_mac, vpn_active=vpn,
                         wired=wired)
+
+
+ONLINE_PROBES = (("1.1.1.1", 53), ("1.1.1.1", 443), ("9.9.9.9", 443))
+
+
+def is_online() -> bool:
+    """Any one probe is enough: a network that blocks outside DNS (port 53) must not read as
+    offline, which would switch off Jarvis's web tools for nothing."""
+    return any(_reachable(h, p, 1.5) for h, p in ONLINE_PROBES)
 
 
 def _reachable(host: str, port: int, timeout: float = 2.0) -> bool:
@@ -135,9 +144,9 @@ class TrustPolicy:
             return Trust.TRUSTED if f.vpn_active else Trust.LIMITED
         if f.vpn_active:
             return Trust.LIMITED          # unknown network, but traffic is tunnelled
-        if f.wifi_ssid:
-            return Trust.UNTRUSTED        # unknown Wi-Fi: coffee-shop rule
-        return Trust.UNKNOWN
+        # Unknown Wi-Fi: coffee-shop rule. An unknown cable gets the same, not less: rated
+        # UNKNOWN it refused even read-only internet actions on a wired desktop (2026-11-01).
+        return Trust.UNTRUSTED
 
 
 def allows(trust: Trust, level: str) -> bool:
