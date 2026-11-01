@@ -5,14 +5,27 @@ previous wheel back by itself. Off until the owner turns it on (no default). Fak
 network, no pip, no systemctl. Written before the code."""
 
 import hashlib
+import io
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
 
 from bau import update as U
 
-WHEEL = b"PK\x03\x04 a fake wheel"
+
+def zwheel(tag, updater=True):
+    """A tiny wheel-shaped zip; real builds carry bau/update.py, the stick's first one did not."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("bau/__init__.py", tag)
+        if updater:
+            z.writestr("bau/update.py", "")
+    return buf.getvalue()
+
+
+WHEEL = zwheel("new")
 NAME = "bau-0.3.0-py3-none-any.whl"
 COMMIT = "a" * 40
 
@@ -57,7 +70,7 @@ class Box:
         self.state, self.conf = tmp / "update", tmp / "update.conf"
         self.first = tmp / "payload-wheels"
         self.first.mkdir()
-        (self.first / "bau-0.2.0-py3-none-any.whl").write_bytes(b"PK old")
+        (self.first / "bau-0.2.0-py3-none-any.whl").write_bytes(zwheel("old"))
 
     new_installed = False
 
@@ -145,8 +158,9 @@ def test_after_one_good_update_the_kept_build_is_the_one_to_go_back_to(box):
     box.go()
     box.cmds.clear()
     box.fail_on = {"import"}
-    out = box.go(Net(manifest(commit="b" * 40, sha256=hashlib.sha256(b"PK new2").hexdigest()),
-                     body=b"PK new2"))
+    new2 = zwheel("new2")
+    out = box.go(Net(manifest(commit="b" * 40, sha256=hashlib.sha256(new2).hexdigest()),
+                     body=new2))
     assert out["result"] == "rolled back"
     back = [c[-1] for c in box.cmds if "install" in c and str(c[-1]).endswith(".whl")][-1]
     assert Path(back) == box.state / "current" / NAME and Path(back).read_bytes() == WHEEL
@@ -203,6 +217,10 @@ def test_ci_builds_the_wheel_only_from_a_green_main():
     assert "github.event.workflow_run.head_branch == 'main'" in wf
     assert "github.event.workflow_run.event == 'push'" in wf
     assert "head_sha" in wf and "bau-update.json" in wf and "contents: write" in wf
+    # The owner's first run (2026-11-01) hit the gap while the release was deleted and made
+    # again: 404. Files are replaced in place, the wheel before the record that names it.
+    assert "release delete" not in wf
+    assert wf.index("dist/bau-*.whl --clobber") < wf.index("dist/bau-update.json --clobber")
 
 
 def test_the_timer_runs_nightly_as_root_and_install_enables_it():
@@ -217,7 +235,7 @@ def test_the_timer_runs_nightly_as_root_and_install_enables_it():
 def test_the_one_time_setup_for_an_installed_desktop_checks_and_matches():
     first = (ROOT / "installer" / "bau-update-first.sh").read_text()
     assert "sha256sum -c" in first and "/run/live/medium" in first
-    assert "bau update auto" in first and "bau update now" in first
+    assert "bau update auto" in first and "bau update keep" in first
     for unit in ("bau-update.service", "bau-update.timer"):
         text = (ROOT / "installer" / "payload" / "systemd" / unit).read_text()
         assert f"/etc/systemd/system/{unit} <<'UNIT'\n{text}UNIT\n" in first
@@ -234,3 +252,31 @@ def test_bau_update_status_and_root_only_changes(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("os.geteuid", lambda: 1000)
     with pytest.raises(SystemExit, match="sudo"):
         main(["update", "auto"])
+
+
+# The owner's desktop, 2026-11-01: an update went back to the stick's own build, which has no
+# updater, so `bau update` was gone and nothing could update again.
+def test_never_goes_back_to_a_build_without_the_updater(box):
+    (box.first / "bau-0.2.0-py3-none-any.whl").write_bytes(zwheel("stick", updater=False))
+    out = box.go()
+    assert out["result"] == "refused" and "bau-update-first.sh" in out["why"]
+    assert not pips(box)
+
+
+def test_mission_control_is_only_required_if_it_was_running(box):
+    box.fail_on = {"systemctl"}                     # bau-ui not active before the update
+    assert box.go(ui_ok=False)["result"] == "installed"
+
+
+def test_keep_records_the_setup_build_as_the_way_back(tmp_path):
+    w = tmp_path / NAME
+    w.write_bytes(WHEEL)
+    U.keep(w, COMMIT, tmp_path / "u")
+    assert (tmp_path / "u" / "current" / NAME).read_bytes() == WHEEL
+    assert U.status(tmp_path / "u", tmp_path / "c")["installed_commit"] == COMMIT
+    old = tmp_path / "bau-0.2.0-py3-none-any.whl"
+    old.write_bytes(zwheel("stick", updater=False))
+    with pytest.raises(ValueError):
+        U.keep(old, COMMIT, tmp_path / "u")
+    with pytest.raises(ValueError):
+        U.keep(w, "main", tmp_path / "u")

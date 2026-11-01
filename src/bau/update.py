@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import time
 import urllib.request
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -120,12 +121,36 @@ def _fetch(opener: Any, url: str, limit: int) -> bytes:
     return data
 
 
+def _can_update(wheel: Path) -> bool:
+    """A build without this updater must never be the way back: after going back to it,
+    nothing would update again (the owner's desktop, 2026-11-01: the stick's own build)."""
+    try:
+        with zipfile.ZipFile(wheel) as z:
+            return "bau/update.py" in z.namelist()
+    except (OSError, zipfile.BadZipFile):
+        return False
+
+
 def _previous(state_dir: Path, first_dir: Path) -> Path | None:
     for d in (state_dir / "current", first_dir):
-        found = sorted(p for p in d.glob("bau-*.whl") if WHEEL.match(p.name)) if d.is_dir() else []
+        found = sorted(p for p in d.glob("bau-*.whl")
+                       if WHEEL.match(p.name) and _can_update(p)) if d.is_dir() else []
         if found:
             return found[-1]
     return None
+
+
+def keep(wheel: Path, commit: str, state_dir: Path = STATE) -> None:
+    """Record a build installed outside the nightly run (installer/bau-update-first.sh) as the
+    one to go back to."""
+    if not HEX40.match(commit) or not WHEEL.match(wheel.name) or not _can_update(wheel):
+        raise ValueError("not a BAU build with the updater, or not a full commit id")
+    cur = state_dir / "current"
+    shutil.rmtree(cur, ignore_errors=True)
+    cur.mkdir(parents=True)
+    state_dir.chmod(0o755)
+    shutil.copy2(wheel, cur / wheel.name)
+    (state_dir / "state.json").write_text(json.dumps({"commit": commit, "wheel": wheel.name}))
 
 
 def _pip(runner: Callable[[list[str]], int], wheel: Path) -> bool:
@@ -147,7 +172,7 @@ def _ui_answers(url: str = UI, tries: int = 30, sleep: Callable[[float], None] =
 
 
 def _healthy(runner: Callable[[list[str]], int], ui_check: Callable[[], bool],
-             sleep: Callable[[float], None]) -> str | None:
+             sleep: Callable[[float], None], ui_was_up: bool = True) -> str | None:
     """None when the new BAU works; else what failed."""
     if runner([str(VENV / "bin" / "python"), "-I", "-c",
                "import bau.cli, bau.cli_ext, bau.assistant, bau.ui.jarvis_server"]) != 0:
@@ -158,7 +183,7 @@ def _healthy(runner: Callable[[list[str]], int], ui_check: Callable[[], bool],
         if runner(["systemctl", "restart", unit]) != 0:
             return f"{unit} did not restart"
     sleep(3)
-    if not ui_check():
+    if ui_was_up and not ui_check():      # only if it answered before: not BAU's to blame
         return "Mission Control did not answer on 127.0.0.1:8765"
     return None
 
@@ -196,7 +221,9 @@ def run(opener: Any = None, runner: Callable[[list[str]], int] | None = None,
     previous = _previous(state_dir, first_dir)
     if previous is None:
         return done("update.refused", {"result": "refused", "commit": m["commit"],
-                                       "why": "no earlier build to go back to"})
+                                       "why": "no earlier build to go back to that can "
+                                              "update itself; run installer/"
+                                              "bau-update-first.sh once"})
     try:
         body = _fetch(opener, RELEASE + m["wheel"], MAX_WHEEL)
     except (OSError, ValueError) as e:
@@ -210,9 +237,10 @@ def run(opener: Any = None, runner: Callable[[list[str]], int] | None = None,
     new = incoming / m["wheel"]
     new.write_bytes(body)
     rec = {"commit": m["commit"], "wheel": m["wheel"], "previous": previous.name}
+    ui_was_up = runner(["systemctl", "is-active", "--quiet", "bau-ui.service"]) == 0
 
     why = None if _pip(runner, new) else "pip could not install it"
-    why = why or _healthy(runner, ui_check, sleep)
+    why = why or _healthy(runner, ui_check, sleep, ui_was_up)
     if why is None:
         cur = state_dir / "current"
         shutil.rmtree(cur, ignore_errors=True)
@@ -220,7 +248,7 @@ def run(opener: Any = None, runner: Callable[[list[str]], int] | None = None,
         (state_dir / "state.json").write_text(json.dumps({"commit": m["commit"],
                                                           "wheel": m["wheel"]}))
         return done("update.installed", {"result": "installed", **rec})
-    back = _pip(runner, previous) and _healthy(runner, ui_check, sleep) is None
+    back = _pip(runner, previous) and _healthy(runner, ui_check, sleep, ui_was_up) is None
     shutil.rmtree(incoming, ignore_errors=True)
     if back:
         return done("update.rolled_back", {"result": "rolled back", "why": why, **rec})
