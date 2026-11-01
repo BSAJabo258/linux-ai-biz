@@ -1,0 +1,15 @@
+[Unit]
+Description=BAU automatic update (only when the owner chose: sudo bau update auto)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Root, because pip writes /opt/bau/venv and the kept builds live in root-owned /opt/bau/update.
+Environment=BAU_HOME=/var/lib/bau
+Environment=BAU_AUDIT_KEY=/etc/bau/audit.key
+ExecStart=/opt/bau/venv/bin/bau update now
+UMask=0007
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes

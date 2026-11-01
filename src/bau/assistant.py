@@ -1011,6 +1011,8 @@ class Assistant:
                 f[key] = fn()
             except Exception as e:  # one broken source must not silence the briefing
                 f[key] = {"error": f"{type(e).__name__}: {e}"[:200]}
+        from . import update
+        f["update"] = update.last(update.STATE)     # read at call time (tests point it away)
         return f
 
     def plain_briefing(self, f: dict[str, Any]) -> str:
@@ -1044,6 +1046,15 @@ class Assistant:
             parts.append(f"{len(d['regulation_reviews_due'])} regulation review(s) due soon.")
         if d.get("incidents_open"):
             parts.append(f"Heads up: {len(d['incidents_open'])} open incident(s).")
+        up = f.get("update") or {}
+        if up.get("result") == "installed":
+            parts.append("Last night BAU installed its newest tested update.")
+        elif up.get("result") == "rolled back":
+            parts.append(f"Last night's update failed ({up.get('why', 'unknown')}), so BAU "
+                         "went back to the previous version by itself.")
+        elif up.get("result") == "broken":
+            parts.append(f"Heads up: last night's update failed and going back failed too. "
+                         f"{up.get('why', '')}")
         review = [m for m in (f.get("missions") or []) if isinstance(m, dict)
                   and m.get("status") == "NEEDS_REVIEW"]
         if review:

@@ -591,6 +591,7 @@ It needs about 24 GB RAM. Check `reply_ok` and `tool_calls` are true before appr
 ### 3. Owner setup still to do
 - **Claude:** `ANTHROPIC_API_KEY` in `/etc/bau/models.env` (laptop) or `.env` (Docker), then `bau set-status model claude-opus-5-5 APPROVED`.
 - **TikTok:** app keys plus TikTok's app audit (INSTALL Phase 8).
+- **Automatic updates on the desktop** (owner's choice 2026-11-01, `docs/UPDATES.md`): once, `sudo bash bau-update-first.sh` (from `installer/`); not run on the desktop yet.
 - **ElevenLabs:** the owner's account was blocked ("unusual activity", free tier disabled). Voice falls back to the browser's, and nothing in code is needed.
 
 ## Known gaps / ideas (not started)
