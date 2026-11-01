@@ -27,7 +27,7 @@ NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*(API_KEY[A-Z0-9_]*|_KEY|_TOKEN|_SECRET|_C
                      r"|_KEY_ID)$")
 NEVER = ("BAU_", "LD_", "PYTHON")
 PLATFORMS = ("TIKTOK_", "YOUTUBE_", "INSTAGRAM_", "FACEBOOK_", "META_", "PINTEREST_",
-             "TWITTER_", "X_", "LINKEDIN_")
+             "TWITTER_", "X_", "LINKEDIN_", "AYRSHARE_")
 
 
 class KeyFileError(ValueError):

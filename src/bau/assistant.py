@@ -145,6 +145,8 @@ SENTENCE_END = re.compile(r"(?<![.\s][a-z])\.\s+(?=[A-Z])")
 ANNOUNCED = re.compile(r"\b(let me|i'll|i will|i am going to|i'm going to)\b[^.?!]{0,60}"
                        r"\b(search|look|check|find|ask|use|see)\b", re.I)
 NUDGE = "(Go ahead: call the tool now instead of saying you will.)"
+WEEK_CMD = re.compile(r"\b(?:schedule|post|publish)\b.{0,20}\bweek\W+([a-z0-9][a-z0-9._-]{0,60}"
+                      r"[a-z0-9])", re.I)
 # Facts first: for the common questions a local model is handed the answer's facts with the
 # question (plain matching, no model), so it only has to say them. Read tools only.
 GROUND = (
@@ -434,6 +436,12 @@ class Assistant:
                  _schema({"platform": {"type": "string", "enum": sorted(ADAPTERS)},
                           "item_id": {"type": "string"}}),
                  self.t_post_video, kind="confirm", stage=self._post_card),
+            Tool("schedule_week", "Put a week of the creator's posts (a plan in "
+                 "BAU_HOME/weeks) on the owner's screen as one card. The owner reads every "
+                 "post, picks TikTok's visibility and confirms once; Ayrshare then posts each "
+                 "on its day with the AI label. You cannot schedule or choose for them.",
+                 _schema({"week": {"type": "string"}}),
+                 self.t_schedule_week, kind="confirm", stage=self._week_card),
             Tool("tool_menu", "Your other tools, one line each. Give a name to see that "
                  "tool in full (what it does and its inputs).",
                  _schema({"name": {"type": "string"}}, []), self.t_tool_menu),
@@ -885,6 +893,17 @@ class Assistant:
         Governor(self.home, audit=self.audit, systemctl="").release(self.owner)
         return {"hold": None}
 
+    def _week_card(self, week: str) -> dict[str, Any]:
+        from . import week as W
+        try:
+            return W.stage(self.home, week)
+        except W.WeekError as e:
+            raise ValueError(str(e)) from e
+
+    def t_schedule_week(self, week: str, tiktok_visibility: str = "") -> dict[str, Any]:
+        from . import week as W
+        return W.send(self.home, week, tiktok_visibility, W.client(), self.owner)
+
     def _post_card(self, platform: str, item_id: str) -> dict[str, Any]:
         return self.hub().adapter(platform).card(item_id)
 
@@ -1121,10 +1140,21 @@ class Assistant:
         model = self.metered()
         start = len(self.messages)
         cards: list[dict[str, Any]] = []
+        staged: list[str] = []
         if self.lean:
             user_text = self._ground(user_text, cards)
+            # Naming a week plan that exists puts its card up at once: the small model did not
+            # find schedule_week in its menu (real run, 2026-11-01). Staging changes nothing.
+            m = WEEK_CMD.search(user_text)
+            if m and (self.home / "weeks" / f"{m.group(1)}.yaml").is_file():
+                out, err = self._run_tool("schedule_week", {"week": m.group(1)})
+                if not err and out.get("pending_id"):
+                    staged.append(out["pending_id"])
+                    user_text += (f"\n\n(The week {m.group(1)} is already on the owner's screen "
+                                  "as one card waiting for their confirmation. Say so briefly.)")
+                else:
+                    user_text += f"\n\n(Showing that week failed: {str(out)[:300]}. Say why.)"
         self.messages.append({"role": "user", "content": user_text})
-        staged: list[str] = []
         final = ""
         nudged = False
         for _ in range(max_steps):
