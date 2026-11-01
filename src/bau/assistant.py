@@ -145,6 +145,10 @@ SENTENCE_END = re.compile(r"(?<![.\s][a-z])\.\s+(?=[A-Z])")
 ANNOUNCED = re.compile(r"\b(let me|i'll|i will|i am going to|i'm going to)\b[^.?!]{0,60}"
                        r"\b(search|look|check|find|ask|use|see)\b", re.I)
 NUDGE = "(Go ahead: call the tool now instead of saying you will.)"
+# "Remember that ..." from the owner: saved first, then the model only confirms. A small model
+# asked to remember searched instead and said it had saved it (real-model check 2026-11-01).
+REMEMBER_CMD = re.compile(r"^\W*(?:please\W+|jarvis\W+|hey jarvis\W+)*remember\W+(?:that\W+)?"
+                          r"(.{3,})", re.I | re.S)
 WEEK_CMD = re.compile(r"\b(?:schedule|post|publish)\b.{0,20}\bweek\W+([a-z0-9][a-z0-9._-]{0,60}"
                       r"[a-z0-9])", re.I)
 # Facts first: for the common questions a local model is handed the answer's facts with the
@@ -1141,7 +1145,14 @@ class Assistant:
         start = len(self.messages)
         cards: list[dict[str, Any]] = []
         staged: list[str] = []
-        if self.lean:
+        if self.lean and (m := REMEMBER_CMD.match(user_text)):
+            note = m.group(1).strip()
+            out, err = self._run_tool("remember", {"title": note[:60], "note": note})
+            cards.append({"tool": "remember", "data": out})
+            user_text += (f"\n\n(Already saved to long-term memory: {note[:200]!r}. Confirm "
+                          "it in one short sentence; do not save it again.)" if not err else
+                          f"\n\n(Saving it failed: {str(out)[:200]}. Say so plainly.)")
+        elif self.lean:
             user_text = self._ground(user_text, cards)
             # Naming a week plan that exists puts its card up at once: the small model did not
             # find schedule_week in its menu (real run, 2026-11-01). Staging changes nothing.
