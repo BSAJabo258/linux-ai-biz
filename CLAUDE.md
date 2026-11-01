@@ -42,6 +42,7 @@ stand and what is next.
 | `Dockerfile`, `docker-compose.yml`, `docker/` | test drive in containers |
 | `vm/` | VirtualBox rehearsal scripts (`create-vm.ps1`, `create-vm.sh`) |
 | `docs/` | `INSTALL.md` (owner guide), `LIVE-USB.md`, `CLOUD-TEST.md` (free Codespaces + Z.ai), `WORKSPACES.md`, `MY-JARVIS.md` (spec + build order), `ARCHITECTURE.md`, `HANDOFF.md` |
+| `.claude/skills/real-model-check/`, `.claude/skills/platform-facts/`, `.claude/skills/stick-change/` | Skills any coding agent follows: prove Jarvis on the real local model (`run.py` grades each answer by what he did), verify platform and law facts from official pages with dates, change the stick image safely (the PR checks do not build the stick) |
 | `.claude/skills/grow-bau/SKILL.md`, `docs/BUILD-ISO.md` | Growing BAU from any terminal: the loop any coding agent follows (ask itself, find, inspect, sandbox test, owner decides, add, rebuild) and its best-case targets; building the stick image without VS Code (GitHub button or WSL + Docker) |
 | `tests/` | pytest suite |
 
