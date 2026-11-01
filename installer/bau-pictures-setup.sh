@@ -23,6 +23,15 @@ HOME_DIR=/usr/local/comfyui
 SRC="${HOME_DIR}/ComfyUI"
 VENV="${HOME_DIR}/venv"
 UNIT=/etc/systemd/system/bau-pictures.service
+# The age check on every picture (src/bau/media/comfy.py): FairFace age groups, Apache-2.0,
+# huggingface.co/dima806/fairface_age_image_detection at a pinned revision (read 2026-11-01).
+AGE_REVISION="4e02ab8057ea7fd74b1670940995c5dfda3e6ec0"
+AGE_DIR="${HOME_DIR}/age-model"
+AGE_FILES=(
+  "model.safetensors 1265d8e5a8a363a615898be873c224aebc6f310654bf23b1745da0975a7b7555"
+  "config.json 1ce878a77395b4a6a4da291a09b2b627d7d9b31bbe3be1fb1a37ad4d63f1a7e2"
+  "preprocessor_config.json 445c77049d082004aa07593344d5e1f521f1198228bf586196f70ce7ae021414"
+)
 
 say() { printf '%s\n' "$*"; }
 
@@ -81,6 +90,25 @@ if [[ ! -f ${DEST} ]]; then
   echo "${MODEL_SHA256}  ${DEST}.part" | sha256sum -c --quiet \
     || { rm -f "${DEST}.part"; say "The model file is not the pinned one: stopping"; exit 1; }
   mv "${DEST}.part" "${DEST}"
+fi
+
+say "   The age check model (343 MB, checked) and its runner..."
+install -d -o comfyui -g comfyui "${AGE_DIR}"
+for entry in "${AGE_FILES[@]}"; do
+  read -r f sum <<< "${entry}"
+  if [[ ! -f ${AGE_DIR}/${f} ]]; then
+    runuser -u comfyui -- curl -fsSL --retry 3 -o "${AGE_DIR}/${f}.part" \
+      "https://huggingface.co/dima806/fairface_age_image_detection/resolve/${AGE_REVISION}/${f}"
+    echo "${sum}  ${AGE_DIR}/${f}.part" | sha256sum -c --quiet \
+      || { rm -f "${AGE_DIR}/${f}.part"; say "${f} is not the pinned one: stopping"; exit 1; }
+    mv "${AGE_DIR}/${f}.part" "${AGE_DIR}/${f}"
+  fi
+done
+# BAU runs agecheck_run.py (shipped with BAU) with ${VENV}/bin/python; check it works now.
+RUNNER=$(python3 -c 'import bau.media, pathlib; print(pathlib.Path(bau.media.__file__).with_name("agecheck_run.py"))' 2>/dev/null || true)
+if [[ -n ${RUNNER} && -f ${RUNNER} ]]; then
+  runuser -u comfyui -- "${VENV}/bin/python" -I "${RUNNER}" "${AGE_DIR}" /dev/null >/dev/null 2>&1 \
+    || say "   (the age check loads; it is used on the first picture)"
 fi
 
 cat > "${UNIT}" <<EOF

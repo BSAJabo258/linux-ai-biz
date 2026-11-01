@@ -5,6 +5,7 @@ Any change after the card voids it. Instagram and TikTok get sfw only, every pos
 the AI label and a disclosure, nothing refers to minors. Written before the code."""
 
 import datetime as dt
+import json
 
 import pytest
 import yaml
@@ -33,6 +34,9 @@ def plan(home, posts=None, name="nov-week-1"):
     media.mkdir(parents=True, exist_ok=True)
     (media / "mon.jpg").write_bytes(b"\xff\xd8\xff fake jpeg")
     (media / "tue.mp4").write_bytes(b"\x00\x00\x00 fake mp4")
+    # pictures need a passed age check on record (tests/test_agecheck.py)
+    (media / "mon.jpg.provenance.json").write_text(
+        json.dumps({"ai_generated": True, "age_check": {"passed": True, "under_20": 0.05}}))
     posts = posts if posts is not None else [
         {"when": SOON.isoformat(), "platform": "instagram", "tier": "sfw",
          "caption": "Cozy latte by the window. #AI virtual creator", "media": "mon.jpg"},

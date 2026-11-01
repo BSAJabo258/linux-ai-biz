@@ -22,6 +22,15 @@ harming minors; file sd_xl_base_1.0.safetensors, 6,938,078,334 bytes, SHA-256 31
 Every picture: the prompt is checked for anything about minors first (never sent if so), the
 file lands in BAU_HOME/artifacts/media with a provenance record (AI-generated, model, seed,
 prompt hash), and the audit chain gets a media.drawn row.
+
+Nothing childlike (the owner, 2026-11-01): every picture is looked at by an age model before it
+is kept - dima806/fairface_age_image_detection (Apache-2.0 on its page, a ViT on FairFace age
+groups), revision 4e02ab8, run by agecheck_run.py inside ComfyUI's own Python (BAU never loads
+PyTorch). If the three youngest groups (0-2, 3-9, 10-19) add up to more than MAX_UNDER_20, the
+picture is moved to artifacts/rejected and never used; if the check cannot run, it is not kept.
+Sandbox test 2026-11-01 (agecheck_run.py on the pinned model, all nine groups) on two
+real SDXL pictures: 0.25 for one that read young (rejected), 0.05 for a clearly adult one
+(kept). A second guard: the owner still looks at every picture.
 """
 
 from __future__ import annotations
@@ -31,6 +40,8 @@ import hashlib
 import json
 import random
 import re
+import shutil
+import subprocess
 import time
 import urllib.parse
 import urllib.request
@@ -45,6 +56,12 @@ MODEL = "sd_xl_base_1.0.safetensors"
 MODEL_SHA256 = "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b"
 LOCAL = re.compile(r"^http://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$")
 NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,80}$")
+AGE_MODEL = "dima806/fairface_age_image_detection"
+AGE_REVISION = "4e02ab8057ea7fd74b1670940995c5dfda3e6ec0"
+AGE_PYTHON = Path("/usr/local/comfyui/venv/bin/python")
+AGE_DIR = Path("/usr/local/comfyui/age-model")
+YOUNG_GROUPS = ("0-2", "3-9", "10-19")
+MAX_UNDER_20 = 0.10
 NEGATIVE = ("child, childlike, minor, teen, young-looking, school uniform, cartoon, anime, "
             "illustration, character sheet, color swatches, real person, celebrity, text, "
             "watermark, logo")
@@ -52,6 +69,20 @@ NEGATIVE = ("child, childlike, minor, teen, young-looking, school uniform, carto
 
 class ComfyError(RuntimeError):
     pass
+
+
+def under_20(scores: dict[str, float]) -> float:
+    """How likely the face is to read under 20: the three youngest FairFace groups."""
+    return round(sum(float(scores.get(g, 0.0)) for g in YOUNG_GROUPS), 6)
+
+
+def age_scores(path: Path) -> dict[str, float]:
+    """Run the age model in ComfyUI's Python on the desktop (no PyTorch inside BAU)."""
+    run = subprocess.run([str(AGE_PYTHON), "-I", str(Path(__file__).with_name("agecheck_run.py")),
+                          str(AGE_DIR), str(path)], capture_output=True, text=True, timeout=300)
+    if run.returncode != 0:
+        raise OSError((run.stderr or run.stdout).strip()[-300:] or "the age model did not run")
+    return json.loads(run.stdout)
 
 
 def creator_prompt(profile: dict[str, Any], theme: str, shot: str) -> str:
@@ -96,7 +127,7 @@ def _call(opener: Any, url: str, body: dict[str, Any] | None = None, raw: bool =
 
 def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str = BASE,
          opener: Any = None, wait: float = 2.0, max_wait: float = 900.0,
-         **size: int) -> dict[str, Any]:
+         checker: Any = None, **size: int) -> dict[str, Any]:
     """Draw one picture into BAU_HOME/artifacts/media/NAME.png and record where it came from."""
     if not LOCAL.match(base):
         raise ComfyError("pictures are drawn only by a model server on this computer")
@@ -128,16 +159,31 @@ def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str 
     q = urllib.parse.urlencode({k: images[0].get(k, "") for k in ("filename", "subfolder",
                                                                    "type")})
     png = _call(opener, f"{base}/view?{q}", raw=True)
+    audit = AuditLog(home / "audit" / "chain.jsonl")
+    rejected = home / "artifacts" / "rejected"
+    rejected.mkdir(parents=True, exist_ok=True)
+    held = rejected / f"{name}.png"                 # stays here unless the age check passes
+    held.write_bytes(png)
+    try:
+        young = under_20((checker or age_scores)(held))
+    except Exception as e:  # noqa: BLE001 - any failure means the picture is not kept
+        audit.append("media.rejected", "bau", {"file": held.name, "why": "age check failed"})
+        raise ComfyError(f"the age check could not run ({e}); the picture was not kept") from e
+    if young > MAX_UNDER_20:
+        audit.append("media.rejected", "bau", {"file": held.name, "under_20": young})
+        raise ComfyError(f"the picture could pass for under 20 ({young:.2f}); it was moved to "
+                         "artifacts/rejected and will not be used")
     media = home / "artifacts" / "media"
     media.mkdir(parents=True, exist_ok=True)
     out = media / f"{name}.png"
-    out.write_bytes(png)
+    shutil.move(held, out)
     prov = {"ai_generated": True, "generator": "ComfyUI (local)", "model": MODEL, "seed": seed,
             "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
             "file_sha256": hashlib.sha256(png).hexdigest(),
+            "age_check": {"passed": True, "under_20": young, "max": MAX_UNDER_20,
+                          "model": AGE_MODEL, "revision": AGE_REVISION},
             "created": dt.datetime.now(dt.UTC).isoformat()}
     (media / f"{name}.png.provenance.json").write_text(json.dumps(prov, indent=1))
-    AuditLog(home / "audit" / "chain.jsonl").append(
-        "media.drawn", "bau", {"file": out.name, "model": MODEL, "seed": seed,
-                               "file_sha256": prov["file_sha256"]})
+    audit.append("media.drawn", "bau", {"file": out.name, "model": MODEL, "seed": seed,
+                                        "under_20": young, "file_sha256": prov["file_sha256"]})
     return {"file": out.name, "seed": seed, "bytes": len(png)}

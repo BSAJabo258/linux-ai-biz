@@ -37,6 +37,24 @@ the prompt and the file. Every picture is also recorded in the audit log.
 clearly adult. Fanvue's rule is that how she looks counts, not her stated age. Then list the
 good ones in a week plan (docs/WEEK.md).
 
+## The age check on every picture
+
+Every picture is checked by an age model before it is kept. The model is
+`dima806/fairface_age_image_detection`, pinned and checked, and it runs on this computer.
+
+If the picture could pass for under 20 (more than 0.10 on the model's three youngest age
+groups), it is moved to `/var/lib/bau/artifacts/rejected/` and never used. If the check
+cannot run, the picture is not kept either. A week plan refuses any picture without a passed
+check on record.
+
+Tested 2026-11-01 on two real pictures, using BAU's own check script with the pinned model:
+
+- the first try, which looked young, scored 0.25 and was rejected;
+- the clearly adult one scored 0.05 and was kept.
+
+Two pictures is little proof, and the age groups are wide (10-19, 20-29). So it is a second
+guard, and you still look at every picture. Videos are not age-checked yet.
+
 ## What BAU refuses or does on its own
 
 - Anything about minors is never sent to the picture model.

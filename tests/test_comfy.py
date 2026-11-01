@@ -58,7 +58,8 @@ class _Resp:
 def test_a_picture_is_drawn_saved_and_recorded(tmp_path):
     fake = FakeComfy()
     out = comfy.draw(tmp_path, "Aria Vale, a fictional adult, autumn cafe, warm light",
-                     "aria-mon", seed=7, opener=fake, wait=0)
+                     "aria-mon", seed=7, opener=fake, wait=0,
+                     checker=lambda p: {"20-29": 0.9, "10-19": 0.02})   # see test_agecheck
     pic = tmp_path / "artifacts" / "media" / "aria-mon.png"
     assert out["file"] == "aria-mon.png" and pic.read_bytes() == PNG
     prov = json.loads((tmp_path / "artifacts" / "media" / "aria-mon.png.provenance.json")
