@@ -91,26 +91,6 @@
   legal_review_required: true
   verification_note: Signed 2026-09-16 (Governor's office). Operative date not yet confirmed - BAU enforces it now as a precaution. Unlike NY, covers audio ads.
 
-- reg_id: us-ca-ab1609-chatbot
-  jurisdiction: US-CA
-  authority: California Legislature
-  law: AB 1609 (2026) - customer service chatbots at large businesses
-  legal_status: enacted
-  bau_status: MAPPED
-  effective_date: null
-  covered_entities: Businesses with $500M+ annual revenue
-  obligations:
-    - Disclose that the customer is talking to an automated chatbot
-    - Connect to a human within 15 minutes or schedule a callback within 1 day
-    - List contact information on the website
-  penalties: To be confirmed
-  source_url: https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260AB1609
-  source_type: statute
-  last_verified: 2026-10-04
-  next_review: 2026-11-04
-  legal_review_required: true
-  verification_note: Signed 2026-09-28. BAU is far below the revenue threshold today but discloses chatbots everywhere anyway.
-
 - reg_id: us-ca-sb243-companion-chatbot
   jurisdiction: US-CA
   authority: California Legislature
