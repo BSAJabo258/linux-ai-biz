@@ -128,3 +128,20 @@ def test_jarvis_only_stages_it_and_the_owner_picks_visibility(tmp_path, monkeypa
 def test_the_ayrshare_key_goes_with_the_platform_keys():
     from bau import keys
     assert keys.route({"AYRSHARE_API_KEY": "x"})["platforms.env"] == {"AYRSHARE_API_KEY": "x"}
+
+
+# Real run on Qwen3.5-4B (2026-11-01, the recorded video): "Schedule the week nov-week-1."
+# The small model never found schedule_week in its menu and asked instead. Naming a week plan
+# that exists now puts its card on the owner's screen at once (staging changes nothing).
+def test_naming_a_week_puts_its_card_up_for_a_small_model(tmp_path):
+    from bau.models.providers import ScriptedProvider
+    from bau.assistant import Assistant
+    name = plan(tmp_path)
+    a = Assistant(tmp_path, ScriptedProvider(["It's on your screen."]),
+                  {"id": "qwen-local", "deployment": "local"}, "human:owner")
+    r = a.ask(f"Schedule the week {name}.")
+    assert [p["tool"] for p in r.pending] == ["schedule_week"]
+    assert "on the owner's screen" in str(a.provider.calls[0]["messages"][-1]["content"])
+    b = Assistant(tmp_path, ScriptedProvider(["Which one?"]),
+                  {"id": "qwen-local", "deployment": "local"}, "human:owner")
+    assert not b.ask("Schedule the week nope-week.").pending      # only a plan that exists
