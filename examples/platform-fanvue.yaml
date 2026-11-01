@@ -13,7 +13,13 @@ ai_content_policy: >-
 copyright_policy: Only your own work; no AI content made from other people's photos or videos; no copyrighted characters.
 music_policy: not read yet
 advertising_policy: not read yet
-commercial_content_policy: not read yet
+commercial_content_policy: >-
+  Prices (help.fanvue.com, read 2026-11-01): subscriptions $3.99-$100 a month, $9.99-$15 does
+  best on average (articles/16233102-subscription-pricing-retention-guide); a post's price
+  $3-$500 (articles/7860554-how-do-i-set-a-price-for-a-post); Fanvue's guide calls $10-15 a
+  sensible floor for the cheapest pay-per-view item (articles/16237634); creators keep 80%
+  (articles/7860515-earning-rate-changes-for-creators-on-fanvue); free trials exist
+  (articles/7860795). Not found: paid-message and tip limits, multi-month bundles.
 api_policy: not read yet (no Fanvue posting from BAU yet; its adapter is planned)
 automation_policy: not read yet
 account_limits: The human behind a fully AI account completes Fanvue's ID verification (KYC).

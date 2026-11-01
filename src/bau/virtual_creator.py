@@ -7,6 +7,13 @@ Two tiers: ``sfw`` works for every platform; ``explicit`` only for adult platfor
 age-verified audiences (``EXPLICIT_PLATFORMS``) and only when the owner has written the
 profile's own ``explicit_boundaries``. Explicit batches are marked for the local content lane
 model (docs/VIRTUAL-CREATOR.md); Jarvis's tool asks for ``sfw`` only.
+
+Four paid levels on top of the tiers (the owner's plan, 2026-11-01, docs/VIRTUAL-CREATOR.md):
+0 teaser (sfw, free), 1 subscriber (suggestive, Fanvue subscription), 2 nude and 3 xxx (Fanvue
+pay-to-unlock). Prices are the owner's own (`bau creator prices`), never a default.
+Fanvue facts read 2026-11-01 on help.fanvue.com: subscriptions $3.99-$100 a month
+(articles/16233102); a post's price $3-$500 (articles/7860554); creators keep 80%
+(articles/7860515). Paid-message and tip limits were not found on its pages.
 """
 
 from __future__ import annotations
@@ -26,6 +33,22 @@ PLATFORMS = ("instagram", "tiktok", "fanvue")
 # Platforms where the owner may plan explicit adult content.
 EXPLICIT_PLATFORMS = ("fanvue",)
 TIERS = ("sfw", "explicit")
+LEVELS: dict[int, dict[str, Any]] = {
+    0: {"name": "teaser", "tier": "sfw", "platforms": PLATFORMS, "access": "free",
+        "price": None, "line": "Level 0 teaser: free, safe for work, no nudity or sexual "
+                               "activity."},
+    1: {"name": "subscriber", "tier": "sfw", "platforms": ("fanvue",), "access": "subscription",
+        "price": "subscription", "line": "Level 1 subscriber: suggestive and flirty, lingerie "
+                                         "or swimwear at most; no nudity, no sexual activity."},
+    2: {"name": "nude", "tier": "explicit", "platforms": ("fanvue",), "access": "unlock",
+        "price": "nude", "line": "Level 2 nude: artistic nudity of the adult persona alone; "
+                                 "no sexual activity."},
+    3: {"name": "xxx", "tier": "explicit", "platforms": ("fanvue",), "access": "unlock",
+        "price": "xxx", "line": "Level 3 xxx: explicit adult content, only within the owner's "
+                                "explicit_boundaries."},
+}
+# Fanvue's limits in US dollars (read 2026-11-01, see the module docstring).
+PRICE_LIMITS = {"subscription": (3.99, 100.0), "nude": (3.0, 500.0), "xxx": (3.0, 500.0)}
 SHOT_TYPES = ("portrait", "lifestyle", "behind-the-scenes", "story", "short-video")
 # Also the old kids-channel list's terms (2026-10-31), so nothing it caught gets through:
 # toddlers, preschool, nursery, "little ones", plural ages, "ages 2-4", "aged 5". Ages count
@@ -97,6 +120,8 @@ class VirtualCreator:
                 problems.append("explicit_boundaries must list the owner's explicit-tier limits")
             elif any(MINOR_REFERENCE.search(item) for item in explicit):
                 problems.append("explicit_boundaries must not describe content involving minors")
+        if "prices" in p:
+            problems += price_problems(p["prices"])
         platform_rules = p.get("platform_rules", {})
         if not isinstance(platform_rules, dict):
             problems.append("platform_rules must map platform names to owner-reviewed rules")
@@ -123,8 +148,19 @@ class VirtualCreator:
                 "Do not imitate a real person or introduce age ambiguity.")
 
     def batch(self, theme: str, platform: str, count: int = 7,
-              shot_types: list[str] | None = None, tier: str = "sfw") -> dict[str, Any]:
+              shot_types: list[str] | None = None, tier: str = "sfw",
+              level: int | None = None) -> dict[str, Any]:
         self._ready()
+        lv = None
+        if level is not None:
+            if level not in LEVELS:
+                raise CreatorError("level is 0 (teaser), 1 (subscriber), 2 (nude) or 3 (xxx)")
+            lv, tier = LEVELS[level], LEVELS[level]["tier"]
+            if platform not in lv["platforms"]:
+                raise CreatorError(f"level {level} ({lv['name']}) goes only to "
+                                   f"{', '.join(lv['platforms'])}")
+            if lv["price"] and lv["price"] not in (self.profile.get("prices") or {}):
+                raise CreatorError(f"set your {lv['price']} price first: bau creator prices")
         if platform not in PLATFORMS:
             raise CreatorError(f"unknown platform {platform!r}; use {', '.join(PLATFORMS)}")
         if tier not in TIERS:
@@ -155,6 +191,9 @@ class VirtualCreator:
                      "with the local content lane model only." if tier == "explicit" else
                      "Tier: sfw. Suitable for mainstream platforms; no nudity or sexual "
                      "activity.")
+        if lv:
+            tier_line = lv["line"] + (" Draft with the local content lane model only."
+                                      if tier == "explicit" else "")
         posts = []
         for i in range(count):
             kind = kinds[i % len(kinds)]
@@ -181,7 +220,13 @@ class VirtualCreator:
                            "check platform_rules and current platform policy",
                            "review caption and AI disclosure before posting"],
             })
+        paid = {}
+        if lv:
+            paid = {"level": level, "level_name": lv["name"], "access": lv["access"]}
+            if lv["price"]:
+                paid["price_usd"] = p["prices"][lv["price"]]
         return {
+            **paid,
             "profile": p["id"], "platform": platform, "theme": theme, "tier": tier,
             "created_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
             "identity_lock": identity, "platform_rules": rules,
@@ -191,9 +236,40 @@ class VirtualCreator:
         }
 
 
+def price_problems(prices: Any) -> list[str]:
+    if not isinstance(prices, dict):
+        return ["prices must map subscription, nude and xxx to US dollars"]
+    out = []
+    for key, value in prices.items():
+        if key not in PRICE_LIMITS:
+            out.append(f"unknown price {key!r}; use {', '.join(PRICE_LIMITS)}")
+            continue
+        low, high = PRICE_LIMITS[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) \
+                or not low <= value <= high:
+            out.append(f"{key} price must be ${low:.2f} to ${high:.2f} (Fanvue's limits)")
+    return out
+
+
+def set_prices(path: Path, prices: dict[str, float]) -> None:
+    """The owner's prices into the profile, keeping the rest of the file as written."""
+    prices = {k: round(float(v), 2) for k, v in prices.items()}
+    if bad := price_problems(prices):
+        raise CreatorError("; ".join(bad))
+    text = Path(path).read_text(encoding="utf-8")
+    text = re.sub(r"^prices:.*\n(?:[ \t]+.*\n?)*", "", text, flags=re.MULTILINE)
+    block = yaml.safe_dump({"prices": prices}, sort_keys=False)
+    Path(path).write_text(text.rstrip("\n") + "\n" + block, encoding="utf-8")
+
+
 def write_markdown(batch: dict[str, Any]) -> str:
+    paid = []
+    if "level" in batch:
+        paid = [f"Level: {batch['level']} ({batch['level_name']})  ",
+                f"Access: {batch['access']}"
+                + (f" at ${batch['price_usd']:.2f}" if "price_usd" in batch else "") + "  "]
     lines = [f"# {batch['profile']} content batch", "",
-             f"Platform: {batch['platform']}  ", f"Tier: {batch['tier']}  ",
+             f"Platform: {batch['platform']}  ", f"Tier: {batch['tier']}  ", *paid,
              f"Theme: {batch['theme']}", "",
              "> Draft prompts only. Review the current platform policy and every item "
              "before generation or publication.", "",
