@@ -259,6 +259,7 @@ How the *My Jarvis OS* spec maps onto this repository, and the build order:
 | [docs/HANDS.md](docs/HANDS.md) | Jarvis does terminal jobs, one command at a time, each on your yes |
 | [docs/TOOLBOX.md](docs/TOOLBOX.md) | Researched open-source tools Jarvis looks up before guessing; licences to watch |
 | [docs/CAPABILITY-MAP.md](docs/CAPABILITY-MAP.md) | What Jarvis can do, what's missing, which tools fill each gap, and the build order |
+| [docs/HARNESS-MAP.md](docs/HARNESS-MAP.md) | Every part of BAU on one map, the five loops that should share one tool list, what Hermes Agent and LocalHarness offer, and the build plan |
 | [docs/engineering/repo-intelligence.md](docs/engineering/repo-intelligence.md) | Repo Scout (`bau scout`) and the weekly open-source watch |
 | [docs/GODS-EYE.md](docs/GODS-EYE.md) | God's Eye: earthquakes, aircraft and satellites on a world map in Jarvis; what it will never do |
 
