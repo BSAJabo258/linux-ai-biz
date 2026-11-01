@@ -53,6 +53,7 @@ class Handler:
     provider: str | None = None          # external provider id, if data leaves the machine
     estimate_usd: Callable[[dict[str, Any]], float] = field(default=lambda args: 0.0)
     description: str = ""
+    local: bool = False                  # never touches the network: network trust is moot
 
 
 @dataclass
@@ -119,12 +120,14 @@ class Gateway:
                 min_level="APPROVAL_REQUIRED" if b["requires_approval"] else None)
         except PermissionDenied as e:
             raise self._deny(req, "permission", str(e)) from e
-        trust = self.trust()
-        if h.needs_network and trust == network.Trust.OFFLINE:
-            raise self._deny(req, "network", "offline - job must WAIT_FOR_NETWORK",
-                             WaitingForNetwork)
-        if not network.allows(trust, level):
-            raise self._deny(req, "network", f"{trust} network cannot run {level} actions")
+        trust = None if h.local else self.trust()
+        if trust is not None:
+            if h.needs_network and trust == network.Trust.OFFLINE:
+                raise self._deny(req, "network", "offline - job must WAIT_FOR_NETWORK",
+                                 WaitingForNetwork)
+            if not network.allows(trust, level):
+                raise self._deny(req, "network",
+                                 f"{trust} network cannot run {level} actions")
         if h.provider is not None:
             ok, why = provider_allows(self.providers.get(h.provider), req.data_classes)
             if not ok:
@@ -133,7 +136,8 @@ class Gateway:
         ok, why = self.budgets.check(self.ledger, req.agent, est, req.job_id, req.mission_id)
         if not ok:
             raise self._deny(req, "budget", why)
-        return {"level": level, "blast": b["level"], "trust": str(trust), "estimate_usd": est}
+        return {"level": level, "blast": b["level"], "trust": str(trust or "local"),
+                "estimate_usd": est}
 
     def invoke(self, req: CallRequest) -> Any:
         info = self.check(req)

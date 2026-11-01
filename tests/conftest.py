@@ -14,6 +14,15 @@ WHEN = dt.datetime(2026, 10, 4, 15, 0, tzinfo=dt.UTC)
 
 
 @pytest.fixture(autouse=True)
+def no_real_network(monkeypatch):
+    """Tests never ask the real network whether it is up (Jarvis's tools now pass the
+    gateway's network check): an online, unknown, wired network unless a test says else."""
+    from bau import network
+    monkeypatch.setattr(network, "detect", lambda: network.NetworkFacts(online=True,
+                                                                         wired=True))
+
+
+@pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):
     home = tmp_path / "bauhome"
     home.mkdir()
