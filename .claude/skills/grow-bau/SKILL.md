@@ -30,7 +30,7 @@ Answer these in writing before you search anything:
    Space on the stick, network use, paid API calls.
 6. **Can it work offline?** If not, say exactly what it needs online.
 7. **What could go wrong?** Check it against every rule in `CLAUDE.md` (approvals,
-   kids, secrets, ports, untrusted data, compliance claims).
+   adults only, secrets, ports, untrusted data, compliance claims).
 8. **Is it worth doing now**, or should it wait on the watch list?
 
 If the answers say "already have it" or "not worth it now", stop and tell the owner why.
@@ -126,7 +126,7 @@ Only after the owner says yes:
 
 - Never install or run a candidate outside a sandbox, and never before the owner says yes.
 - Never give anything a tool that approves money, email, legal or posting.
-- Never send kids content anywhere but YouTube made-for-kids.
+- Never make anything that involves or refers to minors; explicit content goes only to Fanvue.
 - Never give abliterated or uncensored models tools or network: content lane only.
 - Never open ports, turn off encryption or AppArmor, or bind beyond 127.0.0.1.
 - Never put secrets in the repo, the chat or a log: names only.
@@ -160,5 +160,5 @@ each has a number to measure, so "better" is never a guess.
 - **Self-improving, supervised:** a coding agent that proposes changes to BAU itself as
   pull requests, with tests first; a human merges. Measure: pull requests merged without
   a fix-up.
-- **Results that pay:** the studio, series and publishing lanes tied to the results
-  tracker, so effort goes where watch time and earnings are. Measure: profit per video.
+- **Results that pay:** the creator's posts tied to what each one earned on Fanvue,
+  Instagram and TikTok, so effort goes where earnings are. Measure: profit per post.
