@@ -51,7 +51,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          gh release delete bau-update --yes --cleanup-tag || true
-          gh release create bau-update dist/bau-*.whl dist/bau-update.json \
-            --target "$SHA" --prerelease --title "BAU update (${SHA:0:7})" \
-            --notes "Built from ${SHA} after every check passed on main. The desktop installs it by itself at night when the owner turned updates on (docs/UPDATES.md)."
+          # Never delete the release: a desktop checking at that moment would get a 404.
+          # The wheel goes up first, the record naming it last; a desktop in between finds
+          # the old record and a new file, refuses the SHA-256 mismatch, and tries next night.
+          notes="Built from ${SHA} after every check passed on main. The desktop installs it by itself at night when the owner turned updates on (docs/UPDATES.md)."
+          if gh release view bau-update >/dev/null 2>&1; then
+            gh release upload bau-update dist/bau-*.whl --clobber
+            gh release upload bau-update dist/bau-update.json --clobber
+            gh release edit bau-update --title "BAU update (${SHA:0:7})" --notes "$notes"
+          else
+            gh release create bau-update dist/bau-*.whl dist/bau-update.json \
+              --target "$SHA" --prerelease --title "BAU update (${SHA:0:7})" --notes "$notes"
+          fi

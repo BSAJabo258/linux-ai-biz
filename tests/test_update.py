@@ -203,6 +203,10 @@ def test_ci_builds_the_wheel_only_from_a_green_main():
     assert "github.event.workflow_run.head_branch == 'main'" in wf
     assert "github.event.workflow_run.event == 'push'" in wf
     assert "head_sha" in wf and "bau-update.json" in wf and "contents: write" in wf
+    # The owner's first run (2026-11-01) hit the gap while the release was deleted and made
+    # again: 404. Files are replaced in place, the wheel before the record that names it.
+    assert "release delete" not in wf
+    assert wf.index("dist/bau-*.whl --clobber") < wf.index("dist/bau-update.json --clobber")
 
 
 def test_the_timer_runs_nightly_as_root_and_install_enables_it():
