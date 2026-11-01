@@ -181,15 +181,6 @@ Instagram or Facebook means one adapter plus its policy record in the platform r
 | TikTok | `tiktok.py` (Content Posting API) | privacy, commercial disclosure | never (13+) |
 | YouTube | `youtube.py` (Data API v3, resumable upload) | audience (made for kids or not), privacy, full-watch confirmation for kids | yes, made for kids |
 
-Kids rules live in the `publish` policy domain (`data/policies/kids_content.yaml`) and only
-apply when a video is child-directed. `kids.scan` turns the title, description and tags into
-facts: personal-info requests, links, engagement bait, purchase pressure, unsuitable themes,
-sensational titles, third-party characters, and near-duplicate episodes. The rules cite
-`us-coppa`, `industry-youtube-made-for-kids`, `us-ftc-act-s5`, `us-ftc-endorsement-guides`,
-`us-lanham-act` and `industry-youtube-inauthentic-content` (near-copies are a review
-warning, not a block). Uploads set `selfDeclaredMadeForKids` and `containsSyntheticMedia`;
-paid promotion uploads go up private, because the API cannot tick the box.
-
 ## Two tiers: operator and Governor
 
 BAU is run by two AIs with different jobs:

@@ -1,0 +1,23 @@
+# Fanvue platform policy record (bau platform add examples/platform-fanvue.yaml).
+# Read 2026-11-01 on help.fanvue.com ("AI content on Fanvue: what's allowed") and
+# legal.fanvue.com/acceptable-use-policy. Fields marked "not read yet" were not checked on an
+# official page: read them before relying on them. Re-verify at least every 90 days.
+platform: fanvue
+policy_version: "Help centre 'AI content on Fanvue' + Community Guidelines Section D (read 2026-11-01)"
+ai_content_policy: >-
+  AI media must be disclosed clearly and prominently (profile bio, caption or watermark) and
+  every AI account type shows the AI label. A fully AI account never tells fans it is a real
+  person. AI characters must look clearly adult; stated ages do not override how they look. No
+  real, identifiable person without verification and documented consent; no content made from
+  other people's photos or videos; no copyrighted characters.
+copyright_policy: Only your own work; no AI content made from other people's photos or videos; no copyrighted characters.
+music_policy: not read yet
+advertising_policy: not read yet
+commercial_content_policy: not read yet
+api_policy: not read yet (no Fanvue posting from BAU yet; its adapter is planned)
+automation_policy: not read yet
+account_limits: The human behind a fully AI account completes Fanvue's ID verification (KYC).
+appeal_process: not read yet
+requires_ai_label: true
+source_url: https://help.fanvue.com/en/articles/9538738-is-ai-content-allowed-on-fanvue
+last_verified: 2026-11-01
