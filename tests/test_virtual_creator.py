@@ -59,3 +59,24 @@ def test_jarvis_tool_only_drafts_sfw(tmp_path):
     a = Assistant(home=tmp_path)
     assert a.t_creator_batch("aria", "evening", "fanvue", 1)["tier"] == "sfw"
     assert "tier" not in a.tools["creator_batch"].schema["properties"]
+
+
+def test_jarvis_uses_the_only_profile_and_says_how_to_make_one(tmp_path):
+    a = Assistant(home=tmp_path)
+    out, err = a._run_tool("creator_batch", {"theme": "autumn", "platform": "instagram"})
+    assert err and "bau creator init" in out["error"] and "Errno" not in out["error"]
+    _profile(tmp_path)
+    out, err = a._run_tool("creator_batch", {"theme": "autumn", "platform": "instagram",
+                                             "count": 2})
+    assert not err and out["tier"] == "sfw" and len(out["posts"]) == 2
+    out, err = a._run_tool("creator_batch", {"creator": "nova", "theme": "x",
+                                             "platform": "instagram"})
+    assert err and "aria" in out["error"]                  # names the ones that exist
+
+
+def test_creator_init_puts_the_starter_where_jarvis_looks(tmp_path, monkeypatch, capsys):
+    from bau.cli import main
+    monkeypatch.setenv("BAU_HOME", str(tmp_path))
+    assert main(["creator", "init"]) == 0
+    assert (tmp_path / "creators" / "aria.yaml").is_file()
+    assert "aria" in capsys.readouterr().out

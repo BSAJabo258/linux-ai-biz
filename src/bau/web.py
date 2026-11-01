@@ -33,8 +33,9 @@ MAX_TEXT = 20_000
 TIMEOUT = 20
 DEADLINE = 45          # a whole page, however slowly it arrives (audit 2026-10-25)
 TEXT_TYPES = ("text/html", "text/plain", "application/xhtml+xml")
-NOT_RUNNING = ("the private search is not running on this computer; docs/RESEARCH.md says "
-               "how to start it")
+NOT_RUNNING = ("the private search is not running on this computer. On the installed laptop, "
+               "with internet, the owner runs once: sudo bash /opt/bau-payload/"
+               "bau-search-setup.sh (docs/RESEARCH.md)")
 
 
 def _need_reason(why: str) -> None:

@@ -169,3 +169,38 @@ def test_earlier_answers_are_not_carried_into_a_local_models_instructions(tmp_pa
     b.ask("hi")
     assert "status?" in b.provider.calls[0]["system"]
     assert "The system is fine." not in b.provider.calls[0]["system"]
+
+
+# Real run, 2026-11-01 (Qwen3.5-4B, llama.cpp b11747, fresh home): told "Remember that the
+# creator posts at 7pm", it was handed recall's facts, searched twice, saved nothing and said
+# "I've saved that". A command to remember is not a question about the past.
+def test_a_remember_command_is_not_answered_with_recall(tmp_path):
+    a = lean(tmp_path, [{"tool": "remember", "input": {"title": "posting", "note": "7pm"}},
+                        "Saved."])
+    r = a.ask("Remember that the creator posts on Instagram every day at 7pm.")
+    assert "Facts already looked up" not in str(a.provider.calls[0]["messages"][-1]["content"])
+    assert r.cards[0]["tool"] == "remember"
+    b = lean(tmp_path, ["We said 7pm."])
+    b.ask("Do you remember what we decided about posting?")
+    assert "Facts already looked up" in str(b.provider.calls[0]["messages"][-1]["content"])
+
+
+# Same run: "What workspaces do I have?" - the menu line for workspaces was cut at "e.g" and
+# the model never found it.
+def test_menu_lines_are_not_cut_at_an_abbreviation(tmp_path):
+    lines = lean(tmp_path, ["ok"]).t_tool_menu()["tools"]
+    ws = next(x for x in lines if x.startswith("workspaces:"))
+    assert "creator week" in ws
+    a = lean(tmp_path, ["You have none yet."])
+    r = a.ask("What workspaces do I have?")
+    assert r.cards and r.cards[0]["tool"] == "workspaces"
+
+
+# Same run: with no limits set, the model said "4 calls remaining before today's limit".
+def test_usage_says_plainly_when_no_limit_is_set(tmp_path):
+    assert "No daily limits are set." in lean(tmp_path, ["ok"]).t_usage()["say"]
+
+
+# Same run: asked to plan the creator's posts, it never saw creator_batch (menu only).
+def test_the_creator_batch_is_in_a_small_models_core_tools(tmp_path):
+    assert "creator_batch" in CORE_TOOLS

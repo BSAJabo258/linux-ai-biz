@@ -125,13 +125,15 @@ def load_constitution(home: Path) -> str:
 # A small local model on the laptop reads every tool description before each answer
 # (measured: 34 tools = 3,155 tokens, ~52 s on the laptop's CPU). It gets these in full and
 # a one-line menu of the rest (tool_menu), run through use_tool - the same gateway.
-CORE_TOOLS = ("system_status", "recall", "remember", "toolbox", "missions", "usage_today",
-              "hold_everything", "web_search")
+CORE_TOOLS = ("system_status", "recall", "remember", "toolbox", "usage_today",
+              "hold_everything", "web_search", "creator_batch")
 LEAN_MAX_TOKENS = 400                         # spoken answers; a small model can loop
 LEAN_NOTE = ("You see a few tools in full. tool_menu lists the others in one line each "
              "(tool_menu with a name shows one in full); run any of them with use_tool. "
              "Before saying something doesn't exist, look: toolbox, recall, tool_menu.")
 META_TOOLS = ("tool_menu", "use_tool")
+# Where a menu line ends: the first sentence ("e.g. the creator" is not a sentence end).
+SENTENCE_END = re.compile(r"(?<![.\s][a-z])\.\s+(?=[A-Z])")
 # Small models often announce a lookup ("Let me search...") and stop without doing it.
 ANNOUNCED = re.compile(r"\b(let me|i'll|i will|i am going to|i'm going to)\b[^.?!]{0,60}"
                        r"\b(search|look|check|find|ask|use|see)\b", re.I)
@@ -149,8 +151,12 @@ GROUND = (
                 re.I), "publish_queue", lambda q: {}),
     (re.compile(r"\b(tools?|repos?|open.source|librar(y|ies)|already have)\b", re.I),
      "toolbox", lambda q: {"question": q}),
-    (re.compile(r"\b(remember|last time|we decided|earlier|my notes)\b", re.I),
+    # "Remember that ..." is a command to save (real run 2026-11-01: handed recall's facts,
+    # the model saved nothing and said it had), so only questions about the past match.
+    (re.compile(r"^(?!\W*(?:please\W+|jarvis\W+)*remember\b).*"
+                r"\b(remember|last time|we decided|earlier|my notes)\b", re.I | re.S),
      "recall", lambda q: {"query": q}),
+    (re.compile(r"\bworkspaces?\b", re.I), "workspaces", lambda q: {}),
 )
 
 
@@ -362,8 +368,10 @@ class Assistant:
                  "owner's own command (bau creator batch --tier explicit), never this tool. "
                  "Pass the profile id, theme, platform and optional post count.",
                  _schema({"creator": {"type": "string"}, "theme": {"type": "string"},
-                          "platform": {"type": "string"}, "count": {"type": "integer"}},
-                         ["creator", "theme", "platform"]), self.t_creator_batch),
+                          "platform": {"type": "string",
+                                       "enum": ["instagram", "tiktok", "fanvue"]},
+                          "count": {"type": "integer"}},
+                         ["theme", "platform"]), self.t_creator_batch),
             Tool("draft_stage", "Draft the next stage of one episode (only the files that "
                  "stage lists are read; only its output folder is written). The stage folder "
                  "says which brain drafts it: small (free local model), strong (Claude) or "
@@ -414,7 +422,8 @@ class Assistant:
             return {"name": t.name, "description": t.description,
                     "parameters": t.schema, "how": how}
         rest = [t for n, t in self.tools.items() if n not in CORE_TOOLS and n not in META_TOOLS]
-        return {"tools": [f"{t.name}: {t.description.split('. ')[0][:110]}" for t in rest],
+        return {"tools": [f"{t.name}: {SENTENCE_END.split(t.description)[0][:110]}"
+                          for t in rest],
                 "how": how}
 
     def t_use_tool(self, name: str, input: dict[str, Any] | None = None) -> Any:  # noqa: A002
@@ -580,6 +589,7 @@ class Assistant:
         t, w = s["today"], s["week"]
         say = (f"Today: {t['calls']} model calls, {t['tokens']:,} tokens, ${t['usd']:.2f}. "
                f"This week: {w['calls']} calls, ${w['usd']:.2f}."
+               + ("" if s["limits"] else " No daily limits are set.")
                + (f" Warnings: {'; '.join(map(str, s['warnings']))}." if s["warnings"] else ""))
         return {"say": say, **s, "by_model": s["by_model"][:8]}
 
@@ -734,11 +744,18 @@ class Assistant:
                            + "see already_researched (the toolbox).")
         return out
 
-    def t_creator_batch(self, creator: str, theme: str, platform: str,
+    def t_creator_batch(self, creator: str = "", theme: str = "", platform: str = "",
                         count: int = 7) -> dict[str, Any]:
         from .virtual_creator import CreatorError, VirtualCreator
-        if not re.fullmatch(r"[a-z][a-z0-9-]{0,30}", creator):
-            raise ValueError("creator id must be lowercase letters, digits, and hyphens")
+        if not theme or not platform:
+            raise ValueError("give a theme and a platform (instagram, tiktok or fanvue)")
+        have = sorted(p.stem for p in (self.home / "creators").glob("*.yaml"))
+        if not have:
+            raise ValueError("there is no creator profile yet: the owner runs "
+                             "`bau creator init`, edits it, then `bau creator check`")
+        creator = creator.strip().lower() or (have[0] if len(have) == 1 else "")
+        if creator not in have:
+            raise ValueError(f"which creator? The profiles are: {', '.join(have)}")
         path = self.home / "creators" / f"{creator}.yaml"
         try:
             batch = VirtualCreator(path).batch(theme, platform, int(count), tier="sfw")
