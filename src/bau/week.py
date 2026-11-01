@@ -50,6 +50,7 @@ MAX_MEDIA = 30 * 1024 * 1024
 DISCLOSURE = re.compile(r"(#ai\b|\bai[- ](generated|creator|model|influencer|art)\b|"
                         r"\bvirtual (creator|influencer|model)\b|\bmade with ai\b)", re.I)
 NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,60}$")
+PICTURES = (".png", ".jpg", ".jpeg", ".webp")   # videos: no age check yet
 
 
 class WeekError(ValueError):
@@ -115,7 +116,19 @@ def problems(home: Path, name: str, now: dt.datetime | None = None) -> list[str]
             out.append(f"{say}: media must be a file in BAU_HOME/artifacts/media")
         elif m.stat().st_size > MAX_MEDIA:
             out.append(f"{say}: media is over Ayrshare's 30 MB upload limit")
+        elif m.suffix.lower() in PICTURES and not _age_checked(m):
+            out.append(f"{say}: {m.name} has no passed age check on record; draw it with "
+                       "bau creator draw, which checks every picture")
     return out
+
+
+def _age_checked(picture: Path) -> bool:
+    """Nothing childlike: a picture is used only with a passed age check on record."""
+    try:
+        prov = json.loads(picture.with_name(picture.name + ".provenance.json").read_text())
+    except (OSError, ValueError):
+        return False
+    return (prov.get("age_check") or {}).get("passed") is True
 
 
 def digest(home: Path, name: str) -> str:
