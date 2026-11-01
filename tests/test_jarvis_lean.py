@@ -175,11 +175,25 @@ def test_earlier_answers_are_not_carried_into_a_local_models_instructions(tmp_pa
 # creator posts at 7pm", it was handed recall's facts, searched twice, saved nothing and said
 # "I've saved that". A command to remember is not a question about the past.
 def test_a_remember_command_is_not_answered_with_recall(tmp_path):
-    a = lean(tmp_path, [{"tool": "remember", "input": {"title": "posting", "note": "7pm"}},
-                        "Saved."])
+    a = lean(tmp_path, ["Saved."])
     r = a.ask("Remember that the creator posts on Instagram every day at 7pm.")
     assert "Facts already looked up" not in str(a.provider.calls[0]["messages"][-1]["content"])
     assert r.cards[0]["tool"] == "remember"
+
+
+# Real-model check, 2026-11-01 (second run): asked to remember, the model searched instead and
+# said "I'm adding that". A small model is not trusted with it: the note is saved first.
+def test_a_remember_command_is_saved_before_the_model_answers(tmp_path):
+    a = lean(tmp_path, ["Got it."])
+    r = a.ask("Jarvis, remember that the creator posts on Instagram every day at 7pm.")
+    notes = list((tmp_path / "memory" / "records").glob("*.md"))
+    assert len(notes) == 1 and "every day at 7pm" in notes[0].read_text()
+    assert "Already saved" in str(a.provider.calls[0]["messages"][-1]["content"])
+    assert r.cards[0]["tool"] == "remember" and r.text == "Got it."
+    b = lean(tmp_path, ["We said 7pm."])
+    b.ask("Do you remember when the creator posts?")
+    # a question saves nothing
+    assert len(list((tmp_path / "memory" / "records").glob("*.md"))) == 1
     b = lean(tmp_path, ["We said 7pm."])
     b.ask("Do you remember what we decided about posting?")
     assert "Facts already looked up" in str(b.provider.calls[0]["messages"][-1]["content"])
