@@ -674,6 +674,13 @@ def cmd_update(a):
         AuditLog().append("update.mode", who, {"mode": a.update_cmd})
         _out(U.status())
         return 0
+    if a.update_cmd == "keep":
+        try:
+            U.keep(Path(a.wheel), a.commit)
+        except ValueError as e:
+            raise SystemExit(f"bau update keep: {e}") from None
+        _out(U.status())
+        return 0
     out = U.run(audit=lambda ev: AuditLog().append(ev[0], "bau-update", ev[1]))
     _out(out)
     return 0 if out["result"] in ("off", "up to date", "installed", "no answer") else 1
@@ -1784,6 +1791,10 @@ def register(sub: argparse._SubParsersAction) -> None:
     w.add_parser("now", help="root: check for a tested update and install it now")
     w.add_parser("auto", help="you, with sudo: install tested updates by themselves each night")
     w.add_parser("off", help="you, with sudo: stop automatic updates")
+    x = w.add_parser("keep", help="root: record an installed build as the one to go back to "
+                                  "(bau-update-first.sh)")
+    x.add_argument("wheel")
+    x.add_argument("commit")
     s.set_defaults(fn=cmd_update)
 
     s = sub.add_parser("team", help="who runs the show: boss, thinker, specialist (docs/TEAM.md)")

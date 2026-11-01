@@ -3,8 +3,8 @@
 # Run once, as root, on the installed desktop:
 #   sudo bash bau-update-first.sh
 # It fetches the newest BAU that passed every check on main, checks its SHA-256, installs it,
-# turns automatic updates on and runs the first one (which restarts Mission Control, checks it
-# answers and goes back to the stick's own build if it does not).
+# checks it starts (else puts the stick's own back), keeps it as the build to go back to, and
+# turns automatic updates on. Safe to run again.
 set -euo pipefail
 
 URL="https://github.com/BSAJabo258/linux-ai-biz/releases/download/bau-update"
@@ -23,9 +23,10 @@ work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
 say "1/3 The newest tested build..."
 curl -fsSL --retry 3 -o "${work}/bau-update.json" "${URL}/bau-update.json"
-read -r wheel sha < <(python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1]));
-print(m["wheel"], m["sha256"])' "${work}/bau-update.json")
-[[ ${wheel} =~ ^bau-[0-9][0-9A-Za-z.+]*-py3-none-any\.whl$ && ${sha} =~ ^[0-9a-f]{64}$ ]] \
+read -r wheel sha commit < <(python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1]));
+print(m["wheel"], m["sha256"], m["commit"])' "${work}/bau-update.json")
+[[ ${wheel} =~ ^bau-[0-9][0-9A-Za-z.+]*-py3-none-any\.whl$ && ${sha} =~ ^[0-9a-f]{64}$ \
+   && ${commit} =~ ^[0-9a-f]{40}$ ]] \
   || { say "The update record looks wrong: stopping"; exit 1; }
 curl -fsSL --retry 3 -o "${work}/${wheel}" "${URL}/${wheel}"
 echo "${sha}  ${work}/${wheel}" | sha256sum -c --quiet \
@@ -33,6 +34,10 @@ echo "${sha}  ${work}/${wheel}" | sha256sum -c --quiet \
 
 say "2/3 Installing it..."
 /opt/bau/venv/bin/pip install --quiet --no-index --no-deps --force-reinstall "${work}/${wheel}"
+/opt/bau/venv/bin/python -I -c 'import bau.cli, bau.cli_ext, bau.assistant, bau.update' \
+  || { say "The new version does not start: putting the stick's back";
+       /opt/bau/venv/bin/pip install --quiet --no-index --no-deps --force-reinstall \
+         /opt/bau-payload/wheels/bau-*.whl; exit 1; }
 # The same two files as installer/payload/systemd/ (a test keeps them equal).
 cat > /etc/systemd/system/bau-update.service <<'UNIT'
 [Unit]
@@ -66,8 +71,11 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now bau-update.timer >/dev/null
 
-say "3/3 Automatic updates on, and the first one now..."
+say "3/3 Automatic updates on..."
 export BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key
-/usr/local/bin/bau update auto >/dev/null
-/usr/local/bin/bau update now
+# This build is the one to go back to from now on (the stick's own has no updater).
+/opt/bau/venv/bin/bau update keep "${work}/${wheel}" "${commit}" >/dev/null
+/opt/bau/venv/bin/bau update auto >/dev/null
+systemctl restart bau-ui.service 2>/dev/null || true
+/opt/bau/venv/bin/bau update status
 say "Done. BAU now updates itself each night; see it with: bau update status"
