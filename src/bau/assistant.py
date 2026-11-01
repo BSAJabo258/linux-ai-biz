@@ -31,6 +31,7 @@ import json
 import os
 import re
 import secrets
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -133,9 +134,10 @@ LEAN_NOTE = ("You see a few tools in full. tool_menu lists the others in one lin
              "Before saying something doesn't exist, look: toolbox, recall, tool_menu.")
 META_TOOLS = ("tool_menu", "use_tool")
 # Harness step 1 (docs/HARNESS-MAP.md): Jarvis's read and act tools run through the Universal
-# Gateway as agent "jarvis". These reach the internet, so network trust applies to them; the
-# rest work on this computer only. hold_everything only makes BAU safer, so it runs on HOLD.
-NETWORK_TOOLS = {"web_search", "read_page", "world_watch", "find_tools", "video_clips"}
+# Gateway as agent "jarvis". These reach the internet directly, so network trust applies to
+# them (world_watch is not here: offline it still answers from its 5-minute cache).
+# hold_everything only makes BAU safer, so it runs on HOLD.
+NETWORK_TOOLS = {"web_search", "read_page", "find_tools", "video_clips"}
 SAFE_ON_HOLD = {"hold_everything"}
 # Where a menu line ends: the first sentence ("e.g. the creator" is not a sentence end).
 SENTENCE_END = re.compile(r"(?<![.\s][a-z])\.\s+(?=[A-Z])")
@@ -252,19 +254,27 @@ class Assistant:
         from .gateway import Gateway, Handler
         from .governor import hold_reason
         home = self.home
+        ask = trust or (lambda: network.TrustPolicy(
+            home / "security" / "networks.yaml").classify(network.detect()))
+        seen: dict[str, Any] = {}
+
+        def trust_now() -> Any:           # the probes take seconds offline: once a minute
+            if time.monotonic() - seen.get("at", -1e9) > 60:
+                seen.update(at=time.monotonic(), trust=ask())
+            return seen["trust"]
+
         gw = Gateway(audit=self.audit, ledger=Ledger(home),
                      budgets=Budgets.load(home / "config" / "budgets.yaml"),
-                     trust=trust or (lambda: network.TrustPolicy(
-                         home / "security" / "networks.yaml").classify(network.detect())),
-                     hold=lambda: hold_reason(home))
+                     trust=trust_now, hold=lambda: hold_reason(home))
         caps = {}
         for t in self.tools.values():
             if t.kind == "confirm" or t.name in META_TOOLS:
                 continue                  # staged for the owner / only dispatch to others
             cap = f"{'inspect' if t.kind == 'read' else 'change'}.jarvis.{t.name}"
-            level = "READ_ONLY" if t.kind == "read" or t.name in SAFE_ON_HOLD else "LOW_RISK"
+            level = "READ_ONLY" if t.kind == "read" else "LOW_RISK"
             net = t.name in NETWORK_TOOLS
             gw.register(cap, Handler(t.fn, level, needs_network=net, local=not net,
+                                     safe_on_hold=t.name in SAFE_ON_HOLD,
                                      description=t.description[:200]))
             caps[t.name] = cap
         return gw, caps
@@ -1223,8 +1233,10 @@ class Assistant:
             self._log("jarvis", msg)
             return Reply(msg, pending=[p.public()], mode="plain")
         if re.search(r"\b(hold|freeze|stop everything|pause everything)\b", t):
-            out, _ = self._run_tool("hold_everything", {"reason": text[:120]})
-            msg = "Done. Everything's on hold; only read-only work runs until you release it."
+            out, err = self._run_tool("hold_everything", {"reason": text[:120]})
+            msg = ("Done. Everything's on hold; only read-only work runs until you release it."
+                   if not err else f"I couldn't put BAU on hold: {out.get('error')}. "
+                   "Run `bau governor hold` in a terminal.")
             self._log("jarvis", msg)
             return Reply(msg, [{"tool": "hold_everything", "data": out}], mode="plain")
         # Before the routes: "what did the video transcripts say" is not the publish queue.

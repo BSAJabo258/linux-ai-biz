@@ -77,3 +77,43 @@ def test_a_network_that_blocks_outside_dns_is_still_online(monkeypatch):
     assert network.is_online()
     monkeypatch.setattr(network, "_reachable", lambda h, p, t=2.0: False)
     assert not network.is_online()
+
+
+# Code review of step 1 (2026-11-01): with Jarvis's model spend over the default budget
+# ($2/hour), every Jarvis tool was refused at the budget step, hold_everything included.
+def test_free_tools_and_holding_are_never_stopped_by_the_budget(tmp_path):
+    from bau.economics import Ledger
+    Ledger(tmp_path).cost("model", 25.0, agent="jarvis", provider="anthropic")
+    a = make(tmp_path)
+    out, err = a._run_tool("system_status", {})
+    assert not err
+    out, err = a._run_tool("hold_everything", {"reason": "over budget"})
+    assert not err
+
+
+def test_hold_runs_on_hold_without_pretending_to_be_read_only(tmp_path):
+    a = make(tmp_path)
+    row = next(c for c in a.gateway.catalog()
+               if c["capability"] == "change.jarvis.hold_everything")
+    assert row["level"] == "LOW_RISK"
+
+
+def test_the_quick_hold_reply_tells_the_truth(tmp_path, monkeypatch):
+    a = make(tmp_path)                        # plain mode: no model
+    monkeypatch.setattr(a, "_run_tool", lambda n, args: ({"error": "not run: test"}, True))
+    r = a.ask("stop everything")
+    assert "couldn't" in r.text.lower() and "everything's on hold" not in r.text.lower()
+
+
+def test_world_watch_can_answer_from_its_cache_offline(tmp_path):
+    a = make(tmp_path, trust=lambda: Trust.OFFLINE)
+    assert a.caps["world_watch"] in {c["capability"] for c in a.gateway.catalog()
+                                     if not c["needs_network"]}
+
+
+def test_the_network_is_asked_at_most_once_a_minute(tmp_path):
+    asked = []
+    a = make(tmp_path, trust=lambda: asked.append(1) or Trust.UNTRUSTED)
+    for _ in range(3):
+        a._run_tool("web_search", {"query": "x", "why": "test"})
+    assert len(asked) == 1
