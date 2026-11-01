@@ -134,8 +134,8 @@ def test_the_ayrshare_key_goes_with_the_platform_keys():
 # The small model never found schedule_week in its menu and asked instead. Naming a week plan
 # that exists now puts its card on the owner's screen at once (staging changes nothing).
 def test_naming_a_week_puts_its_card_up_for_a_small_model(tmp_path):
-    from bau.models.providers import ScriptedProvider
     from bau.assistant import Assistant
+    from bau.models.providers import ScriptedProvider
     name = plan(tmp_path)
     a = Assistant(tmp_path, ScriptedProvider(["It's on your screen."]),
                   {"id": "qwen-local", "deployment": "local"}, "human:owner")
