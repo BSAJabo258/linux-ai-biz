@@ -76,11 +76,11 @@ def test_mission_control_never_scrolls_sideways_on_a_phone():
 def facts():
     from bau.policy import PolicyEngine
     from bau.regulations import Registry
-    from bau.series import Series
     from bau.toolbox import Toolbox
+    from bau.virtual_creator import PLATFORMS
     reg = Registry.load()
     return {"regulations": len(reg.regs), "policies": len(PolicyEngine.load(reg).policies),
-            "tools": len(Toolbox().entries), "formats": len(Series(ROOT).formats())}
+            "tools": len(Toolbox().entries), "platforms": len(PLATFORMS)}
 
 
 def test_stats_panel_shows_the_repo_as_it_really_is():
@@ -99,7 +99,7 @@ def test_terminal_demo_types_real_commands():
     for theme in ("dark", "light"):
         text = (ART / f"terminal-{theme}.svg").read_text()
         assert "@keyframes" in text and "prefers-reduced-motion" in text
-        for cmd in ("bau toolbox ask", "bau series plan", "bau usage"):
+        for cmd in ("bau toolbox ask", "bau creator batch", "bau usage"):
             assert cmd in text, cmd
 
 

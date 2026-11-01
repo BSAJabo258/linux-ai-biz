@@ -171,18 +171,6 @@ def overview(asst: Any) -> dict[str, Any]:
                                             if sd["in_progress"] else ""),
                            sd, "What clips have we made?"))
 
-    rs, err = _safe(lambda: asst.results().report())
-    if err:
-        nodes.append(_broken("results", "Results", "team", err))
-    else:
-        t = rs["totals"]
-        earned = f", ${t['revenue_usd']:.2f} earned (est.)" if t["revenue_usd"] else ""
-        nodes.append(_node("results", "Results", "team", "ok" if t["views"] else "idle",
-                           f"{t['videos']} video(s), {t['views']:,} views{earned}"
-                           if t["videos"] else "nothing posted yet",
-                           {"totals": t, "what_works": rs["what_works"]},
-                           "How are our videos doing?"))
-
     st, err = _safe(asst.t_status)
     if err:
         nodes.append(_broken("watchdog", "Watchdog", "team", err))
@@ -277,7 +265,7 @@ def overview(asst: Any) -> dict[str, Any]:
                            "What open-source tools have you found?"))
 
     # ---------------------------------------------------------------- connections
-    for nid, label in (("youtube", "YouTube"), ("tiktok", "TikTok")):
+    for nid, label in (("tiktok", "TikTok"),):
         signed = (home / "secrets" / f"{nid}.json").exists()
         nodes.append(_node(nid, label, "connector", "ok" if signed else "off",
                            "signed in" if signed else f"not signed in: bau {nid} login"))

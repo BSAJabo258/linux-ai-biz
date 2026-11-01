@@ -6,8 +6,8 @@ A workspace is a folder one agent walks. Numbered stage folders carry the order,
 stage's ``CONTEXT.md`` contract lists exactly which files it reads, and outputs are plain
 files the owner reads and edits before the next stage runs. BAU adds what ICM leaves
 informal: the owner's check is recorded with a SHA-256 of what they checked (edit after
-checking and the check is void), kids rules run on the stages that list them, a stage's
-context must fit the model, and every draft and check goes into the audit chain.
+checking and the check is void), a stage's context must fit the model, and every draft and
+check goes into the audit chain.
 
 Layout (template shipped in ``data/workspaces/<name>/``, instance in BAU_HOME):
     <ws>/CLAUDE.md, CONTEXT.md        routing + the pipeline on one screen
@@ -28,7 +28,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from . import kids
 from .home import bau_home, shipped_data
 
 CHECK_FILE = ".checked"
@@ -190,20 +189,13 @@ def run_checks(ws: Path, ep: Path, c: Contract) -> list[dict[str, str]]:
             f = c.out_dir / o
             if not f.exists():
                 continue
-            text = f.read_text()
-            if name == "kids_text":
-                issues += [i for i in kids.scan("", text) if i["issue"] != "clickbait"]
-            elif name == "kids_metadata":
-                issues += _metadata_issues(ws, ep, text)
-            elif name == "series_lock":
-                from .series import Series
-                sr = Series(ws)
-                # Applies once the owner has filled in the character sheets; until then the
-                # series bible alone describes the characters.
-                if not sr.problems():
-                    issues += sr.drift(text)
-            else:
+            if name != "no_minors":
                 raise WorkspaceError(f"{c.path}: unknown check {name!r}")
+            # The creator is a fictional adult: nothing may refer to minors (virtual_creator).
+            from .virtual_creator import MINOR_REFERENCE
+            for m in MINOR_REFERENCE.finditer(f.read_text()):
+                issues.append({"issue": "minor_reference",
+                               "detail": f"{o}: refers to minors ({m.group(0)!r})"})
     return issues
 
 
@@ -214,22 +206,6 @@ def parse_metadata(text: str) -> dict[str, str]:
         if sep and k.strip().lower() in ("title", "description", "tags"):
             out[k.strip().lower()] = v.strip()
     return out
-
-
-def _metadata_issues(ws: Path, ep: Path, text: str) -> list[dict[str, str]]:
-    md = parse_metadata(text)
-    if not md.get("title"):
-        return [{"issue": "no_title", "detail": "metadata needs a 'Title: ...' line"}]
-    tags = [t.strip() for t in md.get("tags", "").split(",") if t.strip()]
-    issues = kids.scan(md["title"], md.get("description", ""), tags)
-    earlier = [(p.name, parse_metadata(m.read_text()).get("title", ""))
-               for p in episodes(ws) if p != ep
-               for m in p.glob("stages/*/output/metadata.md")]
-    dup = kids.near_duplicate(md["title"], earlier)
-    if dup:
-        issues.append({"issue": "near_duplicate",
-                       "detail": f"title is almost the same as {dup} (mass-produced content)"})
-    return issues
 
 
 def status(ws: Path, ep: Path) -> list[dict[str, Any]]:
@@ -318,7 +294,7 @@ def build_context(ep: Path, c: Contract, budget: int = DEFAULT_BUDGET
     if tokens > budget:
         raise WorkspaceError(f"{c.stage} needs about {tokens} tokens of context, over this "
                              f"model's budget of {budget}: shorten the listed files "
-                             "(the series bible is the usual culprit)")
+                             "(the shared reference files are the usual culprit)")
     return system, user, hashes
 
 
@@ -326,15 +302,6 @@ def _clean(text: str) -> str:
     text = text.strip()
     m = re.fullmatch(r"```[\w-]*\n(.*)\n```", text, re.S)
     return (m.group(1) if m else text).strip() + "\n"
-
-
-def for_kids(ws: Path) -> bool:
-    """A kids workspace: it carries the kids rules or a stage runs the kids checks. The
-    content brain is never allowed in one."""
-    if (ws / "_shared" / "kids-rules.md").exists():
-        return True
-    stages = (ws / "_templates" / "episode" / "stages").glob("*/CONTEXT.md")
-    return any("kids_" in p.read_text() for p in stages)
 
 
 def draft(ws: Path, ep: Path, provider: Any, model: dict[str, Any], audit: Any = None,

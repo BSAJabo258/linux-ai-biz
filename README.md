@@ -85,7 +85,7 @@ only **staged**: it runs when you press **Confirm**.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/terminal-dark.svg">
-  <img src="assets/terminal-light.svg" width="100%" alt="A terminal typing BAU commands: asking the toolbox how to stop made-up answers, planning a kids episode with the series engine, checking token usage, and choosing which anime scenes flow behind Jarvis">
+  <img src="assets/terminal-light.svg" width="100%" alt="A terminal typing BAU commands: asking the toolbox how to stop made-up answers, drafting a creator batch with the same identity lock in every prompt, checking token usage, and choosing which anime scenes flow behind Jarvis">
 </picture>
 
 <picture>
@@ -175,8 +175,8 @@ back to the desktop.
     and a specialist (Claude), watched by the supervisor;
   - the model router (Claude, local llama.cpp, hosted models with backups) and `bau models bench`;
   - MAYA memory, the Second Brain, Project Genesis and your chat library (`bau chats`);
-  - the video studio, the kids series engine, ICM workspaces, publishing (YouTube, TikTok) and
-    the results tracker;
+  - the video studio, the virtual creator (one fictional adult persona), ICM workspaces
+    and publishing (TikTok; Instagram and Fanvue planned);
   - God's Eye: public earthquakes, aircraft and satellites on a world map;
   - the toolbox (100 researched tools), Repo Scout and its weekly open-source watch;
   - the usage meter and your daily limits;
@@ -267,9 +267,8 @@ How the *My Jarvis OS* spec maps onto this repository, and the build order:
 | Document | What it is |
 |---|---|
 | [docs/STUDIO.md](docs/STUDIO.md) | Make AI video clips (Higgsfield) inside a budget you set; priced first, made only on your Confirm |
-| [docs/SERIES.md](docs/SERIES.md) | Kids series engine: the same characters and look in every clip; story formats; drift and sameness checks |
-| [docs/WORKSPACES.md](docs/WORKSPACES.md) | Make an episode step by step: ICM workspaces (`bau ws`), you check every step |
-| [docs/RESULTS.md](docs/RESULTS.md) | See views, earnings and profit for every posted video, and which formats work |
+| [docs/VIRTUAL-CREATOR.md](docs/VIRTUAL-CREATOR.md) | The virtual creator: one fictional adult persona, the same look in every post; sfw for Instagram and TikTok, explicit for Fanvue |
+| [docs/WORKSPACES.md](docs/WORKSPACES.md) | Plan a week of posts step by step: ICM workspaces (`bau ws`), you check every step |
 
 **Rules and design**
 
@@ -295,12 +294,12 @@ src/bau/
   models/       providers (Claude, llama.cpp, hosted), router, bench, fetch
   usage.py toolbox.py scout/                              usage meter, toolbox, Repo Scout + weekly watch
   pack.py keys.py look.py live.py                         BAU Pack, keys transfer, the look, stick storage
-  studio.py series.py workspace.py publishing.py results.py   video, kids series, workspaces, posting, results
+  studio.py virtual_creator.py workspace.py publishing.py      video, the creator, workspaces, posting
   memory.py genesis.py brain.py chats.py spatial.py       memory, Second Brain, chat library, God's Eye
   factories.py opportunity.py economics.py accounting.py sanctions.py
   comms/ commerce/ privacy/ security/                     email/SMS, subscriptions/IP/tax, DSR, trust
   audit.py evidence.py status.py governor.py cli.py cli_ext.py
-  data/  regulations, policies, factories, toolbox, scout watch, series formats, agents
+  data/  regulations, policies, factories, toolbox, scout watch, workspaces, agents
 image/      build-live.sh, live-build/ (the one stick: crash console, USB guard, look, preseed)
 installer/  laptop check, BAU Pack and keys export (Windows), payload/install.sh, cloud/
 tests/      pytest suite

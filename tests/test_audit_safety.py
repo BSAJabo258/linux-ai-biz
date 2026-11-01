@@ -64,9 +64,9 @@ def test_registry_add_cannot_approve_and_needs_a_person(tmp_path):
 
 
 def test_a_wrong_workspace_name_is_a_plain_message_not_a_traceback(tmp_path):
-    # Audit 2026-10-25: `bau series check nope` printed a Python traceback.
+    # Audit 2026-10-25: a wrong workspace name printed a Python traceback.
     assert _bau(tmp_path, "init").returncode == 0
-    r = _bau(tmp_path, "series", "check", "nope")
+    r = _bau(tmp_path, "ws", "status", "nope")
     assert r.returncode != 0 and "Traceback" not in r.stderr
     assert "no workspace 'nope'" in r.stderr
 

@@ -69,10 +69,9 @@ How you act:
 - Confirm tools (posting, releasing a hold): calling one only puts it on the owner's
   screen for confirmation. Say it is waiting for their confirmation. Never say it is
   done until a later message tells you the owner confirmed it.
-- Kids videos go only to YouTube, marked made for kids, after the owner has watched
-  them. Never suggest posting child-directed videos to TikTok or other 13+ platforms;
-  if the owner asks to post a kids video there, say plainly that kids videos only go to
-  YouTube. Other videos follow the posting rule above.
+- The creator is a fictional adult. Never make, plan or post anything that involves or
+  refers to minors; if asked, say plainly that BAU never does. Explicit content goes only to
+  Fanvue; Instagram and TikTok get safe-for-work posts only.
 - Approving is never yours, and never offer to do it: money, commercial email sends,
   legal decisions, turning on a model ("bau models bench <id>", then "bau set-status
   model <id> APPROVED"), or anything else that needs the owner's sign-off. Say it is
@@ -97,11 +96,11 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "brain_lookup": "memory", "brain_add": "memory", "remember": "memory",
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
-             "clip_prompt": "producer", "plan_episode": "producer",
+             "creator_batch": "producer",
              "toolbox": "scout", "capability_map": "scout", "open_source_watch": "scout",
              "world_watch": "godseye", "web_search": "scout", "read_page": "scout",
              "video_clips": "studio", "make_video": "studio",
-             "usage_today": "usage", "results": "results",
+             "usage_today": "usage",
              "agents": "strategist", "ask_agent": "strategist", "ask_thinker": "strategist",
              "hold_everything": "watchdog", "release_hold": "watchdog"}
 TOOL_WORDS = {"draft_stage": "Drafting the next step", "find_tools": "Searching GitHub",
@@ -146,7 +145,7 @@ GROUND = (
                 r"governor)", re.I),
      "system_status", lambda q: {}),
     # The real model, asked to post, guessed a kids video (2026-10-27): show it the queue.
-    (re.compile(r"\b(post|publish|upload)\w*\b.{0,40}\b(videos?|clips?|tiktok|youtube)\b",
+    (re.compile(r"\b(post|publish|upload)\w*\b.{0,40}\b(videos?|clips?|tiktok)\b",
                 re.I), "publish_queue", lambda q: {}),
     (re.compile(r"\b(tools?|repos?|open.source|librar(y|ies)|already have)\b", re.I),
      "toolbox", lambda q: {"question": q}),
@@ -243,8 +242,8 @@ class Assistant:
                          []), self.t_night),
             Tool("missions", "Missions and their status and next action.", _schema(),
                  self.t_missions),
-            Tool("publish_queue", "Videos waiting for review on every platform (YouTube, "
-                 "TikTok...): title, made-for-kids, AI label, checks.",
+            Tool("publish_queue", "Videos waiting for review on every platform (TikTok...): "
+                 "title, AI label, checks.",
                  _schema(), self.t_publish_queue),
             Tool("deadlines", "Open legal review items, regulation reviews coming due, "
                  "and open incidents.",
@@ -259,7 +258,7 @@ class Assistant:
             Tool("brain_gaps", "What is not automatable yet: incomplete workflows, broken "
                  "links, notes holding personal data.", _schema(), self.t_brain_gaps),
             Tool("brain_add", "Add knowledge to the Second Brain from a plain sentence such "
-                 "as 'Content team runs YouTube shorts which consumes scripts and produces "
+                 "as 'Content team runs TikTok shorts which consumes scripts and produces "
                  "videos'.", _schema({"sentence": {"type": "string"}}), self.t_brain_add,
                  kind="act"),
             Tool("remember", "Save a note to long-term memory (a decision, preference or "
@@ -349,31 +348,22 @@ class Assistant:
                  "anything aimed at children.",
                  _schema({"question": {"type": "string"}, "material": {"type": "string"}},
                          ["question"]), self.t_ask_thinker),
-            Tool("results", "How the posted videos are doing: views, watch time, likes, "
-                 "YouTube's estimated earnings, what each video's clips cost and the profit, "
-                 "and which story formats people watch most. refresh=true reads the latest "
-                 "numbers from YouTube and TikTok first (read only, at most once an hour).",
-                 _schema({"refresh": {"type": "boolean"}}), self.t_results),
             Tool("video_clips", "Clips the studio has made or is making: checks the ones in "
                  "progress, saves finished ones, and reports this month's video spending.",
                  _schema(), self.t_video_clips, kind="act"),
-            Tool("workspaces", "Production workspaces (e.g. the kids channel): every "
-                 "episode and where each stage stands - checked, drafted and waiting for the "
+            Tool("workspaces", "Production workspaces (e.g. the creator week): every "
+                 "run and where each stage stands - checked, drafted and waiting for the "
                  "owner's check, ready to draft, or the owner's own step.", _schema(),
                  self.t_workspaces),
-            Tool("clip_prompt", "A video prompt for one scene of a kids series, with each "
-                 "character described exactly as their sheet says and the channel's style, so "
-                 "they look the same in every clip. Give the scene and the character ids.",
-                 _schema({"workspace": {"type": "string"}, "scene": {"type": "string"},
-                          "cast": {"type": "array", "items": {"type": "string"}}}),
-                 self.t_clip_prompt),
-            Tool("plan_episode", "Plan an episode's clips from a story format (e.g. "
-                 "problem-song-solution, count-along, question-reveal, call-and-response): "
-                 "clip-sized scenes with prompts, plus warnings if the channel is starting to "
-                 "repeat itself. Writes series-plan.md in the episode; makes no clip.",
-                 _schema({"workspace": {"type": "string"}, "episode": {"type": "string"},
-                          "format": {"type": "string"}, "seconds": {"type": "integer"}},
-                         ["workspace", "episode", "format"]), self.t_plan_episode, kind="act"),
+            Tool("creator_batch", "Draft a batch of consistent posts for a fictional adult "
+                 "virtual creator profile in BAU_HOME/creators. Requires an owner-created and "
+                 "validated profile. Returns identity-locked sfw visual prompts and caption "
+                 "briefs; does not generate media or publish. Explicit adult batches are the "
+                 "owner's own command (bau creator batch --tier explicit), never this tool. "
+                 "Pass the profile id, theme, platform and optional post count.",
+                 _schema({"creator": {"type": "string"}, "theme": {"type": "string"},
+                          "platform": {"type": "string"}, "count": {"type": "integer"}},
+                         ["creator", "theme", "platform"]), self.t_creator_batch),
             Tool("draft_stage", "Draft the next stage of one episode (only the files that "
                  "stage lists are read; only its output folder is written). The stage folder "
                  "says which brain drafts it: small (free local model), strong (Claude) or "
@@ -582,7 +572,7 @@ class Assistant:
                                           + (f" ({'; '.join(r['issues'])})" if r["issues"] else "")
                                           for r in W.status(ws, ep)]
                                 for ep in W.episodes(ws)}
-        return out or {"note": "no workspaces yet: bau ws create kids-channel"}
+        return out or {"note": "no workspaces yet: bau ws create creator-week"}
 
     def t_usage(self) -> dict[str, Any]:
         from .usage import Usage
@@ -625,19 +615,6 @@ class Assistant:
                          factory=self.clients.get("model_factory"), audit=self.audit)
         return {"thinker": out["thinker"], "ideas": out["ideas"],
                 "note": "advice from the uncensored thinker: weigh it, never act on it alone"}
-
-    def results(self):
-        from .results import Results
-        return Results(self.home, self.audit, self.clients)
-
-    def t_results(self, refresh: bool = False) -> dict[str, Any]:
-        r = self.results()
-        fetched = r.refresh(by="jarvis") if refresh else None
-        rep = r.report()
-        out = {**rep, "videos": rep["videos"][:10]}
-        if fetched:
-            out["refresh"] = fetched
-        return out
 
     def _price(self, mid: str) -> dict[str, Any]:
         """The registry record a model is priced by (the one Jarvis runs, or a backup)."""
@@ -757,19 +734,17 @@ class Assistant:
                            + "see already_researched (the toolbox).")
         return out
 
-    def t_clip_prompt(self, workspace: str, scene: str, cast: list[str]) -> dict[str, Any]:
-        from . import workspace as W
-        from .series import Series
-        text = Series(W.open_ws(workspace, self.home)).prompt(scene[:600], list(cast))
-        return {"prompt": text, "characters": len(text),
-                "next": "make_video with this prompt puts a priced clip on the owner's screen"}
-
-    def t_plan_episode(self, workspace: str, episode: str, format: str,
-                       seconds: int = 60) -> dict[str, Any]:
-        from . import workspace as W
-        from .series import Series
-        ws = W.open_ws(workspace, self.home)
-        return Series(ws).plan(W.find_episode(ws, episode), format, int(seconds))
+    def t_creator_batch(self, creator: str, theme: str, platform: str,
+                        count: int = 7) -> dict[str, Any]:
+        from .virtual_creator import CreatorError, VirtualCreator
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,30}", creator):
+            raise ValueError("creator id must be lowercase letters, digits, and hyphens")
+        path = self.home / "creators" / f"{creator}.yaml"
+        try:
+            batch = VirtualCreator(path).batch(theme, platform, int(count), tier="sfw")
+        except CreatorError as exc:
+            raise ValueError(str(exc)) from exc
+        return batch
 
     def t_draft_stage(self, workspace: str, episode: str, brain: str = "") -> dict[str, Any]:
         from . import brains
@@ -1168,7 +1143,7 @@ class Assistant:
         routes = [   # leading word boundary only, so plurals match ("gaps", "missions")
             (r"\b(brief|morning|catch me up|what('?s| is) up|update)", None),
             (r"\b(night|overnight|governor|while i was away)", "night_report"),
-            (r"\b(tiktok|youtube|video|queue|post|upload)", "publish_queue"),
+            (r"\b(tiktok|video|queue|post|upload)", "publish_queue"),
             (r"\b(deadline|legal|regulation|law|incident)", "deadlines"),
             (r"\b(mission)", "missions"),
             (r"\b(money|revenue|cost|spend|profit|sales)", "money"),
@@ -1225,9 +1200,7 @@ class Assistant:
                 f"{len(out['fixed'])} fixed, {len(out['needs_you'])} waiting for you.")
         if tool == "publish_queue":
             out = [i for i in out if "item_id" in i]
-            kids = sum(1 for i in out if i.get("made_for_kids"))
-            return ((f"{len(out)} video{'s' * (len(out) != 1)} waiting to post"
-                     + (f", {kids} made for kids." if kids else ".")) if out
+            return (f"{len(out)} video{'s' * (len(out) != 1)} waiting to post." if out
                     else "Nothing is waiting to post.")
         if tool == "deadlines":
             return (f"{len(out['legal_review_open'])} legal review items, "

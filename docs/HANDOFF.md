@@ -234,14 +234,8 @@ the repo (a test fails if they go stale: rerun `python3 assets/make_art.py`), Gi
 [!IMPORTANT]/[!TIP] notices. Jarvis answer cards for usage_today, toolbox, plan_episode
 and clip_prompt now use readable layouts instead of raw fields.
 
-The kids series engine (2026-10-10, tests first in `tests/test_series.py`): `series.py`
-reads `_shared/characters/*.yaml` + `_shared/style.yaml` (templates with placeholders in
-the kids-channel workspace); `lock(id)` is the fixed character sentence every prompt
-carries; `prompt()` = style + locks + scene + avoid (kids scan, 2500-char cap); `drift()`
-flags off-sheet colours/"never" traits and names without their lock (stage 04 check
-`series_lock`, active once sheets are filled); `plan()` scales `data/series_formats.yaml`
-beats to 3-15 s clips, writes `series.yaml` + `series-plan.md`, warns on four same formats
-in a row or a near-duplicate idea. Jarvis tools `clip_prompt`, `plan_episode`; `bau series`.
+The kids series engine (2026-10-10): removed on 2026-10-31 with the kids channel; the
+owner's business is now one fictional adult virtual creator (docs/VIRTUAL-CREATOR.md).
 
 The repo's look (2026-10-10, tests in `tests/test_repo_look.py`): README opens with an
 animated banner and feature cards (`assets/*.svg`, dark and light via `<picture>`, drawn by
@@ -426,19 +420,8 @@ Owner decisions (2026-10-12):
 
 Next build: the browser lane (map layer 1), then the one-stick installer.
 
-The results tracker (2026-10-10, tests first in `tests/test_results.py`): `results.py`
-reads numbers back for every POSTED queue item, read only. YouTube uses Analytics
-`reports.query`, `dimensions=video`, batches of 200, with `estimatedRevenue` asked
-separately; a refusal means "no earnings" and views still count. TikTok uses
-`/v2/video/query/`, 20 per request. Both clients gained the read scopes, so owners log in
-once more. Other behaviour:
-- snapshots go to `results/snapshots.jsonl`, one refresh per platform an hour;
-- `bau results link` ties a video to its studio clips and episode; cost comes from the
-  ledger's `job_id`, and the format from the episode's `series.yaml`;
-- the report shows profit per video, unlinked clip spend, `by_format` and `what_works`;
-- it is reachable through the `results` tool, a Results node and panel, `/api/results`
-  and `/api/results/refresh`.
-Owner guide: `docs/RESULTS.md`.
+The results tracker (2026-10-10): removed on 2026-10-31 (it read YouTube's numbers);
+results for Fanvue, Instagram and TikTok are planned.
 
 The usage meter (2026-10-10, tests first in `tests/test_usage.py`):
 - `usage.py`: `Metered` wraps the provider for Jarvis's turns, workspace drafts and Scout;
@@ -605,7 +588,6 @@ It needs about 24 GB RAM. Check `reply_ok` and `tool_calls` are true before appr
 
 ### 3. Owner setup still to do
 - **Claude:** `ANTHROPIC_API_KEY` in `/etc/bau/models.env` (laptop) or `.env` (Docker), then `bau set-status model claude-opus-5-5 APPROVED`.
-- **YouTube:** Google Cloud "Desktop app" OAuth client, then `YOUTUBE_CLIENT_ID`/`_SECRET` in `/etc/bau/platforms.env`, then `bau youtube login`. Apply for Google's API audit; until it passes, uploads stay private. See INSTALL Phase 8b.
 - **TikTok:** app keys plus TikTok's app audit (INSTALL Phase 8).
 - **ElevenLabs:** the owner's account was blocked ("unusual activity", free tier disabled). Voice falls back to the browser's, and nothing in code is needed.
 
