@@ -8,11 +8,13 @@ or video prompt, while varying the shot and creative angle.
 ## Create a profile
 
 ```bash
-bau creator init --out "$BAU_HOME/creators/aria.yaml"
+bau creator init
 ```
 
-On a standard installed machine, `BAU_HOME` is `/var/lib/bau`; for a personal development
-copy, it is usually `~/.bau`. Set the environment variable explicitly if it is not configured.
+This puts the starter profile (Aria) where Jarvis looks, `BAU_HOME/creators/aria.yaml`
+(`/var/lib/bau/creators/aria.yaml` on the installed laptop). Jarvis can plan her posts right
+away: say "Plan seven Instagram posts about a cozy autumn week." With only one profile he uses
+it without being told her name. `--out PATH` puts it somewhere else.
 
 Edit the copied YAML before use. The profile must describe a fictional person aged 21 or
 older, enable AI disclosure, list at least four stable appearance traits, and define content

@@ -455,12 +455,18 @@ def cmd_creator(a):
 
     if a.creator_cmd == "init":
         import shutil
-        dst = Path(a.out)
+
+        from .home import bau_home
+        starter = shipped_data() / "virtual_creator_profile.example.yaml"
+        # Jarvis looks in BAU_HOME/creators: put it there unless the owner names a path.
+        dst = Path(a.out) if a.out else bau_home() / "creators" / (
+            yaml.safe_load(starter.read_text())["id"] + ".yaml")
         if dst.exists():
             raise ValueError(f"{dst} already exists; choose another path")
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(shipped_data() / "virtual_creator_profile.example.yaml", dst)
-        _out({"profile": str(dst), "next": f"edit the profile, then run `bau creator check {dst}`"})
+        shutil.copy2(starter, dst)
+        _out({"profile": str(dst), "jarvis": f"Jarvis can draft for {dst.stem} now",
+              "next": f"edit the profile, then run `bau creator check {dst}`"})
         return EXIT_OK
     creator = VirtualCreator(Path(a.profile))
     if a.creator_cmd == "check":
@@ -1623,7 +1629,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     s = sub.add_parser("creator", help="fictional adult virtual-model content drafts")
     w = s.add_subparsers(dest="creator_cmd", required=True)
     x = w.add_parser("init", help="copy a starter fictional adult creator profile")
-    x.add_argument("--out", required=True, help="new YAML profile path")
+    x.add_argument("--out", help="new YAML profile path (default: where Jarvis looks)")
     x = w.add_parser("check", help="validate age, identity, disclosure, and platform rules")
     x.add_argument("profile")
     x = w.add_parser("batch", help="draft a consistent multi-post content batch")
