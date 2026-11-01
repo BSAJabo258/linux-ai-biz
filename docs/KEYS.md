@@ -3,7 +3,7 @@
 BAU reads your keys from two files on the laptop:
 - `/etc/bau/models.env`: Claude, Z.ai, NVIDIA, ElevenLabs, Higgsfield and other model or
   service keys;
-- `/etc/bau/platforms.env`: YouTube, TikTok and other platform app keys.
+- `/etc/bau/platforms.env`: TikTok, Ayrshare (`AYRSHARE_API_KEY`, see WEEK.md) and other platform keys.
 
 Instead of typing each key, you can carry them all over from the computer that has them,
 in one locked file. Your keys are **never** pasted into a chat, never put on GitHub, and

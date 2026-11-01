@@ -12,6 +12,7 @@ stand and what is next.
 | `src/bau/` | the package. `cli.py` + `cli_ext.py` = the `bau` command; `policy.py`/`regulations.py` = rule engine; `data/` = regulations, policies, factories, registry defaults |
 | `src/bau/assistant.py`, `ui/jarvis_server.py`, `ui/jarvis.html` | Jarvis: briefing, conversation, tools, voice HUD |
 | `src/bau/publishing.py` | publishing hub; platforms are adapters (`tiktok.py`; Instagram and Fanvue planned) |
+| `src/bau/week.py` | A week of posts (Jarvis `schedule_week`): a plan in `weeks/NAME.yaml`, one card shows every post, the owner picks TikTok visibility and confirms once; Ayrshare schedules each with the AI label. sfw on Instagram/TikTok only, AI disclosure, no minors, any change voids the card, sent once. See `docs/WEEK.md` |
 | `src/bau/workspace.py`, `src/bau/brains.py`, `data/workspaces/` | ICM workspaces (`bau ws`): numbered stage folders one agent walks, owner checks each stage; the `creator-week` template plans a week of posts (`no_minors` check on every drafted stage). Each stage's `## Brain` says who drafts it: `small` (free local model), `strong` (Claude/Jarvis's model) or `content` (sealed content lane, never minors); the owner maps brains to models with `bau ws brains` |
 | `src/bau/virtual_creator.py`, `data/virtual_creator_profile.example.yaml` | Virtual creator (`bau creator`): a fictional adult (21+) persona with an identity lock in every prompt; tiers `sfw` (every platform) and `explicit` (adult platforms only, `fanvue`, needs the owner's `explicit_boundaries`, local content lane); Jarvis `creator_batch` is sfw only; youth-coded words refused (`MINOR_REFERENCE`, also used by the thinker and TikTok). Platforms: Fanvue (explicit), Instagram and TikTok (sfw). See `docs/VIRTUAL-CREATOR.md` |
 | `src/bau/scout/`, `data/scout.yaml` | Repo Scout (`bau scout`): finds open-source projects for a capability, keeps claims apart from inspected and tested facts, licence/security gates; never installs or runs them. Weekly open-source watch (`bau scout watch`/`shortlist`, `scout/watch.py`, `data/scout_watch.yaml`, `bau-scout-watch.timer`): nine categories, star trends, already-have vs new, ranked test next / watch / ignore; Jarvis `open_source_watch`. See `docs/engineering/repo-intelligence.md` |
@@ -73,7 +74,8 @@ These are the product's safety model, not style preferences:
   approve, and none of them may be given a tool that does.
 - **Consequential actions are confirmed by the owner.** Posting to any platform, releasing a
   HOLD, and similar actions are only *staged* by Jarvis; they run on the owner's click or
-  `y`. Owner-only choices (privacy, audience, commercial disclosure) never
+  `y`. A week of posts may be confirmed with one click on one card that shows every post
+  (the owner's choice, 2026-11-01, `src/bau/week.py`). Owner-only choices (privacy, audience, commercial disclosure) never
   come from a model and never have defaults.
 - **Never weaken the host.** Don't open firewall ports, disable AppArmor or encryption,
   or bind servers beyond localhost (containers bind their interface only with
