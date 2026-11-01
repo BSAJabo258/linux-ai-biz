@@ -468,6 +468,19 @@ def cmd_creator(a):
         _out({"profile": str(dst), "jarvis": f"Jarvis can draft for {dst.stem} now",
               "next": f"edit the profile, then run `bau creator check {dst}`"})
         return EXIT_OK
+    if a.creator_cmd == "prices":         # the owner's choice: never a model, never a default
+        from .virtual_creator import set_prices
+        who = _human()
+        prices = {"subscription": a.subscription, "nude": a.nude, "xxx": a.xxx}
+        try:
+            set_prices(Path(a.profile), prices)
+        except CreatorError as exc:
+            raise ValueError(str(exc)) from exc
+        AuditLog().append("creator.prices", who, {"profile": Path(a.profile).name, **prices})
+        _out({"profile": str(a.profile), "prices_usd": prices,
+              "you_keep_about": {k: round(v * 0.8, 2) for k, v in prices.items()},
+              "note": "Fanvue keeps 20% (help.fanvue.com, read 2026-11-01); before tax"})
+        return EXIT_OK
     creator = VirtualCreator(Path(a.profile))
     if a.creator_cmd == "draw":          # pictures on this computer (docs/PICTURES.md)
         import datetime as dt
@@ -491,7 +504,7 @@ def cmd_creator(a):
               "problems": problems})
         return EXIT_OK if not problems else EXIT_BLOCKED
     try:
-        batch = creator.batch(a.theme, a.platform, a.count, tier=a.tier)
+        batch = creator.batch(a.theme, a.platform, a.count, tier=a.tier, level=a.level)
     except CreatorError as exc:
         raise ValueError(str(exc)) from exc
     text = write_markdown(batch)
@@ -1678,7 +1691,14 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--count", type=int, default=7)
     x.add_argument("--tier", choices=["sfw", "explicit"], default="sfw",
                    help="explicit: adult platforms only (fanvue), needs explicit_boundaries")
+    x.add_argument("--level", type=int, choices=[0, 1, 2, 3],
+                   help="paid level: 0 teaser, 1 subscriber, 2 nude, 3 xxx (sets the tier)")
     x.add_argument("--out", help="write Markdown to a file instead of stdout")
+    x = w.add_parser("prices", help="you: your Fanvue prices in US dollars")
+    x.add_argument("profile")
+    x.add_argument("--subscription", type=float, required=True, help="a month")
+    x.add_argument("--nude", type=float, required=True, help="level 2, each unlock")
+    x.add_argument("--xxx", type=float, required=True, help="level 3, each unlock")
     s.set_defaults(fn=cmd_creator)
 
     s = sub.add_parser("toolbox", help="researched open-source tools; ask before guessing")

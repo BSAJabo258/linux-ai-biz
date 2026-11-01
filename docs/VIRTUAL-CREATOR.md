@@ -63,6 +63,42 @@ minors). Jarvis only drafts `sfw` batches; explicit ones are always your own com
 every tier, youth-coded words ("barely legal", "schoolgirl", any age under 18, and others)
 are refused.
 
+## Four paid levels (your plan, 2026-11-01)
+
+| Level | What | Where | Who pays |
+|---|---|---|---|
+| 0 teaser | safe for work | Instagram, TikTok, Fanvue | free |
+| 1 subscriber | suggestive (lingerie or swimwear at most, no nudity) | Fanvue feed | the monthly subscription |
+| 2 nude | nudity, no sexual activity | Fanvue | each unlock |
+| 3 xxx | explicit, only within your `explicit_boundaries` | Fanvue | each unlock |
+
+Your prices are yours: BAU never fills them in. You chose $9.99 a month, $14.99 per nude
+unlock and $29.99 per XXX unlock (2026-11-01). Write them into the profile once, at a terminal:
+
+```bash
+bau creator prices "$BAU_HOME/creators/aria.yaml" --subscription 9.99 --nude 14.99 --xxx 29.99
+```
+
+It shows roughly what you keep after Fanvue's 20%, before tax. Run it again any time to change
+them. Fanvue's limits, read on its help pages 2026-11-01: subscriptions $3.99 to $100 a month,
+a post $3 to $500, and creators keep 80%. Prices outside those limits are refused. Limits for
+paid messages and tips were not found on Fanvue's pages.
+
+Then draft a batch for a level (the level sets the tier and the platform check):
+
+```bash
+bau creator batch "$BAU_HOME/creators/aria.yaml" "evening in" --platform fanvue --level 1 --count 5
+```
+
+Each batch says its level and price. Levels 2 and 3 also need your `explicit_boundaries`.
+
+Your starter profile's `boundaries` say "suggestive fashion styling only; no explicit sexual
+activity", and those apply to every level. Change that line yourself if you want levels 2
+and 3 to go further.
+
+Not built yet: posting to Fanvue, and drawing level 2 and 3 pictures (`bau creator draw` is
+safe for work only).
+
 The batch includes an identity lock, distinct visual prompts, caption briefs that disclose
 the AI persona, and a review checklist for every post. It does not call an image/video
 provider or publish anything. Review the provider's terms and the platform's current rules
