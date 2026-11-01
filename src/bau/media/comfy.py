@@ -1,0 +1,143 @@
+"""Local pictures for the creator: ComfyUI on this computer draws them (docs/PICTURES.md).
+
+The owner's choice (2026-11-01): pictures are made on his own desktop (RTX 3060, 12 GB), not
+by a paid service. ComfyUI (GPL-3.0, github.com/Comfy-Org/ComfyUI) runs as its own program on
+127.0.0.1:8188; BAU only talks to its local API, so ComfyUI's code is never imported here.
+
+Facts read 2026-11-01 in ComfyUI's code (commit 17ff1dc):
+  server.py   POST /prompt {"prompt": graph} -> {"prompt_id", "number", "node_errors"};
+              GET /history/{prompt_id} -> {id: {"status", "outputs": {node: {"images":
+              [{"filename", "subfolder", "type"}]}}}}; GET /view?filename=&subfolder=&type=
+  cli_args.py --listen defaults to 127.0.0.1, --port to 8188
+  nodes.py    CheckpointLoaderSimple(ckpt_name) -> MODEL, CLIP, VAE; CLIPTextEncode(text, clip);
+              EmptyLatentImage(width, height, batch_size); KSampler(model, seed, steps, cfg,
+              sampler_name, scheduler, positive, negative, latent_image, denoise);
+              VAEDecode(samples, vae); SaveImage(images, filename_prefix)
+
+The model: Stable Diffusion XL base 1.0 (huggingface.co/stabilityai/stable-diffusion-xl-base-1.0,
+CreativeML Open RAIL++-M, commercial use allowed under its use restrictions, which include never
+harming minors; file sd_xl_base_1.0.safetensors, 6,938,078,334 bytes, SHA-256 31e35c80fc4829d1
+4f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b; read 2026-11-01).
+
+Every picture: the prompt is checked for anything about minors first (never sent if so), the
+file lands in BAU_HOME/artifacts/media with a provenance record (AI-generated, model, seed,
+prompt hash), and the audit chain gets a media.drawn row.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import hashlib
+import json
+import random
+import re
+import time
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+from ..audit import AuditLog
+from ..virtual_creator import MINOR_REFERENCE
+
+BASE = "http://127.0.0.1:8188"
+MODEL = "sd_xl_base_1.0.safetensors"
+MODEL_SHA256 = "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b"
+LOCAL = re.compile(r"^http://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$")
+NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,80}$")
+NEGATIVE = ("child, childlike, minor, teen, young-looking, school uniform, cartoon, anime, "
+            "illustration, character sheet, color swatches, real person, celebrity, text, "
+            "watermark, logo")
+
+
+class ComfyError(RuntimeError):
+    pass
+
+
+def creator_prompt(profile: dict[str, Any], theme: str, shot: str) -> str:
+    """Short visual facts for a picture model, from the creator profile. The batch's
+    instruction-style prompt drew a character sheet in the sandbox run (2026-11-01)."""
+    age = int(profile.get("age") or 0)
+    if age < 21:
+        raise ComfyError("the creator must be a fictional adult of 21 or over")
+    parts = [f"photo of a {age}-year-old adult woman", *profile.get("appearance", []),
+             str(profile.get("style", "")), theme, f"{shot} shot",
+             "realistic photograph, natural skin, sharp focus"]
+    return ", ".join(p.strip() for p in parts if p and p.strip())
+
+
+def graph(prompt: str, seed: int, width: int = 1024, height: int = 1024, steps: int = 30,
+          negative: str = NEGATIVE, ckpt: str = MODEL) -> dict[str, Any]:
+    """The smallest text-to-picture job, in ComfyUI's API format (node id -> node)."""
+    return {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["1", 1]}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["1", 1]}},
+        "4": {"class_type": "EmptyLatentImage",
+              "inputs": {"width": width, "height": height, "batch_size": 1}},
+        "5": {"class_type": "KSampler",
+              "inputs": {"model": ["1", 0], "seed": seed, "steps": steps, "cfg": 7.0,
+                         "sampler_name": "euler", "scheduler": "normal", "positive": ["2", 0],
+                         "negative": ["3", 0], "latent_image": ["4", 0], "denoise": 1.0}},
+        "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+        "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "bau"}},
+    }
+
+
+def _call(opener: Any, url: str, body: dict[str, Any] | None = None, raw: bool = False,
+          timeout: int = 60) -> Any:
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method="POST" if data else "GET",
+                                 headers={"Content-Type": "application/json"})
+    with opener(req, timeout=timeout) as r:
+        got = r.read()
+    return got if raw else json.loads(got or b"{}")
+
+
+def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str = BASE,
+         opener: Any = None, wait: float = 2.0, max_wait: float = 900.0,
+         **size: int) -> dict[str, Any]:
+    """Draw one picture into BAU_HOME/artifacts/media/NAME.png and record where it came from."""
+    if not LOCAL.match(base):
+        raise ComfyError("pictures are drawn only by a model server on this computer")
+    if not NAME.match(name or ""):
+        raise ComfyError("a picture name is lowercase letters, digits, dot, dash")
+    if m := MINOR_REFERENCE.search(prompt):
+        raise ComfyError(f"refers to minors ({m.group(0)!r}); BAU never draws that")
+    opener = opener or urllib.request.urlopen
+    seed = random.randrange(2**32) if seed is None else int(seed)
+    job = _call(opener, base + "/prompt", {"prompt": graph(prompt, seed, **size)})
+    if not job.get("prompt_id"):
+        err = job.get("error")
+        why = err.get("message") if isinstance(err, dict) else err
+        raise ComfyError(f"ComfyUI refused the job: {why or job.get('node_errors')}")
+    pid, waited = job["prompt_id"], 0.0
+    while True:
+        hist = _call(opener, f"{base}/history/{urllib.parse.quote(pid)}").get(pid)
+        if hist and hist.get("outputs"):
+            break
+        if hist and (hist.get("status") or {}).get("status_str") == "error":
+            raise ComfyError(f"ComfyUI failed the job: {hist['status']}")
+        if waited >= max_wait:
+            raise ComfyError(f"no picture after {int(max_wait)} s")
+        time.sleep(wait)
+        waited += max(wait, 0.001)
+    images = [i for o in hist["outputs"].values() for i in o.get("images", [])]
+    if not images:
+        raise ComfyError("ComfyUI finished without a picture")
+    q = urllib.parse.urlencode({k: images[0].get(k, "") for k in ("filename", "subfolder",
+                                                                   "type")})
+    png = _call(opener, f"{base}/view?{q}", raw=True)
+    media = home / "artifacts" / "media"
+    media.mkdir(parents=True, exist_ok=True)
+    out = media / f"{name}.png"
+    out.write_bytes(png)
+    prov = {"ai_generated": True, "generator": "ComfyUI (local)", "model": MODEL, "seed": seed,
+            "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+            "file_sha256": hashlib.sha256(png).hexdigest(),
+            "created": dt.datetime.now(dt.UTC).isoformat()}
+    (media / f"{name}.png.provenance.json").write_text(json.dumps(prov, indent=1))
+    AuditLog(home / "audit" / "chain.jsonl").append(
+        "media.drawn", "bau", {"file": out.name, "model": MODEL, "seed": seed,
+                               "file_sha256": prov["file_sha256"]})
+    return {"file": out.name, "seed": seed, "bytes": len(png)}

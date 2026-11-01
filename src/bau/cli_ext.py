@@ -469,6 +469,22 @@ def cmd_creator(a):
               "next": f"edit the profile, then run `bau creator check {dst}`"})
         return EXIT_OK
     creator = VirtualCreator(Path(a.profile))
+    if a.creator_cmd == "draw":          # pictures on this computer (docs/PICTURES.md)
+        import datetime as dt
+
+        from .home import bau_home
+        from .media import comfy
+        batch = creator.batch(a.theme, "instagram", a.count, tier="sfw")
+        stamp = dt.date.today().isoformat()
+        made = []
+        for post in batch["posts"]:
+            prompt = comfy.creator_prompt(creator.profile, a.theme, post["format"])
+            name = f"{creator.profile['id']}-{stamp}-{post['number']}"
+            made.append(comfy.draw(bau_home(), prompt, name))
+        _out({"pictures": made, "folder": str(bau_home() / "artifacts" / "media"),
+              "next": "look at every picture, then list the good ones in a week plan "
+                      "(docs/WEEK.md)"})
+        return EXIT_OK
     if a.creator_cmd == "check":
         problems = creator.problems()
         _out({"profile": str(a.profile), "id": creator.profile.get("id"),
@@ -1632,6 +1648,10 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--out", help="new YAML profile path (default: where Jarvis looks)")
     x = w.add_parser("check", help="validate age, identity, disclosure, and platform rules")
     x.add_argument("profile")
+    x = w.add_parser("draw", help="draw sfw pictures for a batch on this computer")
+    x.add_argument("profile")
+    x.add_argument("theme")
+    x.add_argument("--count", type=int, default=7)
     x = w.add_parser("batch", help="draft a consistent multi-post content batch")
     x.add_argument("profile")
     x.add_argument("theme")
