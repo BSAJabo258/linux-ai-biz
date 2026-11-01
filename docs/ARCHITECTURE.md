@@ -153,7 +153,7 @@ facts, a natural conversation with memory (`BAU_HOME/jarvis/history.jsonl`), and
 | Tool kind | Examples | Rule |
 |---|---|---|
 | read | status, night report, missions, TikTok queue, deadlines, money, brain lookup/gaps | runs freely |
-| act | brain add, remember, plan mission, hold everything | low-risk, runs when asked, audited `jarvis.tool` |
+| act | brain add, remember, plan mission, hold everything | low-risk, runs when asked through the Universal Gateway (agent `jarvis`), audited `gateway.invoked` / `gateway.denied` |
 | confirm | post to TikTok, release a hold | **staged only** (`jarvis.staged`); runs when the owner presses Confirm (`jarvis.confirmed`, actor `human:<login>`) |
 
 * Tool results reach the model wrapped as untrusted data; only arguments declared in a

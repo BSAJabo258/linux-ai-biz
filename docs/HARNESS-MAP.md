@@ -7,7 +7,7 @@ owner's architecture request in three parts:
 2. **What others built:** the projects the owner named, checked on 2026-11-01.
 3. **The plan:** what to build, in order, each step small and tested.
 
-Nothing here is built yet. Every "planned" item is a plan, not a command you can run.
+Step 1 is built (2026-11-01). Every other "planned" item is a plan, not a command you can run.
 
 ## The short answer
 
@@ -16,7 +16,7 @@ do not share a tool list.** The work is to join them, not to replace them:
 
 | Loop | Where | Who drives it | Tools it can use | Goes through the gateway? |
 |---|---|---|---|---|
-| Jarvis talking | `src/bau/assistant.py` (`_turn`, `_run_tool`) | the boss model | Jarvis's own 36 tools: 25 read, 8 act, 3 owner-confirmed | **No**: its own table, its own staging |
+| Jarvis talking | `src/bau/assistant.py` (`_turn`, `_run_tool`) | the boss model | Jarvis's own 36 tools: 25 read, 8 act, 3 owner-confirmed | **Yes, since step 1** (read and act tools, agent `jarvis`); confirm tools stay cards for the owner |
 | Agents | `src/bau/agents.py` (`run`) via `src/bau/agentfolders.py` | the agent's brain | only the tools its `AGENT.md` lists | **Yes**: all 8 checks |
 | Hands | `src/bau/hands.py` | the local model | one shell tool, owner says y to each command | No: its own refusals and the owner's y |
 | Workspace stages | `src/bau/workspace.py`, `src/bau/brains.py` | the stage's brain | none (writes the stage file) | No tools to check |
@@ -34,7 +34,7 @@ asks for. Every call goes through the same 8 steps, and every outcome is audited
 7. blast radius and budget;
 8. run, then record cost and evidence.
 
-Jarvis's own loop skips it. That is the biggest gap.
+Jarvis's own loop skipped it; step 1 (done 2026-11-01) routes his read and act tools through it.
 
 ## 1. The map: every component
 
@@ -160,7 +160,7 @@ it. All are planned; none exist yet.
 
 | # | Step | Why first | Done when (the test) |
 |---|---|---|---|
-| 1 | **One tool list.** Register Jarvis's read and act tools on the gateway; `_run_tool` calls `Gateway.invoke` with agent id `jarvis`. Confirm tools stay staged cards. | Jarvis today skips HOLD, budget, network and audit-per-call checks | With HOLD on, Jarvis's act tools are refused and its read tools still answer; every Jarvis tool call leaves a `gateway.invoked` row |
+| 1 | **Done 2026-11-01.** **One tool list.** Register Jarvis's read and act tools on the gateway; `_run_tool` calls `Gateway.invoke` with agent id `jarvis`. Confirm tools stay staged cards. | Jarvis today skips HOLD, budget, network and audit-per-call checks | With HOLD on, Jarvis's act tools are refused and its read tools still answer; every Jarvis tool call leaves a `gateway.invoked` row |
 | 2 | **Tool search for every model.** Replace `tool_menu`/`use_tool` with Hermes-style search, describe and call over the gateway catalog, sized to the model's context | measured earlier: 34 tools = 3,155 tokens, ~52 s on the laptop's CPU; MCP tools will add more | A lean model finds and calls a tool it was not shown, through the gateway, and the listing fits its budget |
 | 3 | **Tool-call fitness on the record.** The router and team read the lab's tool-call score, not the yes/no flag; a model below the bar is not made boss | the lab already measures this; nothing uses it | A model with a failing tool score is refused as boss, with the reason |
 | 4 | **Text-mode tool calls.** When a model fails native tool calls in the lab, the provider asks for one XML block and parses it | small local models often fail native calls | The lab's tool rows pass on a scripted model that only writes XML |
@@ -170,6 +170,28 @@ it. All are planned; none exist yet.
 | 8 | **Executive wired in.** Jarvis hands long jobs to the executive with a task contract and checkpoints | the prototype already exists | A long job survives a restart and resumes from its checkpoint |
 
 Steps 1 to 3 make the harness one piece; do them before adding anything new.
+
+**Step 1, what it did (2026-11-01).**
+
+What changed:
+
+- Jarvis's read and act tools are registered on a gateway as `inspect.jarvis.NAME` and
+  `change.jarvis.NAME`. Every call leaves a `gateway.invoked` or `gateway.denied` row in the
+  audit chain.
+- On HOLD his act tools are refused; reading and `hold_everything` still run.
+- Tools that work on this computer skip the network check. Only `web_search`, `read_page`,
+  `world_watch`, `find_tools` and `video_clips` are checked, and offline they say so.
+
+Two needless blocks found on the way and fixed:
+
+- An online computer on a cable with no Wi-Fi name was rated below coffee-shop Wi-Fi, so
+  read-only internet actions were refused. It now counts like unknown Wi-Fi.
+- "Online" was one probe to 1.1.1.1 port 53. Now any of three probes counts.
+
+Run on the real Qwen3.5-4B (the stick's llama.cpp b11747):
+
+- status, remember, recall, creator batch and hold all went through the gateway;
+- the audit chain has one row per call.
 
 ### The agent acceptance test (planned, step 1 onward)
 
