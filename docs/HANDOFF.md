@@ -508,6 +508,8 @@ reads back what `remember` saved (memory used to be write-only for him).
 
 ## Next steps (in order)
 
+**2026-11-01:** the universal-harness plan is in [HARNESS-MAP.md](HARNESS-MAP.md). Build its steps 1 to 3 first (one tool list through the gateway, tool search, tool-call fitness on the model record), each on its own branch, merged only after the owner reviews it.
+
 ### Laptop "best setup" (owner's go, 2026-10-21): what was searched, tested and built
 
 Two research rounds (8 researchers, primary sources only) plus real tests on the stick's
