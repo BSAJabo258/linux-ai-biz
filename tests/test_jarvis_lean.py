@@ -68,7 +68,9 @@ def test_use_tool_cannot_skip_the_owners_confirmation(tmp_path):
 def test_use_tool_refuses_unknown_and_itself(tmp_path):
     a = lean(tmp_path, ["ok"])
     assert "unknown tool" in a.t_use_tool("nope")["error"]
-    assert "error" in a.t_use_tool("use_tool", {"name": "money"})
+    # nested use_tool is unwrapped since 2026-11-02 (see test_a_nested_use_tool_is_unwrapped);
+    # use_tool with nothing to run inside is still refused
+    assert "error" in a.t_use_tool("use_tool", {})
     assert "error" in a.t_use_tool("tool_menu")
 
 
@@ -218,3 +220,35 @@ def test_usage_says_plainly_when_no_limit_is_set(tmp_path):
 # Same run: asked to plan the creator's posts, it never saw creator_batch (menu only).
 def test_the_creator_batch_is_in_a_small_models_core_tools(tmp_path):
     assert "creator_batch" in CORE_TOOLS
+
+
+# The owner's desktop, 2026-11-02: the small model put use_tool inside use_tool, then asked
+# the menu about "use_tool", and "lets do all" ran out of steps. Now "do all" puts every
+# setup step waiting for the owner on screen at once (no model needed), and a nested
+# use_tool is unwrapped instead of refused.
+def test_do_all_puts_everything_waiting_on_screen_without_the_model(tmp_path, monkeypatch):
+    from bau import setup_steps
+    monkeypatch.setattr(setup_steps, "_probe", {"nvidia": True, "driver": False,
+                                                "pictures": False, "search": False,
+                                                "update": "off"}.__getitem__)
+    for said in ("lets do all", "Let's do it all", "do everything", "ok continue",
+                 "what's waiting on me?"):
+        a = lean(tmp_path, [])                       # the model is never asked
+        r = a.ask(said)
+        assert len(r.pending) == 3 and all(p["tool"] == "setup_step" for p in r.pending), said
+        assert "Accept" in r.text
+    a = lean(tmp_path, ["Sure."])
+    assert not a.ask("can we continue the story about the cafe later").pending
+
+
+def test_nothing_waiting_is_said_plainly(tmp_path):
+    r = lean(tmp_path, []).ask("lets do all")
+    assert r.pending == [] and "nothing" in r.text.lower()
+
+
+def test_a_nested_use_tool_is_unwrapped(tmp_path):
+    a = lean(tmp_path, [])
+    out = a.t_use_tool("use_tool", {"name": "missions", "input": {}})
+    assert not (isinstance(out, dict) and out.get("error"))
+    menu = a.t_tool_menu("use_tool")
+    assert "error" not in menu and "use_tool" in menu["how"]

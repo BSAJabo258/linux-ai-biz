@@ -16,6 +16,10 @@ to skip it for this time. A step that is done does not come back.
 | Turn on nightly updates | Opens a terminal running `sudo bau update auto` |
 | Set your Fanvue prices | Opens a terminal that asks you for each price. Nothing is filled in for you |
 
+You can also say or type **"do all"**, **"let's do it all"**, **"continue"** or **"what's
+waiting on me?"**. Jarvis then puts every card that is waiting for you on screen at once,
+without asking the AI model. That takes a second, even on the small model.
+
 Steps that need your password always open a terminal, so you see the exact command and type
 the password yourself. Nothing runs without your Accept. Jarvis and the AI models cannot
 start these steps themselves.
