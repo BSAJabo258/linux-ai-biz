@@ -35,6 +35,12 @@ class Step:
 
 
 STEPS = (
+    Step("api_keys", "Use your API keys while online",
+         "Your keys are on this computer, but the models they pay for aren't switched on, so "
+         "Jarvis only uses the slower local model. Online he'll answer with them first and "
+         "fall back to the local model; offline he uses the local one. A terminal opens. "
+         "Note: NVIDIA's free API is a trial for testing; their terms say business use "
+         "needs a paid subscription."),
     Step("laws", "Bring in the current rules",
          "Your computer still reads the rules copied at install time (YouTube and kids rules, "
          "no creator rules). This swaps in the current ones and keeps the old copy."),
@@ -113,6 +119,8 @@ def _profile(home: Path) -> Path | None:
 
 def _done(step: str, home: Path, probe: Probe) -> bool | None:
     """True done, False waiting, None not for this computer."""
+    if step == "api_keys":
+        return None if not _unused_keys(home) else False
     if step == "laws":                    # an empty or missing copy reads the shipped rules
         regs = home / "regulations"
         if not regs.is_dir() or not any(regs.glob("*.yaml")):
@@ -137,6 +145,27 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
     raise ValueError(step)
 
 
+def _unused_keys(home: Path) -> list[str]:
+    """Hosted models whose API key is on this computer but which are not approved yet."""
+    import os
+
+    from . import localonly
+    from .registry import CapabilityRegistry
+    if localonly.mode(home) == "local-only":
+        return []
+    p = home / "registry" / "capabilities.yaml"
+    if not p.exists():
+        return []
+    out = []
+    for mid, rec in sorted(CapabilityRegistry(p).data.get("model", {}).items()):
+        key = rec.get("api_key_env")
+        if (key and os.environ.get(key) and rec.get("deployment") != "local"
+                and rec.get("lane") != "content_only"
+                and rec.get("status") not in ("APPROVED", "ACTIVE")):
+            out.append(mid)
+    return out
+
+
 def waiting(home: Path, probe: Probe | None = None) -> list[Step]:
     probe = probe or _probe
     return [s for s in STEPS if _done(s.id, home, probe) is False]
@@ -144,6 +173,8 @@ def waiting(home: Path, probe: Probe | None = None) -> list[Step]:
 
 def _command(step: str, home: Path) -> str:
     q = shlex.quote
+    if step == "api_keys":
+        return "; ".join(f"bau set-status model {q(m)} APPROVED" for m in _unused_keys(home))
     if step == "nvidia":
         return "sudo bau-gpu-setup"
     if step == "pictures":

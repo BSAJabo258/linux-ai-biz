@@ -1602,17 +1602,29 @@ def build_assistant(home: Path | None = None, owner: str = "human:owner") -> Ass
 
 
 def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any] | None]:
-    """The model Jarvis (and the workspaces he walks) uses: the first APPROVED, reachable
-    one in the owner's order. When that is a hosted model, the other approved hosted models
-    after it become its backups (FallbackProvider). (None, None) when nothing is approved."""
+    """The model Jarvis (and the workspaces he walks) uses, from the APPROVED models in the
+    owner's order. The owner's rule (2026-11-02): online, the hosted models his API keys pay
+    for answer first and the local model is their backup (FallbackProvider); offline, only
+    the local model is asked, so nothing waits on a model that cannot answer. Claude, when it
+    comes first, answers alone (its tool format is not chained). Local-only mode keeps hosted
+    models out (provider_for refuses them). (None, None) when nothing is approved."""
+    import os
+
+    from . import network
     from .models.providers import FallbackProvider
     from .runtime import provider_for
     home = home or bau_home()
     cfg = YamlStore(home / "config" / "jarvis.yaml").load() or {}
-    chosen: list[tuple[Provider, dict[str, Any], str]] = []
     order = [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "glm-4.7-flash-zai",
              "nemotron-3-super-nim", "qwen3.5-9b", "qwen3.5-4b", "lfm2.5-2.6b",
              "qwen2.5-1.5b-instruct", "local-llm"]
+    try:
+        online = bool(network.detect().online)
+    except Exception:
+        online = True                        # unknown: try the keys, the local model backs up
+    hosted: list[tuple[Provider, dict[str, Any], str]] = []
+    local: tuple[Provider, dict[str, Any], str] | None = None
+    first: tuple[Provider, dict[str, Any], str] | None = None
     for mid in dict.fromkeys(m for m in order if m):
         try:
             provider, rec = provider_for(mid, home)
@@ -1620,8 +1632,11 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             continue
         if rec.get("lane") == "content_only":
             continue                         # content-lane models never run Jarvis
-        hosted = hasattr(provider, "waits")
-        if hosted:
+        key = rec.get("api_key_env")
+        if key and not os.environ.get(key):
+            continue                         # no key on this computer: it cannot answer
+        first = first or (provider, rec, mid)
+        if hasattr(provider, "waits"):       # a hosted OpenAI-compatible model
             # The owner is watching the screen: give a busy hosted model about 20 s, not
             # the bench's 75 s, then say so plainly. A page kept waiting over a minute can
             # be dropped by the browser or the Codespaces proxy (seen as BrokenPipe).
@@ -1629,18 +1644,21 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             # Z.ai sometimes accepts a request and never answers (rehearsal 2026-10-08:
             # "The read operation timed out" after the bench's 120 s). Give up sooner.
             provider.timeout = CONVERSATION_TIMEOUT
-        if not chosen:
-            chosen.append((provider, rec, mid))
-            if not hosted:
-                break                        # Claude or a local model: no backup chain
-        elif hosted:
-            chosen.append((provider, rec, mid))
-    if not chosen:
+            hosted.append((provider, rec, mid))
+        elif rec.get("deployment") == "local":
+            local = local or (provider, rec, mid)
+    if first is None:
         return None, None
-    provider, rec, mid = chosen[0]
-    if len(chosen) > 1:
-        provider = FallbackProvider([p for p, _, _ in chosen], [m for _, _, m in chosen])
-        rec = {**rec, "fallbacks": [m for _, _, m in chosen[1:]]}
+    if not hasattr(first[0], "waits") and first[1].get("deployment") != "local":
+        if online or local is None:
+            return first[0], {**first[1], "id": first[2]}     # Claude answers alone
+    chain = (hosted + ([local] if local else [])) if online or local is None else [local]
+    if not chain:
+        chain = [first]
+    provider, rec, mid = chain[0]
+    if len(chain) > 1:
+        provider = FallbackProvider([p for p, _, _ in chain], [m for _, _, m in chain])
+        rec = {**rec, "fallbacks": [m for _, _, m in chain[1:]]}
     return provider, {**rec, "id": mid}
 
 
