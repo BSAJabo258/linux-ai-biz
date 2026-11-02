@@ -20,6 +20,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -37,6 +38,7 @@ VENV = Path("/opt/bau/venv")
 FIRST = Path("/opt/bau-payload/wheels")          # the stick's own wheel, the first way back
 UI = "http://127.0.0.1:8765/"
 SERVICES = ("bau-ui.service", "bau-jarvis.service")
+RUN_AS = "bau"
 WHEEL = re.compile(r"^bau-[0-9][0-9A-Za-z.+]*-py3-none-any\.whl$")
 HEX40, HEX64 = re.compile(r"^[0-9a-f]{40}$"), re.compile(r"^[0-9a-f]{64}$")
 MAX_WHEEL = 50 * 1024 * 1024
@@ -154,8 +156,13 @@ def keep(wheel: Path, commit: str, state_dir: Path = STATE) -> None:
 
 
 def _pip(runner: Callable[[list[str]], int], wheel: Path) -> bool:
-    return runner([str(VENV / "bin" / "pip"), "install", "--quiet", "--no-index", "--no-deps",
-                   "--force-reinstall", str(wheel)]) == 0
+    # Files readable by the bau account whatever umask root has (sudo can carry a strict one).
+    old = os.umask(0o022)
+    try:
+        return runner([str(VENV / "bin" / "pip"), "install", "--quiet", "--no-index",
+                       "--no-deps", "--force-reinstall", str(wheel)]) == 0
+    finally:
+        os.umask(old)
 
 
 def _ui_answers(url: str = UI, tries: int = 30, sleep: Callable[[float], None] = time.sleep,
@@ -174,12 +181,14 @@ def _ui_answers(url: str = UI, tries: int = 30, sleep: Callable[[float], None] =
 def _healthy(runner: Callable[[list[str]], int], ui_check: Callable[[], bool],
              sleep: Callable[[float], None], ui_was_up: bool = True) -> str | None:
     """None when the new BAU works; else what failed."""
-    if runner([str(VENV / "bin" / "python"), "-I", "-c",
+    # As the bau account, which runs Mission Control: root can read files it cannot.
+    if runner(["runuser", "-u", RUN_AS, "--", str(VENV / "bin" / "python"), "-I", "-c",
                "import bau.cli, bau.cli_ext, bau.assistant, bau.ui.jarvis_server"]) != 0:
-        return "the new version does not start (import failed)"
+        return "the new version does not start for the bau account (import failed)"
     for unit in SERVICES:
         if runner(["systemctl", "is-enabled", "--quiet", unit]) != 0:
             continue
+        runner(["systemctl", "reset-failed", unit])          # clear systemd's start limit
         if runner(["systemctl", "restart", unit]) != 0:
             return f"{unit} did not restart"
     sleep(3)
@@ -238,6 +247,10 @@ def run(opener: Any = None, runner: Callable[[list[str]], int] | None = None,
     new.write_bytes(body)
     rec = {"commit": m["commit"], "wheel": m["wheel"], "previous": previous.name}
     ui_was_up = runner(["systemctl", "is-active", "--quiet", "bau-ui.service"]) == 0
+    # Stopped while pip swaps the files: on the owner's desktop (2026-11-01) Mission Control
+    # restarted mid-install, found no bau.cli five times and systemd gave up on it.
+    for unit in SERVICES:
+        runner(["systemctl", "stop", unit])
 
     why = None if _pip(runner, new) else "pip could not install it"
     why = why or _healthy(runner, ui_check, sleep, ui_was_up)

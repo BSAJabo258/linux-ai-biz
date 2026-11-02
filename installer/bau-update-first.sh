@@ -6,6 +6,7 @@
 # checks it starts (else puts the stick's own back), keeps it as the build to go back to, and
 # turns automatic updates on. Safe to run again.
 set -euo pipefail
+umask 022    # BAU's files must stay readable by the bau account that runs Mission Control
 
 URL="https://github.com/BSAJabo258/linux-ai-biz/releases/download/bau-update"
 say() { printf '%s\n' "$*"; }
@@ -33,8 +34,9 @@ echo "${sha}  ${work}/${wheel}" | sha256sum -c --quiet \
   || { say "The download does not match its SHA-256: stopping"; exit 1; }
 
 say "2/3 Installing it..."
+systemctl stop bau-ui.service 2>/dev/null || true
 /opt/bau/venv/bin/pip install --quiet --no-index --no-deps --force-reinstall "${work}/${wheel}"
-/opt/bau/venv/bin/python -I -c 'import bau.cli, bau.cli_ext, bau.assistant, bau.update' \
+runuser -u bau -- /opt/bau/venv/bin/python -I -c 'import bau.cli, bau.cli_ext, bau.assistant, bau.update' \
   || { say "The new version does not start: putting the stick's back";
        /opt/bau/venv/bin/pip install --quiet --no-index --no-deps --force-reinstall \
          /opt/bau-payload/wheels/bau-*.whl; exit 1; }
@@ -51,7 +53,7 @@ Type=oneshot
 Environment=BAU_HOME=/var/lib/bau
 Environment=BAU_AUDIT_KEY=/etc/bau/audit.key
 ExecStart=/opt/bau/venv/bin/bau update now
-UMask=0007
+UMask=0022
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectHome=yes
@@ -76,6 +78,7 @@ export BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key
 # This build is the one to go back to from now on (the stick's own has no updater).
 /opt/bau/venv/bin/bau update keep "${work}/${wheel}" "${commit}" >/dev/null
 /opt/bau/venv/bin/bau update auto >/dev/null
+systemctl reset-failed bau-ui.service 2>/dev/null || true
 systemctl restart bau-ui.service 2>/dev/null || true
 /opt/bau/venv/bin/bau update status
 say "Done. BAU now updates itself each night; see it with: bau update status"
