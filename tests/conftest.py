@@ -23,6 +23,16 @@ def no_real_network(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def setup_all_done(monkeypatch):
+    """Tests never probe this computer's card or services for setup steps: everything is
+    set up unless a test says else (tests/test_setup_steps.py)."""
+    from bau import setup_steps
+    facts = {"nvidia": False, "driver": False, "pictures": False, "search": True,
+             "update": "auto"}
+    monkeypatch.setattr(setup_steps, "_probe", facts.__getitem__)
+
+
+@pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):
     home = tmp_path / "bauhome"
     home.mkdir()
