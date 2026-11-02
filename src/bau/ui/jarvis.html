@@ -1513,6 +1513,7 @@ let previewUrl = null;
 function nextConfirm() {
   if (showing || !confirmQ.length) return;
   showing = confirmQ.shift(); $("csum").textContent = showing.summary;
+  $("yes").textContent = showing.tool === "setup_step" ? "Accept" : "Confirm";   // setup steps
   const form = $("cform"), note = $("cnote"), need = $("cneed"), vid = $("cvid");
   form.textContent = ""; note.textContent = ""; need.textContent = ""; picked = {};
   const fields = (showing.form && showing.form.fields) || [];

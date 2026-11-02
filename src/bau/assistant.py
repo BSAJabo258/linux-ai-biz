@@ -250,7 +250,12 @@ class Assistant:
         self.owner_tools = {"check_stage": Tool(
             "check_stage", "The owner checks a stage they have read.",
             _schema({"workspace": {"type": "string"}, "episode": {"type": "string"},
-                     "stage": {"type": "string"}}), self.t_check_stage, kind="confirm")}
+                     "stage": {"type": "string"}}), self.t_check_stage, kind="confirm"),
+            # Setup steps waiting on this computer (src/bau/setup_steps.py); the owner's
+            # Accept runs one. Never offered to a model.
+            "setup_step": Tool("setup_step", "Run one setup step the owner accepted.",
+                               _schema({"step": {"type": "string"}}), self.t_setup_step,
+                               kind="confirm")}
 
     def _gateway(self, trust: Callable[[], Any] | None) -> tuple[Any, dict[str, str]]:
         """The same gateway the agents use: HOLD, permissions, network trust, budget and the
@@ -876,6 +881,26 @@ class Assistant:
                    + "\n\n".join(texts))
         self.pending[pid] = Pending(pid, "check_stage", args, summary, _now())
         return self.pending[pid].public()
+
+    def setup_waiting(self) -> list[dict[str, Any]]:
+        """Every setup step still waiting here, as a card with Accept (the owner's ask,
+        2026-11-02). Each step is staged once; a step done meanwhile is taken down."""
+        from . import setup_steps
+        steps = {s.id: s for s in setup_steps.waiting(self.home)}
+        for pid, p in list(self.pending.items()):
+            if p.tool == "setup_step" and p.args["step"] not in steps:
+                self.pending.pop(pid)
+        staged = {p.args["step"] for p in self.pending.values() if p.tool == "setup_step"}
+        for s in steps.values():
+            if s.id not in staged:
+                pid = "su_" + secrets.token_hex(4)
+                self.pending[pid] = Pending(pid, "setup_step", {"step": s.id},
+                                            f"Setup: {s.title}\n{s.why}", _now())
+        return [p.public() for p in self.pending.values() if p.tool == "setup_step"]
+
+    def t_setup_step(self, step: str) -> dict[str, Any]:
+        from . import setup_steps
+        return setup_steps.run(step, self.home)
 
     def t_check_stage(self, workspace: str, episode: str, stage: str) -> dict[str, Any]:
         from . import workspace as W

@@ -53,6 +53,10 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
 
     def state() -> dict[str, Any]:
         from ..look import brief
+        try:
+            assistant.setup_waiting()     # setup steps pop up by themselves (owner, 2026-11-02)
+        except Exception:                 # a probe that fails must not break the page
+            pass
         return {"call_me": assistant.cfg["call_me"], "look": brief(assistant.home),
                 "mode": "model" if assistant.provider else "plain",
                 "model": assistant.model.get("id") or assistant.model.get("api_model"),
