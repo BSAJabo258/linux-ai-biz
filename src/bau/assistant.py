@@ -129,6 +129,12 @@ def load_constitution(home: Path) -> str:
 CORE_TOOLS = ("system_status", "recall", "remember", "toolbox", "usage_today",
               "hold_everything", "web_search", "creator_batch")
 LEAN_MAX_TOKENS = 400                         # spoken answers; a small model can loop
+# The local model server's window: bau-llm.service runs llama-server with --ctx-size 8192
+# (a test keeps the two equal). Requests are measured in characters, about 3 per token, which
+# errs on the safe side; the owner's desktop got HTTP 400s when Jarvis sent more (2026-11-02).
+LOCAL_SERVER_CTX = 8192
+CHARS_PER_TOKEN = 3
+LEAN_RESULT_CHARS = 3000                      # one tool result, local model
 LEAN_NOTE = ("You see a few tools in full. tool_menu lists the others in one line each "
              "(tool_menu with a name shows one in full); run any of them with use_tool. "
              "Before saying something doesn't exist, look: toolbox, recall, tool_menu.")
@@ -214,6 +220,24 @@ class Reply:
     pending: list[dict[str, Any]] = field(default_factory=list)
     mode: str = "model"                       # model | plain
     model: str = ""                           # which model gave this answer
+
+
+def _longest_text(messages: list[Any]) -> tuple[Any, Any, str] | None:
+    """The longest string in these messages, as (holder, key, text), for cutting in place."""
+    best: tuple[Any, Any, str] | None = None
+
+    def walk(node: Any) -> None:
+        nonlocal best
+        items = node.items() if isinstance(node, dict) else enumerate(node) \
+            if isinstance(node, list) else ()
+        for k, v in items:
+            if isinstance(v, str):
+                if len(v) > 400 and (best is None or len(v) > len(best[2])):
+                    best = (node, k, v)
+            else:
+                walk(v)
+    walk(messages)
+    return best
 
 
 def _now() -> str:
@@ -1262,9 +1286,11 @@ class Assistant:
         final = ""
         nudged = False
         for _ in range(max_steps):
+            limit = LEAN_MAX_TOKENS if self.lean else 2000
+            start -= self._fit(start, limit)
             try:
                 resp = model.complete(self.system_prompt(), self.messages, self.specs(),
-                                      max_tokens=LEAN_MAX_TOKENS if self.lean else 2000)
+                                      max_tokens=limit)
             except UsageLimit as e:
                 del self.messages[start:]
                 final = str(e)
@@ -1304,7 +1330,8 @@ class Assistant:
                 else:
                     shown = (call.input or {}).get("name") if call.name == "use_tool" else None
                     cards.append({"tool": shown or call.name, "data": out})
-                wrapped = untrusted(call.name, json.dumps(out, default=str)[:12000])[0]
+                cap = LEAN_RESULT_CHARS if self.lean else 12000
+                wrapped = untrusted(call.name, json.dumps(out, default=str)[:cap])[0]
                 results.append((call, wrapped, err))
             msg = self.provider.tool_result_message(results)
             if msg.get("role") == "_multi":
@@ -1328,6 +1355,42 @@ class Assistant:
         backups = self.model.get("fallbacks") or []
         main = self.model.get("id") or self.model.get("api_model") or "?"
         return main + (f", backup: {', '.join(backups)}" if backups else "")
+
+    def _window_chars(self, max_tokens: int) -> int:
+        ctx = int(self.model.get("context") or LOCAL_SERVER_CTX)
+        if self.lean:                             # the local server's real window wins
+            ctx = min(ctx, LOCAL_SERVER_CTX)
+        return (ctx - max_tokens - 256) * CHARS_PER_TOKEN
+
+    def _fit(self, start: int, max_tokens: int) -> int:
+        """Make the next request fit the model's window: drop the oldest turns first, then cut
+        the longest texts of this turn. Returns how many messages were dropped in front."""
+        budget = self._window_chars(max_tokens)
+        fixed = len(self.system_prompt()) + len(json.dumps(
+            [t.__dict__ for t in self.specs()], default=str))
+
+        def size() -> int:
+            return fixed + len(json.dumps(self.messages, default=str))
+        dropped = 0
+        def plain_user(i: int) -> bool:          # a turn starts here: tool pairs stay whole
+            m = self.messages[i]
+            return m.get("role") == "user" and isinstance(m.get("content"), str)
+        while size() > budget and start - dropped > 0:
+            here = start - dropped
+            cut = next((i for i in range(1, here + 1) if i == here or plain_user(i)), here)
+            del self.messages[:cut]
+            dropped += cut
+        for _ in range(40):                       # this turn alone is still too big
+            over = size() - budget
+            if over <= 0:
+                break
+            spot = _longest_text(self.messages[start - dropped + 1:])
+            if spot is None:
+                break
+            holder, key, text = spot
+            keep = max(200, len(text) - over - 64)
+            holder[key] = text[:keep] + " [cut to fit]"
+        return dropped
 
     def _trim(self, keep: int = 40) -> None:
         """Bound the live context. Cut only before a plain user utterance so tool calls
