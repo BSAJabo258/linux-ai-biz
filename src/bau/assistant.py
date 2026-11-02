@@ -151,6 +151,12 @@ REMEMBER_CMD = re.compile(r"^\W*(?:please\W+|jarvis\W+|hey jarvis\W+)*remember\W
                           r"(.{3,})", re.I | re.S)
 WEEK_CMD = re.compile(r"\b(?:schedule|post|publish)\b.{0,20}\bweek\W+([a-z0-9][a-z0-9._-]{0,60}"
                       r"[a-z0-9])", re.I)
+# Talking to the autopilot (docs/AUTOPILOT.md): handled here, never by a model.
+AUTOPILOT_CMD = re.compile(
+    r"^\W*(?:(?:ok(?:ay)?|jarvis|hey jarvis)\W+)*(?:(?P<pause>pause|stop working|hold on)"
+    r"|(?P<resume>resume|carry on|keep working|start working)"
+    r"|focus on\W+(?P<focus>.{2,80}?)"
+    r"|(?P<status>what are you (?:working on|doing)|autopilot status))\W*$", re.I)
 # Facts first: for the common questions a local model is handed the answer's facts with the
 # question (plain matching, no model), so it only has to say them. Read tools only.
 GROUND = (
@@ -255,7 +261,11 @@ class Assistant:
             # Accept runs one. Never offered to a model.
             "setup_step": Tool("setup_step", "Run one setup step the owner accepted.",
                                _schema({"step": {"type": "string"}}), self.t_setup_step,
-                               kind="confirm")}
+                               kind="confirm"),
+            # The autopilot's questions (src/bau/autopilot.py): Accept is yes, Not now is no.
+            "autopilot_answer": Tool("autopilot_answer", "The owner answers the autopilot.",
+                                     _schema({"task": {"type": "string"}}),
+                                     self.t_autopilot_yes, kind="confirm")}
 
     def _gateway(self, trust: Callable[[], Any] | None) -> tuple[Any, dict[str, str]]:
         """The same gateway the agents use: HOLD, permissions, network trust, budget and the
@@ -896,7 +906,20 @@ class Assistant:
                 pid = "su_" + secrets.token_hex(4)
                 self.pending[pid] = Pending(pid, "setup_step", {"step": s.id},
                                             f"Setup: {s.title}\n{s.why}", _now())
-        return [p.public() for p in self.pending.values() if p.tool == "setup_step"]
+        from . import autopilot
+        asked = {p.args["task"] for p in self.pending.values() if p.tool == "autopilot_answer"}
+        for q in autopilot.questions(self.home):
+            if q["id"] not in asked:
+                pid = "ap_" + secrets.token_hex(4)
+                self.pending[pid] = Pending(pid, "autopilot_answer", {"task": q["id"]},
+                                            f"Jarvis asks: {q['question']}\n"
+                                            "Accept = yes, Not now = no.", _now())
+        return [p.public() for p in self.pending.values()
+                if p.tool in ("setup_step", "autopilot_answer")]
+
+    def t_autopilot_yes(self, task: str) -> dict[str, Any]:
+        from . import autopilot
+        return autopilot.answer(self.home, task, "yes", self.owner)
 
     def t_setup_step(self, step: str) -> dict[str, Any]:
         from . import setup_steps
@@ -1000,6 +1023,9 @@ class Assistant:
                     return {"error": f"choose: {f['label']}", "retry": True}
                 picked[f["name"]] = v
             p.args = {**p.args, **picked}
+        if not approve and p.tool == "autopilot_answer":     # Not now on a question = no
+            from . import autopilot
+            autopilot.answer(self.home, p.args["task"], "no", by)
         if not approve:
             self.audit.append("jarvis.declined", by, {"tool": p.tool, "pending": p.id})
             note = f"[The owner declined: {p.tool}. Nothing was done.]"
@@ -1038,6 +1064,9 @@ class Assistant:
                 f[key] = {"error": f"{type(e).__name__}: {e}"[:200]}
         from . import update
         f["update"] = update.last(update.STATE)     # read at call time (tests point it away)
+        from . import autopilot
+        f["autopilot"] = autopilot.digest(self.home) if autopilot._load(self.home)["tasks"] \
+            else None
         return f
 
     def plain_briefing(self, f: dict[str, Any]) -> str:
@@ -1071,6 +1100,8 @@ class Assistant:
             parts.append(f"{len(d['regulation_reviews_due'])} regulation review(s) due soon.")
         if d.get("incidents_open"):
             parts.append(f"Heads up: {len(d['incidents_open'])} open incident(s).")
+        if f.get("autopilot"):
+            parts.append(f["autopilot"].split("\n")[0])
         up = f.get("update") or {}
         if up.get("result") == "installed":
             parts.append("Last night BAU installed its newest tested update.")
@@ -1152,9 +1183,27 @@ class Assistant:
         if not text:
             return Reply("I didn't catch that.", mode="plain" if self.provider is None else "model")
         self._log("owner", text)
+        if m := AUTOPILOT_CMD.match(text):
+            return self._autopilot_cmd(m)
         if self.provider is None:
             return self._plain(text)
         return self._turn(text)
+
+    def _autopilot_cmd(self, m: re.Match[str]) -> Reply:
+        from . import autopilot as A
+        if m.group("pause"):
+            A.pause(self.home, self.owner)
+            text = "Paused. I won't start anything new until you say resume."
+        elif m.group("resume"):
+            A.resume(self.home, self.owner)
+            text = "Back to work."
+        elif m.group("focus"):
+            A.focus(self.home, m.group("focus"), self.owner)
+            text = f"Got it: {m.group('focus')} comes first now."
+        else:
+            text = A.digest(self.home)
+        self._log("jarvis", text)
+        return Reply(text, mode="plain" if self.provider is None else "model")
 
     def _ground(self, question: str, cards: list[dict[str, Any]]) -> str:
         """Look up the facts for a common question before a small model answers it."""

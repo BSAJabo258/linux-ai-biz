@@ -50,6 +50,10 @@ STEPS = (
     Step("updates", "Turn on nightly updates",
          "BAU installs its newest tested version each night and goes back by itself if one "
          "fails. A terminal opens; type your password."),
+    Step("autopilot", "Let Jarvis work on his own",
+         "The autopilot: every 30 minutes Jarvis scans GitHub, inspects what he finds and "
+         "votes on what to add, and asks you only about money, posting and legal. A "
+         "terminal opens; type your password."),
     Step("prices", "Set your Fanvue prices",
          "Your monthly price and the two unlock prices. A terminal opens and asks you for "
          "each one; nothing is filled in for you."),
@@ -81,6 +85,9 @@ def _probe(what: str) -> object:
         return _answers("http://127.0.0.1:8188/system_stats")
     if what == "search":
         return _answers("http://127.0.0.1:8888/")
+    if what == "autopilot":
+        return subprocess.run(["systemctl", "is-enabled", "--quiet", "bau-autopilot.timer"],
+                              capture_output=True, check=False).returncode == 0
     if what == "update":
         from . import update
         return update.mode() or "off"
@@ -119,6 +126,8 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         return bool(probe("search"))
     if step == "updates":
         return probe("update") == "auto"
+    if step == "autopilot":
+        return bool(probe("autopilot"))
     if step == "prices":
         import yaml
         prof = _profile(home)
@@ -143,6 +152,8 @@ def _command(step: str, home: Path) -> str:
         return f"sudo bash {q(str(script('bau-search-setup.sh')))}"
     if step == "updates":
         return "sudo bau update auto"
+    if step == "autopilot":
+        return f"sudo bash {q(str(script('bau-autopilot-setup.sh')))}"
     if step == "prices":
         prof = q(str(_profile(home)))
         return ("read -r -p 'Monthly subscription in dollars: ' s; "

@@ -1,0 +1,29 @@
+# The compass (docs/AUTOPILOT.md): what Jarvis works toward when he runs on his own, in the
+# owner's words (2026-11-02): find the best open-source and AI work, and push it toward the
+# business - the creator's content, growing her audience and sales, BAU staying sovereign,
+# and Jarvis getting more capable. Every scan, vote and job is scored against these goals.
+# Edit this copy in BAU_HOME/autopilot/compass.yaml, or tell Jarvis "focus on ...".
+goals:
+  - name: the creator's content
+    weight: 3
+    words: [video, picture, image, photo, voice, speech, caption, edit, creator, influencer,
+            avatar, face, animation, music, content, reel, thumbnail]
+  - name: grow the audience and sales
+    weight: 2
+    words: [marketing, audience, social, schedule, post, analytics, sales, fans, engagement,
+            seo, trend, growth, revenue, campaign]
+  - name: sovereign and local
+    weight: 3
+    words: [local, offline, self-hosted, gguf, quantiz, llama, on-device, privacy, open-source,
+            open source, cpu, gpu]
+  - name: a more capable Jarvis
+    weight: 2
+    words: [agent, memory, tool, mcp, skill, automation, workflow, reasoning, search,
+            browser, planner, orchestrat]
+  - name: safety
+    weight: 1
+    words: [security, sandbox, audit, guard, test]
+# Never: anything here is vetoed by the rules, whatever else it scores.
+avoid: [aimbot, cheat, wallhack, crack, keygen, piracy, pirated, spam bot, credential stealer,
+        stealer, malware, ransomware, keylogger, crypto miner, cryptominer, botnet, ddos,
+        doxx, stalkerware]

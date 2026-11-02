@@ -14,6 +14,7 @@ to skip it for this time. A step that is done does not come back.
 | Set up pictures on this computer | Opens a terminal running the pictures setup (about 10 GB download, once). It shows up only after NVIDIA's driver works |
 | Set up private web search | Opens a terminal running the search setup |
 | Turn on nightly updates | Opens a terminal running `sudo bau update auto` |
+| Let Jarvis work on his own | Opens a terminal that switches on the autopilot timer (docs/AUTOPILOT.md) |
 | Set your Fanvue prices | Opens a terminal that asks you for each price. Nothing is filled in for you |
 
 Steps that need your password always open a terminal, so you see the exact command and type
