@@ -296,3 +296,19 @@ def digest(home: Path, hours: int = 24) -> str:
     if st.get("paused"):
         lines.append("Paused by you.")
     return "\n".join(lines)
+
+
+def view(home: Path, n: int = 8) -> dict[str, Any]:
+    """What the screen draws: status, the latest jobs with their votes, the compass."""
+    st, c = _load(home), compass(home)
+    focus = st.get("focus", "")
+    recent = sorted(st["tasks"], key=lambda t: t.get("finished") or t.get("started")
+                    or t["created"], reverse=True)[:n]
+    goals = []
+    for g in c.get("goals", []):
+        hit = bool(focus) and any(w.lower() in focus.lower() for w in g.get("words", []))
+        goals.append({"name": g["name"], "short": g.get("short") or g["name"][:12],
+                      "weight": g.get("weight", 1), "focus": hit})
+    return {"status": status(home), "focus": focus, "goals": goals,
+            "tasks": [{"lane": t["lane"], "state": t["state"], "title": t["title"],
+                       "note": t.get("note", ""), "vote": t.get("vote")} for t in recent]}

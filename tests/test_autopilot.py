@@ -252,3 +252,23 @@ def test_the_briefing_says_what_the_autopilot_did(home):
     A.run(home, {"scan": lambda t: {"ok": True}})
     j = Assistant(home)
     assert "Autopilot" in j.plain_briefing(j.facts())
+
+
+# ------------------------------------------------------------------ the screen
+def test_the_screen_view_has_status_jobs_votes_and_the_compass(home):
+    A.add(home, "add_tool", "local video generation",
+          {"tested": True, "security": "clean", "licence": "MIT"})
+    A.run(home, {"add_tool": lambda t: {"ok": True}})
+    A.focus(home, "video", by="human:owner")
+    v = A.view(home)
+    assert v["tasks"][0]["vote"]["passed"] and v["tasks"][0]["lane"] == "VOTE"
+    assert any(g["focus"] for g in v["goals"]) and v["focus"] == "video"
+    assert v["status"]["done"] == 1
+
+
+def test_jarvis_page_has_the_mind_and_the_autopilot_panel():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1] / "src/bau/ui"
+    page = (root / "jarvis.html").read_text()
+    assert "function drawMind" in page and 'id="mindhud"' in page and "/api/autopilot" in page
+    assert '"/api/autopilot"' in (root / "jarvis_server.py").read_text()

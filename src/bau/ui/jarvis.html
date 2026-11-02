@@ -171,6 +171,18 @@ input.q,select.q{width:100%;background:var(--field);color:var(--ink);border:1px 
 .card a{color:var(--cyan);font-weight:600}.badge{float:right;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   border:1px solid currentColor;padding:1px 6px}.badge.rejected{color:var(--red)}.badge.needs{color:var(--amber)}.badge.eligible{color:var(--green)}
 pre.md{white-space:pre-wrap;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;max-height:50vh;overflow:auto}
+#mindhud{display:none;left:16px;right:auto}body.showmind #mindhud{display:block}
+body.showmind aside.l{display:none}
+#mindhud canvas{width:100%;height:auto;display:block}
+#mindhud h2{margin:0 0 6px;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--cyan);font-weight:600}
+#mindhud .eq{font:12px/1.9 ui-monospace,Consolas,monospace}#mindhud .eq b{color:var(--cyan);font-weight:600}
+#mindhud .eq i{font-style:normal;color:var(--violet);font-variant-numeric:tabular-nums;float:right}
+#mindhud .dim{color:var(--dim);font-size:11.5px}
+#m-queue{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+#m-queue li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px}
+#m-queue .ln{font:10px ui-monospace,monospace;letter-spacing:.1em;text-align:center;border:1px solid;border-radius:5px;padding:1px 0;align-self:start}
+#m-queue .GO{color:var(--green)}#m-queue .VOTE{color:var(--violet)}#m-queue .ASK{color:var(--amber)}
+#m-queue small{display:block;color:var(--dim);overflow-wrap:anywhere}
 #timeline{position:fixed;top:56px;bottom:110px;right:16px;width:340px;overflow:auto;display:none}
 #eye{position:fixed;top:60px;left:336px;right:24px;bottom:118px;z-index:5;display:flex;flex-direction:column;gap:8px;
   background:var(--solid);border:1px solid var(--cyan);border-radius:14px;padding:12px 14px;box-shadow:0 0 40px -12px var(--cyan)}
@@ -231,6 +243,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
     <span class="chip" id="c-mode">—</span>
     <span class="chip" id="c-hold" hidden>HOLD</span>
     <button class="chip" id="c-time" data-key="T" title="Timeline: everything that happened (T)">TIMELINE</button>
+    <button class="chip" id="c-mind" data-key="P" title="The autopilot: his mind, the compass, the vote, his jobs (P)">AUTOPILOT</button>
     <button class="chip" id="c-mc" data-key="C" title="Mission Control (C)">MISSION CONTROL</button>
     <button class="chip" id="c-log" data-key="L" title="Show the conversation log (L)">LOG</button>
     <button class="chip" id="c-mute" data-key="M" title="Mute voice (M)">VOICE ON</button>
@@ -246,6 +259,14 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 <aside class="l" id="cards"></aside>
 <aside class="r" id="log" aria-label="Conversation log"></aside>
 <aside id="timeline" aria-label="Timeline"></aside>
+<aside id="mindhud" aria-label="Autopilot">
+  <div class="panel"><h2>Mind · Lorenz field</h2>
+    <div class="eq"><div><b>dx/dt</b> = σ(y − x) <i id="m-x"></i></div><div><b>dy/dt</b> = x(ρ − z) − y <i id="m-y"></i></div>
+    <div><b>dz/dt</b> = xy − βz <i id="m-z"></i></div><div class="dim">σ 10 · β 8/3 · ρ <i id="m-rho"></i></div></div></div>
+  <div class="panel"><h2>Compass · where he points</h2><canvas id="m-compass" width="480" height="480"></canvas><div class="dim" id="m-focus"></div></div>
+  <div class="panel"><h2>The vote · 2 of 3, rules veto</h2><canvas id="m-vote" width="480" height="420"></canvas><div class="dim" id="m-votelegend"></div></div>
+  <div class="panel"><h2>Autopilot · jobs</h2><div class="dim" id="m-status"></div><ul id="m-queue"></ul></div>
+</aside>
 <div id="voicebar" aria-hidden="true"><span class="rule"></span><div><canvas id="wave"></canvas><div id="statelabel">STANDBY</div></div><span class="rule r"></span></div>
 <button id="speakpill" data-key="S" title="Stop speaking (S)" hidden><span class="dot"></span>Speaking · tap to stop</button>
 <div id="caption" aria-live="polite"></div>
@@ -277,7 +298,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
     <li><kbd>Y</kbd>Confirm what is on screen</li>
     <li><kbd>1</kbd>…<kbd>9</kbd>Open a part of the business (in order around the core)</li>
     <li><kbd>G</kbd>Go into the open panel, then Tab and Enter</li>
-    <li><kbd>T</kbd>Timeline</li><li><kbd>C</kbd>Mission Control</li><li><kbd>L</kbd>Conversation log</li>
+    <li><kbd>T</kbd>Timeline</li><li><kbd>P</kbd>Autopilot: his mind, compass, vote and jobs</li><li><kbd>C</kbd>Mission Control</li><li><kbd>L</kbd>Conversation log</li>
     <li><kbd>M</kbd>Voice on or off</li><li><kbd>V</kbd>Chat or Voice mode</li>
     <li><kbd>S</kbd>Stop Jarvis speaking</li><li><kbd>W</kbd>Wake word on or off</li>
     <li><kbd>A</kbd>Alerts on or off</li><li><kbd>D</kbd>Light or dark</li>
@@ -349,11 +370,15 @@ function resize() { DPR = Math.min(window.devicePixelRatio || 1, 2); W = innerWi
 addEventListener("resize", resize); resize();
 const REDUCED = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
 const SPEED = REDUCED ? 0.15 : 1;            // calm, not frozen, for reduced-motion users
-// The orb: points spread evenly on a sphere (Fibonacci lattice), turned in 3D each frame.
-const ORB_POINTS = 720;
-const orb = Array.from({ length: ORB_POINTS }, (_, i) => {
-  const y = 1 - (i + 0.5) * 2 / ORB_POINTS, r = Math.sqrt(1 - y * y), th = i * 2.39996323;
-  return [Math.cos(th) * r, y, Math.sin(th) * r, Math.random()]; });
+// The mind: a Lorenz strange attractor (the owner's ask, 2026-11-02: "deep formula" visuals).
+// Particles follow dx=σ(y−x), dy=x(ρ−z)−y, dz=xy−βz; ρ rises while he thinks, the voice
+// level shakes it; each keeps a short trail. The live means are shown in the mind panel.
+const MIND_N = REDUCED ? 300 : 760, MIND_TRAIL = 8;
+const mind = Array.from({ length: MIND_N }, () => {
+  const p = [Math.random() * 2 - 1, Math.random() * 2 - 1, 15 + Math.random() * 20];
+  return { p, h: [] }; });
+let RHO = 28;
+const MIND_RHO = { idle: 28, listening: 30, thinking: 36, speaking: 31 };
 const rings = [ // radius factor, width, arc length, speed, dash count
   [1.22, 1, 6.2, -0.002, 60], [1.36, 2, 1.2, 0.004, 3], [1.52, 1, 6.2, 0.001, 120]];
 const STREAMS = Array.from({ length: REDUCED ? 8 : 16 }, (_, i) => ({ y: (i + 0.5) / (REDUCED ? 8 : 16),
@@ -412,25 +437,35 @@ function drawHalo(X, Y, R, now) {
   cx.beginPath(); cx.arc(X, Y, rr, 0, 6.283); cx.stroke();
   cx.restore();
 }
-// The orb itself: a turning sphere of points with a soft glow behind it.
-function drawOrb(X, Y, R, now) {
-  if (!LIQ) {     // with the liquid art the core is glass (WebGL): only the points float in it
+// The mind itself: the attractor's trails inside a soft glass glow.
+function drawMind(X, Y, R, now) {
+  if (!LIQ) {     // with the liquid art the core is glass (WebGL): only the trails float in it
     const g = cx.createRadialGradient(X, Y, 0, X, Y, R * 1.02);
-    g.addColorStop(0, rgba([180, 235, 255], 0.55 + level * 0.3)); g.addColorStop(0.55, rgba(col, 0.22));
-    g.addColorStop(1, rgba(col, 0.04));
+    g.addColorStop(0, rgba([180, 235, 255], 0.28 + level * 0.25)); g.addColorStop(0.55, rgba(col, 0.14));
+    g.addColorStop(1, rgba(col, 0.03));
     cx.fillStyle = g; cx.beginPath(); cx.arc(X, Y, R, 0, 6.283); cx.fill();
   }
-  const rad = R * 0.9 * (1 + level * 0.12), tilt = 0.42, ct = Math.cos(tilt), st = Math.sin(tilt);
-  const ca = Math.cos(spinA), sa = Math.sin(spinA);
-  for (const [px, py, pz, j] of orb) {
-    const x1 = px * ca + pz * sa, z1 = -px * sa + pz * ca;
-    const y2 = py * ct - z1 * st, z2 = py * st + z1 * ct;
-    const wob = 1 + (STATE === "speaking" || STATE === "listening" ? Math.sin(now / 120 + j * 20) * level * 0.08 : 0);
-    const depth = (z2 + 1) / 2, sx = X + x1 * rad * wob, sy = Y + y2 * rad * wob;
-    cx.fillStyle = rgba(themeLight() ? (depth > 0.5 ? [10, 95, 140] : [10, 120, 168]) : depth > 0.5 ? [225, 248, 255] : col, 0.18 + depth * 0.75);
-    const sz = 0.6 + depth * 1.5; cx.fillRect(sx - sz / 2, sy - sz / 2, sz, sz);
+  RHO += ((MIND_RHO[STATE] || 28) + level * 6 - RHO) * 0.02;
+  const dt = 0.0055 * SPEED * (STATE === "thinking" ? 1.6 : 1), sc = R / 21;
+  const ca = Math.cos(spinA), sa = Math.sin(spinA), light = themeLight();
+  let mx = 0, my = 0, mz = 0;
+  cx.lineWidth = 1;
+  for (const m of mind) {
+    const p = m.p;
+    for (let k = 0; k < 2; k++) {
+      const dx = 10 * (p[1] - p[0]), dy = p[0] * (RHO - p[2]) - p[1], dz = p[0] * p[1] - 8 / 3 * p[2];
+      p[0] += dx * dt; p[1] += dy * dt; p[2] += dz * dt;
+    }
+    mx += p[0]; my += p[1]; mz += p[2];
+    const x = p[0] * ca - p[1] * sa, y = -(p[2] - 25), d = (p[0] * sa + p[1] * ca + 30) / 60;
+    m.h.push([X + x * sc, Y + y * sc]); if (m.h.length > MIND_TRAIL) m.h.shift();
+    const hot = Math.min(1, Math.abs(p[2] - 25) / 20);
+    cx.strokeStyle = rgba(light ? (hot > 0.7 ? [95, 69, 196] : [10, 95, 140]) : hot > 0.7 ? [169, 139, 255] : col, 0.22 + d * 0.6);
+    cx.beginPath(); m.h.forEach(([u, v], i) => i ? cx.lineTo(u, v) : cx.moveTo(u, v)); cx.stroke();
   }
+  MIND_NOW = [mx / MIND_N, my / MIND_N, mz / MIND_N, RHO];
 }
+let MIND_NOW = [0, 0, 0, 28];
 // The voice bar under the orb: bars that follow the real audio when there is some.
 const wv = document.getElementById("wave"), wx = wv ? wv.getContext("2d") : null;
 function drawWave(now) {
@@ -492,7 +527,7 @@ function frame(now) {
     for (let i = 0; i < 72; i++) { const a = i * 0.0873, r1 = R * 1.68, r2 = r1 + (i % 6 ? 4 : 10);
       cx.beginPath(); cx.moveTo(X + Math.cos(a) * r1, Y + Math.sin(a) * r1);
       cx.lineTo(X + Math.cos(a) * r2, Y + Math.sin(a) * r2); cx.stroke(); }
-    drawOrb(X, Y, R, now);
+    drawMind(X, Y, R, now);
     drawHalo(X, Y, R, now);
     drawWave(now);
   } catch (e) { /* never let one bad frame stop the animation */ }
@@ -2081,6 +2116,59 @@ async function loadTimeline(older) {
 }
 $("c-time").onclick = () => { document.body.classList.remove("showlog"); document.body.classList.toggle("showtime");
   if (document.body.classList.contains("showtime")) loadTimeline(); };
+
+// ---------------------------------------------------------------- the mind panel (autopilot)
+let MIND_DATA = null, mindTimer = null;
+function drawCompassRadar(goals) {
+  const c = $("m-compass"), x = c.getContext("2d"), w = c.width, m = w / 2, r = w * 0.32;
+  const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#cfefff";
+  x.clearRect(0, 0, w, w); if (!goals.length) return;
+  const max = Math.max(...goals.map(g => g.weight)), ang = i => -Math.PI / 2 + i / goals.length * 6.283;
+  x.strokeStyle = rgba([80, 200, 255], 0.2); x.lineWidth = 1.5;
+  for (let k = 1; k <= 4; k++) { x.beginPath(); goals.forEach((g, i) => x[i ? "lineTo" : "moveTo"](m + Math.cos(ang(i)) * r * k / 4, m + Math.sin(ang(i)) * r * k / 4)); x.closePath(); x.stroke(); }
+  x.beginPath(); goals.forEach((g, i) => { const v = g.focus ? 1 : 0.35 + 0.55 * g.weight / max;
+    x[i ? "lineTo" : "moveTo"](m + Math.cos(ang(i)) * r * v, m + Math.sin(ang(i)) * r * v); }); x.closePath();
+  x.fillStyle = rgba(col, 0.2); x.fill(); x.strokeStyle = rgba(col, 0.95); x.lineWidth = 2.5; x.stroke();
+  x.font = "21px ui-monospace,Consolas,monospace"; x.textAlign = "center"; x.textBaseline = "middle";
+  goals.forEach((g, i) => { x.fillStyle = g.focus ? "#ffb340" : ink;
+    x.fillText(g.short, m + Math.cos(ang(i)) * (r + 50), m + Math.sin(ang(i)) * (r + 30)); });
+}
+function drawVoteSimplex(tasks) {
+  const c = $("m-vote"), x = c.getContext("2d"), w = c.width, h = c.height;
+  const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#cfefff";
+  x.clearRect(0, 0, w, h);
+  const A = [w / 2, 40], B = [50, h - 50], D = [w - 50, h - 50];
+  x.strokeStyle = rgba([80, 200, 255], 0.45); x.lineWidth = 1.5; x.beginPath(); x.moveTo(...A); x.lineTo(...B); x.lineTo(...D); x.closePath(); x.stroke();
+  x.font = "18px ui-monospace,Consolas,monospace"; x.fillStyle = ink; x.textAlign = "center";
+  x.fillText("RULES", A[0], A[1] - 14); x.fillText("EVIDENCE", B[0] + 30, B[1] + 32); x.fillText("JUDGE", D[0] - 20, D[1] + 32);
+  const voted = tasks.filter(t => t.vote);
+  voted.forEach((t, i) => { const v = t.vote.votes, s = (v.rules + v.evidence + v.judge) || 1;
+    const px = (A[0] * v.rules + B[0] * v.evidence + D[0] * v.judge) / s, py = (A[1] * v.rules + B[1] * v.evidence + D[1] * v.judge) / s;
+    x.fillStyle = t.vote.veto ? "#ff4d5e" : t.vote.passed ? "#46f2a4" : "#ffb340";
+    x.beginPath(); x.arc(px + (i % 3 - 1) * 12, py + (i % 2 ? 8 : -8), i ? 8 : 13, 0, 6.283); x.fill(); });
+  const t = voted[0];
+  $("m-votelegend").textContent = t ? `${t.title}: ` + (t.vote.veto ? `stopped by the rules (${t.vote.veto})` :
+    `${t.vote.yes} of 3, ${t.vote.passed ? "passed" : "not passed"}`) : "No votes yet.";
+}
+async function loadMind() {
+  try {
+    MIND_DATA = await apiJson("/api/autopilot"); const s = MIND_DATA.status;
+    $("m-status").textContent = `${s.done} done · ${s.queued} queued · ${s.questions} for you` + (s.paused ? " · paused" : "");
+    $("m-focus").textContent = MIND_DATA.focus ? "Focus: " + MIND_DATA.focus : "No focus set. Say “focus on …”.";
+    const q = $("m-queue"); q.textContent = "";
+    for (const t of MIND_DATA.tasks) { const li = el("li"); li.appendChild(el("span", "ln " + t.lane, t.lane));
+      const d = el("span", null, t.title); d.appendChild(el("small", null, t.state.replace("_", " ") + (t.note ? " · " + t.note : ""))); li.appendChild(d); q.appendChild(li); }
+    if (!MIND_DATA.tasks.length) q.appendChild(el("li", null, "Nothing yet. He starts on his next round."));
+    drawCompassRadar(MIND_DATA.goals); drawVoteSimplex(MIND_DATA.tasks);
+  } catch (e) {}
+}
+function tickMind() { if (!document.body.classList.contains("showmind")) return;
+  const [a, b, c2, r] = MIND_NOW; $("m-x").textContent = a.toFixed(2); $("m-y").textContent = b.toFixed(2);
+  $("m-z").textContent = c2.toFixed(2); $("m-rho").textContent = r.toFixed(1); }
+setInterval(tickMind, 250);
+$("c-mind").onclick = () => { document.body.classList.toggle("showmind");
+  const on = document.body.classList.contains("showmind"); clearInterval(mindTimer);
+  if (on) { loadMind(); mindTimer = setInterval(loadMind, 15000); } };
 
 // ---------------------------------------------------------------- Mission Control, inside
 const MC = [["status", "Status"], ["missions", "Missions"], ["jobs", "Jobs"], ["regulations", "Regulations"],

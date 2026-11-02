@@ -5,22 +5,27 @@
 # Edit this copy in BAU_HOME/autopilot/compass.yaml, or tell Jarvis "focus on ...".
 goals:
   - name: the creator's content
+    short: content
     weight: 3
     words: [video, picture, image, photo, voice, speech, caption, edit, creator, influencer,
             avatar, face, animation, music, content, reel, thumbnail]
   - name: grow the audience and sales
+    short: audience
     weight: 2
     words: [marketing, audience, social, schedule, post, analytics, sales, fans, engagement,
             seo, trend, growth, revenue, campaign]
   - name: sovereign and local
+    short: sovereign
     weight: 3
     words: [local, offline, self-hosted, gguf, quantiz, llama, on-device, privacy, open-source,
             open source, cpu, gpu]
   - name: a more capable Jarvis
+    short: Jarvis
     weight: 2
     words: [agent, memory, tool, mcp, skill, automation, workflow, reasoning, search,
             browser, planner, orchestrat]
   - name: safety
+    short: safety
     weight: 1
     words: [security, sandbox, audit, guard, test]
 # Never: anything here is vetoed by the rules, whatever else it scores.

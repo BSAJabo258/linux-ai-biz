@@ -100,6 +100,20 @@ bau autopilot pause           # and: resume, focus WORDS, skip ID
 bau autopilot run             # work now instead of waiting for the timer
 ```
 
+## See him think
+
+Press **AUTOPILOT** at the top of Jarvis (or the P key).
+
+- **The mind.** The centre of the screen is a living Lorenz attractor: the "butterfly"
+  of chaos mathematics. It speeds up and widens while he thinks, and shakes with his voice.
+- **The panel** shows:
+  - the mind's equations, with their live values;
+  - the compass as a radar, with the goal you focused on lit up;
+  - the vote as a triangle with Rules, Evidence and Judge at its corners, where each
+    decision sits by how its votes went (green passed, amber not passed, red stopped by
+    the rules);
+  - his latest jobs, coloured by lane.
+
 ## Turn it on
 
 A desktop installed from a new stick has it on already. On your desktop today, Jarvis pops
