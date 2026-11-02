@@ -280,3 +280,26 @@ def test_keep_records_the_setup_build_as_the_way_back(tmp_path):
         U.keep(old, COMMIT, tmp_path / "u")
     with pytest.raises(ValueError):
         U.keep(w, "main", tmp_path / "u")
+
+
+# The owner's desktop, 2026-11-01: Mission Control restarted while pip was swapping files,
+# found no bau.cli and systemd gave up on it. Services stop first, the import is checked as
+# the bau account, pip runs with a umask that leaves the files readable.
+def test_services_stop_before_pip_and_imports_are_checked_as_bau(box, monkeypatch):
+    masks = []
+    real = box.run
+
+    def run(cmd):
+        if "install" in cmd:
+            import os
+            masks.append(os.umask(0o022))
+            os.umask(masks[-1])
+        return real(cmd)
+    box.run = run
+    assert box.go()["result"] == "installed"
+    first_pip = next(i for i, c in enumerate(box.cmds) if "install" in c)
+    assert ["systemctl", "stop", "bau-ui.service"] in box.cmds[:first_pip]
+    assert masks and all(m == 0o022 for m in masks)
+    imp = next(c for c in box.cmds if "-c" in c)
+    assert imp[:4] == ["runuser", "-u", "bau", "--"]
+    assert ["systemctl", "reset-failed", "bau-ui.service"] in box.cmds
