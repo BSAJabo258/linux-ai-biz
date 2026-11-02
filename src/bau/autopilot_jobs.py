@@ -18,9 +18,13 @@ def _scout(home: Path) -> Any:
                  actor="process:autopilot")
 
 
-def handlers(home: Path, sc: Any = None) -> dict[str, A.Handler]:
+def handlers(home: Path, sc: Any = None, gh: Any = None) -> dict[str, A.Handler]:
     from .scout import watch as W
-    box: dict[str, Any] = {"sc": sc}
+    box: dict[str, Any] = {"sc": sc, "gh": gh}
+
+    def github() -> Any:
+        box["gh"] = box["gh"] or scout().source
+        return box["gh"]
 
     def scout() -> Any:
         box["sc"] = box["sc"] or _scout(home)
@@ -52,7 +56,20 @@ def handlers(home: Path, sc: Any = None) -> dict[str, A.Handler]:
                                          + ("" if clean else "; not taken further")),
                 "follow_ups": follow}
 
-    return {"scan": scan, "inspect": inspect}
+    def research(task: dict[str, Any]) -> dict[str, Any]:
+        """What the owner pointed Jarvis at: search GitHub, read the top blueprints."""
+        run = scout().find(task["detail"]["query"], max_queries=2, per_query=10, readmes=1)
+        top = [r["full_name"] for r in run.get("ranked", [])][:3]
+        return {"ok": bool(top) or not run.get("searches"),
+                "evidence": f"{run.get('found', 0)} found; reading {len(top)} blueprints",
+                "follow_ups": [("blueprint", f"blueprint {n}", {"repo": n}) for n in top]}
+
+    def blueprint(task: dict[str, Any]) -> dict[str, Any]:
+        from . import blueprint as B
+        bp = B.read(home, task["detail"]["repo"], github())
+        return {"ok": True, "evidence": B.summary(bp).split("\n")[1]}
+
+    return {"scan": scan, "inspect": inspect, "research": research, "blueprint": blueprint}
 
 
 def seed(home: Path, days: int = 7) -> int:

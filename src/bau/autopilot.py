@@ -32,7 +32,7 @@ from .audit import AuditLog
 from .home import shipped_data
 from .virtual_creator import MINOR_REFERENCE
 
-GO = {"scan", "inspect", "sandbox_test", "research", "draft", "learn"}
+GO = {"scan", "inspect", "sandbox_test", "research", "blueprint", "draft", "learn"}
 VOTE = {"add_tool", "enable_ability", "run_job"}
 # Everything else asks; listed so the docs and the tests can name them.
 ASK = {"post", "spend", "legal", "delete", "keys", "approve"}

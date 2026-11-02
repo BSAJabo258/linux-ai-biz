@@ -19,11 +19,37 @@ Every 30 minutes the autopilot works through its queue, up to 20 jobs at a time:
 
 Each finished job can add the next one, so the work keeps going by itself.
 
+## Point him at something
+
+Say **"look into local voice cloning"** (or "research ...", "find out about ..."). He:
+
+1. searches GitHub for it;
+2. reads the **blueprints** of the best three projects from GitHub itself, without
+   downloading anything;
+3. tells you what each one is, how it is built, and how BAU could use it or build its own.
+
+He also puts that subject first in his queue until you change it.
+
+A blueprint covers:
+
+- what the project says it does;
+- its kind (MCP server, service, command-line tool, library or agent skill);
+- its language, how many files it has and how they are laid out;
+- its dependencies and its commands;
+- whether it has tests and docs;
+- its licence and latest release;
+- what it needs (a GPU, Docker);
+- how BAU could use it.
+
+The project's README is someone else's words, so AI models only ever see it marked as
+untrusted data, and it never appears on your card. Blueprints are saved in
+`/var/lib/bau/scout/blueprints/`.
+
 ## Three lanes: what he may do
 
 | Lane | What | How |
 |---|---|---|
-| **Go** | scan, inspect, sandbox tests, research, drafts | Just done. Logged, and in your summary |
+| **Go** | scan, inspect, read blueprints, research, sandbox tests, drafts | Just done. Logged, and in your summary |
 | **Vote** | adding or enabling an ability | Two of three voters must say yes, then it's done and reported |
 | **Ask you** | money, posting, legal, deleting, keys, approvals, and anything new | One question card. That job waits; everything else keeps going |
 
@@ -58,6 +84,7 @@ Say or type these in Jarvis:
 - **"resume"** (or "carry on") starts him again.
 - **"focus on video tools"** puts video tools first.
 - **"what are you working on?"** gives the summary.
+- **"look into local voice cloning"** sends him to research it.
 
 When he needs you, a card pops up with his question: **Accept** is yes, **Not now** is no.
 The morning briefing says what he did overnight.
@@ -85,6 +112,11 @@ terminal that opens.
 
 - The tests use fake GitHub and fake jobs: lanes, vote, compass, questions, talk-back,
   briefing, and a scan that leads to inspections and then a sandbox test.
+- A real blueprint read of BAU's own repository on GitHub (433 files, its layout, a
+  service, MIT licence, its latest release). It also showed two of my rules were wrong
+  (a test file named like an MCP server, a skills folder), and both are fixed.
+- The cloud computer used to build this could not read other people's repositories
+  through GitHub's API, so blueprints of other projects first run on your desktop.
 
 **Not built yet:**
 

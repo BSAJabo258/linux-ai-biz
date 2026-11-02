@@ -156,6 +156,7 @@ AUTOPILOT_CMD = re.compile(
     r"^\W*(?:(?:ok(?:ay)?|jarvis|hey jarvis)\W+)*(?:(?P<pause>pause|stop working|hold on)"
     r"|(?P<resume>resume|carry on|keep working|start working)"
     r"|focus on\W+(?P<focus>.{2,80}?)"
+    r"|(?:look into|research|find out about)\W+(?P<look>.{2,80}?)"
     r"|(?P<status>what are you (?:working on|doing)|autopilot status))\W*$", re.I)
 # Facts first: for the common questions a local model is handed the answer's facts with the
 # question (plain matching, no model), so it only has to say them. Read tools only.
@@ -1197,6 +1198,13 @@ class Assistant:
         elif m.group("resume"):
             A.resume(self.home, self.owner)
             text = "Back to work."
+        elif m.group("look"):
+            what = m.group("look")
+            A.add(self.home, "research", f"research {what}", {"query": what},
+                  source=self.owner)
+            A.focus(self.home, what, self.owner)
+            text = (f"On it: I'll search GitHub for {what}, read the best projects' blueprints "
+                    "and tell you what I find.")
         elif m.group("focus"):
             A.focus(self.home, m.group("focus"), self.owner)
             text = f"Got it: {m.group('focus')} comes first now."
