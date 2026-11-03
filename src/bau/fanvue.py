@@ -302,7 +302,8 @@ class Queue:
     def items(self) -> list[dict[str, Any]]:
         if not self.dir.is_dir():
             return []
-        return [json.loads(p.read_text()) for p in sorted(self.dir.glob("fv_*.json"))]
+        items = [json.loads(p.read_text()) for p in self.dir.glob("fv_*.json")]
+        return sorted(items, key=lambda i: (i["queued_at"], i["item_id"]))   # oldest first
 
     def pending(self) -> list[dict[str, Any]]:
         return [i for i in self.items() if i["status"] == "QUEUED"]
@@ -441,3 +442,67 @@ def sync_if_due(home: Path, client: FanvueClient | None = None) -> dict[str, Any
     except (OSError, ValueError, KeyError):
         pass
     return sync_earnings(home, client)
+
+
+# ------------------------------------------------------------------ autopost (the owner's switch)
+# The owner's choice (2026-11-03, "let Jarvis be Jarvis"): once he switches it on, with the
+# audience and the number a day he picks (no defaults), the autopilot posts queued Fanvue
+# posts by itself. Every content check still runs on each post; HOLD stops it.
+MAX_PER_DAY = 10
+
+
+def autopost_choice(home: Path) -> dict[str, Any] | None:
+    p = home / "fanvue" / "autopost.json"
+    try:
+        return json.loads(p.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def set_autopost(home: Path, on: bool, by: str, audience: str = "",
+                 per_day: int = 0) -> dict[str, Any]:
+    if not by.startswith("human:"):
+        raise PermissionError("only the owner switches autopost")
+    if on and (audience not in AUDIENCES or not 1 <= int(per_day) <= MAX_PER_DAY):
+        raise ValueError(f"choose the audience and 1 to {MAX_PER_DAY} posts a day")
+    rec = {"on": on, "audience": audience if on else "", "per_day": int(per_day) if on else 0,
+           "by": by, "at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}
+    (home / "fanvue").mkdir(parents=True, exist_ok=True)
+    atomic_write_json(home / "fanvue" / "autopost.json", rec)
+    AuditLog(home / "audit" / "chain.jsonl").append("fanvue.autopost", by,
+                                                    {k: rec[k] for k in ("on", "audience",
+                                                                         "per_day")})
+    return rec
+
+
+def autopost_tick(home: Path, client: FanvueClient | None = None,
+                  now: dt.datetime | None = None) -> dict[str, Any]:
+    """One post at most per run of the autopilot (every 30 min), within the owner's number a
+    day. A failure today stops it until tomorrow, so a broken login does not burn the queue."""
+    choice = autopost_choice(home)
+    if not choice or not choice.get("on"):
+        return {"autopost": "off"}
+    today = (now or dt.datetime.now(dt.UTC)).date().isoformat()
+    q = Queue(home)
+    mine = [i for i in q.items() if i.get("auto") and str(i.get("tried_at", "")).startswith(
+        today)]
+    if any(i["status"] == "FAILED" for i in mine):
+        return {"autopost": "stopped for today after a failure", "item": mine[-1]["item_id"]}
+    posted = sum(i["status"] == "POSTED" for i in mine)
+    if posted >= choice["per_day"]:
+        return {"autopost": "done for today", "posted_today": posted}
+    waiting = q.pending()
+    if not waiting:
+        return {"autopost": "nothing queued", "posted_today": posted}
+    item = waiting[0]
+    item["auto"], item["tried_at"] = True, (now or dt.datetime.now(dt.UTC)).isoformat()
+    q.save(item)
+    try:
+        done = q.post(item, client or FanvueClient(home), choice["by"], choice["audience"])
+    except Exception as e:  # noqa: BLE001 - reported, and the day stops here
+        cur = q.get(item["item_id"]) or item
+        if cur["status"] == "QUEUED" and "HOLD" not in str(e):   # refused by a check
+            cur["status"], cur["result"] = "FAILED", {"error": str(e)[:300]}
+            q.save(cur)
+        return {"autopost": "failed", "item": item["item_id"], "why": str(e)[:200]}
+    return {"autopost": "posted", "item": done["item_id"], "posted_today": posted + 1}

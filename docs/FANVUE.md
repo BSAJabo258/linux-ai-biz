@@ -20,6 +20,22 @@ Tested against a fake Fanvue only. It has **not run against your real Fanvue acc
 Levels 0 (free teaser) and 1 (subscribers, no nudity) for now. Levels 2 and 3 come once BAU
 can draw their pictures.
 
+## Let Jarvis post on his own (your switch)
+
+Your choice (2026-11-03): once Fanvue is connected, a card asks **"Let Jarvis post to Fanvue on
+his own"**. You pick who sees the posts and how many a day (1 to 10). Nothing is picked for
+you. After that, every 30 minutes the autopilot posts the oldest queued post, until your
+number for the day is reached. No click per post.
+
+Every check still runs on every post: the age check, the AI label, no minors, a picture that
+changed. If one fails, autopost stops for the rest of the day; `bau fanvue queue --all` shows
+which post and why. HOLD stops it at once.
+
+```bash
+bau fanvue autopost off                                            # back to Accept per post
+bau fanvue autopost on --audience subscribers --per-day 3          # or set it in a terminal
+```
+
 ## Set it up once
 
 Fanvue gives out no API keys. Every app signs in through Fanvue's own Allow page. So:

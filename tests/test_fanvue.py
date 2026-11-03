@@ -239,3 +239,68 @@ def test_the_card_shows_the_picture_as_a_picture(tmp_path):
             assert r.headers["Content-Type"] == "image/png" and r.read() == b"PNGDATA!"
     finally:
         srv.shutdown()
+
+
+# ------------------------------------------------------------------ autopost (owner's switch)
+def test_autopost_is_off_until_the_owner_switches_it_on_with_his_choices(tmp_path):
+    q = F.Queue(tmp_path)
+    q.add(picture(tmp_path), "Evening in", 1, "human:owner")
+    assert F.autopost_tick(tmp_path, client(tmp_path, FakeFanvue()))["autopost"] == "off"
+    with pytest.raises(PermissionError):
+        F.set_autopost(tmp_path, True, "jarvis", "subscribers", 3)
+    with pytest.raises(ValueError):
+        F.set_autopost(tmp_path, True, "human:owner", "", 3)          # no default audience
+    with pytest.raises(ValueError):
+        F.set_autopost(tmp_path, True, "human:owner", "subscribers", 0)
+
+
+def test_autopost_posts_one_a_run_up_to_his_number_a_day(tmp_path):
+    q = F.Queue(tmp_path)
+    for n in "abc":
+        q.add(picture(tmp_path, f"{n}.png", data=n.encode() * 9), "Evening in", 1,
+              "human:owner")
+    F.set_autopost(tmp_path, True, "human:owner", "followers-and-subscribers", 2)
+
+    def tick():
+        return F.autopost_tick(tmp_path, client(tmp_path, FakeFanvue()))
+    assert tick()["autopost"] == "posted"
+    assert tick()["autopost"] == "posted"
+    assert tick()["autopost"] == "done for today"
+    posted = [i for i in q.items() if i["status"] == "POSTED"]
+    assert len(posted) == 2 and all(i["result"]["audience"] == "followers-and-subscribers"
+                                    for i in posted)
+
+
+def test_autopost_still_runs_every_check_and_stops_for_the_day_on_a_failure(tmp_path):
+    from bau.governor import Governor
+    q = F.Queue(tmp_path)
+    q.add(picture(tmp_path), "Evening in", 1, "human:owner")
+    q.add(picture(tmp_path, "b.png", data=b"other"), "Evening in", 1, "human:owner")
+    F.set_autopost(tmp_path, True, "human:owner", "subscribers", 5)
+    (tmp_path / "artifacts" / "media" / "a.png").write_bytes(b"changed")   # after queueing
+    out = F.autopost_tick(tmp_path, client(tmp_path, FakeFanvue()))
+    assert out["autopost"] == "failed" and q.items()[0]["status"] == "FAILED"
+    assert "stopped" in F.autopost_tick(tmp_path, client(tmp_path, FakeFanvue()))["autopost"]
+    assert q.items()[1]["status"] == "QUEUED"                    # nothing else went out
+    Governor(tmp_path).hold("test", "human:owner")                     # tomorrow, on HOLD
+    import datetime as dt
+    tomorrow = dt.datetime.now(dt.UTC) + dt.timedelta(days=1)
+    out = F.autopost_tick(tmp_path, client(tmp_path, FakeFanvue()), now=tomorrow)
+    assert out["autopost"] == "failed" and "HOLD" in out["why"]
+    assert q.items()[1]["status"] == "QUEUED"                    # waits for the release
+    F.set_autopost(tmp_path, False, "human:owner")
+    assert F.autopost_tick(tmp_path, client(tmp_path, FakeFanvue()))["autopost"] == "off"
+
+
+def test_autopost_card_takes_his_audience_and_number(tmp_path, monkeypatch):
+    from bau import setup_steps as S
+    assert S._done("autopost", tmp_path, lambda w: None) is None      # not connected yet
+    client(tmp_path, FakeFanvue())
+    assert S._done("autopost", tmp_path, lambda w: None) is False
+    fields = S.form("autopost")["fields"]
+    assert [f["name"] for f in fields] == ["audience", "per_day"]
+    assert "error" in S.run("autopost", tmp_path, owner="human:owner", values={"per_day": "3"})
+    out = S.run("autopost", tmp_path, owner="human:owner",
+                values={"audience": "subscribers", "per_day": "3"})
+    assert out["done"] and F.autopost_choice(tmp_path)["per_day"] == 3
+    assert S._done("autopost", tmp_path, lambda w: None) is True

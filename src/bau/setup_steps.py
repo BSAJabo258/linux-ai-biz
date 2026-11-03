@@ -65,6 +65,11 @@ STEPS = (
     Step("fanvue", "Connect Fanvue",
          "So Jarvis can put Aria's pictures on Fanvue (each one only after your Accept) and "
          "count what she earns. Fanvue opens in the browser: sign in and press Allow."),
+    Step("autopost", "Let Jarvis post to Fanvue on his own",
+         "Your switch: every 30 minutes the autopilot posts the next queued Fanvue post, up "
+         "to your number a day, to the audience you pick. Every check (age, AI label, no "
+         "minors) still runs on each post, and HOLD stops it. Not now keeps your Accept on "
+         "every post. Turn it off any time: bau fanvue autopost off"),
     Step("boundaries", "Write your explicit limits",
          "What the explicit (Fanvue-only) content must never show, one limit per line, in "
          "your words. Until you write them, Jarvis plans sfw content only."),
@@ -151,6 +156,11 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         except fanvue.FanvueError:
             return None
         return fanvue.TokenStore(home).load() is not None
+    if step == "autopost":                # once Fanvue is connected, until he chooses
+        from . import fanvue
+        if fanvue.TokenStore(home).load() is None:
+            return None
+        return fanvue.autopost_choice(home) is not None
     if step in ("boundaries", "prices"):
         import yaml
         prof = _profile(home)
@@ -225,6 +235,13 @@ def form(step: str) -> dict[str, object] | None:
         return {"fields": [{"name": k, "type": "number", "min": lo, "max": hi,
                             "label": f"{names[k]} in dollars (${lo:.2f} to ${hi:.2f})"}
                            for k, (lo, hi) in PRICE_LIMITS.items()]}
+    if step == "autopost":
+        from .fanvue import AUDIENCES, MAX_PER_DAY
+        return {"fields": [
+            {"name": "audience", "label": "Who sees the posts?",
+             "options": [[k, v] for k, v in AUDIENCES.items()]},
+            {"name": "per_day", "type": "number", "min": 1, "max": MAX_PER_DAY,
+             "label": f"Posts a day (1 to {MAX_PER_DAY})"}]}
     if step == "boundaries":
         return {"fields": [{"name": "limits", "type": "text",
                             "label": "Your explicit limits, one per line"}]}
@@ -268,6 +285,16 @@ def run(step: str, home: Path, probe: Probe | None = None,
         said += "".join(f"Not switched on, {m}: {why}. " for m, why in refused.items())
         return {"done": bool(on), "switched_on": on, "refused": refused,
                 "said": said.strip() or "Nothing to switch on."}
+    if step == "autopost":
+        from . import fanvue
+        v = values or {}
+        try:
+            rec = fanvue.set_autopost(home, True, owner, str(v.get("audience", "")),
+                                      int(float(v.get("per_day", 0))))
+        except (ValueError, TypeError) as e:
+            return {"error": str(e)}
+        return {"done": True, "said": f"Autopost on: up to {rec['per_day']} a day to "
+                                      f"{fanvue.AUDIENCES[rec['audience']].lower()}."}
     if step in ("prices", "boundaries"):
         from . import virtual_creator as V
         prof, values = _profile(home), values or {}

@@ -697,7 +697,12 @@ def cmd_autopilot(a):
         load_env_file()                   # an optional GITHUB_TOKEN raises GitHub's limit
         seeded = J.seed(home)
         out = A.run(home, J.handlers(home), max_steps=a.steps)
-        _out({"seeded": seeded, **out, "status": A.status(home)})
+        try:                              # the owner's Fanvue autopost, if he switched it on
+            from . import fanvue
+            posted = fanvue.autopost_tick(home)
+        except Exception as e:  # noqa: BLE001 - the autopilot's own work is already done
+            posted = {"autopost": f"error: {e}"[:200]}
+        _out({"seeded": seeded, **out, "fanvue": posted, "status": A.status(home)})
     elif c == "digest":
         print(A.digest(home))
     elif c == "questions":
@@ -1512,6 +1517,13 @@ def cmd_fanvue(a):
     elif a.fv_cmd == "queue":
         q = fanvue.Queue()
         _out(q.items() if a.all else q.pending())
+    elif a.fv_cmd == "autopost":
+        try:
+            _out(fanvue.set_autopost(bau_home(), a.state == "on", _human(), a.audience or "",
+                                     a.per_day or 0))
+        except (ValueError, PermissionError) as e:
+            print(e, file=sys.stderr)
+            return EXIT_BLOCKED
     elif a.fv_cmd == "sync":
         _out(fanvue.sync_earnings(bau_home(), fanvue.FanvueClient(), days=a.days))
     return EXIT_OK
@@ -2163,6 +2175,11 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--level", type=int, choices=[0, 1], required=True)
     x = fv.add_parser("queue")
     x.add_argument("--all", action="store_true")
+    x = fv.add_parser("autopost", help="your switch: the autopilot posts queued posts by "
+                      "itself, up to your number a day, to the audience you pick")
+    x.add_argument("state", choices=["on", "off"])
+    x.add_argument("--audience", choices=["subscribers", "followers-and-subscribers"])
+    x.add_argument("--per-day", type=int)
     x = fv.add_parser("sync", help="bring Fanvue's earnings into the ledger now")
     x.add_argument("--days", type=int, default=30)
     s.set_defaults(fn=cmd_fanvue)
