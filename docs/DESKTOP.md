@@ -200,7 +200,9 @@ Sticks built after 2026-10-28 do these by themselves. On a desktop installed bef
    Log out and back in. Then add the volume control to the top bar: right-click the top
    bar, **Panel > Add New Items**, pick **PulseAudio Plugin**, **Add**. If the sound goes to
    the monitor instead of your speakers, pick the output in `pavucontrol` (Output Devices).
-2. **Wi-Fi that joins and drops out** (the MediaTek card): turn its power saving off.
+2. **Wi-Fi that joins and drops out** (the MediaTek card): turn its power saving off. Or use the
+   Wi-Fi rescue kit, which tries this and seven other fixes by itself, offline
+   (docs/WIFI-RESCUE.md).
 
    ```bash
    printf '[connection-bau-mt7921]\nmatch-device=driver:mt7921e\nwifi.powersave=2\n' | sudo tee /etc/NetworkManager/conf.d/bau-mt7921-powersave.conf
