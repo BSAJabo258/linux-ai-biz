@@ -9,11 +9,13 @@ to skip it for this time. A step that is done does not come back.
 
 | Step | What Accept does |
 |---|---|
+| Use your API keys while online | Opens a terminal that switches on the hosted models your keys pay for (`bau set-status model ... APPROVED`). After that, Jarvis answers with them first while you're online and with the local model when you're offline. Shown only when a key is on this computer and its model is still off. NVIDIA's free API is a trial: their terms say business use needs a paid plan |
 | Bring in the current rules | Swaps in the rules that came with your newest BAU (creator, Michigan, Fanvue). The old copy is kept beside it as `regulations.before-DATE` |
 | Install NVIDIA's driver | Opens a terminal running `sudo bau-gpu-setup`. Type your password there, then restart when it says |
 | Set up pictures on this computer | Opens a terminal running the pictures setup (about 10 GB download, once). It shows up only after NVIDIA's driver works |
 | Set up private web search | Opens a terminal running the search setup |
 | Turn on nightly updates | Opens a terminal running `sudo bau update auto` |
+| Let Jarvis work on his own | Opens a terminal that switches on the autopilot timer (docs/AUTOPILOT.md) |
 | Set your Fanvue prices | Opens a terminal that asks you for each price. Nothing is filled in for you |
 
 You can also say or type **"do all"**, **"let's do it all"**, **"continue"** or **"what's

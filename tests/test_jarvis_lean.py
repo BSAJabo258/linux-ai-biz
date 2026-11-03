@@ -222,6 +222,50 @@ def test_the_creator_batch_is_in_a_small_models_core_tools(tmp_path):
     assert "creator_batch" in CORE_TOOLS
 
 
+# The owner's desktop, 2026-11-02: HTTP 400s from the local qwen3.5-4b. The model server
+# runs with --ctx-size 8192 (bau-llm.service) but Jarvis kept 40 messages whatever their size
+# and believed the model had 16,384 tokens, so a longer conversation no longer fitted and
+# llama.cpp refused it. Now every request is measured and trimmed to the real window.
+def _size(call):
+    import json
+    return (len(call["system"]) + len(json.dumps(call["messages"], default=str))
+            + len(json.dumps([getattr(t, "__dict__", t) for t in call["tools"] or []],
+                             default=str)))
+
+
+def test_every_request_fits_the_local_servers_window(tmp_path, monkeypatch):
+    from bau import assistant as AS
+    big = "x" * 9000                                   # a long tool result, about 3,000 tokens
+    script = []
+    for _ in range(12):
+        script += [{"tool": "system_status", "input": {}}, "ok"]
+    monkeypatch.setattr(AS.Assistant, "t_status", lambda self: {"detail": big})
+    a = lean(tmp_path, script)
+    a.model = {**LOCAL, "context": 16384}              # what the record claimed
+    for i in range(12):
+        a.ask(f"question {i}")
+    window = AS.LOCAL_SERVER_CTX * AS.CHARS_PER_TOKEN
+    sizes = [_size(c) for c in a.provider.calls]
+    assert all(n <= window for n in sizes), max(sizes)
+    assert a.provider.calls[-1]["messages"][-1]["role"] in ("user", "assistant")
+
+
+def test_one_huge_tool_result_is_cut_not_sent_whole(tmp_path, monkeypatch):
+    from bau import assistant as AS
+    monkeypatch.setattr(AS.Assistant, "t_status", lambda self: {"detail": "y" * 100000})
+    a = lean(tmp_path, [{"tool": "system_status", "input": {}}, "ok"])
+    a.ask("status?")
+    assert _size(a.provider.calls[-1]) <= AS.LOCAL_SERVER_CTX * AS.CHARS_PER_TOKEN
+
+
+def test_the_window_matches_the_model_servers_own_setting():
+    import re
+    from pathlib import Path
+
+    from bau import assistant as AS
+    unit = (Path(__file__).resolve().parents[1] / "image/live-build/config/includes.chroot"
+            "/etc/systemd/system/bau-llm.service").read_text()
+    assert int(re.search(r"--ctx-size (\d+)", unit).group(1)) == AS.LOCAL_SERVER_CTX
 # The owner's desktop, 2026-11-02: the small model put use_tool inside use_tool, then asked
 # the menu about "use_tool", and "lets do all" ran out of steps. Now "do all" puts every
 # setup step waiting for the owner on screen at once (no model needed), and a nested
@@ -230,7 +274,7 @@ def test_do_all_puts_everything_waiting_on_screen_without_the_model(tmp_path, mo
     from bau import setup_steps
     monkeypatch.setattr(setup_steps, "_probe", {"nvidia": True, "driver": False,
                                                 "pictures": False, "search": False,
-                                                "update": "off"}.__getitem__)
+                                                "update": "off", "autopilot": True}.__getitem__)
     for said in ("lets do all", "Let's do it all", "do everything", "ok continue",
                  "what's waiting on me?"):
         a = lean(tmp_path, [])                       # the model is never asked

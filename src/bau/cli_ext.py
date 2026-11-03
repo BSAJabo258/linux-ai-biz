@@ -686,6 +686,39 @@ def cmd_update(a):
     return 0 if out["result"] in ("off", "up to date", "installed", "no answer") else 1
 
 
+def cmd_autopilot(a):
+    from . import autopilot as A
+    from . import autopilot_jobs as J
+    from .home import bau_home
+    home = bau_home()
+    c = a.ap_cmd or "status"
+    if c == "run":
+        from .assistant import load_env_file
+        load_env_file()                   # an optional GITHUB_TOKEN raises GitHub's limit
+        seeded = J.seed(home)
+        out = A.run(home, J.handlers(home), max_steps=a.steps)
+        _out({"seeded": seeded, **out, "status": A.status(home)})
+    elif c == "digest":
+        print(A.digest(home))
+    elif c == "questions":
+        _out(A.questions(home))
+    elif c in ("pause", "resume"):
+        getattr(A, c)(home, _human())
+        _out(A.status(home))
+    elif c == "focus":
+        what = " ".join(a.what)
+        A.focus(home, "" if what.lower() == "none" else what, _human())
+        _out(A.status(home))
+    elif c == "skip":
+        A.skip(home, a.task, _human())
+        _out(A.status(home))
+    elif c == "answer":
+        _out(A.answer(home, a.task, a.choice, _human()))
+    else:
+        _out(A.status(home))
+    return 0
+
+
 def cmd_team(a):
     from . import team as T
     try:
@@ -1796,6 +1829,25 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("wheel")
     x.add_argument("commit")
     s.set_defaults(fn=cmd_update)
+
+    s = sub.add_parser("autopilot", help="Jarvis works on his own: lanes, vote, compass "
+                                         "(docs/AUTOPILOT.md)")
+    w = s.add_subparsers(dest="ap_cmd")
+    w.add_parser("status", help="what is queued, done, waiting on you")
+    x = w.add_parser("run", help="work through the queue now (the timer does this by itself)")
+    x.add_argument("--steps", type=int, default=20)
+    w.add_parser("digest", help="what happened in the last 24 hours")
+    w.add_parser("questions", help="what it is waiting to ask you")
+    w.add_parser("pause", help="you: stop starting new work")
+    w.add_parser("resume", help="you: carry on")
+    x = w.add_parser("focus", help="you: put this first (or 'none')")
+    x.add_argument("what", nargs="+")
+    x = w.add_parser("skip", help="you: drop one task")
+    x.add_argument("task")
+    x = w.add_parser("answer", help="you: answer a question yes or no")
+    x.add_argument("task")
+    x.add_argument("choice", choices=["yes", "no"])
+    s.set_defaults(fn=cmd_autopilot)
 
     s = sub.add_parser("team", help="who runs the show: boss, thinker, specialist (docs/TEAM.md)")
     w = s.add_subparsers(dest="team_cmd")

@@ -212,6 +212,9 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     shutil.copyfileobj(f, self.wfile, 1024 * 1024)
             elif path == "/api/state":
                 self._json(200, self._state())
+            elif path == "/api/autopilot":           # the mind panel (docs/AUTOPILOT.md)
+                from .. import autopilot
+                self._json(200, autopilot.view(assistant.home))
             elif path == "/api/overview":
                 # Never wait for a long model turn: the page polls this, and waiting
                 # requests use up the browser's few connections and stall the live feed.

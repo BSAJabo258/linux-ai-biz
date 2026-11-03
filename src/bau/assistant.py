@@ -129,6 +129,12 @@ def load_constitution(home: Path) -> str:
 CORE_TOOLS = ("system_status", "recall", "remember", "toolbox", "usage_today",
               "hold_everything", "web_search", "creator_batch")
 LEAN_MAX_TOKENS = 400                         # spoken answers; a small model can loop
+# The local model server's window: bau-llm.service runs llama-server with --ctx-size 8192
+# (a test keeps the two equal). Requests are measured in characters, about 3 per token, which
+# errs on the safe side; the owner's desktop got HTTP 400s when Jarvis sent more (2026-11-02).
+LOCAL_SERVER_CTX = 8192
+CHARS_PER_TOKEN = 3
+LEAN_RESULT_CHARS = 3000                      # one tool result, local model
 LEAN_NOTE = ("You see a few tools in full. tool_menu lists the others in one line each "
              "(tool_menu with a name shows one in full); run any of them with use_tool. "
              "Before saying something doesn't exist, look: toolbox, recall, tool_menu.")
@@ -151,6 +157,13 @@ REMEMBER_CMD = re.compile(r"^\W*(?:please\W+|jarvis\W+|hey jarvis\W+)*remember\W
                           r"(.{3,})", re.I | re.S)
 WEEK_CMD = re.compile(r"\b(?:schedule|post|publish)\b.{0,20}\bweek\W+([a-z0-9][a-z0-9._-]{0,60}"
                       r"[a-z0-9])", re.I)
+# Talking to the autopilot (docs/AUTOPILOT.md): handled here, never by a model.
+AUTOPILOT_CMD = re.compile(
+    r"^\W*(?:(?:ok(?:ay)?|jarvis|hey jarvis)\W+)*(?:(?P<pause>pause|stop working|hold on)"
+    r"|(?P<resume>resume|carry on|keep working|start working)"
+    r"|focus on\W+(?P<focus>.{2,80}?)"
+    r"|(?:look into|research|find out about)\W+(?P<look>.{2,80}?)"
+    r"|(?P<status>what are you (?:working on|doing)|autopilot status))\W*$", re.I)
 # "Let's do all" and the like: everything waiting on the owner goes on screen at once as cards
 # with Accept, no model needed (the owner's desktop, 2026-11-02: a small model ran out of steps).
 DO_ALL_CMD = re.compile(
@@ -215,6 +228,24 @@ class Reply:
     model: str = ""                           # which model gave this answer
 
 
+def _longest_text(messages: list[Any]) -> tuple[Any, Any, str] | None:
+    """The longest string in these messages, as (holder, key, text), for cutting in place."""
+    best: tuple[Any, Any, str] | None = None
+
+    def walk(node: Any) -> None:
+        nonlocal best
+        items = node.items() if isinstance(node, dict) else enumerate(node) \
+            if isinstance(node, list) else ()
+        for k, v in items:
+            if isinstance(v, str):
+                if len(v) > 400 and (best is None or len(v) > len(best[2])):
+                    best = (node, k, v)
+            else:
+                walk(v)
+    walk(messages)
+    return best
+
+
 def _now() -> str:
     return dt.datetime.now(dt.UTC).isoformat()
 
@@ -261,7 +292,11 @@ class Assistant:
             # Accept runs one. Never offered to a model.
             "setup_step": Tool("setup_step", "Run one setup step the owner accepted.",
                                _schema({"step": {"type": "string"}}), self.t_setup_step,
-                               kind="confirm")}
+                               kind="confirm"),
+            # The autopilot's questions (src/bau/autopilot.py): Accept is yes, Not now is no.
+            "autopilot_answer": Tool("autopilot_answer", "The owner answers the autopilot.",
+                                     _schema({"task": {"type": "string"}}),
+                                     self.t_autopilot_yes, kind="confirm")}
 
     def _gateway(self, trust: Callable[[], Any] | None) -> tuple[Any, dict[str, str]]:
         """The same gateway the agents use: HOLD, permissions, network trust, budget and the
@@ -907,7 +942,20 @@ class Assistant:
                 pid = "su_" + secrets.token_hex(4)
                 self.pending[pid] = Pending(pid, "setup_step", {"step": s.id},
                                             f"Setup: {s.title}\n{s.why}", _now())
-        return [p.public() for p in self.pending.values() if p.tool == "setup_step"]
+        from . import autopilot
+        asked = {p.args["task"] for p in self.pending.values() if p.tool == "autopilot_answer"}
+        for q in autopilot.questions(self.home):
+            if q["id"] not in asked:
+                pid = "ap_" + secrets.token_hex(4)
+                self.pending[pid] = Pending(pid, "autopilot_answer", {"task": q["id"]},
+                                            f"Jarvis asks: {q['question']}\n"
+                                            "Accept = yes, Not now = no.", _now())
+        return [p.public() for p in self.pending.values()
+                if p.tool in ("setup_step", "autopilot_answer")]
+
+    def t_autopilot_yes(self, task: str) -> dict[str, Any]:
+        from . import autopilot
+        return autopilot.answer(self.home, task, "yes", self.owner)
 
     def t_setup_step(self, step: str) -> dict[str, Any]:
         from . import setup_steps
@@ -1011,6 +1059,9 @@ class Assistant:
                     return {"error": f"choose: {f['label']}", "retry": True}
                 picked[f["name"]] = v
             p.args = {**p.args, **picked}
+        if not approve and p.tool == "autopilot_answer":     # Not now on a question = no
+            from . import autopilot
+            autopilot.answer(self.home, p.args["task"], "no", by)
         if not approve:
             self.audit.append("jarvis.declined", by, {"tool": p.tool, "pending": p.id})
             note = f"[The owner declined: {p.tool}. Nothing was done.]"
@@ -1049,6 +1100,9 @@ class Assistant:
                 f[key] = {"error": f"{type(e).__name__}: {e}"[:200]}
         from . import update
         f["update"] = update.last(update.STATE)     # read at call time (tests point it away)
+        from . import autopilot
+        f["autopilot"] = autopilot.digest(self.home) if autopilot._load(self.home)["tasks"] \
+            else None
         return f
 
     def plain_briefing(self, f: dict[str, Any]) -> str:
@@ -1082,6 +1136,8 @@ class Assistant:
             parts.append(f"{len(d['regulation_reviews_due'])} regulation review(s) due soon.")
         if d.get("incidents_open"):
             parts.append(f"Heads up: {len(d['incidents_open'])} open incident(s).")
+        if f.get("autopilot"):
+            parts.append(f["autopilot"].split("\n")[0])
         up = f.get("update") or {}
         if up.get("result") == "installed":
             parts.append("Last night BAU installed its newest tested update.")
@@ -1163,12 +1219,36 @@ class Assistant:
         if not text:
             return Reply("I didn't catch that.", mode="plain" if self.provider is None else "model")
         self._log("owner", text)
+        if m := AUTOPILOT_CMD.match(text):
+            return self._autopilot_cmd(m)
         if DO_ALL_CMD.match(text):
             return self._do_all()
         if self.provider is None:
             return self._plain(text)
         return self._turn(text)
 
+    def _autopilot_cmd(self, m: re.Match[str]) -> Reply:
+        from . import autopilot as A
+        if m.group("pause"):
+            A.pause(self.home, self.owner)
+            text = "Paused. I won't start anything new until you say resume."
+        elif m.group("resume"):
+            A.resume(self.home, self.owner)
+            text = "Back to work."
+        elif m.group("look"):
+            what = m.group("look")
+            A.add(self.home, "research", f"research {what}", {"query": what},
+                  source=self.owner)
+            A.focus(self.home, what, self.owner)
+            text = (f"On it: I'll search GitHub for {what}, read the best projects' blueprints "
+                    "and tell you what I find.")
+        elif m.group("focus"):
+            A.focus(self.home, m.group("focus"), self.owner)
+            text = f"Got it: {m.group('focus')} comes first now."
+        else:
+            text = A.digest(self.home)
+        self._log("jarvis", text)
+        return Reply(text, mode="plain" if self.provider is None else "model")
     def _do_all(self) -> Reply:
         self.setup_waiting()
         waiting = [p.public() for p in self.pending.values()]
@@ -1227,9 +1307,11 @@ class Assistant:
         final = ""
         nudged = False
         for _ in range(max_steps):
+            limit = LEAN_MAX_TOKENS if self.lean else 2000
+            start -= self._fit(start, limit)
             try:
                 resp = model.complete(self.system_prompt(), self.messages, self.specs(),
-                                      max_tokens=LEAN_MAX_TOKENS if self.lean else 2000)
+                                      max_tokens=limit)
             except UsageLimit as e:
                 del self.messages[start:]
                 final = str(e)
@@ -1269,7 +1351,8 @@ class Assistant:
                 else:
                     shown = (call.input or {}).get("name") if call.name == "use_tool" else None
                     cards.append({"tool": shown or call.name, "data": out})
-                wrapped = untrusted(call.name, json.dumps(out, default=str)[:12000])[0]
+                cap = LEAN_RESULT_CHARS if self.lean else 12000
+                wrapped = untrusted(call.name, json.dumps(out, default=str)[:cap])[0]
                 results.append((call, wrapped, err))
             msg = self.provider.tool_result_message(results)
             if msg.get("role") == "_multi":
@@ -1293,6 +1376,42 @@ class Assistant:
         backups = self.model.get("fallbacks") or []
         main = self.model.get("id") or self.model.get("api_model") or "?"
         return main + (f", backup: {', '.join(backups)}" if backups else "")
+
+    def _window_chars(self, max_tokens: int) -> int:
+        ctx = int(self.model.get("context") or LOCAL_SERVER_CTX)
+        if self.lean:                             # the local server's real window wins
+            ctx = min(ctx, LOCAL_SERVER_CTX)
+        return (ctx - max_tokens - 256) * CHARS_PER_TOKEN
+
+    def _fit(self, start: int, max_tokens: int) -> int:
+        """Make the next request fit the model's window: drop the oldest turns first, then cut
+        the longest texts of this turn. Returns how many messages were dropped in front."""
+        budget = self._window_chars(max_tokens)
+        fixed = len(self.system_prompt()) + len(json.dumps(
+            [t.__dict__ for t in self.specs()], default=str))
+
+        def size() -> int:
+            return fixed + len(json.dumps(self.messages, default=str))
+        dropped = 0
+        def plain_user(i: int) -> bool:          # a turn starts here: tool pairs stay whole
+            m = self.messages[i]
+            return m.get("role") == "user" and isinstance(m.get("content"), str)
+        while size() > budget and start - dropped > 0:
+            here = start - dropped
+            cut = next((i for i in range(1, here + 1) if i == here or plain_user(i)), here)
+            del self.messages[:cut]
+            dropped += cut
+        for _ in range(40):                       # this turn alone is still too big
+            over = size() - budget
+            if over <= 0:
+                break
+            spot = _longest_text(self.messages[start - dropped + 1:])
+            if spot is None:
+                break
+            holder, key, text = spot
+            keep = max(200, len(text) - over - 64)
+            holder[key] = text[:keep] + " [cut to fit]"
+        return dropped
 
     def _trim(self, keep: int = 40) -> None:
         """Bound the live context. Cut only before a plain user utterance so tool calls
@@ -1504,17 +1623,29 @@ def build_assistant(home: Path | None = None, owner: str = "human:owner") -> Ass
 
 
 def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any] | None]:
-    """The model Jarvis (and the workspaces he walks) uses: the first APPROVED, reachable
-    one in the owner's order. When that is a hosted model, the other approved hosted models
-    after it become its backups (FallbackProvider). (None, None) when nothing is approved."""
+    """The model Jarvis (and the workspaces he walks) uses, from the APPROVED models in the
+    owner's order. The owner's rule (2026-11-02): online, the hosted models his API keys pay
+    for answer first and the local model is their backup (FallbackProvider); offline, only
+    the local model is asked, so nothing waits on a model that cannot answer. Claude, when it
+    comes first, answers alone (its tool format is not chained). Local-only mode keeps hosted
+    models out (provider_for refuses them). (None, None) when nothing is approved."""
+    import os
+
+    from . import network
     from .models.providers import FallbackProvider
     from .runtime import provider_for
     home = home or bau_home()
     cfg = YamlStore(home / "config" / "jarvis.yaml").load() or {}
-    chosen: list[tuple[Provider, dict[str, Any], str]] = []
     order = [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "glm-4.7-flash-zai",
              "nemotron-3-super-nim", "qwen3.5-9b", "qwen3.5-4b", "lfm2.5-2.6b",
              "qwen2.5-1.5b-instruct", "local-llm"]
+    try:
+        online = bool(network.detect().online)
+    except Exception:
+        online = True                        # unknown: try the keys, the local model backs up
+    hosted: list[tuple[Provider, dict[str, Any], str]] = []
+    local: tuple[Provider, dict[str, Any], str] | None = None
+    first: tuple[Provider, dict[str, Any], str] | None = None
     for mid in dict.fromkeys(m for m in order if m):
         try:
             provider, rec = provider_for(mid, home)
@@ -1522,8 +1653,11 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             continue
         if rec.get("lane") == "content_only":
             continue                         # content-lane models never run Jarvis
-        hosted = hasattr(provider, "waits")
-        if hosted:
+        key = rec.get("api_key_env")
+        if key and not os.environ.get(key):
+            continue                         # no key on this computer: it cannot answer
+        first = first or (provider, rec, mid)
+        if hasattr(provider, "waits"):       # a hosted OpenAI-compatible model
             # The owner is watching the screen: give a busy hosted model about 20 s, not
             # the bench's 75 s, then say so plainly. A page kept waiting over a minute can
             # be dropped by the browser or the Codespaces proxy (seen as BrokenPipe).
@@ -1531,18 +1665,21 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             # Z.ai sometimes accepts a request and never answers (rehearsal 2026-10-08:
             # "The read operation timed out" after the bench's 120 s). Give up sooner.
             provider.timeout = CONVERSATION_TIMEOUT
-        if not chosen:
-            chosen.append((provider, rec, mid))
-            if not hosted:
-                break                        # Claude or a local model: no backup chain
-        elif hosted:
-            chosen.append((provider, rec, mid))
-    if not chosen:
+            hosted.append((provider, rec, mid))
+        elif rec.get("deployment") == "local":
+            local = local or (provider, rec, mid)
+    if first is None:
         return None, None
-    provider, rec, mid = chosen[0]
-    if len(chosen) > 1:
-        provider = FallbackProvider([p for p, _, _ in chosen], [m for _, _, m in chosen])
-        rec = {**rec, "fallbacks": [m for _, _, m in chosen[1:]]}
+    if not hasattr(first[0], "waits") and first[1].get("deployment") != "local":
+        if online or local is None:
+            return first[0], {**first[1], "id": first[2]}     # Claude answers alone
+    chain = (hosted + ([local] if local else [])) if online or local is None else [local]
+    if not chain:
+        chain = [first]
+    provider, rec, mid = chain[0]
+    if len(chain) > 1:
+        provider = FallbackProvider([p for p, _, _ in chain], [m for _, _, m in chain])
+        rec = {**rec, "fallbacks": [m for _, _, m in chain[1:]]}
     return provider, {**rec, "id": mid}
 
 
