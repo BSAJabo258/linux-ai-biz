@@ -1486,6 +1486,37 @@ def cmd_tiktok(a):
     return EXIT_OK
 
 
+def cmd_fanvue(a):
+    from . import fanvue
+    if a.fv_cmd == "login":
+        who = _human()
+        client = fanvue.FanvueClient()
+        import webbrowser
+        fanvue.login(client, port=a.port, open_browser=lambda u: (
+            print(f"Opening Fanvue to connect. If nothing opens, open this link:\n{u}"),
+            webbrowser.open(u)))
+        me = client.me()
+        AuditLog().append("fanvue.connected", who, {})
+        _out({"connected": me.get("handle"), "creator": me.get("isCreator"),
+              "ai_creator": me.get("isAiCreator")})
+    elif a.fv_cmd == "logout":
+        fanvue.TokenStore().clear()
+        _out({"connected": None})
+    elif a.fv_cmd == "add":
+        try:
+            item = fanvue.Queue().add(a.picture, a.caption, a.level, _human())
+        except ValueError as e:
+            print(e, file=sys.stderr)
+            return EXIT_BLOCKED
+        _out(item)
+    elif a.fv_cmd == "queue":
+        q = fanvue.Queue()
+        _out(q.items() if a.all else q.pending())
+    elif a.fv_cmd == "sync":
+        _out(fanvue.sync_earnings(bau_home(), fanvue.FanvueClient(), days=a.days))
+    return EXIT_OK
+
+
 # ------------------------------------------------------------------ parser
 
 def register(sub: argparse._SubParsersAction) -> None:
@@ -2119,6 +2150,22 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--draft", action="store_true", help="send to TikTok drafts instead")
     tt.add_parser("status", help="refresh processing status of posted videos")
     s.set_defaults(fn=cmd_tiktok)
+
+    s = sub.add_parser("fanvue", help="Fanvue: queue pictures, your Accept in Jarvis posts "
+                       "them; earnings into the ledger (docs/FANVUE.md)")
+    fv = s.add_subparsers(dest="fv_cmd", required=True)
+    x = fv.add_parser("login", help="connect your Fanvue account (opens Fanvue)")
+    x.add_argument("--port", type=int, default=3456)
+    fv.add_parser("logout")
+    x = fv.add_parser("add", help="queue a picture from artifacts/media with its caption")
+    x.add_argument("picture", help="file name in $BAU_HOME/artifacts/media")
+    x.add_argument("--caption", required=True)
+    x.add_argument("--level", type=int, choices=[0, 1], required=True)
+    x = fv.add_parser("queue")
+    x.add_argument("--all", action="store_true")
+    x = fv.add_parser("sync", help="bring Fanvue's earnings into the ledger now")
+    x.add_argument("--days", type=int, default=30)
+    s.set_defaults(fn=cmd_fanvue)
 
     s = sub.add_parser("gateway", help="list gateway capabilities")
     s.set_defaults(fn=cmd_gateway)

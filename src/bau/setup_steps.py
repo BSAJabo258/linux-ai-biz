@@ -62,6 +62,9 @@ STEPS = (
          "The autopilot: every 30 minutes Jarvis scans GitHub, inspects what he finds and "
          "votes on what to add, and asks you only about money, posting and legal. A "
          "terminal opens; type your password."),
+    Step("fanvue", "Connect Fanvue",
+         "So Jarvis can put Aria's pictures on Fanvue (each one only after your Accept) and "
+         "count what she earns. Fanvue opens in the browser: sign in and press Allow."),
     Step("boundaries", "Write your explicit limits",
          "What the explicit (Fanvue-only) content must never show, one limit per line, in "
          "your words. Until you write them, Jarvis plans sfw content only."),
@@ -141,6 +144,13 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         return probe("update") == "auto"
     if step == "autopilot":
         return bool(probe("autopilot"))
+    if step == "fanvue":                  # only once the app's keys are on this computer
+        from . import fanvue
+        try:
+            fanvue.app_credentials()
+        except fanvue.FanvueError:
+            return None
+        return fanvue.TokenStore(home).load() is not None
     if step in ("boundaries", "prices"):
         import yaml
         prof = _profile(home)
@@ -181,6 +191,8 @@ def waiting(home: Path, probe: Probe | None = None) -> list[Step]:
 
 def _command(step: str, home: Path) -> str:
     q = shlex.quote
+    if step == "fanvue":
+        return "bau fanvue login"
     if step == "nvidia":
         return "sudo bau-gpu-setup"
     if step == "pictures":

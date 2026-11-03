@@ -96,8 +96,9 @@ Your starter profile's `boundaries` say "suggestive fashion styling only; no exp
 activity", and those apply to every level. Change that line yourself if you want levels 2
 and 3 to go further.
 
-Not built yet: posting to Fanvue, and drawing level 2 and 3 pictures (`bau creator draw` is
-safe for work only).
+Posting levels 0 and 1 to Fanvue is built (docs/FANVUE.md): your Accept on Jarvis's card posts
+each one. Not built yet: drawing level 2 and 3 pictures (`bau creator draw` is safe for work
+only), so they cannot be posted yet.
 
 The batch includes an identity lock, distinct visual prompts, caption briefs that disclose
 the AI persona, and a review checklist for every post. It does not call an image/video

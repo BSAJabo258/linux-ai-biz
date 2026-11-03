@@ -93,7 +93,8 @@ CONFIRMATION_NOTE = "PENDING_OWNER_CONFIRMATION"
 # Which node on the Jarvis screen lights up while a tool runs, and what it says.
 TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "strategist",
              "plan_mission": "strategist", "publish_queue": "publisher",
-             "post_video": "publisher", "deadlines": "compliance", "money": "finance",
+             "post_video": "publisher", "fanvue_queue": "publisher",
+             "deadlines": "compliance", "money": "finance",
              "brain_lookup": "memory", "brain_add": "memory", "remember": "memory",
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
@@ -497,6 +498,13 @@ class Assistant:
             Tool("release_hold", "Lift a HOLD so BAU runs normally again (owner confirms "
                  "on screen).", _schema(), self.t_release, kind="confirm",
                  stage=lambda: {"summary": "Release the HOLD and let BAU run normally again?"}),
+            Tool("fanvue_queue", "Queue one of the creator's pictures (a file in "
+                 "artifacts/media drawn by bau creator draw) with its caption for Fanvue, "
+                 "level 0 (free teaser) or 1 (subscribers, no nudity). The AI label is added. "
+                 "This only queues it; post it with post_video, which the owner confirms.",
+                 _schema({"picture": {"type": "string"}, "caption": {"type": "string"},
+                          "level": {"type": "integer", "enum": [0, 1]}}),
+                 self.t_fanvue_queue, kind="act"),
             Tool("post_video", "Put one queued video on the owner's screen to post on its "
                  "platform. The owner watches the preview and makes the platform's choices "
                  "(who can see it, audience, promotion) on that card; you cannot make them.",
@@ -610,11 +618,18 @@ class Assistant:
 
     def t_money(self, days: int = 30) -> dict[str, Any]:
         from .economics import Ledger, metrics
+        synced = None
+        try:                                   # Fanvue's earnings in first, once an hour
+            from .fanvue import sync_if_due
+            synced = sync_if_due(self.home)
+        except Exception as e:  # noqa: BLE001 - the ledger still answers without Fanvue
+            synced = {"error": f"Fanvue earnings not read: {e}"[:200]}
         since = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
         m = metrics(Ledger(self.home), since=since)
         keep = ("revenue", "profit", "fees", "costs_by_kind", "gross_margin", "net_margin",
                 "ai_cost_to_revenue")
-        return {"days": days, **{k: m[k] for k in keep if k in m}}
+        return {"days": days, **{k: m[k] for k in keep if k in m},
+                **({"fanvue": synced} if synced else {})}
 
     def t_brain_lookup(self, query: str) -> dict[str, Any]:
         from .brain import Brain
@@ -1020,6 +1035,15 @@ class Assistant:
 
     def _post_card(self, platform: str, item_id: str) -> dict[str, Any]:
         return self.hub().adapter(platform).card(item_id)
+
+    def t_fanvue_queue(self, picture: str, caption: str, level: int) -> dict[str, Any]:
+        from .fanvue import Queue
+        try:
+            item = Queue(self.home, self.audit).add(picture, caption, int(level), "jarvis")
+        except ValueError as e:
+            return {"error": str(e)}
+        return {"queued": item["item_id"], "next": "post_video platform=fanvue item_id="
+                + item["item_id"] + " puts it on the owner's screen"}
 
     def t_post_video(self, platform: str, item_id: str, **choices: Any) -> dict[str, Any]:
         return self.hub().adapter(platform).post(item_id, choices, self.owner)

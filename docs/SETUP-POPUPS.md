@@ -16,6 +16,7 @@ to skip it for this time. A step that is done does not come back.
 | Set up private web search | Opens a terminal running the search setup |
 | Turn on nightly updates | Opens a terminal running `sudo bau update auto` |
 | Let Jarvis work on his own | Opens a terminal that switches on the autopilot timer (docs/AUTOPILOT.md) |
+| Connect Fanvue | Opens a terminal running `bau fanvue login`; Fanvue opens in the browser, you sign in and press Allow. Shown only once your Fanvue app's keys are on this computer (docs/FANVUE.md) |
 | Write your explicit limits | A box on the card: type what explicit (Fanvue-only) content must never show, one limit per line. Anything about minors is refused. Until you write them, Jarvis plans sfw content only |
 | Set your Fanvue prices | Three empty boxes on the card: the monthly price and the two unlock prices, inside Fanvue's limits (shown next to each box). Accept stays grey until all three are typed. Nothing is filled in for you |
 
