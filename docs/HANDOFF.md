@@ -596,6 +596,22 @@ It needs about 24 GB RAM. Check `reply_ok` and `tool_calls` are true before appr
 
 ## Known gaps / ideas (not started)
 
+- **Grow-BAU review, 2026-11-03: the creator's feed.** The job: "fill the Fanvue queue by
+  itself so the loop makes money without me". The answer was mostly glue between parts BAU
+  already has (ComfyUI, the local model, the autopilot timer, the Fanvue queue), so
+  `src/bau/creator_feed.py` was built (PR #135). Candidates looked at for keeping Aria's
+  face the same across pictures:
+  - AHEKOT/ComfyUI_VNCCS (MIT): not a fit. It makes anime and visual-novel sprites on
+    Illustrious/Qwen models, and its "Character Cloner" copies characters from pictures
+    taken from the internet (real-likeness risk).
+  - cubiq/ComfyUI_IPAdapter_plus (GPL-3.0): works with SDXL from a reference picture, and
+    the non-FaceID adapter needs no insightface. But it has been in maintenance-only mode
+    since 2025-04-14, and its page states no licence for the h94/IP-Adapter weights. Next
+    step, only if the owner says yes: read the weights' licence on Hugging Face, then test
+    it in a sandbox on the desktop.
+  - Workflow tools (Activepieces, from the toolbox) were not needed, because the autopilot
+    timer already schedules the work.
+
 - Instagram, Facebook and Snapchat adapters for the publishing hub. Each needs one adapter class in `publishing.py`, a client module, an `examples/platform-*.yaml`, and tests. Verify each platform's current API and posting rules first (consent screens, AI labels, age limits).
 - The `ghcr.io/bsajabo258/bau` image is private by default. Make it public in the package settings if the owner wants `docker pull` to work without logging in.
 - `vm/create-vm.*` has never run against real VirtualBox (see step 1).

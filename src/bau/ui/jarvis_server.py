@@ -122,7 +122,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
             self.send_header("Content-Security-Policy",
                              "default-src 'none'; script-src 'unsafe-inline'; "
                              "style-src 'unsafe-inline'; connect-src 'self'; "
-                             "media-src 'self' blob:; img-src 'self'; frame-ancestors 'none'")
+                             "media-src 'self' blob:; img-src 'self' blob:; frame-ancestors 'none'")
             self.end_headers()
             self.wfile.write(body)
 
@@ -204,7 +204,10 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 with f:
                     size = os.fstat(f.fileno()).st_size
                     self.send_response(200)
-                    self.send_header("Content-Type", "video/mp4")
+                    kind = {".png": "image/png", ".jpg": "image/jpeg",
+                            ".jpeg": "image/jpeg"}.get(Path(p.preview).suffix.lower(),
+                                                       "video/mp4")
+                    self.send_header("Content-Type", kind)
                     self.send_header("Content-Length", str(size))
                     self.send_header("Cache-Control", "no-store")
                     self.send_header("X-Content-Type-Options", "nosniff")

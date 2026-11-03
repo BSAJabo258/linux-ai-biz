@@ -116,7 +116,56 @@ class TikTokAdapter(Adapter):
                 "result": done.result, "account": creator.get("creator_username")}
 
 
-ADAPTERS: dict[str, type[Adapter]] = {"tiktok": TikTokAdapter}
+class FanvueAdapter(Adapter):
+    """Fanvue (src/bau/fanvue.py): a queued picture and caption; the owner picks the
+    audience with no default and Accept uploads and posts it."""
+    name, label = "fanvue", "Fanvue"
+
+    @property
+    def queue(self):
+        from .fanvue import Queue
+        return Queue(self.home, self.audit)
+
+    @property
+    def client(self):
+        from .fanvue import FanvueClient
+        return self._client or FanvueClient(self.home)
+
+    def pending(self) -> list[dict[str, Any]]:
+        return [{"platform": self.name, "item_id": i["item_id"], "picture": i["picture"],
+                 "title": i["caption"][:120], "level": i["level"], "ai_label": True}
+                for i in self.queue.pending()]
+
+    def card(self, item_id: str) -> dict[str, Any]:
+        from .fanvue import AUDIENCES, LEVELS, FanvueError
+        q = self.queue
+        item = q.get(item_id)
+        if item is None or item["status"] != "QUEUED":
+            raise ValueError(f"{item_id} is not waiting in the Fanvue queue")
+        if problems := q.check(item["picture"], item["caption"], item["level"]):
+            raise ValueError("blocked by checks: " + "; ".join(problems))
+        try:
+            me = self.client.me()
+        except (FanvueError, OSError) as e:
+            raise ValueError(f"Fanvue is not connected ({e}); run: bau fanvue login") from e
+        summary = (f"Post to Fanvue now?\nAccount: {me.get('displayName', '?')} "
+                   f"(@{me.get('handle', '?')})\nLevel {item['level']}: "
+                   f"{LEVELS[item['level']]}\nCaption:\n{item['caption']}")
+        form = {"fields": [{"name": "audience", "label": "Who sees this post?",
+                            "options": [[k, v] for k, v in AUDIENCES.items()]}]}
+        return {"summary": summary, "form": form, "preview": str(q.picture(item))}
+
+    def post(self, item_id: str, choices: dict[str, Any], approver: str) -> dict[str, Any]:
+        q = self.queue
+        item = q.get(item_id)
+        if item is None:
+            return {"error": f"{item_id} is not in the Fanvue queue"}
+        done = q.post(item, self.client, approver, choices.get("audience", ""))
+        return {"platform": self.name, "item_id": item_id, "status": done["status"],
+                "result": done["result"]}
+
+
+ADAPTERS: dict[str, type[Adapter]] = {"tiktok": TikTokAdapter, "fanvue": FanvueAdapter}
 
 
 class Hub:

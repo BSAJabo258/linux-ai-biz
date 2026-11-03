@@ -20,7 +20,15 @@ commercial_content_policy: >-
   sensible floor for the cheapest pay-per-view item (articles/16237634); creators keep 80%
   (articles/7860515-earning-rate-changes-for-creators-on-fanvue); free trials exist
   (articles/7860795). Not found: paid-message and tip limits, multi-month bundles.
-api_policy: not read yet (no Fanvue posting from BAU yet; its adapter is planned)
+api_policy: >-
+  Read 2026-11-03 on api.fanvue.com/docs: OAuth 2.0 with PKCE (S256) only, no API keys or
+  personal tokens; client_secret_basic; rotating single-use refresh tokens (offline_access).
+  X-Fanvue-API-Version 2025-06-26. POST /v1/posts (write:post): audience subscribers |
+  followers-and-subscribers, text <= 5000 (checked for prohibited language), price in cents
+  >= 300. Media upload in parts (write:media, write:creator), attach once status is ready,
+  max 1.5 GiB. Earnings GET /v1/insights/earnings (read:insights) in USD cents. 200
+  requests per 60 s per client per user, 6 in flight. No API field for an AI label.
+  BAU's adapter: src/bau/fanvue.py, docs/FANVUE.md.
 automation_policy: not read yet
 account_limits: The human behind a fully AI account completes Fanvue's ID verification (KYC).
 appeal_process: not read yet
