@@ -151,6 +151,12 @@ REMEMBER_CMD = re.compile(r"^\W*(?:please\W+|jarvis\W+|hey jarvis\W+)*remember\W
                           r"(.{3,})", re.I | re.S)
 WEEK_CMD = re.compile(r"\b(?:schedule|post|publish)\b.{0,20}\bweek\W+([a-z0-9][a-z0-9._-]{0,60}"
                       r"[a-z0-9])", re.I)
+# "Let's do all" and the like: everything waiting on the owner goes on screen at once as cards
+# with Accept, no model needed (the owner's desktop, 2026-11-02: a small model ran out of steps).
+DO_ALL_CMD = re.compile(
+    r"^\W*(?:(?:ok(?:ay)?|yes|yeah|alright|all right|jarvis)\W+)*(?:let'?s\W+)?"
+    r"(?:do\W+(?:it\W+)?all|do\W+everything|continue|keep\W+going|"
+    r"what(?:'s|\W+is)\W+waiting(?:\W+(?:on|for)\W+me)?)\W*$", re.I)
 # Facts first: for the common questions a local model is handed the answer's facts with the
 # question (plain matching, no model), so it only has to say them. Read tools only.
 GROUND = (
@@ -474,6 +480,8 @@ class Assistant:
 
     def t_tool_menu(self, name: str = "") -> dict[str, Any]:
         how = 'run it with use_tool: {"name": "<tool>", "input": {...}}'
+        if name in ("use_tool", "tool_menu"):
+            return {"name": name, "how": how}
         if name:
             t = self.tools.get(name)
             if t is None or name in META_TOOLS:
@@ -486,6 +494,9 @@ class Assistant:
                 "how": how}
 
     def t_use_tool(self, name: str, input: dict[str, Any] | None = None) -> Any:  # noqa: A002
+        # A small model wrapped use_tool in use_tool (owner's desktop, 2026-11-02): unwrap it.
+        while name == "use_tool" and isinstance(input, dict) and "name" in input:
+            name, input = str(input["name"]), input.get("input") or {}
         if name in META_TOOLS:
             return {"error": f"{name} is not run through use_tool"}
         out, err = self._run_tool(name, input if isinstance(input, dict) else {})
@@ -1152,9 +1163,20 @@ class Assistant:
         if not text:
             return Reply("I didn't catch that.", mode="plain" if self.provider is None else "model")
         self._log("owner", text)
+        if DO_ALL_CMD.match(text):
+            return self._do_all()
         if self.provider is None:
             return self._plain(text)
         return self._turn(text)
+
+    def _do_all(self) -> Reply:
+        self.setup_waiting()
+        waiting = [p.public() for p in self.pending.values()]
+        text = (f"{len(waiting)} thing{'s' * (len(waiting) != 1)} wait for you. They are on "
+                "your screen now: press Accept on each one you want done." if waiting else
+                "Nothing is waiting for you right now.")
+        self._log("jarvis", text)
+        return Reply(text, pending=waiting, mode="plain" if self.provider is None else "model")
 
     def _ground(self, question: str, cards: list[dict[str, Any]]) -> str:
         """Look up the facts for a common question before a small model answers it."""
