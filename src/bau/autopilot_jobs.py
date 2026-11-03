@@ -1,6 +1,7 @@
 """The real jobs the autopilot runs (src/bau/autopilot.py): scan GitHub with Repo Scout and
 inspect what it finds in quarantine. Nothing found is installed or run here; a repository
-that passes the inspection is queued for a sandbox test, the next step."""
+that passes the inspection is queued for a sandbox test, the next step. Draft jobs make the
+creator's Fanvue posts while the owner's autopost is on (src/bau/creator_feed.py)."""
 
 from __future__ import annotations
 
@@ -69,7 +70,17 @@ def handlers(home: Path, sc: Any = None, gh: Any = None) -> dict[str, A.Handler]
         bp = B.read(home, task["detail"]["repo"], github())
         return {"ok": True, "evidence": B.summary(bp).split("\n")[1]}
 
-    return {"scan": scan, "inspect": inspect, "research": research, "blueprint": blueprint}
+    def draft(task: dict[str, Any]) -> dict[str, Any]:
+        if task["detail"].get("job") != "fanvue_post":
+            return {"ok": False, "evidence": "no handler for this draft"}
+        from .creator_feed import make_post
+        try:
+            return make_post(home, task)
+        except Exception as e:  # noqa: BLE001 - a refused or failed picture is the evidence
+            return {"ok": False, "evidence": f"{type(e).__name__}: {e}"[:300]}
+
+    return {"scan": scan, "inspect": inspect, "research": research, "blueprint": blueprint,
+            "draft": draft}
 
 
 def seed(home: Path, days: int = 7) -> int:
@@ -85,4 +96,5 @@ def seed(home: Path, days: int = 7) -> int:
         if not recent and A.add(home, "scan", f"scan {c['title']}", {"category": key},
                                 source="autopilot (weekly)"):
             n += 1
-    return n
+    from .creator_feed import fill
+    return n + fill(home)                     # the creator's posts, while autopost is on

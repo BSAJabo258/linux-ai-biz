@@ -36,6 +36,19 @@ bau fanvue autopost off                                            # back to Acc
 bau fanvue autopost on --audience subscribers --per-day 3          # or set it in a terminal
 ```
 
+## The feed fills itself
+
+While autopost is on, the autopilot keeps the queue stocked with your number of posts a day
+(`src/bau/creator_feed.py`). For each one it:
+
+1. picks an everyday scene (or one of yours, if you add a `themes:` list to Aria's profile);
+2. draws the picture on your desktop with ComfyUI, and the age check runs as always;
+3. has your local model write the caption in Aria's voice. Without a local model, the
+   caption is a plain line;
+4. queues it. The AI label is added, and a caption that refers to minors is refused.
+
+Subscribers-only posts are level 1. Posts for followers and subscribers are level 0.
+
 ## Set it up once
 
 Fanvue gives out no API keys. Every app signs in through Fanvue's own Allow page. So:
