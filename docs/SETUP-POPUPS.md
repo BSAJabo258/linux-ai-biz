@@ -9,14 +9,15 @@ to skip it for this time. A step that is done does not come back.
 
 | Step | What Accept does |
 |---|---|
-| Use your API keys while online | Opens a terminal that switches on the hosted models your keys pay for (`bau set-status model ... APPROVED`). After that, Jarvis answers with them first while you're online and with the local model when you're offline. Shown only when a key is on this computer and its model is still off. NVIDIA's free API is a trial: their terms say business use needs a paid plan |
+| Use your API keys while online | Switches on the hosted models your keys pay for, right there, with you as the reviewer (the same as `bau set-status model ... APPROVED`). No terminal. A model the registry's own checks would refuse (unknown or third-party source) never gets a card. After that, Jarvis answers with them first while you're online and with the local model when you're offline. Shown only when a key is on this computer and its model is still off. NVIDIA's free API is a trial: their terms say business use needs a paid plan |
 | Bring in the current rules | Swaps in the rules that came with your newest BAU (creator, Michigan, Fanvue). The old copy is kept beside it as `regulations.before-DATE` |
 | Install NVIDIA's driver | Opens a terminal running `sudo bau-gpu-setup`. Type your password there, then restart when it says |
 | Set up pictures on this computer | Opens a terminal running the pictures setup (about 10 GB download, once). It shows up only after NVIDIA's driver works |
 | Set up private web search | Opens a terminal running the search setup |
 | Turn on nightly updates | Opens a terminal running `sudo bau update auto` |
 | Let Jarvis work on his own | Opens a terminal that switches on the autopilot timer (docs/AUTOPILOT.md) |
-| Set your Fanvue prices | Opens a terminal that asks you for each price. Nothing is filled in for you |
+| Write your explicit limits | A box on the card: type what explicit (Fanvue-only) content must never show, one limit per line. Anything about minors is refused. Until you write them, Jarvis plans sfw content only |
+| Set your Fanvue prices | Three empty boxes on the card: the monthly price and the two unlock prices, inside Fanvue's limits (shown next to each box). Accept stays grey until all three are typed. Nothing is filled in for you |
 
 You can also say or type **"do all"**, **"let's do it all"**, **"continue"** or **"what's
 waiting on me?"**. Jarvis then puts every card that is waiting for you on screen at once,
@@ -29,8 +30,13 @@ start these steps themselves.
 Not in the pop-ups:
 
 - **A lawyer's or accountant's sign-off.** Only those people can give it (`bau reg promote`).
-- **Your explicit limits for levels 2 and 3** (`explicit_boundaries`). You write those
-  yourself in Aria's profile.
+- **Signed approvals** for money, commercial email and legal (`bau approve`). Those are
+  signed with your SSH key on purpose, so nothing on the screen can do them.
+- **Platform accounts and keys** (Fanvue, Instagram, TikTok, Ayrshare). Those sites make you
+  sign up and verify yourself; then the keys come in with `bau keys import`.
+
+Since 2026-11-03 (your ask: "only the very necessary clicks"), only steps that need your
+password still open a terminal. API keys, explicit limits and prices are done on the card.
 
 Built and tested 2026-11-02:
 

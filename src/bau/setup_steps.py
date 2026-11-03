@@ -4,8 +4,10 @@ to click the accept button so that it can continue").
 Each step knows how to tell whether it is already done on this computer. Jarvis shows every
 step still waiting as a card with Accept; nothing runs without that click. A step that needs
 the owner's password opens a terminal window running the exact command, so the owner sees it
-and types the password there. Owner-only values (prices) are typed by the owner in that
-window, never filled in. Done steps disappear the next time Jarvis checks.
+and types the password there. Everything else happens on the card itself (the owner's ask,
+2026-11-03: "only the very necessary clicks"): owner-only values (prices, explicit limits)
+are typed by the owner in the card's boxes, never filled in. Done steps disappear the next
+time Jarvis checks.
 """
 
 from __future__ import annotations
@@ -60,9 +62,12 @@ STEPS = (
          "The autopilot: every 30 minutes Jarvis scans GitHub, inspects what he finds and "
          "votes on what to add, and asks you only about money, posting and legal. A "
          "terminal opens; type your password."),
+    Step("boundaries", "Write your explicit limits",
+         "What the explicit (Fanvue-only) content must never show, one limit per line, in "
+         "your words. Until you write them, Jarvis plans sfw content only."),
     Step("prices", "Set your Fanvue prices",
-         "Your monthly price and the two unlock prices. A terminal opens and asks you for "
-         "each one; nothing is filled in for you."),
+         "Type your monthly price and the two unlock prices in the boxes; nothing is filled "
+         "in for you."),
 )
 BY_ID = {s.id: s for s in STEPS}
 
@@ -136,12 +141,13 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         return probe("update") == "auto"
     if step == "autopilot":
         return bool(probe("autopilot"))
-    if step == "prices":
+    if step in ("boundaries", "prices"):
         import yaml
         prof = _profile(home)
         if prof is None:
             return None
-        return bool((yaml.safe_load(prof.read_text()) or {}).get("prices"))
+        key = "explicit_boundaries" if step == "boundaries" else "prices"
+        return bool((yaml.safe_load(prof.read_text()) or {}).get(key))
     raise ValueError(step)
 
 
@@ -150,7 +156,7 @@ def _unused_keys(home: Path) -> list[str]:
     import os
 
     from . import localonly
-    from .registry import CapabilityRegistry
+    from .registry import CapabilityRegistry, validate
     if localonly.mode(home) == "local-only":
         return []
     p = home / "registry" / "capabilities.yaml"
@@ -161,7 +167,9 @@ def _unused_keys(home: Path) -> list[str]:
         key = rec.get("api_key_env")
         if (key and os.environ.get(key) and rec.get("deployment") != "local"
                 and rec.get("lane") != "content_only"
-                and rec.get("status") not in ("APPROVED", "ACTIVE")):
+                and rec.get("status") not in ("APPROVED", "ACTIVE")
+                # one the registry's own checks would refuse never gets a card
+                and not validate("model", dict(rec, status="APPROVED"))):
             out.append(mid)
     return out
 
@@ -173,8 +181,6 @@ def waiting(home: Path, probe: Probe | None = None) -> list[Step]:
 
 def _command(step: str, home: Path) -> str:
     q = shlex.quote
-    if step == "api_keys":
-        return "; ".join(f"bau set-status model {q(m)} APPROVED" for m in _unused_keys(home))
     if step == "nvidia":
         return "sudo bau-gpu-setup"
     if step == "pictures":
@@ -185,12 +191,6 @@ def _command(step: str, home: Path) -> str:
         return "sudo bau update auto"
     if step == "autopilot":
         return f"sudo bash {q(str(script('bau-autopilot-setup.sh')))}"
-    if step == "prices":
-        prof = q(str(_profile(home)))
-        return ("read -r -p 'Monthly subscription in dollars: ' s; "
-                "read -r -p 'Level 2 (nude) unlock in dollars: ' n; "
-                "read -r -p 'Level 3 (xxx) unlock in dollars: ' x; "
-                f'bau creator prices {prof} --subscription "$s" --nude "$n" --xxx "$x"')
     raise ValueError(step)
 
 
@@ -204,14 +204,71 @@ def _refresh_laws(home: Path) -> None:
         shutil.copytree(src, cur)
 
 
+def form(step: str) -> dict[str, object] | None:
+    """The boxes the owner types into on the card. Empty: nothing is ever filled in."""
+    if step == "prices":
+        from .virtual_creator import PRICE_LIMITS
+        names = {"subscription": "Monthly subscription", "nude": "Level 2 (nude) unlock",
+                 "xxx": "Level 3 (xxx) unlock"}
+        return {"fields": [{"name": k, "type": "number", "min": lo, "max": hi,
+                            "label": f"{names[k]} in dollars (${lo:.2f} to ${hi:.2f})"}
+                           for k, (lo, hi) in PRICE_LIMITS.items()]}
+    if step == "boundaries":
+        return {"fields": [{"name": "limits", "type": "text",
+                            "label": "Your explicit limits, one per line"}]}
+    return None
+
+
+def approve_keys(home: Path, owner: str) -> tuple[list[str], dict[str, str]]:
+    """The owner's Accept switches on the hosted models whose keys are here (what
+    `bau set-status model ID APPROVED` does, with the owner as the reviewer)."""
+    import yaml
+
+    from .registry import CapabilityRegistry, validate
+    if not owner.startswith("human:"):
+        raise PermissionError("only the owner switches models on")
+    reg = CapabilityRegistry(home / "registry" / "capabilities.yaml")
+    done, refused = [], {}
+    for mid in _unused_keys(home):
+        new = dict(reg.data["model"][mid], status="APPROVED", reviewed_by=owner,
+                   reviewed_at=dt.datetime.now(dt.UTC).isoformat())
+        if errs := validate("model", new):
+            refused[mid] = "; ".join(errs)
+        else:
+            reg.data["model"][mid] = new
+            done.append(mid)
+    reg.path.write_text(yaml.safe_dump(reg.data, sort_keys=True))
+    return done, refused
+
+
 def run(step: str, home: Path, probe: Probe | None = None,
-        terminal: Terminal | None = None) -> dict[str, object]:
-    """Only after the owner pressed Accept."""
+        terminal: Terminal | None = None, owner: str = "",
+        values: dict[str, object] | None = None) -> dict[str, object]:
+    """Only after the owner pressed Accept; `values` are what the owner typed on the card."""
     if step not in BY_ID:
         raise ValueError(f"no setup step {step!r}")
     if step == "laws":
         _refresh_laws(home)
         return {"done": True, "said": "The current rules are in; the old copy is kept."}
+    if step == "api_keys":
+        on, refused = approve_keys(home, owner)
+        said = ("Switched on: " + ", ".join(on) + ". ") if on else ""
+        said += "".join(f"Not switched on, {m}: {why}. " for m, why in refused.items())
+        return {"done": bool(on), "switched_on": on, "refused": refused,
+                "said": said.strip() or "Nothing to switch on."}
+    if step in ("prices", "boundaries"):
+        from . import virtual_creator as V
+        prof, values = _profile(home), values or {}
+        if prof is None:
+            return {"error": "no creator profile yet"}
+        try:
+            if step == "prices":
+                V.set_prices(prof, {k: float(values[k]) for k in V.PRICE_LIMITS})
+            else:
+                V.set_explicit_boundaries(prof, str(values.get("limits", "")).splitlines())
+        except (KeyError, ValueError, TypeError, V.CreatorError) as e:
+            return {"error": str(e)}
+        return {"done": True, "said": "Saved in your creator profile."}
     cmd = _command(step, home)
     if not (terminal or _terminal)(f"BAU setup: {BY_ID[step].title}", cmd):
         return {"error": f"No screen to open a terminal on. In a terminal, run: {cmd}"}

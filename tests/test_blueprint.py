@@ -107,7 +107,8 @@ def test_the_autopilot_reads_blueprints_and_researches_what_the_owner_points_at(
         stopped = None
 
         def find(self, q, max_queries=2, per_query=10, readmes=1):
-            return {"ranked": [{"full_name": "acme/fastspeech"}, {"full_name": "acme/other"}],
+            # the shape Scout.find really returns (src/bau/scout/__init__.py: "id")
+            return {"ranked": [{"id": "acme/fastspeech"}, {"id": "acme/other"}],
                     "found": 2, "searches": []}
 
     from bau import autopilot_jobs as J
