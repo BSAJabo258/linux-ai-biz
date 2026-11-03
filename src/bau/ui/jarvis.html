@@ -133,6 +133,9 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:cente
 #confirm #cform .opt{border:1px solid var(--line);color:var(--ink);background:var(--field);padding:12px 14px;
   font-size:14px;letter-spacing:normal;text-transform:none;text-align:left;flex:1 1 180px}
 #confirm #cform .opt.on{border-color:var(--green);color:var(--green);background:rgba(70,242,164,.1)}
+#cform .typed{display:block;width:100%;box-sizing:border-box;border:1px solid var(--line);color:var(--ink);
+  background:var(--field);padding:10px 12px;font:inherit;font-size:15px;margin:0 0 14px}
+#cform textarea.typed{min-height:110px;resize:vertical}
 #cneed{font-size:12px;color:var(--amber);margin:0 0 10px}
 #confirm .btns button{padding:12px 20px}
 #confirm .box:focus{outline:none}
@@ -1548,7 +1551,7 @@ let previewUrl = null;
 function nextConfirm() {
   if (showing || !confirmQ.length) return;
   showing = confirmQ.shift(); $("csum").textContent = showing.summary;
-  $("yes").textContent = showing.tool === "setup_step" ? "Accept" : "Confirm";   // setup steps
+  $("yes").textContent = /^(setup_step|autopilot_answer)$/.test(showing.tool) ? "Accept" : "Confirm";
   const form = $("cform"), note = $("cnote"), need = $("cneed"), vid = $("cvid");
   form.textContent = ""; note.textContent = ""; need.textContent = ""; picked = {};
   const fields = (showing.form && showing.form.fields) || [];
@@ -1560,6 +1563,14 @@ function nextConfirm() {
     if (notes) note.textContent = notes[picked.promotes || ""] || notes.default; };
   for (const f of fields) {               // owner-only choices: no default is ever preselected
     form.appendChild(el("label", null, f.label));
+    if (!f.options) {                     // typed by the owner (prices, limits): starts empty
+      const box = el(f.type === "number" ? "input" : "textarea", "typed");
+      if (f.type === "number") { box.type = "number"; box.step = "0.01"; box.min = f.min; box.max = f.max; }
+      box.setAttribute("aria-label", f.label);
+      box.oninput = () => { const v = box.value.trim();
+        picked[f.name] = f.type === "number" && (v === "" || +v < f.min || +v > f.max) ? "" : v; check(); };
+      form.appendChild(box); continue;
+    }
     const row = el("div", "opts");
     for (const [v, label] of f.options) {
       const b = el("button", "opt", label); b.type = "button";
@@ -1580,7 +1591,7 @@ function nextConfirm() {
   }
   $("confirm").classList.add("show");
   shownAt = performance.now();
-  setTimeout(() => (form.querySelector(".opt") || $("confirm").querySelector(".box")).focus(), 50);
+  setTimeout(() => (form.querySelector(".opt, .typed") || $("confirm").querySelector(".box")).focus(), 50);
 }
 async function answer(approve) {
   if (!showing) return;
@@ -2301,7 +2312,7 @@ async function wake() {
   setState("thinking"); caption("");
   try { handle(await settle(await apiJson("/api/briefing"))); }
   catch (e) { caption(e.message); setState("idle"); }
-  $("text").focus();
+  if (!$("confirm").classList.contains("show")) $("text").focus();   // never steal a card's box
 }
 $("wake").addEventListener("click", wake);
 addEventListener("keydown", () => { if (!woke) wake(); }, { capture: true });

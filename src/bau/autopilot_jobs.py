@@ -59,7 +59,7 @@ def handlers(home: Path, sc: Any = None, gh: Any = None) -> dict[str, A.Handler]
     def research(task: dict[str, Any]) -> dict[str, Any]:
         """What the owner pointed Jarvis at: search GitHub, read the top blueprints."""
         run = scout().find(task["detail"]["query"], max_queries=2, per_query=10, readmes=1)
-        top = [r["full_name"] for r in run.get("ranked", [])][:3]
+        top = [r["id"] for r in run.get("ranked", [])][:3]          # id: owner/repo
         return {"ok": bool(top) or not run.get("searches"),
                 "evidence": f"{run.get('found', 0)} found; reading {len(top)} blueprints",
                 "follow_ups": [("blueprint", f"blueprint {n}", {"repo": n}) for n in top]}

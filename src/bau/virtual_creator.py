@@ -262,6 +262,19 @@ def set_prices(path: Path, prices: dict[str, float]) -> None:
     Path(path).write_text(text.rstrip("\n") + "\n" + block, encoding="utf-8")
 
 
+def set_explicit_boundaries(path: Path, limits: list[str]) -> None:
+    """The owner's explicit-tier limits into the profile, in the owner's own words."""
+    limits = [x.strip() for x in limits if x.strip()]
+    if not limits:
+        raise CreatorError("write at least one limit")
+    if any(MINOR_REFERENCE.search(x) for x in limits):
+        raise CreatorError("explicit_boundaries must not describe content involving minors")
+    text = Path(path).read_text(encoding="utf-8")
+    text = re.sub(r"^explicit_boundaries:.*\n(?:[ \t]+.*\n?)*", "", text, flags=re.MULTILINE)
+    block = yaml.safe_dump({"explicit_boundaries": limits}, sort_keys=False)
+    Path(path).write_text(text.rstrip("\n") + "\n" + block, encoding="utf-8")
+
+
 def write_markdown(batch: dict[str, Any]) -> str:
     paid = []
     if "level" in batch:

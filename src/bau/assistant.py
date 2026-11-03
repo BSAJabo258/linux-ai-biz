@@ -129,6 +129,9 @@ def load_constitution(home: Path) -> str:
 CORE_TOOLS = ("system_status", "recall", "remember", "toolbox", "usage_today",
               "hold_everything", "web_search", "creator_batch")
 LEAN_MAX_TOKENS = 400                         # spoken answers; a small model can loop
+# After Accept opens a terminal, that step's card stays down this long (the NVIDIA driver and
+# the pictures download take a while); a step still not done after it comes back.
+SETUP_RUNNING_S = 45 * 60
 # The local model server's window: bau-llm.service runs llama-server with --ctx-size 8192
 # (a test keeps the two equal). Requests are measured in characters, about 3 per token, which
 # errs on the safe side; the owner's desktop got HTTP 400s when Jarvis sent more (2026-11-02).
@@ -204,6 +207,19 @@ class Tool:
     stage: Callable[..., dict[str, Any]] | None = None
 
 
+def _typed(v: Any, f: dict[str, Any]) -> Any:
+    """The owner's choice for one card field, or None when it is not a valid one."""
+    if "options" in f:
+        return v if v in [o[0] for o in f["options"]] else None
+    if f.get("type") == "number":
+        try:
+            n = float(v)
+        except (TypeError, ValueError):
+            return None
+        return n if f["min"] <= n <= f["max"] else None
+    return v if isinstance(v, str) and v.strip() and len(v) <= 4000 else None
+
+
 @dataclass
 class Pending:
     id: str
@@ -277,6 +293,7 @@ class Assistant:
         self.clients = clients or {}         # platform -> API client (tests inject fakes)
         self.messages: list[dict[str, Any]] = []
         self.pending: dict[str, Pending] = {}
+        self.setup_started: dict[str, float] = {}     # step -> when its terminal opened
         self.last_model = ""                  # the model that gave the last answer
         self._continuity: str | None = None   # earlier conversation, read once per session
         self.tools = {t.name: t for t in self._tools()}
@@ -937,11 +954,14 @@ class Assistant:
             if p.tool == "setup_step" and p.args["step"] not in steps:
                 self.pending.pop(pid)
         staged = {p.args["step"] for p in self.pending.values() if p.tool == "setup_step"}
+        # A step whose terminal is open is being done: no second card while it runs.
+        busy = {k for k, t in self.setup_started.items() if time.monotonic() - t < SETUP_RUNNING_S}
         for s in steps.values():
-            if s.id not in staged:
+            if s.id not in staged and s.id not in busy:
                 pid = "su_" + secrets.token_hex(4)
                 self.pending[pid] = Pending(pid, "setup_step", {"step": s.id},
-                                            f"Setup: {s.title}\n{s.why}", _now())
+                                            f"Setup: {s.title}\n{s.why}", _now(),
+                                            form=setup_steps.form(s.id))
         from . import autopilot
         asked = {p.args["task"] for p in self.pending.values() if p.tool == "autopilot_answer"}
         for q in autopilot.questions(self.home):
@@ -957,9 +977,15 @@ class Assistant:
         from . import autopilot
         return autopilot.answer(self.home, task, "yes", self.owner)
 
-    def t_setup_step(self, step: str) -> dict[str, Any]:
+    def t_setup_step(self, step: str, **typed: Any) -> dict[str, Any]:
         from . import setup_steps
-        return setup_steps.run(step, self.home)
+        out = setup_steps.run(step, self.home, owner=self.owner, values=typed)
+        if out.get("started"):
+            self.setup_started[step] = time.monotonic()
+        for mid in out.get("switched_on", []):
+            self.audit.append("registry.status", self.owner,
+                              {"kind": "model", "key": mid, "status": "APPROVED"})
+        return out
 
     def t_check_stage(self, workspace: str, episode: str, stage: str) -> dict[str, Any]:
         from . import workspace as W
@@ -1053,8 +1079,8 @@ class Assistant:
         if approve and p.form:
             picked = {}
             for f in p.form["fields"]:
-                v = (choices or {}).get(f["name"])
-                if v not in [o[0] for o in f["options"]]:
+                v = _typed((choices or {}).get(f["name"]), f)
+                if v is None:
                     self.pending[p.id] = p              # still waiting; let them choose
                     return {"error": f"choose: {f['label']}", "retry": True}
                 picked[f["name"]] = v

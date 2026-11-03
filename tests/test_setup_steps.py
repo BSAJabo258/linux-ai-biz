@@ -5,10 +5,10 @@ for anything that needs the owner's password), and a step that is done disappear
 runs without the owner's click; owner-only values (prices) are typed by the owner, never
 filled in. Fakes only. Written before the code."""
 
-import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from bau import setup_steps as S
 
@@ -24,7 +24,9 @@ class Box:
             "[]\n")
         (self.home / "creators").mkdir()
         prof = {"id": "aria"} | ({"prices": profile_prices} if profile_prices else {})
-        (self.home / "creators" / "aria.yaml").write_text(json.dumps(prof))
+        if profile_prices:
+            prof["explicit_boundaries"] = ["no real people"]
+        (self.home / "creators" / "aria.yaml").write_text(yaml.safe_dump(prof))
         self.facts = {"nvidia": nvidia, "driver": driver, "pictures": pictures,
                       "search": search, "update": update, "autopilot": autopilot}
         self.opened = []
@@ -47,7 +49,8 @@ def ids(box):
 
 
 def test_everything_still_waiting_is_listed_in_order(box):
-    assert ids(box) == ["laws", "nvidia", "search", "updates", "autopilot", "prices"]
+    assert ids(box) == ["laws", "nvidia", "search", "updates", "autopilot", "boundaries",
+                        "prices"]
 
 
 def test_done_steps_disappear(tmp_path):
@@ -81,12 +84,57 @@ def test_the_shipped_setup_scripts_are_the_installers_own():
         assert S.script(name).exists()
 
 
-def test_prices_are_typed_by_the_owner_never_filled_in(box):
-    S.run("prices", box.home, probe=box.probe, terminal=box.terminal)
-    cmd = box.opened[-1][1]
-    assert "read -r" in cmd and "bau creator prices" in cmd
-    for number in ("9.99", "14.99", "29.99"):
-        assert number not in cmd
+def test_prices_are_typed_by_the_owner_on_the_card_never_filled_in(box):
+    fields = S.form("prices")["fields"]
+    assert [f["name"] for f in fields] == ["subscription", "nude", "xxx"]
+    assert all("options" not in f and "value" not in f and "default" not in f
+               for f in fields)
+    out = S.run("prices", box.home, values={"subscription": "9.99", "nude": "14.99",
+                                            "xxx": "29.99"})
+    assert out["done"] and not box.opened                        # no terminal needed
+    prof = yaml.safe_load((box.home / "creators" / "aria.yaml").read_text())
+    assert prof["prices"] == {"subscription": 9.99, "nude": 14.99, "xxx": 29.99}
+    assert "prices" not in ids(box)
+
+
+def test_prices_outside_fanvues_limits_or_missing_are_refused(box):
+    assert "error" in S.run("prices", box.home, values={"subscription": "1", "nude": "5",
+                                                        "xxx": "5"})
+    assert "error" in S.run("prices", box.home, values={"subscription": "9.99"})
+    assert "prices" in ids(box)
+
+
+def test_explicit_limits_are_the_owners_words_and_never_about_minors(box):
+    assert S.form("boundaries")["fields"][0]["type"] == "text"
+    assert "error" in S.run("boundaries", box.home, values={"limits": "  \n "})
+    assert "error" in S.run("boundaries", box.home,
+                            values={"limits": "nothing with a teen"})
+    out = S.run("boundaries", box.home, values={"limits": "no real people\nno violence\n"})
+    assert out["done"]
+    prof = yaml.safe_load((box.home / "creators" / "aria.yaml").read_text())
+    assert prof["explicit_boundaries"] == ["no real people", "no violence"]
+    assert "boundaries" not in ids(box)
+
+
+def test_api_keys_switch_on_with_accept_and_the_owner_as_reviewer(box, monkeypatch):
+    reg = box.home / "registry" / "capabilities.yaml"
+    reg.parent.mkdir()
+    rec = {"model_id": "glm", "name": "GLM", "version": "1", "provider": "zai",
+           "source": "z.ai", "license": "terms", "commercial_use": True,
+           "deployment": "hosted", "trust_level": "OFFICIAL", "privacy": "hosted",
+           "api_key_env": "ZAI_KEY", "status": "REGISTERED"}
+    bad = dict(rec, model_id="odd", trust_level="UNKNOWN", api_key_env="ZAI_KEY")
+    reg.write_text(yaml.safe_dump({"model": {"glm": rec, "odd": bad}}))
+    monkeypatch.setenv("ZAI_KEY", "x")
+    assert "api_keys" in ids(box)
+    with pytest.raises(PermissionError):
+        S.run("api_keys", box.home, owner="process:bau")
+    out = S.run("api_keys", box.home, owner="human:owner")
+    assert out["switched_on"] == ["glm"] and not box.opened
+    assert "api_keys" not in ids(box)        # "odd" fails the registry's checks: no card
+    saved = yaml.safe_load(reg.read_text())["model"]["glm"]
+    assert saved["status"] == "APPROVED" and saved["reviewed_by"] == "human:owner"
+    assert yaml.safe_load(reg.read_text())["model"]["odd"]["status"] == "REGISTERED"
 
 
 def test_laws_refresh_runs_here_and_keeps_the_old_copy(box):
@@ -117,16 +165,27 @@ def test_jarvis_pops_every_waiting_step_up_once_and_accept_runs_it(tmp_path, mon
     monkeypatch.setattr(S, "_terminal", b.terminal)
     j = Assistant(b.home)
     first = j.setup_waiting()
-    assert [p["tool"] for p in first] == ["setup_step"] * 6
+    assert [p["tool"] for p in first] == ["setup_step"] * 7
     assert "Accept" in first[0]["summary"] or first[0]["summary"]
     again = j.setup_waiting()                          # not stacked twice
-    assert len([p for p in j.pending.values() if p.tool == "setup_step"]) == 6
+    assert len([p for p in j.pending.values() if p.tool == "setup_step"]) == 7
     assert {p["id"] for p in again} == {p["id"] for p in first}
     nvidia = next(p for p in first if "NVIDIA" in p["summary"])
     with pytest.raises(PermissionError):
         j.confirm(nvidia["id"], True, "jarvis")          # only the owner accepts
     out = j.confirm(nvidia["id"], True, "human:owner")
     assert out["done"] and "sudo bau-gpu-setup" in b.opened[-1][1]
+    # its terminal is running: no second NVIDIA card on the next check (it would nag)
+    assert not any("NVIDIA" in p["summary"] for p in j.setup_waiting())
+    j.setup_started["nvidia"] -= 46 * 60                  # still not done much later: back
+    assert any("NVIDIA" in p["summary"] for p in j.setup_waiting())
+    prices = next(p for p in first if "prices" in p["summary"])
+    assert prices["form"]["fields"][0]["type"] == "number"
+    out = j.confirm(prices["id"], True, "human:owner", {"subscription": "abc"})
+    assert out["retry"]                                  # still waiting until typed right
+    out = j.confirm(prices["id"], True, "human:owner",
+                    {"subscription": "9.99", "nude": "20", "xxx": "40"})
+    assert out["done"]
 
 
 def test_the_model_cannot_stage_or_run_setup_steps(tmp_path):
@@ -140,7 +199,10 @@ def test_the_page_shows_them_when_jarvis_opens():
     text = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis_server.py").read_text()
     assert "setup_waiting()" in text
     page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
-    assert '"setup_step" ? "Accept"' in page
+    assert '/^(setup_step|autopilot_answer)$/.test(showing.tool) ? "Accept"' in page
+    # typed boxes on cards start empty, and the greeting never takes the keyboard from them
+    assert 'el(f.type === "number" ? "input" : "textarea", "typed")' in page
+    assert 'if (!$("confirm").classList.contains("show")) $("text").focus();' in page
 
 
 def test_the_autopilot_setup_script_carries_the_installers_units():

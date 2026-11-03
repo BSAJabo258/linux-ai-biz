@@ -66,9 +66,11 @@ def test_unapproved_keys_pop_up_a_step_to_use_them(home, monkeypatch):
     reg.save()
     facts = {"nvidia": False, "driver": False, "pictures": False, "search": True,
              "update": "auto", "autopilot": True}
+    # NVIDIA's free trial is not for business: the registry refuses it, so no card offers it
+    assert [s.id for s in S.waiting(home, probe=facts.__getitem__)] == []
+    reg.data["model"]["nemotron-3-super-nim"]["commercial_use"] = True   # a paid plan
+    reg.save()
     assert [s.id for s in S.waiting(home, probe=facts.__getitem__)] == ["api_keys"]
-    opened = []
-    S.run("api_keys", home, probe=facts.__getitem__,
-          terminal=lambda t, c: opened.append(c) or True)
-    assert "bau set-status model nemotron-3-super-nim APPROVED" in opened[0]
+    out = S.run("api_keys", home, probe=facts.__getitem__, owner="human:owner")
+    assert out["switched_on"] == ["nemotron-3-super-nim"]
     assert "trial" in S.BY_ID["api_keys"].why.lower()      # NVIDIA's terms said plainly
