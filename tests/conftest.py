@@ -28,7 +28,7 @@ def setup_all_done(monkeypatch):
     set up unless a test says else (tests/test_setup_steps.py)."""
     from bau import setup_steps
     facts = {"nvidia": False, "driver": False, "pictures": False, "search": True,
-             "update": "auto"}
+             "update": "auto", "autopilot": True}
     monkeypatch.setattr(setup_steps, "_probe", facts.__getitem__)
 
 

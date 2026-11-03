@@ -9,10 +9,13 @@ from bau.accessibility import lint_html
 PAGE = (resources.files("bau.ui") / "jarvis.html").read_text()
 
 
-def test_orb_is_a_rotating_particle_sphere_in_a_golden_halo():
-    assert "function drawOrb" in PAGE
-    n = re.search(r"const ORB_POINTS = (\d+)", PAGE)
+def test_the_core_is_a_lorenz_attractor_mind_in_a_golden_halo():
+    # the owner's ask (2026-11-02): "deep formula" visuals; the sphere of points became
+    # a living strange attractor
+    assert "function drawMind" in PAGE and "function drawOrb" not in PAGE
+    n = re.search(r"const MIND_N = REDUCED \? \d+ : (\d+)", PAGE)
     assert n and int(n.group(1)) >= 400
+    assert "10 * (p[1] - p[0])" in PAGE and "p[0] * (RHO - p[2]) - p[1]" in PAGE
     assert "--gold" in PAGE and "function drawHalo" in PAGE
 
 

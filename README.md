@@ -269,6 +269,7 @@ How the *My Jarvis OS* spec maps onto this repository, and the build order:
 |---|---|
 | [docs/STUDIO.md](docs/STUDIO.md) | Make AI video clips (Higgsfield) inside a budget you set; priced first, made only on your Confirm |
 | [docs/VIRTUAL-CREATOR.md](docs/VIRTUAL-CREATOR.md) | The virtual creator: one fictional adult persona, the same look in every post; sfw for Instagram and TikTok, explicit for Fanvue |
+| [docs/AUTOPILOT.md](docs/AUTOPILOT.md) | Jarvis works on his own: three lanes, the vote, the compass, talk to him any time |
 | [docs/SETUP-POPUPS.md](docs/SETUP-POPUPS.md) | Setup steps pop up in Jarvis with an Accept button |
 | [docs/WIFI-RESCUE.md](docs/WIFI-RESCUE.md) | Wi-Fi rescue: one download that tries fix after fix until the Wi-Fi works, no internet needed |
 | [docs/UPDATES.md](docs/UPDATES.md) | Automatic nightly updates on your desktop: tested builds only, goes back by itself if one fails |

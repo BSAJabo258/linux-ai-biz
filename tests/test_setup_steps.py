@@ -17,7 +17,7 @@ class Box:
     """This computer: which services answer, what the card and the files say."""
 
     def __init__(self, tmp, nvidia=True, driver=False, pictures=False, search=False,
-                 update="off", laws_new=False, profile_prices=None):
+                 update="off", laws_new=False, profile_prices=None, autopilot=False):
         self.home = tmp / "home"
         (self.home / "regulations").mkdir(parents=True)
         (self.home / "regulations" / ("creator.yaml" if laws_new else "ai.yaml")).write_text(
@@ -26,7 +26,7 @@ class Box:
         prof = {"id": "aria"} | ({"prices": profile_prices} if profile_prices else {})
         (self.home / "creators" / "aria.yaml").write_text(json.dumps(prof))
         self.facts = {"nvidia": nvidia, "driver": driver, "pictures": pictures,
-                      "search": search, "update": update}
+                      "search": search, "update": update, "autopilot": autopilot}
         self.opened = []
 
     def probe(self, what):
@@ -47,12 +47,13 @@ def ids(box):
 
 
 def test_everything_still_waiting_is_listed_in_order(box):
-    assert ids(box) == ["laws", "nvidia", "search", "updates", "prices"]
+    assert ids(box) == ["laws", "nvidia", "search", "updates", "autopilot", "prices"]
 
 
 def test_done_steps_disappear(tmp_path):
     b = Box(tmp_path, driver=True, pictures=True, search=True, update="auto",
-            laws_new=True, profile_prices={"subscription": 9.99, "nude": 14.99, "xxx": 29.99})
+            laws_new=True, autopilot=True,
+            profile_prices={"subscription": 9.99, "nude": 14.99, "xxx": 29.99})
     assert ids(b) == []
 
 
@@ -116,10 +117,10 @@ def test_jarvis_pops_every_waiting_step_up_once_and_accept_runs_it(tmp_path, mon
     monkeypatch.setattr(S, "_terminal", b.terminal)
     j = Assistant(b.home)
     first = j.setup_waiting()
-    assert [p["tool"] for p in first] == ["setup_step"] * 5
+    assert [p["tool"] for p in first] == ["setup_step"] * 6
     assert "Accept" in first[0]["summary"] or first[0]["summary"]
     again = j.setup_waiting()                          # not stacked twice
-    assert len([p for p in j.pending.values() if p.tool == "setup_step"]) == 5
+    assert len([p for p in j.pending.values() if p.tool == "setup_step"]) == 6
     assert {p["id"] for p in again} == {p["id"] for p in first}
     nvidia = next(p for p in first if "NVIDIA" in p["summary"])
     with pytest.raises(PermissionError):
@@ -140,3 +141,12 @@ def test_the_page_shows_them_when_jarvis_opens():
     assert "setup_waiting()" in text
     page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
     assert '"setup_step" ? "Accept"' in page
+
+
+def test_the_autopilot_setup_script_carries_the_installers_units():
+    root = Path(__file__).resolve().parents[1]
+    text = S.script("bau-autopilot-setup.sh").read_text()
+    for unit in ("bau-autopilot.service", "bau-autopilot.timer"):
+        body = (root / "installer/payload/systemd" / unit).read_text()
+        assert f"/etc/systemd/system/{unit} <<'UNIT'\n{body}UNIT\n" in text
+    assert "bau-autopilot.timer" in (root / "installer/payload/install.sh").read_text()
