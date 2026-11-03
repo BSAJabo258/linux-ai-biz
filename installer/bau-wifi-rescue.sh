@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Wi-Fi rescue for the desktop's MediaTek MT7921 card (docs/WIFI-RESCUE.md). Works with no
+# Wi-Fi rescue for the owner's two Wi-Fi cards (docs/WIFI-RESCUE.md): the desktop's MediaTek
+# MT7921 and the laptop's Killer 1435 (Qualcomm QCA6174, ath10k). Works with no
 # internet: it tries one fix after another, checks the Wi-Fi after each, and stops at the
 # first that works, saying which one it was. With --install it also stays on duty and
 # repeats the ladder whenever the Wi-Fi drops.
@@ -17,18 +18,36 @@
 #     (packages.debian.org/trixie/all/firmware-mediatek/download).
 #   mt7921e: module_param_named(disable_aspm, ...) "disable PCI ASPM support" (Linux
 #     drivers/net/wireless/mediatek/mt76/mt7921/pci.c); used only if `modinfo -p` lists it.
+#   The laptop: Killer 1435 / Qualcomm QCA6174, ath10k (docs/HANDOFF.md, the owner's laptop
+#     check); QCA6174_2_1_DEVICE_ID (0x003e) (Linux drivers/net/wireless/ath/ath10k/hw.h).
+#     Firmware: Debian 13 firmware-atheros 20250410-2 [non-free-firmware], file list includes
+#     /usr/lib/firmware/ath10k/QCA6174/hw3.0/board-2.bin and firmware-6.bin;
+#     firmware-atheros_20250410-2_all.deb, 29474828 bytes, SHA-256 below. ath10k_pci has no
+#     ASPM option (its parameters: irq_mode, reset_mode), so step 5 skips itself there.
 #   Power saving off: NetworkManager wifi.powersave=2 (see the stick's
 #     bau-mt7921-powersave.conf).
 set -uo pipefail
 
-PCI_ID="14c3:7961"
-DRIVER="mt7921e"
 ETC=${BAU_WIFI_ETC:-/etc}                  # tests point these into a scratch folder
-FW_DIR=${BAU_WIFI_FW_DIR:-/usr/lib/firmware/mediatek}
-FW_FILES=(WIFI_RAM_CODE_MT7961_1.bin WIFI_MT7961_patch_mcu_1_2_hdr.bin)
-FW_DEB="firmware-mediatek_20250410-2_all.deb"
-FW_SHA256="957f82d72d413f4577f45bfad03237b1dd6f8693eddc226ac452f9c5d4187012"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PCI_LIST="$(lspci -nn 2>/dev/null)"
+if grep -qi "14c3:7961" <<<"${PCI_LIST}"; then           # the desktop
+  CARD="MediaTek MT7921"
+  DRIVER="mt7921e"
+  FW_DIR=${BAU_WIFI_FW_DIR:-/usr/lib/firmware/mediatek}
+  FW_FILES=(WIFI_RAM_CODE_MT7961_1.bin WIFI_MT7961_patch_mcu_1_2_hdr.bin)
+  FW_DEB="firmware-mediatek_20250410-2_all.deb"
+  FW_SHA256="957f82d72d413f4577f45bfad03237b1dd6f8693eddc226ac452f9c5d4187012"
+elif grep -Eqi "QCA6174|:003e\]" <<<"${PCI_LIST}"; then   # the laptop
+  CARD="Killer 1435 (Qualcomm QCA6174)"
+  DRIVER="ath10k_pci"
+  FW_DIR=${BAU_WIFI_FW_DIR:-/usr/lib/firmware/ath10k/QCA6174/hw3.0}
+  FW_FILES=(board-2.bin firmware-6.bin)
+  FW_DEB="firmware-atheros_20250410-2_all.deb"
+  FW_SHA256="8387a45e9307052858185620ab30efebbf9660b072d6c8309673bf112e291f35"
+else
+  CARD=""
+fi
 LOG=${BAU_WIFI_LOG:-/var/log/bau-wifi-rescue.log}
 WAIT=${BAU_WIFI_WAIT:-45}
 
@@ -85,8 +104,8 @@ fix_firmware() {       # 2. the card's firmware missing: install it from the kit
 
 fix_powersave() {      # 3. the card's power saving drops the connection
   install -d "${ETC}/NetworkManager/conf.d"
-  printf '[connection-bau-mt7921]\nmatch-device=driver:%s\nwifi.powersave=2\n' "${DRIVER}" \
-    > "${ETC}/NetworkManager/conf.d/bau-mt7921-powersave.conf"
+  printf '[connection-bau-wifi]\nmatch-device=driver:%s\nwifi.powersave=2\n' "${DRIVER}" \
+    > "${ETC}/NetworkManager/conf.d/bau-wifi-powersave.conf"
   restart_nm
 }
 
@@ -100,14 +119,14 @@ fix_aspm() {           # 5. PCI power saving (ASPM) makes the card hang
     say "   this kernel's ${DRIVER} has no disable_aspm option; skipped"; return 0
   fi
   install -d "${ETC}/modprobe.d"
-  echo "options ${DRIVER} disable_aspm=1" > "${ETC}/modprobe.d/bau-mt7921.conf"
+  echo "options ${DRIVER} disable_aspm=1" > "${ETC}/modprobe.d/bau-wifi.conf"
   reload_driver
   restart_nm
 }
 
 fix_mac() {            # 6. some routers refuse the random address used while scanning
-  printf '[device-bau-mt7921]\nmatch-device=driver:%s\nwifi.scan-rand-mac-address=no\n' \
-    "${DRIVER}" > "${ETC}/NetworkManager/conf.d/bau-mt7921-mac.conf"
+  printf '[device-bau-wifi]\nmatch-device=driver:%s\nwifi.scan-rand-mac-address=no\n' \
+    "${DRIVER}" > "${ETC}/NetworkManager/conf.d/bau-wifi-mac.conf"
   restart_nm
 }
 
@@ -147,10 +166,12 @@ ladder() {
 }
 
 # ------------------------------------------------------------------ start
-if ! lspci -nn 2>/dev/null | grep -qi "${PCI_ID}"; then
-  say "No MediaTek MT7921 card (${PCI_ID}) found in this computer; this rescue is for that card."
+if [[ -z ${CARD} ]]; then
+  say "Neither known Wi-Fi card (the desktop's MediaTek MT7921, the laptop's Killer 1435) is"
+  say "in this computer; this rescue is for those two."
   exit 1
 fi
+say "Wi-Fi card: ${CARD} (driver ${DRIVER})."
 if [[ -t 0 ]] && ! nmcli -t -f NAME,TYPE connection show 2>/dev/null \
     | grep -q ':802-11-wireless$'; then
   say "No Wi-Fi network saved yet. Type it once:"
@@ -164,11 +185,12 @@ fi
 case "${1:-}" in
   --install)
     install -m 0755 "$0" /usr/local/sbin/bau-wifi-rescue
-    [[ -f ${HERE}/${FW_DEB} ]] && install -D -m 0644 "${HERE}/${FW_DEB}" \
-      "/usr/local/share/bau-wifi/${FW_DEB}"
+    if [[ -f ${HERE}/${FW_DEB} ]]; then
+      install -D -m 0644 "${HERE}/${FW_DEB}" "/usr/local/share/bau-wifi/${FW_DEB}"
+    fi
     cat > /etc/systemd/system/bau-wifi-rescue.service <<'UNIT'
 [Unit]
-Description=BAU Wi-Fi rescue: keeps the MT7921 Wi-Fi working (docs/WIFI-RESCUE.md)
+Description=BAU Wi-Fi rescue: keeps the Wi-Fi working (docs/WIFI-RESCUE.md)
 After=NetworkManager.service
 Wants=NetworkManager.service
 

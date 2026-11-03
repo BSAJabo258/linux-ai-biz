@@ -23,19 +23,25 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - name: fetch the firmware package and check it
+      - name: fetch both firmware packages and check them
         run: |
           mkdir -p kit
+          pool=https://deb.debian.org/debian/pool/non-free-firmware/f/firmware-nonfree
           curl -fsSL --retry 3 -o kit/firmware-mediatek_20250410-2_all.deb \
-            https://deb.debian.org/debian/pool/non-free-firmware/f/firmware-nonfree/firmware-mediatek_20250410-2_all.deb
-          echo "957f82d72d413f4577f45bfad03237b1dd6f8693eddc226ac452f9c5d4187012  kit/firmware-mediatek_20250410-2_all.deb" | sha256sum -c
+            "$pool/firmware-mediatek_20250410-2_all.deb"
+          curl -fsSL --retry 3 -o kit/firmware-atheros_20250410-2_all.deb \
+            "$pool/firmware-atheros_20250410-2_all.deb"
+          sha256sum -c <<'SUMS'
+          957f82d72d413f4577f45bfad03237b1dd6f8693eddc226ac452f9c5d4187012  kit/firmware-mediatek_20250410-2_all.deb
+          8387a45e9307052858185620ab30efebbf9660b072d6c8309673bf112e291f35  kit/firmware-atheros_20250410-2_all.deb
+          SUMS
       - name: make the kit
         run: |
           install -m 0755 installer/bau-wifi-rescue.sh kit/bau-wifi-rescue.sh
           cat > kit/README.txt <<'TXT'
-          BAU Wi-Fi rescue kit (for the desktop's MediaTek MT7921 Wi-Fi). No internet needed.
+          BAU Wi-Fi rescue kit (the desktop's MediaTek MT7921 and the laptop's Killer 1435). No internet needed.
 
-          1. Copy this folder to a USB stick, plug it into the desktop.
+          1. Copy this folder to a USB stick, plug it into the desktop or the laptop.
           2. Open a terminal in the folder and run:
                sudo bash bau-wifi-rescue.sh
              It tries one fix after another and stops at the first that works.

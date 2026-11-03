@@ -14,14 +14,15 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "installer" / "bau-wifi-rescue.sh"
 
 
-def fake_box(tmp: Path, works_after: str, aspm=True, card=True):
+def fake_box(tmp: Path, works_after: str, aspm=True, card="desktop"):
     """Fake commands. `works_after`: the marker a fix leaves that brings the Wi-Fi back."""
     bin_ = tmp / "bin"
     bin_.mkdir(parents=True)
     state = tmp / "state"
     state.mkdir()
-    lspci = ("03:00.0 Network controller [0280]: MEDIATEK Corp. MT7921 [14c3:7961]" if card
-             else "no card")
+    lspci = {"desktop": "03:00.0 Network controller [0280]: MEDIATEK Corp. MT7921 [14c3:7961]",
+             "laptop": "02:00.0 Network controller [0280]: Qualcomm Atheros QCA6174 802.11ac "
+                       "Wireless Network Adapter [168c:003e] (rev 32)"}.get(card, "no card")
     cmds = {
         "id": 'echo 0',
         "sleep": 'true',
@@ -47,7 +48,8 @@ esac''',
         p.chmod(p.stat().st_mode | stat.S_IEXEC)
     fw = tmp / "fw"
     fw.mkdir()
-    for f in ("WIFI_RAM_CODE_MT7961_1.bin", "WIFI_MT7961_patch_mcu_1_2_hdr.bin"):
+    for f in ("WIFI_RAM_CODE_MT7961_1.bin", "WIFI_MT7961_patch_mcu_1_2_hdr.bin",
+              "board-2.bin", "firmware-6.bin"):
         (fw / f).write_bytes(b"fw")
     env = {**os.environ, "PATH": f"{bin_}:/usr/bin:/bin", "BAU_WIFI_ETC": str(tmp / "etc"),
            "BAU_WIFI_FW_DIR": str(fw), "BAU_WIFI_LOG": str(tmp / "log"), "BAU_WIFI_WAIT": "5"}
@@ -64,26 +66,26 @@ def test_it_stops_at_the_first_fix_that_brings_the_wifi_back(tmp_path):
     r = run(env)
     assert r.returncode == 0, r.stdout + r.stderr
     assert 'Fixed: the Wi-Fi works after "turn the card\'s power saving off"' in r.stdout
-    conf = (etc / "NetworkManager/conf.d/bau-mt7921-powersave.conf").read_text()
+    conf = (etc / "NetworkManager/conf.d/bau-wifi-powersave.conf").read_text()
     assert "wifi.powersave=2" in conf and "driver:mt7921e" in conf
-    assert not (etc / "modprobe.d/bau-mt7921.conf").exists()   # stopped before ASPM
+    assert not (etc / "modprobe.d/bau-wifi.conf").exists()   # stopped before ASPM
 
 
 def test_aspm_is_turned_off_only_when_the_driver_has_the_option(tmp_path):
     env, state, etc = fake_box(tmp_path / "a", works_after="never")
     r = run(env)
     assert r.returncode == 1 and "Still no Wi-Fi after every fix" in r.stdout
-    assert "disable_aspm=1" in (etc / "modprobe.d/bau-mt7921.conf").read_text()
+    assert "disable_aspm=1" in (etc / "modprobe.d/bau-wifi.conf").read_text()
     env, state, etc = fake_box(tmp_path / "b", works_after="never", aspm=False)
     r = run(env)
     assert "no disable_aspm option; skipped" in r.stdout
-    assert not (etc / "modprobe.d/bau-mt7921.conf").exists()
+    assert not (etc / "modprobe.d/bau-wifi.conf").exists()
 
 
 def test_it_says_so_when_the_card_is_not_there(tmp_path):
-    env, *_ = fake_box(tmp_path, works_after="never", card=False)
+    env, *_ = fake_box(tmp_path, works_after="never", card=None)
     r = run(env)
-    assert r.returncode == 1 and "No MediaTek MT7921 card" in r.stdout
+    assert r.returncode == 1 and "Neither known Wi-Fi card" in r.stdout
 
 
 def test_missing_firmware_is_installed_only_from_the_pinned_deb(tmp_path):
@@ -107,3 +109,21 @@ def test_the_kit_is_built_from_the_pinned_debian_file(name):
     wf = (ROOT / ".github" / "workflows" / name).read_text()
     assert "firmware-mediatek_20250410-2_all.deb" in wf and "sha256sum -c" in wf
     assert "bau-wifi-rescue.sh" in wf and "bau-wifi-kit" in wf
+
+
+# "Laptop as well" (the owner, 2026-11-03): the laptop's Killer 1435 (QCA6174, ath10k).
+def test_the_laptops_card_gets_its_own_driver_and_no_aspm_switch(tmp_path):
+    env, state, etc = fake_box(tmp_path, works_after="nm", aspm=False, card="laptop")
+    r = run(env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "Killer 1435 (Qualcomm QCA6174) (driver ath10k_pci)" in r.stdout
+    conf = (etc / "NetworkManager/conf.d/bau-wifi-powersave.conf").read_text()
+    assert "driver:ath10k_pci" in conf
+
+
+def test_the_laptops_firmware_is_pinned_too():
+    text = SCRIPT.read_text()
+    assert 'FW_SHA256="8387a45e9307052858185620ab30efebbf9660b072d6c8309673bf112e291f35"' in text
+    assert "firmware-atheros_20250410-2_all.deb" in text
+    wf = (ROOT / ".github" / "workflows" / "wifi-kit.yml").read_text()
+    assert "firmware-atheros_20250410-2_all.deb" in wf
