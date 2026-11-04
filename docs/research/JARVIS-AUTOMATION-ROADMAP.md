@@ -23,6 +23,17 @@ BAU stays the authority. The new tools are hands, never a second brain.
 
 ### Step 1: "read untrusted, lose write tools" (small, makes every later step safer)
 
+**Built 2026-11-04** (tests: `tests/test_untrusted_taint.py`, run in CI; not yet run on the
+desktop). Two places use it:
+
+- **Agents** (`src/bau/agents.py`): after a tool whose answer comes from outside the computer
+  (network, an outside provider, an MCP server, a browser), every later call above READ_ONLY
+  in that run is refused at the gateway's `untrusted_read` step, unless it carries the owner's
+  signed approval. HOLD-type safety tools still run.
+- **Jarvis** (`src/bau/assistant.py`): after `web_search`, `read_page` or `find_tools` in a
+  turn, his "act" tools (remember, plan a mission, queue a post...) wait. Asking again in a
+  new message is the owner's OK. Cards that wait for the owner's click were never affected.
+
 - **Change:** within one agent run, once a tool result marked untrusted (a web page, a
   screen, an MCP answer) has been read, every capability above READ_ONLY is refused for the
   rest of that run, unless the owner approves that call. This idea comes from LocalHarness.

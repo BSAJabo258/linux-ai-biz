@@ -89,7 +89,8 @@ These are the product's safety model, not style preferences:
   `BAU_IN_CONTAINER=1`; ports are published on 127.0.0.1). The one exception is the
   owner's cloud server (`install.sh --cloud`): SSH on 22, key login only, rate-limited.
 - **Untrusted data stays data.** Tool results go to models wrapped by `agents.untrusted()`;
-  Jarvis never reads `<untrusted_data>` blocks aloud.
+  Jarvis never reads `<untrusted_data>` blocks aloud. A run that has read outside content (web, MCP, browser) may only
+  read until the owner approves (`gateway` step `untrusted_read`, roadmap step 1, 2026-11-04).
 - **Adults only.** The business is one fictional adult (21+) virtual creator. Nothing may
   involve, depict or refer to minors (`virtual_creator.MINOR_REFERENCE` refuses it), no real
   person's likeness, AI disclosure on every post. Explicit content goes only to Fanvue;

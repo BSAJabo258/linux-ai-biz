@@ -12,6 +12,10 @@ allowed or denied - is written to the audit chain:
   6. blast radius; HIGH/CRITICAL need approval     (spec §54)
   7. budget has room                               (spec §102)
   8. execute, record cost, record evidence
+
+Plus one rule from the owner's automation roadmap (docs/research/JARVIS-AUTOMATION-ROADMAP.md,
+step 1, an idea from LocalHarness): a run that has read outside content (a web page, an MCP
+answer, a browser) is "tainted", and a tainted call may only read until the owner approves.
 """
 
 from __future__ import annotations
@@ -69,6 +73,7 @@ class CallRequest:
     approval: Approval | None = None
     job_id: str = ""
     mission_id: str = ""
+    tainted: bool = False                # this run has read outside content
 
 
 class Gateway:
@@ -116,6 +121,11 @@ class Gateway:
                 and not h.safe_on_hold:
             raise self._deny(req, "governor_hold", f"BAU is on HOLD ({held}); "
                              "only read-only actions run until a human releases it")
+        if req.tainted and req.approval is None and not h.safe_on_hold \
+                and self.table.levels.get(req.capability, h.level) != "READ_ONLY":
+            raise self._deny(req, "untrusted_read", "this run read outside content (a web "
+                             "page, a screen, a tool's answer), so it may only read until the "
+                             "owner approves this action")
         b = blast.score(req.blast) if req.blast else {"level": "LOW",
                                                        "requires_approval": False}
         try:
@@ -170,6 +180,12 @@ class Gateway:
             "ms": int((time.monotonic() - started) * 1000),
             "at": dt.datetime.now(dt.UTC).isoformat()})
         return result
+
+    def brings_outside_content(self, capability: str) -> bool:
+        """Its answer comes from outside this computer: a page, a server, a browser."""
+        h = self.handlers.get(capability)
+        return bool(h and (h.needs_network or h.provider)) \
+            or capability.startswith(("run.mcp__", "browser."))
 
     def catalog(self) -> list[dict[str, Any]]:
         return [{"capability": c, "level": self.table.levels.get(c, h.level),
