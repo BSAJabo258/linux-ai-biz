@@ -48,8 +48,10 @@ Cheapest first:
 Budget: at most 10 GitHub searches and 3 candidates per session unless the owner says
 more. Prefer projects that are:
 
-- under a licence that allows business use (MIT, Apache-2.0, BSD, MPL; never
-  "non-commercial");
+- under a licence that allows business use freely (MIT, Apache-2.0, BSD, MPL; never
+  "non-commercial", and never fair-code or source-available: Sustainable Use, FSL, BUSL,
+  Elastic, SSPL, Commons Clause, "modified Apache"; the owner's rule, 2026-11-04);
+- at an address you opened yourself (a 404 or a rename is reported, never guessed);
 - alive: pushed in the last 90 days, real releases, tests in their repo;
 - small enough for the laptop (CPU, under 4 GB RAM in use);
 - usable behind an adapter: a library, a command line or a local server on 127.0.0.1.

@@ -27,7 +27,8 @@ INSTALL = {"pip": re.compile(r"\bpip3? install\b|\buv (pip|add)\b|\bpoetry add\b
            "docker": re.compile(r"\bdocker(-| )compose\b|\bdocker run\b", re.I),
            "cargo": re.compile(r"\bcargo install\b", re.I),
            "go": re.compile(r"\bgo install\b", re.I)}
-NONCOMMERCIAL_TEXT = re.compile(r"non-?commercial|research (use )?only|not for commercial",
+NONCOMMERCIAL_TEXT = re.compile(r"non-?commercial|research (use )?only|not for commercial"
+                                r"|fair-?code|source-available|sustainable use licen[cs]e",
                                 re.I)
 
 
