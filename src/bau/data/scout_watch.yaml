@@ -6,7 +6,7 @@
 # priority: how much this category matters to the business right now, 1 (low) to 3 (high).
 # A starting point the owner changes here; it moves a project up or down the shortlist,
 # never past the licence and security gates.
-checked: "2026-10-13"
+checked: "2026-11-04"   # seeds added from the breakthrough sweep (docs/research/AI-BREAKTHROUGHS-LAB.md)
 searches: 2
 
 # What BAU already runs (the shortlist says "running in BAU", not "new").
@@ -19,7 +19,7 @@ categories:
     why: Multi-agent systems, agent harnesses, task delegation and persistent workers - the digital workforce.
     priority: 3
     queries: ["multi agent orchestration framework", "persistent ai agent skills", "agent task delegation"]
-    seeds: [NousResearch/hermes-agent, OpenHands/OpenHands]
+    seeds: [NousResearch/hermes-agent, OpenHands/OpenHands, microsoft/conductor, a2aproject/A2A]
   compression:
     title: Model compression and quantization
     why: GGUF, AWQ, GPTQ, low-bit inference and distillation make capable models fit the 8 GB laptop.
@@ -30,14 +30,16 @@ categories:
     title: Token and context reduction
     why: Prompt compression, context pruning, tool-output filtering and caching lower what every model call costs.
     priority: 3
-    queries: ["prompt compression llm", "llm context pruning tokens", "llm router cheap strong model"]
+    queries: ["prompt compression llm", "llm context pruning tokens", "llm router cheap strong model",
+              "stepwise routing small large model"]
     seeds: [microsoft/LLMLingua, lm-sys/RouteLLM]
   inference:
     title: Inference infrastructure
     why: Local model servers, inference engines and CPU optimisation get more work out of the hardware there is.
     priority: 2
-    queries: ["local llm inference server cpu", "llm inference engine"]
-    seeds: [ggml-org/llama.cpp, ollama/ollama, vllm-project/vllm]
+    queries: ["local llm inference server cpu", "llm inference engine", "speculative decoding draft model",
+              "kv cache compression"]
+    seeds: [ggml-org/llama.cpp, ollama/ollama, vllm-project/vllm, ngocbh/trimkv]
   memory:
     title: Memory and knowledge
     why: Persistent memory, document retrieval, knowledge graphs and session compression give Jarvis continuity.
@@ -49,7 +51,8 @@ categories:
     why: Browser automation, GUI control and screen understanding let Jarvis work in real applications (owner confirms anything consequential).
     priority: 3
     queries: ["browser automation ai agent", "computer use agent gui"]
-    seeds: [browser-use/browser-use, microsoft/playwright-mcp]
+    seeds: [browser-use/browser-use, microsoft/playwright-mcp, vercel-labs/agent-browser,
+            vercel-labs/agent-desktop, iFurySt/open-computer-use]
   self_improvement:
     title: Development and self-improvement
     why: Coding agents, automated tests, repository analysis and repair loops help Jarvis maintain software under supervision.
