@@ -149,6 +149,9 @@ META_TOOLS = ("tool_menu", "use_tool")
 # hold_everything only makes BAU safer, so it runs on HOLD.
 NETWORK_TOOLS = {"web_search", "read_page", "find_tools", "video_clips"}
 SAFE_ON_HOLD = {"hold_everything"}
+# What a web page, a search result or a project's README says can try to steer Jarvis. After
+# one of these in a turn, his "act" tools wait for the owner's next message (roadmap step 1).
+OUTSIDE_CONTENT = {"web_search", "read_page", "find_tools"}
 # Where a menu line ends: the first sentence ("e.g. the creator" is not a sentence end).
 SENTENCE_END = re.compile(r"(?<![.\s][a-z])\.\s+(?=[A-Z])")
 # Small models often announce a lookup ("Let me search...") and stop without doing it.
@@ -294,6 +297,7 @@ class Assistant:
         self.clients = clients or {}         # platform -> API client (tests inject fakes)
         self.messages: list[dict[str, Any]] = []
         self.pending: dict[str, Pending] = {}
+        self.tainted = False                  # this turn read outside content
         self.setup_started: dict[str, float] = {}     # step -> when its terminal opened
         self.last_model = ""                  # the model that gave the last answer
         self._continuity: str | None = None   # earlier conversation, read once per session
@@ -1070,11 +1074,17 @@ class Assistant:
             return {"status": CONFIRMATION_NOTE, "pending_id": pid,
                     "note": "Shown on the owner's screen. Nothing has happened yet."}, False
         node = TOOL_NODE.get(name, "chief")
+        if self.tainted and tool.kind == "act" and name not in SAFE_ON_HOLD | OUTSIDE_CONTENT:
+            self.audit.append("jarvis.refused", "jarvis", {"tool": name, "why": "untrusted_read"})
+            return {"error": "not run: I read outside content (a web page or search result) "
+                             "in this turn, so I only read now. Ask me again in a new message "
+                             "if you want this done."}, True
         self.activity.emit(node, "start", TOOL_WORDS.get(name, name.replace("_", " ")))
         from .gateway import CallRequest, GatewayDenied
         try:
             if name in self.caps:
-                out = self.gateway.invoke(CallRequest("jarvis", self.caps[name], args))
+                out = self.gateway.invoke(CallRequest("jarvis", self.caps[name], args,
+                                                      tainted=self.tainted))
             else:
                 out = tool.fn(**args)
         except GatewayDenied as e:
@@ -1088,6 +1098,7 @@ class Assistant:
             return {"error": f"{type(e).__name__}: {e}"[:400]}, True
         if name not in self.caps:         # the gateway already wrote its own row
             self.audit.append("jarvis.tool", "jarvis", {"tool": name, "kind": tool.kind})
+        self.tainted = self.tainted or name in OUTSIDE_CONTENT
         self.activity.emit(node, "done", TOOL_WORDS.get(name, name.replace("_", " ")) + ": done")
         return out, False
 
@@ -1268,6 +1279,7 @@ class Assistant:
         text = (text or "").strip()[:4000]
         if not text:
             return Reply("I didn't catch that.", mode="plain" if self.provider is None else "model")
+        self.tainted = False                  # the owner's new message: a fresh turn
         self._log("owner", text)
         if m := AUTOPILOT_CMD.match(text):
             return self._autopilot_cmd(m)
