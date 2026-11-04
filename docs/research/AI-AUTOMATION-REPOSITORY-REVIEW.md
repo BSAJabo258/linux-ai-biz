@@ -138,10 +138,22 @@ Corrections to the directive's assumptions:
   approval when a folder's hash changes.
 - **Decision: study** (a reference, not a second brain).
 
-### 7. NanoClaw: https://github.com/nanoclaw/nanoclaw
+### 7. NanoClaw: https://github.com/nanocoai/nanoclaw
 
-- **This address returns 404.** Nothing was read and no other repository was substituted.
-- **Decision: none until a working address is given.**
+The first address given (github.com/nanoclaw/nanoclaw) was a 404. The project lives under
+`nanocoai`; that page and its licence opened on 2026-11-04.
+
+- **Licence:** MIT.
+- **What it is:** "A lightweight alternative to OpenClaw that runs in containers for
+  security", connecting chat apps (WhatsApp, Telegram, Slack, Discord, Gmail...) to agents.
+- **Needs:** Node.js 22+ and pnpm on the host, and Docker. Its agent containers run the
+  Claude Agent SDK.
+- **Idea worth taking:** "agents never hold raw API keys. Outbound requests route through a
+  credential gateway that injects credentials at request time and enforces per-agent
+  policies and rate limits." BAU keeps keys away from agents already. This is a stronger
+  version of the same rule.
+- **Note:** it sends "anonymous setup diagnostics" unless `NANOCLAW_NO_DIAGNOSTICS=1` is set.
+- **Decision: study** (the credential gateway pattern).
 
 ### 8. ZeroClaw: https://github.com/zeroclaw-labs/zeroclaw
 
@@ -154,18 +166,39 @@ Corrections to the directive's assumptions:
 - **Activity:** 33.1k stars.
 - **Decision: study.**
 
+## Also checked (the owner's second list, 2026-11-04)
+
+The owner's rule (2026-11-04): **only the best free open source.** A licence must let the
+business use it freely (MIT, Apache-2.0, BSD and the like). "Source-available" or
+"fair-code" licences that limit business use are out, whatever the project calls itself.
+
+| Repository | Licence (from its LICENSE file) | Decision and why |
+|---|---|---|
+| [paperclipai/paperclip](https://github.com/paperclipai/paperclip) | MIT | study: "orchestration for teams of AI agents to run a business". It would duplicate Jarvis's missions and agent roles (Node.js server + Postgres) |
+| [bytedance/deer-flow](https://github.com/bytedance/deer-flow) | MIT | skip: a whole "super agent harness" (Python 3.12 + Node 22). Its own security notice says its gateway admin "is equivalent to code execution" |
+| [langchain-ai/langgraph](https://github.com/langchain-ai/langgraph) | MIT | skip: an orchestration framework; BAU's agent loop already does this job |
+| [letta-ai/letta](https://github.com/letta-ai/letta) | Apache-2.0 | skip: this repository is retired; its code moved to `letta-ai/letta-code`. BAU has its own memory |
+| [OpenHands/OpenHands](https://github.com/OpenHands/OpenHands) | MIT | study later, for the coding layer: its own warning says its default mode gives the agent "full access to your filesystem"; Docker per conversation is optional |
+| [n8n-io/n8n](https://github.com/n8n-io/n8n) | **Sustainable Use License** ("only for your own internal business purposes"), plus an enterprise licence | **out: not free open source** |
+| [langgenius/dify](https://github.com/langgenius/dify) | **modified Apache 2.0** with extra conditions (no multi-tenant use without permission, keep its logo, a commercial licence in some cases) | **out: not free open source** |
+
+Cua is kept only for its MIT parts; its FSL and AGPL parts are out under the same rule.
+
 ## Summary
 
 | Repository | Licence | Decision |
 |---|---|---|
 | Agent Desktop | Apache-2.0 | **integrate** (MCP adapter) |
 | Browser Use | MIT | **adapt** (actions as capabilities; tested against Playwright MCP) |
-| Cua | MIT + FSL + AGPL parts | study |
 | LocalHarness | MIT | study (take the untrusted-read rule) |
 | Hermes Agent | MIT | study (take the propose-a-skill loop; people approve) |
+| NanoClaw | MIT | study (the credential gateway) |
 | Moltis | MIT | study (checkpoints, skill provenance) |
 | ZeroClaw | MIT / Apache-2.0 | study (tool receipts) |
-| NanoClaw | - | address is 404 |
+| Cua (MIT parts only) | MIT | later |
+| Paperclip, OpenHands | MIT | study later |
+| DeerFlow, LangGraph, Letta | MIT / Apache-2.0 | skip (duplicate or retired) |
+| n8n, Dify | not free open source | out |
 
 None of these replace Jarvis's loop, memory, router or gateway. The plan is in
 [JARVIS-AUTOMATION-ROADMAP.md](JARVIS-AUTOMATION-ROADMAP.md).

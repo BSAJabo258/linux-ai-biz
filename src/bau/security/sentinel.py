@@ -26,10 +26,18 @@ TERMINAL_BAD = {"REJECTED", "REVOKED"}
 COMMERCIAL_OK = {"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MPL-2.0",
                  "Zlib", "Unlicense", "0BSD", "CC0-1.0", "PSF-2.0"}
 COPYLEFT = {"GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0"}
+# The owner's rule (2026-11-04): only free open source. "Fair-code" and "source-available"
+# licences that limit business use are blocked like non-commercial ones (n8n's Sustainable
+# Use License, the Functional Source License, Dify's modified Apache 2.0; each read on its
+# project's LICENSE file 2026-11-04).
 NONCOMMERCIAL = {"PolyForm-Noncommercial-1.0.0", "CC-BY-NC-4.0", "CC-BY-NC-SA-4.0",
-                 "BUSL-1.1", "SSPL-1.0", "Elastic-2.0", "Commons-Clause"}
+                 "BUSL-1.1", "SSPL-1.0", "Elastic-2.0", "Commons-Clause",
+                 "Sustainable-Use-1.0", "FSL-1.1", "Modified-Apache-2.0"}
 
-LICENSE_HINTS = [
+LICENSE_HINTS = [   # first match per file wins: the restricted ones come first
+    ("Sustainable-Use-1.0", r"Sustainable Use License"),
+    ("FSL-1.1", r"Functional Source License"),
+    ("Modified-Apache-2.0", r"modified version of the Apache License"),
     ("PolyForm-Noncommercial-1.0.0", r"PolyForm Noncommercial"),
     ("BUSL-1.1", r"Business Source License"),
     ("SSPL-1.0", r"Server Side Public License"),

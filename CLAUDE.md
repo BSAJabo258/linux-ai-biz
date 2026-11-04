@@ -137,6 +137,12 @@ there (prove it) is already "Check yourself" above.
 
 - Before building something new, look for what others already built: `bau toolbox ask "..."`
   (and `bau scout find` for more). Prefer a vetted tool behind an adapter to writing it again.
+- **Only free open source** (the owner's rule, 2026-11-04): a project joins BAU only under a
+  licence that lets the business use it freely (MIT, Apache-2.0, BSD, ISC, MPL and the like,
+  read in its LICENSE file). Fair-code and source-available licences are out, whatever the
+  project calls itself (Sustainable Use, FSL, BUSL, Elastic, SSPL, Commons Clause, "modified
+  Apache"); Scout blocks them (`security/sentinel.py`). Every link written into a research
+  note is opened first; a dead address is reported, never replaced with a guess.
 - Match the surrounding code: stdlib first, small functions, comments only where the
   reason is not obvious. New policy rules go in `src/bau/data/policies/*.yaml` and must
   reference existing `reg_id`s (the loader refuses dangling references).
