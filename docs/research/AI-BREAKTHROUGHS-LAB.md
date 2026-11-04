@@ -4,127 +4,103 @@ The owner's ask (2026-11-04): not more AI apps, but the engineering underneath. 
 making a small model do a big model's work, spending less on tokens, getting more out of
 the RTX 3060, and connecting agents better.
 
-Every item below was looked up on 2026-11-04 on its own page (links given). Each one is
-marked as one of:
+## How an entry gets in (the owner's reference standard, 2026-11-04)
 
-- **have**: already in BAU;
-- **test next**: worth a sandbox test now;
-- **watch**: real, but not needed yet;
-- **not for this hardware**: built for data-centre GPUs or another engine;
-- **not confirmed**: no official page found under that name.
+Every entry has these fields. An entry missing any of them is not ranked.
 
-Published numbers are the authors' own claims, measured on their setups, not on the
-desktop. Only a test on the desktop counts (`bau models lab`).
+- **Exact name:** as its source writes it. No shortened or guessed names.
+- **Primary reference:** the repository, the official documentation or the original paper,
+  opened on the date shown. A page that could not be opened is written as such.
+- **Evidence status:** one of these four.
+  - *documented feature* (the project's own docs say it does this);
+  - *experimental research* (a paper or blog reports it);
+  - *in BAU* (BAU's own code does it);
+  - *unconfirmed* (no primary source found or opened).
+- **What the source supports:** quoted, with the setting it was measured in. A number is
+  the authors' claim on their hardware, never a promise for the desktop.
+- **Licence:** read in the LICENSE file (only free open source, `CLAUDE.md`).
+- **Fit:** whether it works on the desktop's hardware and engine, and how it would join BAU.
+- **Test:** how BAU would reproduce it before adopting it.
 
-The weekly open-source watch (`bau scout watch`, `src/bau/data/scout_watch.yaml`) now
-tracks these projects and searches for new ones in the same areas. That keeps the lab
-updated by itself.
+A repository existing does not prove its benchmark, that it runs here, or that it is ready
+for real use. Those are separate checks, done in the sandbox and with `bau models lab`.
 
-## The desktop this is judged against
+The weekly open-source watch (`bau scout watch`, `src/bau/data/scout_watch.yaml`) tracks
+these projects and searches the same areas for new ones.
+
+## The desktop everything is judged against
 
 - **Hardware:** RTX 3060 with 12 GB, and 16 GB of system memory (`docs/DESKTOP.md`).
 - **Engine:** llama.cpp (build b11747), not vLLM.
 - **Local model:** the 9B is the boss.
 
-Techniques built for vLLM or for newer cards (FP8 needs Hopper or later for native
-conversion, per vLLM's own docs) do not carry over automatically.
+## Reference register (all opened 2026-11-04)
 
-## Ranked
+| Exact name | Primary reference | Status | What the source supports (quoted) | Licence |
+|---|---|---|---|---|
+| Speculative decoding in llama.cpp | [llama.cpp server README](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md) | in BAU (`sudo bau models tune --draft 6`) | lists "Speculative decoding" and draft-model options | MIT |
+| Quantized KV cache in llama.cpp | same README | in BAU (`sudo bau models tune --kv q8_0`) | `--cache-type-k` "allowed values: f32, f16, bf16, q8_0, ..." | MIT |
+| P-EAGLE: Faster LLM inference with Parallel Speculative Decoding in vLLM | [vLLM blog, "Amazon and NVIDIA Team", 2026-03-13](https://vllm.ai/blog/p-eagle) | experimental research | "up to 1.69x speedup over vanilla EAGLE-3 ... on NVIDIA B200"; "1.05×–1.69× speedup ... on GPT-OSS 20B"; "All experiments are conducted on one NVIDIA B200 (Blackwell) GPU" | n/a (vLLM feature) |
+| vLLM Speculators | [vllm-project/speculators](https://github.com/vllm-project/speculators) | documented feature | "A unified library for building, evaluating, and storing speculative decoding algorithms for LLM inference in vLLM" | Apache-2.0 |
+| vLLM quantized (FP8) KV cache | [vLLM docs](https://docs.vllm.ai/features/quantization/quantized_kvcache.html) | unconfirmed: the page answered "too many requests" twice | not read | - |
+| TRIM: Hybrid Inference via Targeted Stepwise Routing in Multi-Step Reasoning Tasks (Kapoor, Gupta, Chen, Beniwal, Huang, Kumar) | [ICLR 2026 poster](https://www.iclr.cc/virtual/2026/poster/10009916), [arXiv 2601.10245](https://arxiv.org/abs/2601.10245) | experimental research | "match the strong, expensive model's performance using 80% fewer expensive model tokens" (MATH-500); "On harder benchmarks such as AIME, TRIM achieves up to 6x higher cost efficiency" | paper CC BY 4.0 |
+| Cache What Lasts: Token Retention for Memory-Bounded KV Cache in LLMs (TRIM-KV; Bui, Sharma, Lamba, Mishra, Ying) | [arXiv 2512.03324v2](https://arxiv.org/abs/2512.03324v2); code [ngocbh/trimkv](https://github.com/ngocbh/trimkv) | experimental research; the ICLR 2026 listing is unconfirmed (the arXiv page names no venue) | "learns each token's intrinsic importance at creation time via a lightweight retention gate" | code Apache-2.0 |
+| LLMLingua | [microsoft/LLMLingua](https://github.com/microsoft/LLMLingua) | documented feature | "compress the prompt and KV-Cache, which achieves up to 20x compression with minimal performance loss"; a quantized example needs "<8GB GPU memory" | MIT |
+| Model Context Protocol | [modelcontextprotocol/modelcontextprotocol](https://github.com/modelcontextprotocol/modelcontextprotocol), [reference servers](https://github.com/modelcontextprotocol/servers) | in BAU (`src/bau/mcp.py`) | "Specification and documentation for the Model Context Protocol"; "a collection of reference implementations" | MIT; servers Apache-2.0 (new) / MIT (existing) |
+| Agent2Agent (A2A) | [a2aproject/A2A](https://github.com/a2aproject/A2A), [spec site](https://a2a-protocol.org/) | documented feature | "an open source project under the Linux Foundation, contributed by Google" | Apache-2.0 |
+| Conductor (Microsoft) | [microsoft/conductor](https://github.com/microsoft/conductor) | documented feature | "No LLM in the orchestration loop, no tokens spent deciding what runs next"; its dashboard shows "model, tokens, cost"; local endpoints "Ollama, vLLM, LM Studio". No `budget_usd` setting and no billing caveat appear on its README | MIT |
+| Hybrid Computer Use: A Unified Programmatic, Semantic, and Visual Interface for General Agents (HCU; Microsoft Research) | [microsoft/Hybrid-Computer-Use](https://github.com/microsoft/Hybrid-Computer-Use), [arXiv 2610.41432](https://arxiv.org/abs/2610.41432) | documented feature (new: about 10 stars, paper dated 2026-10-30) | "an open-source Model Context Protocol (MCP) server, `computer-use`"; "batch up to 64 actions in one call"; its AX tools "report their effects as AX diffs" | MIT |
+| agent-browser (Vercel Labs) | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) | documented feature | "`snapshot` returns the page as compact text with a ref such as `@e1` for each element"; `agent-browser mcp` | Apache-2.0 |
+| Agent Desktop (Vercel Labs) | [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop) | documented feature | desktop apps "through the OS accessibility tree"; `agent-desktop mcp` (see the repository review) | Apache-2.0 |
+| open-computer-use | [iFurySt/open-computer-use](https://github.com/iFurySt/open-computer-use) | documented feature | "an open-source `Computer Use` service wrapped as `MCP`" on "macOS, Linux, and Windows"; its Linux needs are not stated | MIT |
 
-### Have already
+## Ranked for the desktop
 
-| Technique | Where in BAU | Note |
-|---|---|---|
-| Speculative decoding: a draft guesses ahead, the model checks | `sudo bau models tune --draft 6` (the 9B's built-in MTP draft head), `docs/GPU.md` section 5 | llama.cpp's own server README lists "Speculative decoding" and draft-model options |
-| Smaller KV cache (the model's working memory at 8 bits, about half the memory) | `sudo bau models tune --kv q8_0` | llama.cpp: `--cache-type-k` / `--cache-type-v` accept `q8_0`. This is the same saving vLLM's FP8 KV cache gives, on an engine and card BAU has |
-| Tools through one standard | the MCP client, `src/bau/mcp.py` | each tool gets its own permission and no keys |
-| Small model first, strong model when needed | online hosted models first with the local model as backup (`pick_model`); workspace stages marked `small` or `strong`; the supervisor hands a stuck job to the strong model | what is missing is a check on each step, see TRIM below |
-| Steps that need no model at all | the autopilot's scans, the Fanvue feed and autopost, the week of posts | nothing to add |
+### Have already: use them
+
+- **Speculative decoding and the 8-bit KV cache.** Both are in llama.cpp and switched on with
+  `sudo bau models tune` (`docs/GPU.md` section 5). Measure each with `bau models lab`.
+- **MCP**, **small model first with a strong model when needed** (`pick_model`, workspace
+  brains, supervisor takeover), and **steps that need no model** (autopilot, Fanvue feed
+  and autopost).
 
 ### Test next
 
-1. **[Agent Browser](https://github.com/vercel-labs/agent-browser)** (vercel-labs,
-   Apache-2.0).
-   - A browser driver: `snapshot` returns the page "as compact text with a ref such as `@e1`
-     for each element", and `agent-browser mcp` serves it over MCP.
-   - It comes from the same team and uses the same ref design as Agent Desktop. That means
-     far fewer tokens than screenshots.
-   - It needs Node, Rust, and Chrome for Testing.
-   - **It joins the browser lane test** (roadmap step 3) next to Browser Use and Playwright
-     MCP. It may beat both, because it has no agent loop of its own.
-2. **TRIM, step-by-step routing**
-   ([ICLR 2026 poster](https://www.iclr.cc/virtual/2026/poster/10009916),
-   [paper](https://arxiv.org/pdf/2601.10245)).
-   - A cheap model does the reasoning. A step checker (a "process reward model") picks out
-     the "critical steps that cause solution failure", and only those go to the strong
+1. **Desktop and browser lanes** (roadmap steps 2 and 3).
+   - **Desktop:** compare Agent Desktop, Hybrid Computer Use and open-computer-use.
+   - **Browser:** compare agent-browser, Browser Use and Playwright MCP.
+   - **Measure each:** tokens per task, time, whether it works on the desktop's XFCE, and how
+     each action can be gated.
+   - HCU's 64-action batches and AX diffs are aimed at fewer calls and fewer tokens. That is a
+     claim to measure.
+2. **TRIM-style step routing**, built as BAU code, not installed.
+   - The local 9B drafts each step, a check marks the risky ones, and only those go to the paid
      model.
-   - The authors report matching top models with "up to 80% fewer expensive tokens" and up
-     to 6x cost efficiency on AIME. Those are their benchmarks, not ours.
-   - **For BAU, this is a pattern to build, not a package to install.** The local 9B drafts
-     each step, a check marks the risky ones, and only those go to the paid model. Measure
-     with `bau usage`.
-3. **[LLMLingua](https://github.com/microsoft/LLMLingua)** (Microsoft, MIT,
-   `pip install llmlingua`).
-   - It compresses long prompts before they are sent. The authors claim "up to 20x
-     compression with minimal performance loss".
-   - It runs a small model of its own; one quantized example needs "<8GB GPU memory".
-   - **Test:** BAU's own long prompts (briefing facts, research pages). Measure the tokens
-     saved against the answers kept right.
+   - Measure paid tokens with `bau usage` against answers kept right.
+3. **LLMLingua** on BAU's own long prompts (briefing facts, research pages). Measure tokens saved
+   against answers kept right.
 
 ### Watch
 
-- **[A2A](https://github.com/a2aproject/A2A)**, agent-to-agent protocol (Apache-2.0, Linux
-  Foundation, "contributed by Google"). It lets separately built agents talk to each other.
-  It matters when BAU runs across several computers or businesses; not needed for one
-  desktop yet.
-- **[Microsoft Conductor](https://github.com/microsoft/conductor)** (MIT). YAML multi-agent
-  workflows with "no tokens spent deciding what runs next", and MCP steps with "zero prompt
-  tokens".
-  - Its dashboard shows each step's "model, tokens, cost".
-  - It can use local endpoints ("Ollama, vLLM, LM Studio"), routed through its Copilot
-    provider setting.
-  - BAU's own pipelines already run without model calls, and `bau usage` counts tokens and
-    cost, so the idea is kept and a second orchestrator is not added. Revisit if BAU needs
-    YAML workflows that people other than the owner write.
-- **[Open Computer Use](https://github.com/iFurySt/open-computer-use)** (iFurySt, MIT).
-  "An open-source Computer Use service wrapped as MCP" for "macOS, Linux, and Windows"; its
-  Linux needs are not stated. A second candidate for the desktop lane next to Agent Desktop.
-- **[TRIM-KV](https://arxiv.org/abs/2512.03324v2)** (ICLR 2026, code at
-  [ngocbh/trimkv](https://github.com/ngocbh/trimkv), Apache-2.0). It learns which parts of
-  the model's working memory to keep. It needs small gates trained for each model and is
-  not in llama.cpp, so it is research for now.
+- **A2A:** for when BAU runs across several computers or businesses.
+- **Conductor:** BAU's pipelines already run without model calls, and `bau usage` counts tokens
+  and cost.
+- **TRIM-KV:** needs gates trained for each model, and is not in llama.cpp.
+- **vLLM Speculators:** vLLM only.
 
-### Not for this hardware
+### Not for this desktop
 
-- **P-EAGLE** ([vLLM blog](https://vllm.ai/blog/p-eagle)).
-  - The "up to 1.69x over EAGLE-3" figure is on NVIDIA B200 data-centre GPUs, with
-    specific models (GPT-OSS 20B; Qwen3-Coder 30B in FP8).
-  - AWS's own SageMaker table shows about 1.12x to 1.22x at low concurrency.
-  - It runs in vLLM, not llama.cpp. BAU's MTP draft (above) is the version this desktop
-    can use.
-- **vLLM FP8 KV cache**
-  ([vLLM docs](https://docs.vllm.ai/features/quantization/quantized_kvcache.html)).
-  - It runs in vLLM, and native FP8 conversion is for newer GPUs.
-  - The same memory saving on this desktop is llama.cpp's `q8_0` KV cache, which BAU has.
+- **P-EAGLE:** measured on one NVIDIA B200 in vLLM. BAU's MTP draft in llama.cpp is the version
+  this desktop can use.
+- **vLLM FP8 KV cache:** BAU uses llama.cpp, whose `q8_0` KV cache gives the memory saving here.
+  Its hardware support could not be read (see the register).
 
-### Not confirmed
+## Corrections made on 2026-11-04
 
-- **"Hybrid Computer Use", "batches up to 64 actions per call":** no project under that name
-  was found. The closest match is Clawdcursor (accessibility tree plus screenshots, with a
-  batch tool). No maximum batch size was found, and its licence is not read. It stays off
-  the list until an official page is given.
-
-## The order
-
-1. The browser lane test (roadmap step 3) adds **Agent Browser** to the comparison.
-2. **TRIM-style step routing** becomes its own roadmap item after the browser lane. It needs
-   BAU's usage meter, the supervisor and a step checker: all BAU code, no new package.
-3. **LLMLingua** gets a sandbox test on BAU's own prompts.
-4. Everything under "watch" stays in the weekly watch until a need appears.
-
-## The rules that come with every item
-
-- Only free open source (`CLAUDE.md`).
-- Every link opened before it is written here.
-- Claims kept apart from tests.
-- Nothing installed without a sandbox test and the owner's yes.
+- **Hybrid Computer Use:** first listed as unconfirmed. Its repository and paper were then found
+  and opened.
+- **TRIM:** the 80% figure is "80% fewer" on MATH-500, not "up to 80%".
+- **TRIM-KV:** its venue is unconfirmed.
+- **Two claims from an outside research note are not on the cited pages:** a `budget_usd` setting
+  and a billing caveat for Conductor.
+- **The vLLM FP8 hardware note is removed:** it came from a search result, not from the page.

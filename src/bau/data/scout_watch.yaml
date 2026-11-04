@@ -39,7 +39,8 @@ categories:
     priority: 2
     queries: ["local llm inference server cpu", "llm inference engine", "speculative decoding draft model",
               "kv cache compression"]
-    seeds: [ggml-org/llama.cpp, ollama/ollama, vllm-project/vllm, ngocbh/trimkv]
+    seeds: [ggml-org/llama.cpp, ollama/ollama, vllm-project/vllm, ngocbh/trimkv,
+            vllm-project/speculators]
   memory:
     title: Memory and knowledge
     why: Persistent memory, document retrieval, knowledge graphs and session compression give Jarvis continuity.
@@ -52,7 +53,8 @@ categories:
     priority: 3
     queries: ["browser automation ai agent", "computer use agent gui"]
     seeds: [browser-use/browser-use, microsoft/playwright-mcp, vercel-labs/agent-browser,
-            vercel-labs/agent-desktop, iFurySt/open-computer-use]
+            vercel-labs/agent-desktop, iFurySt/open-computer-use,
+            microsoft/Hybrid-Computer-Use]
   self_improvement:
     title: Development and self-improvement
     why: Coding agents, automated tests, repository analysis and repair loops help Jarvis maintain software under supervision.
