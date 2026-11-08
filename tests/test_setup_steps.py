@@ -28,7 +28,8 @@ class Box:
             prof["explicit_boundaries"] = ["no real people"]
         (self.home / "creators" / "aria.yaml").write_text(yaml.safe_dump(prof))
         self.facts = {"nvidia": nvidia, "driver": driver, "pictures": pictures,
-                      "search": search, "update": update, "autopilot": autopilot}
+                      "search": search, "update": update, "autopilot": autopilot,
+                      "room": False}
         self.opened = []
 
     def probe(self, what):

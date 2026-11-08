@@ -34,12 +34,16 @@ d-i passwd/user-default-groups string audio cdrom video plugdev netdev sudo
 d-i clock-setup/utc boolean true
 d-i clock-setup/ntp boolean true
 
-### Partitioning: full-disk encryption (LUKS) + LVM, separate /home.
+### Partitioning: full-disk encryption (LUKS) + LVM, all files in one partition.
+### Not a separate /home: BAU's big files live under / and filled it while /home stayed
+### empty (the owner's desktop, 2026-11-08).
+### Debian's recipes (https://www.debian.org/releases/trixie/example-preseed.txt, read 2026-11-08):
+### "atomic: all files in one partition", "home: separate /home partition".
 ### The disk is NOT chosen here and NO confirmation is preseeded: the installer
 ### shows the target disk and you must confirm the erase yourself.
 d-i partman-auto/method string crypto
 d-i partman-auto-lvm/guided_size string max
-d-i partman-auto/choose_recipe select home
+d-i partman-auto/choose_recipe select atomic
 d-i partman-auto-lvm/new_vg_name string bau-vg
 
 ### Apt

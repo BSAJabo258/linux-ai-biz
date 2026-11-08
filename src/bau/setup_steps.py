@@ -26,6 +26,7 @@ from pathlib import Path
 from .home import shipped_data
 
 Probe = Callable[[str], object]
+ROOM_FULL = 0.85        # "/" this full, with the big folders still on it: offer to make room
 Terminal = Callable[[str, str], bool]
 
 
@@ -52,6 +53,11 @@ STEPS = (
     Step("pictures", "Set up pictures on this computer",
          "ComfyUI and the picture model (about 10 GB download, once). A terminal opens; type "
          "your password."),
+    Step("room", "Make room for Jarvis",
+         "The system part of the disk is nearly full, while /home has room to spare. This "
+         "moves the big folders (local models, the picture maker, the CUDA engine) into "
+         "/home and links them back, so everything keeps working. Your keys and data stay "
+         "where they are. A terminal opens; type your password."),
     Step("search", "Set up private web search",
          "Jarvis's own search on this computer (SearXNG). A terminal opens; type your "
          "password."),
@@ -107,6 +113,18 @@ def _probe(what: str) -> object:
     if what == "autopilot":
         return subprocess.run(["systemctl", "is-enabled", "--quiet", "bau-autopilot.timer"],
                               capture_output=True, check=False).returncode == 0
+    if what == "room":   # True when "/" is nearly full and /home is a separate, bigger part
+        import os
+        try:
+            root, home = os.stat("/"), os.stat("/home")
+        except OSError:
+            return False
+        if root.st_dev == home.st_dev:
+            return False
+        used = shutil.disk_usage("/")
+        big = [d for d in ("/var/lib/bau/models", "/usr/local/comfyui", "/opt/llama.cpp-cuda")
+               if os.path.isdir(d) and not os.path.ismount(d)]
+        return used.used / used.total > ROOM_FULL and bool(big)
     if what == "update":
         from . import update
         return update.mode() or "off"
@@ -143,6 +161,8 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         return None if not probe("nvidia") else bool(probe("driver"))
     if step == "pictures":
         return None if not (probe("nvidia") and probe("driver")) else bool(probe("pictures"))
+    if step == "room":                    # shown only while "/" is nearly full
+        return None if not probe("room") else False
     if step == "search":
         return bool(probe("search"))
     if step == "updates":
@@ -207,6 +227,8 @@ def _command(step: str, home: Path) -> str:
         return "sudo bau-gpu-setup"
     if step == "pictures":
         return f"sudo bash {q(str(script('bau-pictures-setup.sh')))}"
+    if step == "room":
+        return f"sudo bash {q(str(script('bau-make-room.sh')))}"
     if step == "search":
         return f"sudo bash {q(str(script('bau-search-setup.sh')))}"
     if step == "updates":

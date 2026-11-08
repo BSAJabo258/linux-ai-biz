@@ -274,7 +274,8 @@ def test_do_all_puts_everything_waiting_on_screen_without_the_model(tmp_path, mo
     from bau import setup_steps
     monkeypatch.setattr(setup_steps, "_probe", {"nvidia": True, "driver": False,
                                                 "pictures": False, "search": False,
-                                                "update": "off", "autopilot": True}.__getitem__)
+                                                "update": "off", "autopilot": True,
+                                                "room": False}.__getitem__)
     for said in ("lets do all", "Let's do it all", "do everything", "ok continue",
                  "what's waiting on me?"):
         a = lean(tmp_path, [])                       # the model is never asked

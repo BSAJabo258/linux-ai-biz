@@ -65,7 +65,7 @@ def test_unapproved_keys_pop_up_a_step_to_use_them(home, monkeypatch):
     reg.data["model"]["nemotron-3-super-nim"]["status"] = "PROPOSED"
     reg.save()
     facts = {"nvidia": False, "driver": False, "pictures": False, "search": True,
-             "update": "auto", "autopilot": True}
+             "update": "auto", "autopilot": True, "room": False}
     # NVIDIA's free trial is not for business: the registry refuses it, so no card offers it
     assert [s.id for s in S.waiting(home, probe=facts.__getitem__)] == []
     reg.data["model"]["nemotron-3-super-nim"]["commercial_use"] = True   # a paid plan

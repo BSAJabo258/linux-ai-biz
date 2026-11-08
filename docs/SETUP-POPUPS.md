@@ -13,6 +13,7 @@ to skip it for this time. A step that is done does not come back.
 | Bring in the current rules | Swaps in the rules that came with your newest BAU (creator, Michigan, Fanvue). The old copy is kept beside it as `regulations.before-DATE` |
 | Install NVIDIA's driver | Opens a terminal running `sudo bau-gpu-setup`. Type your password there, then restart when it says |
 | Set up pictures on this computer | Opens a terminal running the pictures setup (about 10 GB download, once). It shows up only after NVIDIA's driver works |
+| Make room for Jarvis | Shown only while the system part of the disk is over 85% full. Opens a terminal running the make-room script: the big folders move into `/home` and are linked back (docs/MAKE-ROOM.md) |
 | Set up private web search | Opens a terminal running the search setup |
 | Turn on nightly updates | Opens a terminal running `sudo bau update auto` |
 | Let Jarvis work on his own | Opens a terminal that switches on the autopilot timer (docs/AUTOPILOT.md) |
