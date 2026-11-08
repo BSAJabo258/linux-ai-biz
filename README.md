@@ -30,8 +30,8 @@ someone, publishes generated media, sells a subscription, monetizes an asset or 
 2. decides **PASS / REVIEW / BLOCK**;
 3. records the evidence in a **tamper-evident audit chain**.
 
-It runs from **one USB stick**: boot an 8 GB laptop, keep your work in encrypted storage on
-the stick, and install BAU to the laptop's disk when you are ready. A small local model runs
+It runs from **one USB stick**: boot an 8 GB desktop, keep your work in encrypted storage on
+the stick, and install BAU to the desktop's disk when you are ready. A small local model runs
 Jarvis for free; Claude is on call when a job needs more.
 
 <picture>
@@ -70,7 +70,7 @@ only **staged**: it runs when you press **Confirm**.
   melt into each other through the core about every 40 seconds. Add your
   own pictures with `bau look add`. On a slow or software-only graphics card the motion turns
   itself off and a still picture stays, so Jarvis never stutters.
-- **Lean on small models.** On a local model (Qwen on the laptop) Jarvis offers only its core
+- **Lean on small models.** On a local model (Qwen on the desktop) Jarvis offers only its core
   tools and keeps answers short, so a small model stays quick in 8 GB of memory. Claude is the
   specialist on call (`bau team`).
 - **An honest meter.** Every model call is counted, free ones too, in tokens and dollars
@@ -124,13 +124,13 @@ orders.
 
 | | Where | Guide |
 |---|---|---|
-| 🔑 | **One USB stick** (recommended): boot an 8 GB laptop, encrypted storage on the stick, a local model, and Debian's installer to put BAU on the disk | [docs/LIVE-USB.md](docs/LIVE-USB.md) |
-| 💻 | **Encrypted laptop**: hardened Debian + BAU, installed from the stick (or the older two-stick way) | [docs/INSTALL.md](docs/INSTALL.md) |
+| 🔑 | **One USB stick** (recommended): boot an 8 GB desktop, encrypted storage on the stick, a local model, and Debian's installer to put BAU on the disk | [docs/LIVE-USB.md](docs/LIVE-USB.md) |
+| 💻 | **Encrypted desktop**: hardened Debian + BAU, installed from the stick (or the older two-stick way) | [docs/INSTALL.md](docs/INSTALL.md) |
 | ☁️ | **Your own cloud server** (DigitalOcean): Jarvis always on, reached through a private SSH tunnel | [docs/CLOUD-VM.md](docs/CLOUD-VM.md) |
 | 🧪 | **Free test drive** in GitHub Codespaces with a free hosted model, or Docker on your computer | [docs/CLOUD-TEST.md](docs/CLOUD-TEST.md) |
 
 > [!TIP]
-> Not sure your laptop is ready? Run the read-only **laptop check** first: on Windows,
+> Not sure your desktop is ready? Run the read-only **laptop check** first: on Windows,
 > double-click `installer/BAU-Laptop-Check.cmd`. It ends with READY, READY AFTER THESE STEPS,
 > or NOT READY, plus a summary that is safe to share. See [docs/LAPTOP-CHECK.md](docs/LAPTOP-CHECK.md).
 
@@ -142,7 +142,7 @@ orders.
 ## One USB stick
 
 One stick does everything: it boots *My Jarvis*, keeps your work in encrypted storage, and
-carries Debian's installer to put BAU on the laptop's disk.
+carries Debian's installer to put BAU on the desktop's disk.
 
 | Step | What you do | Guide |
 |---|---|---|
@@ -151,10 +151,10 @@ carries Debian's installer to put BAU on the laptop's disk.
 | 3. Lock your keys | On your Windows computer, double-click `installer/BAU-Keys-Export.cmd`: your API keys go into one locked file, `BAU-KEYS.enc`. Only key *names* are ever shown | [docs/KEYS.md](docs/KEYS.md) |
 | [docs/WINDOWS-TO-DEBIAN.md](docs/WINDOWS-TO-DEBIAN.md) | Every Windows script and what to use on Debian; the sound and Bluetooth fix |
 | 4. Fill the BAU Pack | Double-click `installer/BAU-Pack-Make.cmd`: the local models (each pinned by its SHA-256) and `BAU-KEYS.enc` go on a stick you pick | [docs/PACK.md](docs/PACK.md) |
-| 5. Set up | On the laptop, `sudo bau pack install`: checks every file again while copying and asks yes or no before each change (start the model, benchmark it, name the boss, import the keys) | [docs/PACK.md](docs/PACK.md) |
+| 5. Set up | On the desktop, `sudo bau pack install`: checks every file again while copying and asks yes or no before each change (start the model, benchmark it, name the boss, import the keys) | [docs/PACK.md](docs/PACK.md) |
 | 6. Make it yours | `bau look set dusk`, `summer` or your own picture; the desktop gets the same art | [docs/LOOK.md](docs/LOOK.md) |
 
-**Steady on real laptops.** The stick turns off the laptop power-saving features known to
+**Steady on real desktops.** The stick turns off the desktop power-saving features known to
 freeze some machines (screen self-refresh, USB autosuspend, PCIe power-down), and writes to
 the stick in small steps so the system never stalls waiting on a slow USB drive.
 
@@ -208,7 +208,7 @@ python3 -m pytest -q                       # full test suite
 ```
 
 To use Claude models: `pip install 'bau[claude]'`, put your key in place (`sudo bau keys import`
-on the laptop, or `ANTHROPIC_API_KEY` in `.env` for the test drive), then approve the model
+on the desktop, or `ANTHROPIC_API_KEY` in `.env` for the test drive), then approve the model
 yourself: `bau set-status model claude-opus-5-5 APPROVED`. A local model is approved only
 after a real benchmark: `bau models bench`.
 
@@ -234,7 +234,7 @@ How the *My Jarvis OS* spec maps onto this repository, and the build order:
 | Document | What it is |
 |---|---|
 | [docs/HANDOFF.md](docs/HANDOFF.md) | Where things stand and what is next |
-| [docs/LAPTOP-CHECK.md](docs/LAPTOP-CHECK.md) | Is your laptop ready? A read-only check with a plain verdict |
+| [docs/LAPTOP-CHECK.md](docs/LAPTOP-CHECK.md) | Is your desktop ready? A read-only check with a plain verdict |
 | [docs/BUILD-ISO.md](docs/BUILD-ISO.md) | Build the stick from GitHub with one button, or with WSL + Docker |
 | [docs/LIVE-USB.md](docs/LIVE-USB.md) | The one stick: write, boot, encrypted storage, local model, crash console, install to disk |
 | [docs/PACK.md](docs/PACK.md) | The BAU Pack: local models and your keys on a stick, set up with yes/no questions |
@@ -329,7 +329,7 @@ Every layer of spec §2 has working, tested code. `bau status` shows what only y
 - a CPA fills in the tax rules;
 - you approve the models and agents;
 - the real storefront exists;
-- the boot and restore drill passes on the laptop;
+- the boot and restore drill passes on the desktop;
 - the first real revenue mission completes.
 
 Third-party projects plug in through adapters only after Repo Scout and Sentinel review, and
