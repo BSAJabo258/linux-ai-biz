@@ -52,6 +52,7 @@ these projects and searches the same areas for new ones.
 | Hybrid Computer Use: A Unified Programmatic, Semantic, and Visual Interface for General Agents (HCU; Microsoft Research) | [microsoft/Hybrid-Computer-Use](https://github.com/microsoft/Hybrid-Computer-Use), [arXiv 2610.41432](https://arxiv.org/abs/2610.41432) | documented feature (new: about 10 stars, paper dated 2026-10-30) | "an open-source Model Context Protocol (MCP) server, `computer-use`"; "batch up to 64 actions in one call"; its AX tools "report their effects as AX diffs" | MIT |
 | agent-browser (Vercel Labs) | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) | documented feature | "`snapshot` returns the page as compact text with a ref such as `@e1` for each element"; `agent-browser mcp` | Apache-2.0 |
 | Agent Desktop (Vercel Labs) | [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop) | documented feature | desktop apps "through the OS accessibility tree"; `agent-desktop mcp` (see the repository review) | Apache-2.0 |
+| Reverse API Engineer (kalil0321) | [kalil0321/reverse-api-engineer](https://github.com/kalil0321/reverse-api-engineer), opened 2026-11-08 | documented feature | "Turn websites into APIs. Browse (or let an agent browse), and get a clean, typed client for the endpoints the site actually uses"; "Network traffic is captured to a HAR file"; "Your configured model reads the traffic and writes a working API client". Local models only through OpenCode with Ollama. The README states no terms-of-service guidance | MIT |
 | open-computer-use | [iFurySt/open-computer-use](https://github.com/iFurySt/open-computer-use) | documented feature | "an open-source `Computer Use` service wrapped as `MCP`" on "macOS, Linux, and Windows"; its Linux needs are not stated | MIT |
 
 ## Ranked for the desktop
@@ -87,6 +88,22 @@ these projects and searches the same areas for new ones.
   and cost.
 - **TRIM-KV:** needs gates trained for each model, and is not in llama.cpp.
 - **vLLM Speculators:** vLLM only.
+
+### Watch, with rules: Reverse API Engineer
+
+[kalil0321/reverse-api-engineer](https://github.com/kalil0321/reverse-api-engineer) (MIT,
+2.8k stars) turns the API a website uses behind its pages into a typed client. It could replace
+slow browser automation with direct calls, but the risks are real:
+
+- **What the model sees:** the recorded traffic (a HAR file) can hold cookies, sign-in headers
+  and personal data, and it goes to whichever model is configured, which is a cloud model unless
+  it is OpenCode with a local Ollama model.
+- **The sites' own rules:** many sites' terms forbid using their private APIs. BAU never uses it
+  on Fanvue, Instagram or TikTok; those have official APIs, and breaking their terms risks the
+  accounts and the payouts.
+- **If it is tested:** only on a site whose terms allow it, in the sandbox, signed out, with a
+  local model, and generated code reviewed before it runs (its own README says "review before
+  executing").
 
 ### Not for this desktop
 

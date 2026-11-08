@@ -133,6 +133,9 @@ LEAN_MAX_TOKENS = 400                         # spoken answers; a small model ca
 # After Accept opens a terminal, that step's card stays down this long (the NVIDIA driver and
 # the pictures download take a while); a step still not done after it comes back.
 SETUP_RUNNING_S = 45 * 60
+# "Not now" on a setup card keeps it down this long; before, it came back on the screen's next
+# check, seconds later (found by the screen audit, 2026-11-08).
+SETUP_SNOOZE_S = 4 * 3600
 # The local model server's window: bau-llm.service runs llama-server with --ctx-size 8192
 # (a test keeps the two equal). Requests are measured in characters, about 3 per token, which
 # errs on the safe side; the owner's desktop got HTTP 400s when Jarvis sent more (2026-11-02).
@@ -299,6 +302,7 @@ class Assistant:
         self.pending: dict[str, Pending] = {}
         self.tainted = False                  # this turn read outside content
         self.setup_started: dict[str, float] = {}     # step -> when its terminal opened
+        self.setup_snoozed: dict[str, float] = {}     # step -> when the owner said Not now
         self.last_model = ""                  # the model that gave the last answer
         self._continuity: str | None = None   # earlier conversation, read once per session
         self.tools = {t.name: t for t in self._tools()}
@@ -974,7 +978,9 @@ class Assistant:
                 self.pending.pop(pid)
         staged = {p.args["step"] for p in self.pending.values() if p.tool == "setup_step"}
         # A step whose terminal is open is being done: no second card while it runs.
-        busy = {k for k, t in self.setup_started.items() if time.monotonic() - t < SETUP_RUNNING_S}
+        now = time.monotonic()
+        busy = {k for k, t in self.setup_started.items() if now - t < SETUP_RUNNING_S}
+        busy |= {k for k, t in self.setup_snoozed.items() if now - t < SETUP_SNOOZE_S}
         for s in steps.values():
             if s.id not in staged and s.id not in busy:
                 pid = "su_" + secrets.token_hex(4)
@@ -1120,6 +1126,8 @@ class Assistant:
                     return {"error": f"choose: {f['label']}", "retry": True}
                 picked[f["name"]] = v
             p.args = {**p.args, **picked}
+        if not approve and p.tool == "setup_step":           # Not now: not again for a while
+            self.setup_snoozed[p.args["step"]] = time.monotonic()
         if not approve and p.tool == "autopilot_answer":     # Not now on a question = no
             from . import autopilot
             autopilot.answer(self.home, p.args["task"], "no", by)

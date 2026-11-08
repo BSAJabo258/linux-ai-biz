@@ -136,6 +136,8 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:cente
 #cform .typed{display:block;width:100%;box-sizing:border-box;border:1px solid var(--line);color:var(--ink);
   background:var(--field);padding:10px 12px;font:inherit;font-size:15px;margin:0 0 14px}
 #cform textarea.typed{min-height:110px;resize:vertical}
+.about{font-size:12.5px;line-height:1.45;color:var(--dim);margin:6px 0 4px}
+.next{font-size:13px;line-height:1.45;margin:6px 0 8px;padding:6px 9px;border-left:2px solid var(--green);background:rgba(70,242,164,.07)}
 #cneed{font-size:12px;color:var(--amber);margin:0 0 10px}
 #confirm .btns button{padding:12px 20px}
 #confirm .box:focus{outline:none}
@@ -1798,6 +1800,8 @@ function showDetail(n) {
   const p = panel(n.label, cls); p.id = "detail";
   p.querySelector(".x").onclick = closeDetail;
   p.appendChild(el("div", null, n.summary));
+  if (n.about) p.appendChild(el("div", "about", n.about));       // what this part is for
+  if (n.next) p.appendChild(el("div", "next", "Next: " + n.next));
   const d = n.detail;
   if (n.id === "producer" && d) renderEpisodes(p, d.episodes);
   else if (n.id === "models" && d) renderModels(p, d);

@@ -212,3 +212,16 @@ def test_the_autopilot_setup_script_carries_the_installers_units():
         body = (root / "installer/payload/systemd" / unit).read_text()
         assert f"/etc/systemd/system/{unit} <<'UNIT'\n{body}UNIT\n" in text
     assert "bau-autopilot.timer" in (root / "installer/payload/install.sh").read_text()
+
+
+def test_not_now_keeps_a_setup_card_down_instead_of_popping_straight_back(tmp_path, monkeypatch):
+    # Found by the screen audit (2026-11-08): the declined card was back seconds later.
+    from bau.assistant import SETUP_SNOOZE_S, Assistant
+    b = Box(tmp_path)
+    monkeypatch.setattr(S, "_probe", b.probe)
+    j = Assistant(b.home)
+    nvidia = next(p for p in j.setup_waiting() if "NVIDIA" in p["summary"])
+    j.confirm(nvidia["id"], False, "human:owner")
+    assert not any("NVIDIA" in p["summary"] for p in j.setup_waiting())
+    j.setup_snoozed["nvidia"] -= SETUP_SNOOZE_S + 1        # hours later, still not done: back
+    assert any("NVIDIA" in p["summary"] for p in j.setup_waiting())
