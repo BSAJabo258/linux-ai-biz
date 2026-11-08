@@ -177,3 +177,44 @@ def test_the_screen_keeps_answering_while_jarvis_thinks(tmp_path):
     finally:
         gate.set()
         srv.shutdown()
+
+
+# ---------------------------------------------------------------- the screen audit (2026-11-08)
+def test_every_part_says_what_it_is_for_and_quiet_ones_say_the_next_step(tmp_path):
+    from bau.assistant import Assistant
+    from bau.overview import overview
+    nodes = {n["id"]: n for n in overview(Assistant(tmp_path))["nodes"]}
+    team = ["chief", "producer", "publisher", "strategist", "researcher", "compliance",
+            "finance", "studio", "watchdog"]
+    assert all(nodes[i]["about"] for i in team + ["fanvue", "tiktok", "memory", "scout"])
+    for i in ("publisher", "strategist", "finance", "memory", "scout", "fanvue"):
+        assert nodes[i]["next"], i                       # an empty home: each says what next
+
+
+def test_fanvue_is_on_the_screen_with_autopost_queue_and_earnings(tmp_path):
+    import hashlib
+    import json
+
+    from bau import fanvue as F
+    from bau.assistant import Assistant
+    from bau.overview import overview
+    node = {n["id"]: n for n in overview(Assistant(tmp_path))["nodes"]}["fanvue"]
+    assert node["state"] == "off" and "Connect Fanvue" in node["next"]
+    F.TokenStore(tmp_path).save({"access_token": "a", "refresh_token": "r", "expires_in": 60})
+    media = tmp_path / "artifacts" / "media"
+    media.mkdir(parents=True)
+    (media / "a.png").write_bytes(b"x")
+    (media / "a.png.provenance.json").write_text(json.dumps({
+        "ai_generated": True, "file_sha256": hashlib.sha256(b"x").hexdigest(),
+        "age_check": {"passed": True}}))
+    F.Queue(tmp_path).add("a.png", "Evening in", 1, "human:owner")
+    F.set_autopost(tmp_path, True, "human:owner", "subscribers", 3)
+    node = {n["id"]: n for n in overview(Assistant(tmp_path))["nodes"]}["fanvue"]
+    assert node["state"] == "ok" and node["detail"]["queued"] == 1
+    assert "up to 3 a day to subscribers" in node["detail"]["autopost"]
+
+
+def test_the_panel_shows_about_and_next():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
+    assert 'el("div", "about", n.about)' in page and '"Next: " + n.next' in page

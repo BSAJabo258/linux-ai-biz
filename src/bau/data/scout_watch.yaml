@@ -54,7 +54,7 @@ categories:
     queries: ["browser automation ai agent", "computer use agent gui"]
     seeds: [browser-use/browser-use, microsoft/playwright-mcp, vercel-labs/agent-browser,
             vercel-labs/agent-desktop, iFurySt/open-computer-use,
-            microsoft/Hybrid-Computer-Use]
+            microsoft/Hybrid-Computer-Use, kalil0321/reverse-api-engineer]
   self_improvement:
     title: Development and self-improvement
     why: Coding agents, automated tests, repository analysis and repair loops help Jarvis maintain software under supervision.

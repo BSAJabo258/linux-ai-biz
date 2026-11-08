@@ -18,10 +18,39 @@ def _safe(fn, *a: Any) -> tuple[Any, str | None]:
         return None, f"{type(e).__name__}: {e}"[:200]
 
 
+# What each part of the screen is for, in the owner's words (shown on every panel, so a quiet
+# panel still says what it does).
+ABOUT = {
+    "chief": "Your briefing and everything waiting on you: setup cards, questions, HOLD.",
+    "producer": "Workspaces that turn a theme into content, one checked stage at a time.",
+    "publisher": "Everything queued to post. Nothing goes out without your click, or your "
+                 "Fanvue autopost switch.",
+    "strategist": "Missions: bigger goals Jarvis plans step by step, each with the checks it "
+                  "must pass.",
+    "researcher": "Gaps in how the business is written down, and what Jarvis can research.",
+    "compliance": "Rules and their review dates, legal questions and incidents. Requirements "
+                  "and evidence, never a compliance claim.",
+    "finance": "Revenue and costs from the ledger. Fanvue earnings arrive by themselves once "
+               "it is connected.",
+    "studio": "Paid video clips under the monthly budget you set; each clip priced first and "
+              "confirmed by you.",
+    "watchdog": "System health, HOLD, and the production-readiness checks.",
+    "godseye": "Public world data on a map: earthquakes, aircraft by wide region, satellites.",
+    "usage": "Every model call's tokens and cost, against the daily limits you set.",
+    "models": "Which model thinks first, which back it up, and whether each passed its test.",
+    "memory": "The Second Brain and the memory lane: decisions and notes with their source.",
+    "audit": "The hash-linked record of everything BAU did, checked end to end.",
+    "scout": "Open-source projects found for a job, with licence and security gates.",
+    "fanvue": "Aria's paid platform: posts with the AI label, autopost, and earnings.",
+    "tiktok": "Short videos, posted only with your click (TikTok's own rule).",
+}
+
+
 def _node(nid: str, label: str, group: str, state: str, summary: str,
-          detail: Any = None, ask: str | None = None, **extra: Any) -> dict[str, Any]:
+          detail: Any = None, ask: str | None = None, next_step: str | None = None,
+          **extra: Any) -> dict[str, Any]:
     return {"id": nid, "label": label, "group": group, "state": state, "summary": summary,
-            "detail": detail, "ask": ask, **extra}
+            "detail": detail, "ask": ask, "about": ABOUT.get(nid), "next": next_step, **extra}
 
 
 def _broken(nid: str, label: str, group: str, err: str) -> dict[str, Any]:
@@ -71,6 +100,40 @@ def _models(home: Path, active: dict[str, Any]) -> dict[str, Any]:
     return {"active": active.get("id"), "backups": backups, "models": rows}
 
 
+def _fanvue(home: Path) -> dict[str, Any]:
+    """Connected, autopost, the queue, today's posts, the last earnings sync."""
+    import datetime as dt
+    import json
+
+    from . import fanvue as F
+    signed = F.TokenStore(home).load() is not None
+    choice = F.autopost_choice(home) or {}
+    items = F.Queue(home).items()
+    today = dt.datetime.now(dt.UTC).date().isoformat()
+    posted = [i for i in items if i["status"] == "POSTED"]
+    seen = home / "economics" / "fanvue_seen.json"
+    synced = json.loads(seen.read_text()).get("synced_at") if seen.exists() else None
+    out = {"connected": signed,
+           "autopost": (f"on: up to {choice['per_day']} a day to {choice['audience']}"
+                        if choice.get("on") else "off (your click posts each one)"),
+           "queued": sum(i["status"] == "QUEUED" for i in items),
+           "posted_today": sum(str(i.get("tried_at", i.get("queued_at", ""))).startswith(today)
+                               for i in posted),
+           "posted_all_time": len(posted),
+           "failed": [f"{i['item_id']}: {i['result'].get('error', '')}"[:120]
+                      for i in items if i["status"] == "FAILED"][-3:],
+           "earnings_synced": synced or "never"}
+    if not signed:
+        out.update(state="off", summary="not connected",
+                   next="Create the Fanvue app and bring its keys in, then accept the "
+                        "Connect Fanvue card (docs/FANVUE.md).")
+    else:
+        out.update(state="warn" if out["failed"] else "ok",
+                   summary=f"connected; {out['queued']} queued, {out['posted_today']} posted "
+                           f"today; autopost {'on' if choice.get('on') else 'off'}")
+    return out
+
+
 def overview(asst: Any) -> dict[str, Any]:
     """The nodes for the Jarvis screen. ``asst`` is the running Assistant."""
     from .audit import AuditLog
@@ -89,7 +152,10 @@ def overview(asst: Any) -> dict[str, Any]:
         nodes.append(_node("chief", "Chief of staff", "team", state,
                            f"on HOLD: {night['hold']}" if night["hold"] else
                            f"{needs} thing(s) need you" if needs else "nothing needs you",
-                           night, "Give me my briefing."))
+                           night, "Give me my briefing.",
+                           None if needs or night["hold"] else
+                           "Nothing waiting on you. The autopilot keeps working every 30 "
+                           "minutes; say \"what are you working on\" to see it."))
 
     eps, err = _safe(episodes, home)
     if err:
@@ -109,8 +175,10 @@ def overview(asst: Any) -> dict[str, Any]:
     else:
         q = [i for i in q if isinstance(i, dict) and i.get("item_id")]
         nodes.append(_node("publisher", "Publisher", "team", "warn" if q else "idle",
-                           f"{len(q)} video(s) waiting for you" if q else "queue empty",
-                           q, "What's in the publishing queue?"))
+                           f"{len(q)} post(s) waiting for you" if q else "queue empty",
+                           q, "What's in the publishing queue?",
+                           None if q else "Switch on Fanvue autopost and the feed fills this "
+                           "queue by itself (docs/FANVUE.md)."))
 
     ms, err = _safe(asst.t_missions)
     if err:
@@ -120,7 +188,9 @@ def overview(asst: Any) -> dict[str, Any]:
         nodes.append(_node("strategist", "Strategist", "team",
                            "warn" if review else "ok" if ms else "idle",
                            f"{len(ms)} mission(s), {len(review)} need your sign-off"
-                           if ms else "no missions yet", ms, "What missions are open?"))
+                           if ms else "no missions yet", ms, "What missions are open?",
+                           None if ms else "Say \"plan a mission to ...\" and Jarvis drafts "
+                           "one for your sign-off."))
 
     gaps, err = _safe(asst.t_brain_gaps)
     if err:
@@ -129,7 +199,9 @@ def overview(asst: Any) -> dict[str, Any]:
         nodes.append(_node("researcher", "Researcher", "team", "warn" if gaps else "ok",
                            f"{len(gaps)} gap(s) in how the business is written down"
                            if gaps else "no known gaps", gaps,
-                           "What isn't automatable yet?"))
+                           "What isn't automatable yet?",
+                           None if gaps else "Say \"look into ...\" and the autopilot "
+                           "researches it on GitHub and the web."))
 
     dl, err = _safe(asst.t_deadlines)
     if err:
@@ -149,7 +221,9 @@ def overview(asst: Any) -> dict[str, Any]:
         nodes.append(_node("finance", "Finance", "team", "ok" if has else "idle",
                            f"revenue {money.get('revenue', 0)} in {money['days']} days"
                            if has else "no money recorded yet", money,
-                           "How's the money looking?"))
+                           "How's the money looking?",
+                           None if has else "Connect Fanvue: its earnings land here by "
+                           "themselves, at most once an hour."))
 
     def studio() -> dict[str, Any]:
         st = asst.studio()
@@ -225,7 +299,9 @@ def overview(asst: Any) -> dict[str, Any]:
                            "ok" if mem["brain_notes"] or mem["recent_memories"] else "idle",
                            f"{mem['brain_notes']} brain note(s), "
                            f"{len(mem['recent_memories'])} recent memory(ies)", mem,
-                           "What do you remember?"))
+                           "What do you remember?",
+                           None if mem["brain_notes"] or mem["recent_memories"] else
+                           "Say \"remember ...\" to keep a decision, with its source."))
 
     def audit() -> dict[str, Any]:
         log = AuditLog(home / "audit" / "chain.jsonl")
@@ -262,9 +338,17 @@ def overview(asst: Any) -> dict[str, Any]:
                            "idle" if not sc["candidates"] else "warn" if failed else "ok",
                            f"{sc['candidates']} open-source candidate(s) found"
                            if sc["candidates"] else "no searches yet", sc,
-                           "What open-source tools have you found?"))
+                           "What open-source tools have you found?",
+                           None if sc["candidates"] else "Say \"look into ...\", or wait for "
+                           "the weekly open-source watch."))
 
     # ---------------------------------------------------------------- connections
+    fv, err = _safe(_fanvue, home)
+    if err:
+        nodes.append(_broken("fanvue", "Fanvue", "connector", err))
+    else:
+        nodes.append(_node("fanvue", "Fanvue", "connector", fv.pop("state"), fv.pop("summary"),
+                           fv, "How's Fanvue doing?", fv.pop("next", None)))
     for nid, label in (("tiktok", "TikTok"),):
         signed = (home / "secrets" / f"{nid}.json").exists()
         nodes.append(_node(nid, label, "connector", "ok" if signed else "off",
