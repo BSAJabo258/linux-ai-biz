@@ -84,6 +84,7 @@ button.chip{background:none;color:inherit;font:inherit;cursor:pointer;letter-spa
 #caption{pointer-events:none;position:fixed;left:50%;bottom:150px;transform:translateX(-50%);width:min(760px,calc(100% - 32px));
   text-align:center;font-size:20px;line-height:1.4;color:var(--glow);text-shadow:0 0 18px rgba(63,214,255,.35);
   min-height:2.8em}
+#caption:not(:empty){width:fit-content;max-width:min(760px,calc(100% - 32px));padding:8px 16px;border-radius:12px;background:color-mix(in srgb,var(--panel) 78%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 #caption .you{color:var(--dim);font-size:15px;display:block;margin-bottom:6px}
 aside{position:fixed;top:56px;bottom:110px;width:300px;overflow:auto;padding:0 4px;scrollbar-width:thin}
 aside.l{left:16px}aside.r{right:16px}
@@ -395,7 +396,7 @@ const GOLD = [255, 207, 77];
 function themeLight() { return document.documentElement.dataset.theme === "light"; }
 // Energy streams: soft ribbons flowing across the whole screen, bending through the core.
 function drawStreams(X, Y, R, now) {
-  const t = now * 0.00018 * SPEED, boost = 0.5 + level * 0.9 + (STATE === "thinking" ? 0.3 : 0);
+  const t = now * 0.00018 * SPEED, boost = 0.5 + level * 0.9 + (STATE === "thinking" ? 0.3 : 0) + KICK * 0.6;
   cx.lineCap = "round";
   for (const s of STREAMS) {
     const base = s.y * H, pull = (Y - base) * 0.78;
@@ -433,7 +434,7 @@ function drawTraces(now) {
 }
 // The golden halo round the orb; it brightens with the voice and turns the state's colour.
 function drawHalo(X, Y, R, now) {
-  const hc = STATE === "idle" || STATE === "speaking" ? GOLD : col, rr = R * (1.02 + level * 0.06);
+  const hc = STATE === "idle" || STATE === "speaking" ? GOLD : col, rr = R * (1.02 + level * 0.06 + KICK * 0.04);
   cx.save();
   cx.shadowColor = rgba(hc, 0.9); cx.shadowBlur = 18 + level * 30;
   cx.strokeStyle = rgba(hc, 0.95); cx.lineWidth = 3 + level * 3;
@@ -483,11 +484,67 @@ function drawWave(now) {
   const c = STATE === "idle" ? [93, 138, 163] : STATE === "speaking" ? GOLD : col;
   for (let i = 0; i < bars; i++) {
     const k = Math.abs(i - (bars - 1) / 2) / ((bars - 1) / 2), shape = 1 - k * 0.75;
-    const v = realAudio ? Math.abs(buf[(i * 29) % buf.length] - 128) / 128 * 3
+    const v = SPEC ? SPEC[Math.floor(k * (SPEC.length - 1))] * 2.2
       : Math.abs(Math.sin(now / 140 * SPEED + i * 0.7) * Math.sin(now / 330 * SPEED + i));
     const bh = Math.max(2 * DPR, Math.min(1, v) * Math.min(1, level * 1.6 + 0.1) * h * shape);
     wx.fillStyle = rgba(c, 0.9); wx.fillRect(i * w / bars + w / bars * 0.25, mid - bh / 2, w / bars * 0.5, bh);
   }
+}
+
+// The sound layer (the owner's ask, 2026-11-08: "your best visualizations possible"): a
+// mirrored spectrum ring round the core that follows the real voice when there is one (the
+// same analysers as above; a living synthetic spectrum otherwise), a kick on each bass hit
+// that punches the halo and sends a shockwave out, and spark bursts that fly from the core to
+// a team member when it starts work and back when it finishes. Calm for reduced motion.
+let fbuf = null, BASS = 0, bassAvg = 0, KICK = 0, SPEC = null;
+const SHOCKS = [], SPARKS = [];
+function spectrum(now) {
+  const n = 64, out = new Array(n), an = STATE === "listening" ? micAnalyser : analyser;
+  if (realAudio && an) {
+    if (!fbuf || fbuf.length !== an.frequencyBinCount) fbuf = new Uint8Array(an.frequencyBinCount);
+    an.getByteFrequencyData(fbuf);
+    for (let i = 0; i < n; i++) out[i] = fbuf[Math.floor(Math.pow(i / n, 1.6) * fbuf.length * 0.7)] / 255;
+  } else {
+    const e = level * 1.4 + (STATE === "thinking" ? 0.25 : 0.08);
+    for (let i = 0; i < n; i++) out[i] = Math.max(0, Math.min(1, e * (0.55 + 0.45 *
+      Math.sin(now / 170 * SPEED + i * 0.9) * Math.sin(now / 410 * SPEED + i * 0.37)) * (1 - i / n * 0.6)));
+  }
+  return out;
+}
+function mix(a, b, k) { return [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * k)); }
+function shock(X, Y, R, c) { SHOCKS.push({ X, Y, r: R * 1.05, a: 0.7, c: c.slice() }); if (SHOCKS.length > 8) SHOCKS.shift(); }
+function burst(x, y, tx, ty, c) {
+  for (let i = 0; i < (REDUCED ? 4 : 18); i++) SPARKS.push({ x, y, tx, ty, t: -i * 0.04, c, wob: Math.random() * 6.283 });
+  if (SPARKS.length > 240) SPARKS.splice(0, SPARKS.length - 240);
+}
+function drawSpectrum(X, Y, R, now) {
+  const s = spectrum(now), n = s.length, light = themeLight(); SPEC = s;
+  BASS = (s[0] + s[1] + s[2] + s[3]) / 4; bassAvg += (BASS - bassAvg) * 0.05;
+  if (BASS > bassAvg * 1.35 && BASS > 0.25 && KICK < 0.2) { KICK = 1; if (!REDUCED) shock(X, Y, R, STATE === "speaking" ? GOLD : col); }
+  KICK *= 0.9;
+  const r0 = R * (1.08 + KICK * 0.05);
+  cx.save(); cx.lineCap = "round"; cx.globalCompositeOperation = themeLight() ? "source-over" : "lighter";
+  cx.lineWidth = Math.max(1.5, R * 0.018);
+  for (let i = 0; i < n * 2; i++) {               // mirrored: low notes at the top, both sides
+    const v = s[i < n ? i : 2 * n - 1 - i], a = -Math.PI / 2 + i / (n * 2) * 6.283, len = R * (0.04 + v * 0.42);
+    cx.strokeStyle = light ? rgba(mix([10, 95, 140], [176, 112, 0], v), 0.45 + v * 0.5)
+      : rgba(mix(col, GOLD, v), 0.25 + v * 0.65);
+    cx.beginPath(); cx.moveTo(X + Math.cos(a) * r0, Y + Math.sin(a) * r0);
+    cx.lineTo(X + Math.cos(a) * (r0 + len), Y + Math.sin(a) * (r0 + len)); cx.stroke();
+  }
+  cx.restore();
+}
+function drawShocks(dt) {
+  cx.save(); cx.globalCompositeOperation = themeLight() ? "source-over" : "lighter";
+  for (let i = SHOCKS.length - 1; i >= 0; i--) { const s = SHOCKS[i]; s.r += dt * 0.35; s.a *= 0.94;
+    cx.strokeStyle = rgba(s.c, s.a); cx.lineWidth = 2 + s.a * 6; cx.beginPath(); cx.arc(s.X, s.Y, s.r, 0, 6.283); cx.stroke();
+    if (s.a < 0.02) SHOCKS.splice(i, 1); }
+  for (let i = SPARKS.length - 1; i >= 0; i--) { const p = SPARKS[i]; p.t += dt / 900;
+    if (p.t < 0) continue; if (p.t >= 1) { SPARKS.splice(i, 1); continue; }
+    const k = p.t * p.t * (3 - 2 * p.t), bend = Math.sin(p.t * Math.PI) * 60;
+    const x = p.x + (p.tx - p.x) * k + Math.cos(p.wob) * bend, y = p.y + (p.ty - p.y) * k + Math.sin(p.wob) * bend;
+    cx.fillStyle = rgba(p.c, 1 - p.t * 0.6); cx.beginPath(); cx.arc(x, y, 2.4, 0, 6.283); cx.fill(); }
+  cx.restore();
 }
 function frame(now) {
   try {
@@ -532,8 +589,10 @@ function frame(now) {
     for (let i = 0; i < 72; i++) { const a = i * 0.0873, r1 = R * 1.68, r2 = r1 + (i % 6 ? 4 : 10);
       cx.beginPath(); cx.moveTo(X + Math.cos(a) * r1, Y + Math.sin(a) * r1);
       cx.lineTo(X + Math.cos(a) * r2, Y + Math.sin(a) * r2); cx.stroke(); }
+    drawSpectrum(X, Y, R, now);
     drawMind(X, Y, R, now);
     drawHalo(X, Y, R, now);
+    drawShocks(dt);
     drawWave(now);
   } catch (e) { /* never let one bad frame stop the animation */ }
   requestAnimationFrame(frame);
@@ -2107,6 +2166,11 @@ async function pollActivity() {
     const a = await apiJson("/api/activity?since=" + ASEQ);
     ASEQ = a.seq; BUSY = a.busy || {};
     for (const e of a.events) { (LIVE[e.node] = LIVE[e.node] || []).push(e); if (LIVE[e.node].length > 20) LIVE[e.node].shift();
+      const nd = NODES.find(x => x.id === e.node);
+      if (nd && nd.x != null && CORE) {
+        if (e.kind === "start") burst(CORE[0], CORE[1], nd.x, nd.y, [169, 139, 255]);
+        else if (e.kind === "done") { burst(nd.x, nd.y, CORE[0], CORE[1], [70, 242, 164]); shock(CORE[0], CORE[1], CORE[2], [70, 242, 164]); }
+        else if (e.kind === "error") burst(nd.x, nd.y, CORE[0], CORE[1], [255, 92, 110]); }
       if (e.kind === "done" || e.kind === "error") { logLine("sys", e.node + ": " + e.text); alertOwner(e.node + ": " + e.text);
         clearTimeout(refreshSoon); refreshSoon = setTimeout(loadNodes, 400);
         if (document.body.classList.contains("showtime")) loadTimeline(); } }
