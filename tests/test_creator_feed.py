@@ -58,7 +58,8 @@ def test_the_feed_stocks_his_number_a_day_and_each_job_queues_a_labelled_post(ho
     from bau import team
     monkeypatch.setattr(team, "show", lambda h: {"boss": "qwen3.5-9b"})
     A.run(home, {"draft": handler}, max_steps=5)
-    items = F.Queue(home).pending()
+    assert F.Queue(home).pending() == []                  # nothing posts before the owner says
+    items = F.Queue(home).review()
     assert len(items) == 3 and all(i["level"] == 1 for i in items)   # subscribers -> level 1
     assert items[0]["caption"].startswith("Slow morning") and F.AI_LABEL in items[0]["caption"]
     assert all("25-year-old adult woman" in p for p in drawn)          # the profile's age
@@ -73,7 +74,7 @@ def test_a_caption_about_minors_is_refused_and_nothing_is_queued(home, monkeypat
                        "shot": "medium"}}
     with pytest.raises(ValueError, match="minors"):
         C.make_post(home, task, draw=fake_draw([]), factory=lambda m, h: (model, {}))
-    assert F.Queue(home).pending() == []
+    assert F.Queue(home).pending() == [] and F.Queue(home).review() == []
 
 
 def test_without_a_local_model_the_caption_is_a_plain_line(home, monkeypatch):
@@ -82,7 +83,7 @@ def test_without_a_local_model_the_caption_is_a_plain_line(home, monkeypatch):
     task = {"detail": {"job": "fanvue_post", "theme": "rooftop at golden hour", "level": 0,
                        "shot": "medium"}}
     out = C.make_post(home, task, draw=fake_draw([]))
-    assert out["ok"] and F.Queue(home).pending()[0]["caption"].startswith(
+    assert out["ok"] and F.Queue(home).review()[0]["caption"].startswith(
         "Rooftop at golden hour.")
 
 
@@ -94,4 +95,55 @@ def test_the_autopilot_runs_the_draft_job_through_its_real_handler(home, monkeyp
     F.set_autopost(home, True, "human:owner", "followers-and-subscribers", 1)
     J.seed(home)
     A.run(home, J.handlers(home), max_steps=3)
-    assert [i["level"] for i in F.Queue(home).pending()] == [0]
+    assert [i["level"] for i in F.Queue(home).review()] == [0]
+
+
+def test_every_level_has_its_own_prompt_sections_and_no_youth_words():
+    from bau.virtual_creator import MINOR_REFERENCE
+    tiers = C.tiers()
+    assert set(tiers) == {0, 1}                        # 2 and 3 wait for their own model
+    for level, t in tiers.items():
+        assert {"setting", "outfit", "pose", "light", "camera"} <= set(t["sections"])
+        lines = [x for v in t["sections"].values() for x in v] + [t["negative"]]
+        assert not any(MINOR_REFERENCE.search(x) for x in lines), level
+        assert "nude" in t["negative"]                  # levels 0 and 1 never show nudity
+    assert "lingerie" in tiers[0]["negative"]          # the free teaser stays everyday wear
+
+
+def test_each_picture_uses_its_levels_prompt_and_negative(home, monkeypatch):
+    from bau import team
+    monkeypatch.setattr(team, "show", lambda h: {"boss": None})
+    seen = []
+
+    def draw(home_, prompt, name, **kw):
+        seen.append((prompt, kw["negative"]))
+        return fake_draw([])(home_, prompt, name)
+    parts = C.pick(1)
+    task = {"detail": {"job": "fanvue_post", "theme": "x", "level": 1, "shot": "medium",
+                       "parts": parts}}
+    C.make_post(home, task, draw=draw)
+    prompt, negative = seen[0]
+    assert "25-year-old adult woman" in prompt                      # the identity lock first
+    assert all(v in prompt for v in parts.values())
+    assert C.tiers()[1]["negative"] in negative and "child" in negative
+
+
+def test_the_owner_accepts_or_drops_each_picture_on_its_card(home, monkeypatch):
+    from bau import team
+    from bau.assistant import Assistant
+    monkeypatch.setattr(team, "show", lambda h: {"boss": None})
+    for theme in ("a", "b"):
+        C.make_post(home, {"detail": {"job": "fanvue_post", "theme": theme, "level": 0,
+                                      "shot": "medium", "parts": C.pick(0)}},
+                    draw=fake_draw([]))
+    j = Assistant(home)
+    cards = [p for p in j.setup_waiting() if p["tool"] == "fanvue_review"]
+    assert len(cards) == 2 and all(c["preview"] for c in cards)      # the picture is shown
+    assert len([p for p in j.setup_waiting() if p["tool"] == "fanvue_review"]) == 2  # once
+    with pytest.raises(PermissionError):
+        j.confirm(cards[0]["id"], True, "jarvis")                     # only the owner
+    assert j.confirm(cards[0]["id"], True, "human:owner")["done"]
+    j.confirm(cards[1]["id"], False, "human:owner")
+    q = F.Queue(home)
+    assert len(q.pending()) == 1 and q.review() == []                 # one posts, one dropped
+    assert [i["status"] for i in q.items()].count("DROPPED") == 1
