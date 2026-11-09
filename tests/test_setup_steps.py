@@ -85,11 +85,10 @@ def test_the_shipped_setup_scripts_are_the_installers_own():
         assert S.script(name).exists()
 
 
-def test_prices_are_typed_by_the_owner_on_the_card_never_filled_in(box):
+def test_prices_are_set_on_the_card_only_by_the_owners_accept(box):
     fields = S.form("prices")["fields"]
     assert [f["name"] for f in fields] == ["subscription", "nude", "xxx"]
-    assert all("options" not in f and "value" not in f and "default" not in f
-               for f in fields)
+    assert all("options" not in f for f in fields)            # typed boxes, filled in, changeable
     out = S.run("prices", box.home, values={"subscription": "9.99", "nude": "14.99",
                                             "xxx": "29.99"})
     assert out["done"] and not box.opened                        # no terminal needed
@@ -201,7 +200,9 @@ def test_the_page_shows_them_when_jarvis_opens():
     assert "setup_waiting()" in text
     page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
     assert '/^(setup_step|autopilot_answer)$/.test(showing.tool) ? "Accept"' in page
-    # typed boxes on cards start empty, and the greeting never takes the keyboard from them
+    # typed boxes on cards come filled in from Fanvue's advice, and the greeting never takes
+    # the keyboard from them
+    assert "if (f.value !== undefined) { box.value = f.value; box.oninput(); }" in page
     assert 'el(f.type === "number" ? "input" : "textarea", "typed")' in page
     assert 'if (!$("confirm").classList.contains("show")) $("text").focus();' in page
 
@@ -226,3 +227,32 @@ def test_not_now_keeps_a_setup_card_down_instead_of_popping_straight_back(tmp_pa
     assert not any("NVIDIA" in p["summary"] for p in j.setup_waiting())
     j.setup_snoozed["nvidia"] -= SETUP_SNOOZE_S + 1        # hours later, still not done: back
     assert any("NVIDIA" in p["summary"] for p in j.setup_waiting())
+
+
+def test_the_cards_come_filled_in_from_fanvues_own_advice():
+    # the owner, 2026-11-09: "fill them out"; Accept is still the choice
+    from bau import virtual_creator as V
+    from bau.fanvue import AUDIENCES, MAX_PER_DAY
+    prices = {f["name"]: f for f in S.form("prices")["fields"]}
+    assert {k: f["value"] for k, f in prices.items()} == {
+        "subscription": 9.99, "nude": 10.99, "xxx": 14.99}
+    assert not V.price_problems({k: f["value"] for k, f in prices.items()})  # Fanvue limits
+    assert all("help.fanvue.com" in f["why"] for f in prices.values())       # the source is shown
+    auto = {f["name"]: f for f in S.form("autopost")["fields"]}
+    assert auto["audience"]["value"] in AUDIENCES and 1 <= auto["per_day"]["value"] <= MAX_PER_DAY
+    limits = S.form("boundaries")["fields"][0]["value"].splitlines()
+    assert not any(V.MINOR_REFERENCE.search(x) for x in limits)   # the save would refuse them
+
+
+def test_accepting_the_filled_in_prices_and_limits_saves_them(tmp_path):
+    import shutil
+    home = tmp_path / "home"
+    (home / "creators").mkdir(parents=True)
+    shutil.copy(Path(S.__file__).parent / "data/virtual_creator_profile.example.yaml",
+                home / "creators/aria.yaml")
+    vals = {f["name"]: str(f["value"]) for f in S.form("prices")["fields"]}
+    assert S.run("prices", home, values=vals)["done"]
+    lim = {"limits": S.form("boundaries")["fields"][0]["value"]}
+    assert S.run("boundaries", home, values=lim)["done"]
+    text = (home / "creators/aria.yaml").read_text()
+    assert "subscription: 9.99" in text and "No real person's likeness" in text
