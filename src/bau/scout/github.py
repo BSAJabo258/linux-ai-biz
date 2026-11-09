@@ -189,6 +189,9 @@ class GitHub:
                 err = RateLimited(f"GitHub rate limit (HTTP {e.code}): {str(msg)[:120]}", until)
                 raise RateLimited(f"{err}. BAU will not ask again before {err.when}",
                                   until) from None
+            if e.code == 404:           # deleted, renamed or private since BAU last saw it
+                raise SourceError(f"GitHub HTTP 404: {path.split('?')[0]} is not on GitHub "
+                                  "(deleted, renamed or private)") from None
             raise SourceError(f"GitHub HTTP {e.code}: {str(msg)[:160]}") from None
         except (urllib.error.URLError, OSError, TimeoutError) as e:
             raise SourceError(f"could not reach GitHub: {e}"[:200]) from None
@@ -232,7 +235,14 @@ class GitHub:
             raise
 
     def readme(self, full_name: str) -> str:
-        text = self._get(f"/repos/{urllib.parse.quote(full_name, safe='/')}/readme", raw=True)
+        """The README, or "" when the project has none (GitHub answers 404)."""
+        try:
+            text = self._get(f"/repos/{urllib.parse.quote(full_name, safe='/')}/readme",
+                             raw=True)
+        except SourceError as e:
+            if "HTTP 404" in str(e):
+                return ""
+            raise
         return text[:20000]
 
 
