@@ -155,3 +155,34 @@ def test_creator_draw_makes_one_picture_per_post(tmp_path, monkeypatch, capsys):
                                    for p, _ in drawn)
     assert [n.rsplit("-", 1)[1] for _, n in drawn] == ["1", "2", "3"]
     assert drawn[0][1].startswith("aria-")
+
+
+def test_the_explicit_lane_draws_with_chromas_own_workflow_and_still_checks_age(tmp_path):
+    fake = FakeComfy()
+    comfy.draw(tmp_path, "Aria Vale, a fictional adult, artistic nude", "aria-n", seed=3,
+               opener=fake, wait=0, lane="explicit",
+               checker=lambda p: {"20-29": 0.9, "10-19": 0.02})
+    g = fake.jobs[0]
+    by = {n["class_type"]: n["inputs"] for n in g.values()}
+    assert by["UNETLoader"] == {"unet_name": comfy.CHROMA, "weight_dtype": "fp8_e4m3fn"}
+    assert by["CLIPLoader"]["type"] == "chroma" and by["CFGGuider"]["cfg"] == 3.8
+    assert by["BetaSamplingScheduler"] == {"model": ["2", 0], "steps": 26, "alpha": 0.45,
+                                           "beta": 0.45}
+    prov = json.loads((tmp_path / "artifacts/media/aria-n.png.provenance.json").read_text())
+    assert prov["lane"] == "explicit" and prov["model"] == comfy.CHROMA
+    with pytest.raises(comfy.ComfyError, match="under 20"):           # the age check still rules
+        comfy.draw(tmp_path, "Aria Vale, adult", "aria-y", opener=FakeComfy(), wait=0,
+                   lane="explicit", checker=lambda p: {"10-19": 0.5, "20-29": 0.5})
+
+
+def test_explicit_setup_is_pinned_needs_the_picture_maker_and_room():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    text = (root / "installer/bau-explicit-setup.sh").read_text()
+    assert text == (root / "src/bau/data/setup/bau-explicit-setup.sh").read_text()
+    for sha in ("d446d9695d08276f61e53653e025289dd96f7a489c27982a1fa54ecabc06642a",
+                "a498f0485dc9536735258018417c3fd7758dc3bccc0a645feaa472b34955557a",
+                "afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38"):
+        assert sha in text
+    assert "sha256sum -c" in text and "bau-pictures-setup.sh" in text and "Make room" in text
+    assert "/resolve/main/" not in text                    # every file at a pinned revision

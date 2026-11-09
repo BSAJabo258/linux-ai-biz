@@ -113,8 +113,12 @@ def test_queue_adds_the_ai_label_and_refuses_what_must_not_go(tmp_path):
     assert item["caption"].endswith(F.AI_LABEL) and item["status"] == "QUEUED"
     with pytest.raises(ValueError, match="minors"):
         q.add(picture(tmp_path), "cute schoolgirl look", 0, "human:owner")
-    with pytest.raises(ValueError, match="levels 0 and 1"):
+    with pytest.raises(ValueError, match="needs your price"):
         q.add(picture(tmp_path), "x", 2, "human:owner")
+    with pytest.raises(ValueError, match="only pictures from the explicit lane"):
+        q.add(picture(tmp_path), "x", 3, "human:owner", price_cents=1499)   # an sfw picture
+    with pytest.raises(ValueError, match="the level is 0, 1, 2 or 3"):
+        q.add(picture(tmp_path), "x", 4, "human:owner")
     with pytest.raises(ValueError, match="age check"):
         q.add(picture(tmp_path, "b.png", passed=False), "x", 0, "human:owner")
     with pytest.raises(ValueError, match="artifacts/media"):
@@ -304,3 +308,18 @@ def test_autopost_card_takes_his_audience_and_number(tmp_path, monkeypatch):
                 values={"audience": "subscribers", "per_day": "3"})
     assert out["done"] and F.autopost_choice(tmp_path)["per_day"] == 3
     assert S._done("autopost", tmp_path, lambda w: None) is True
+
+
+def test_a_level_2_or_3_unlock_posts_with_the_owners_price_in_cents(tmp_path):
+    # the owner's choice 2026-11-09: Chroma pictures for the paid levels (POST /v1/posts price)
+    fake = FakeFanvue()
+    q = F.Queue(tmp_path)
+    name = picture(tmp_path, "x.png")
+    prov_path = tmp_path / "artifacts" / "media" / "x.png.provenance.json"
+    prov_path.write_text(json.dumps({**json.loads(prov_path.read_text()), "lane": "explicit"}))
+    with pytest.raises(ValueError, match="needs your price"):
+        q.add(name, "Tonight only", 3, "human:owner", price_cents=299)   # under Fanvue's $3
+    item = q.add(name, "Tonight only", 3, "human:owner", price_cents=1499)
+    q.post(item, client(tmp_path, fake), "human:owner", "subscribers")
+    post = next(json.loads(b) for m, u, _, b in fake.calls if u.endswith("/v1/posts"))
+    assert post["price"] == 1499 and post["mediaUuids"] == ["m-1"]
