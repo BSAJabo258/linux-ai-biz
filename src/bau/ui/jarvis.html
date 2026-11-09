@@ -249,15 +249,15 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <div class="r">
     <span class="chip" id="c-mode">—</span>
     <span class="chip" id="c-hold" hidden>HOLD</span>
-    <button class="chip" id="c-time" data-key="T" title="Timeline: everything that happened (T)">TIMELINE</button>
-    <button class="chip" id="c-mind" data-key="P" title="The autopilot: his mind, the compass, the vote, his jobs (P)">AUTOPILOT</button>
-    <button class="chip" id="c-mc" data-key="C" title="Mission Control (C)">MISSION CONTROL</button>
-    <button class="chip" id="c-log" data-key="L" title="Show the conversation log (L)">LOG</button>
-    <button class="chip" id="c-mute" data-key="M" title="Mute voice (M)">VOICE ON</button>
-    <button class="chip" id="c-wake" data-key="W" title="Listen for the word 'Jarvis' in this tab only, until you leave the page (W)">WAKE WORD OFF</button>
-    <button class="chip" id="c-alerts" data-key="A" title="Notify me when something needs me and this page is in the background (A)">ALERTS OFF</button>
-    <button class="chip" id="c-theme" data-key="D" title="Light or dark (D)">THEME</button>
-    <button class="chip" id="c-help" data-key="?" title="Keyboard keys (?)" aria-label="Keyboard keys">?</button>
+    <button class="chip" id="c-time" title="Timeline: everything that happened">TIMELINE</button>
+    <button class="chip" id="c-mind" title="The autopilot: his mind, the compass, the vote, his jobs">AUTOPILOT</button>
+    <button class="chip" id="c-mc" title="Mission Control">MISSION CONTROL</button>
+    <button class="chip" id="c-log" title="Show the conversation log">LOG</button>
+    <button class="chip" id="c-mute" title="Mute voice">VOICE ON</button>
+    <button class="chip" id="c-wake" title="Listen for the word 'Jarvis' in this tab only, until you leave the page">WAKE WORD OFF</button>
+    <button class="chip" id="c-alerts" title="Notify me when something needs me and this page is in the background">ALERTS OFF</button>
+    <button class="chip" id="c-theme" title="Light or dark">THEME</button>
+    <button class="chip" id="c-help" title="Keyboard keys" aria-label="Keyboard keys">?</button>
   </div>
 </header>
 <main id="main">
@@ -275,24 +275,24 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <div class="panel"><h2>Autopilot · jobs</h2><div class="dim" id="m-status"></div><ul id="m-queue"></ul></div>
 </aside>
 <div id="voicebar" aria-hidden="true"><span class="rule"></span><div><canvas id="wave"></canvas><div id="statelabel">STANDBY</div></div><span class="rule r"></span></div>
-<button id="speakpill" data-key="S" title="Stop speaking (S)" hidden><span class="dot"></span>Speaking · tap to stop</button>
+<button id="speakpill" title="Stop speaking" hidden><span class="dot"></span>Speaking · tap to stop</button>
 <div id="caption" aria-live="polite"></div>
 <div id="ticker" aria-live="polite"></div>
 </main>
 <footer>
   <div class="bar">
-    <button id="modepill" data-key="V" title="Chat (text only) or Voice (Jarvis speaks) (V)"><b>VOICE</b> · chat</button>
-    <button id="mic" data-key="Space" title="Hold to talk (Space)" aria-label="Talk">
+    <button id="modepill" title="Chat (text only) or Voice (Jarvis speaks)"><b>VOICE</b> · chat</button>
+    <button id="mic" title="Hold to talk" aria-label="Talk">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
     </button>
     <input id="text" autocomplete="off" placeholder="Talk to Jarvis…" maxlength="4000" aria-label="Talk to Jarvis">
     <button id="send" data-key="Enter" title="Send (Enter)">SEND</button>
   </div>
 </footer>
-<div class="hint" id="hint">Hold space to talk · Enter to send · Esc to stop speaking</div>
+<div class="hint" id="hint">Type to talk · Hold the mic to speak · Enter to send</div>
 <div id="wake"><div><h1>JARVIS</h1><p>Tap or press any key to wake</p></div></div>
 <div id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"><div class="box" tabindex="-1"><h2 id="confirm-title">Waiting for your confirmation</h2><video id="cvid" controls playsinline></video><img id="cimg" alt="The picture this post will carry"><pre id="csum"></pre><div id="cform"></div><p id="cneed"></p><p id="cnote"></p>
-  <div class="btns"><button id="no" data-key="Esc" title="Not now (Esc)">Not now</button><button id="yes" data-key="Y" title="Confirm (Y)">Confirm</button></div></div></div>
+  <div class="btns"><button id="no" data-key="Esc" title="Not now (Esc)">Not now</button><button id="yes" title="Confirm">Confirm</button></div></div></div>
 <div id="mcbox" class="overlay" role="dialog" aria-label="Mission Control"><div class="box">
   <button class="act" id="mc-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Mission Control</h2><div class="tabs" id="mc-tabs"></div><div id="mc-body"></div></div></div>
@@ -300,16 +300,10 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <button class="act" id="help-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Keyboard keys</h2>
   <ul>
-    <li><kbd>Space</kbd>Hold to talk</li><li><kbd>Enter</kbd>Send what you typed</li>
-    <li><kbd>/</kbd>Type to Jarvis</li><li><kbd>Esc</kbd>Close a panel or window, stop speaking</li>
+    <li><kbd>Any key</kbd>Type to Jarvis</li><li><kbd>Enter</kbd>Send what you typed</li>
+    <li><kbd>Esc</kbd>Close a panel or window, stop speaking</li>
     <li><kbd>Y</kbd>Confirm what is on screen</li>
-    <li><kbd>1</kbd>…<kbd>9</kbd>Open a part of the business (in order around the core)</li>
-    <li><kbd>G</kbd>Go into the open panel, then Tab and Enter</li>
-    <li><kbd>T</kbd>Timeline</li><li><kbd>P</kbd>Autopilot: his mind, compass, vote and jobs</li><li><kbd>C</kbd>Mission Control</li><li><kbd>L</kbd>Conversation log</li>
-    <li><kbd>M</kbd>Voice on or off</li><li><kbd>V</kbd>Chat or Voice mode</li>
-    <li><kbd>S</kbd>Stop Jarvis speaking</li><li><kbd>W</kbd>Wake word on or off</li>
-    <li><kbd>A</kbd>Alerts on or off</li><li><kbd>D</kbd>Light or dark</li>
-    <li><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd>Zoom the map in, out, back</li><li><kbd>?</kbd>This list</li>
+    <li>Hold the microphone button to talk</li>
   </ul>
   <p>On a phone: pinch to zoom, swipe a panel left or right for the next part.</p></div></div>
 <script>
@@ -1707,8 +1701,8 @@ $("text").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preven
 let canListen = false, rec = null, chunks = [], stream = null, srec = null, live = false;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 function paintMic() { const ok = canListen || !!SR; $("mic").disabled = !ok;
-  $("mic").title = ok ? "Hold to talk (Space)" : "Voice input needs an ElevenLabs key or a browser with speech recognition - type instead";
-  $("hint").textContent = ok ? "Hold space to talk · Enter to send · Esc to stop speaking" : "Type to talk · Enter to send · Esc to stop speaking"; }
+  $("mic").title = ok ? "Hold to talk" : "Voice input needs an ElevenLabs key or a browser with speech recognition - type instead";
+  $("hint").textContent = ok ? "Type to talk · Hold the mic to speak · Enter to send" : "Type to talk · Enter to send · Esc to stop speaking"; }
 async function startListening() {
   if (live || busy || $("mic").disabled) return;
   stopSpeaking(); live = true; $("mic").classList.add("live"); setState("listening"); caption("");
@@ -1756,11 +1750,8 @@ addEventListener("keydown", (e) => {
     if (e.key === "Escape") answer(false);
     return;
   }
-  if (e.code === "Space" && document.activeElement !== $("text") && !e.repeat) { e.preventDefault(); startListening(); }
   if (e.key === "Escape") stopSpeaking();
-  if ((e.key === "m" || e.key === "M") && document.activeElement !== $("text")) $("c-mute").onclick();
 });
-addEventListener("keyup", (e) => { if (e.code === "Space" && document.activeElement !== $("text")) stopListening(); });
 $("c-mute").onclick = () => { muted = !muted; try { localStorage.setItem("jarvis-muted", muted ? "1" : "0"); } catch (e) {}
   paintMute(); if (muted) stopSpeaking(); };
 // Chat: Jarvis answers in text only. Voice: he speaks too. Same switch as VOICE ON/OFF.
@@ -2370,15 +2361,9 @@ addEventListener("keydown", (e) => {
     else if (SEL) closeDetail();
     return; }
   if (typing) return;
-  const k = e.key.toLowerCase(), act = { t: "c-time", c: "c-mc", l: "c-log", w: "c-wake", a: "c-alerts", d: "c-theme", "?": "c-help", v: "modepill" }[k];
-  if (k === "s" && !$("speakpill").hidden) { stopSpeaking(); return; }
-  if (act) { e.preventDefault(); $(act).onclick(); return; }
-  if (k === "/") { e.preventDefault(); $("text").focus(); return; }
-  if (k === "+" || k === "=") { setZoom(ZOOM * 1.1); return; }
-  if (k === "-") { setZoom(ZOOM / 1.1); return; }
-  if (k === "0") { setZoom(1); return; }
-  if (k === "g") { const b = document.querySelector("#detail button:not(.x), #detail input, #detail textarea"); if (b) { e.preventDefault(); b.focus(); } return; }
-  if (/^[1-9]$/.test(k)) { const n = NODES[parseInt(k, 10) - 1]; if (n) openNode(n.id); }
+  // Every key types to Jarvis (the owner, 2026-11-09: letters fired the controls instead of
+  // the chat). No single-letter shortcuts: the buttons and the mouse do those.
+  if (e.key.length === 1) $("text").focus();
 });
 
 // ---------------------------------------------------------------- wake + briefing
