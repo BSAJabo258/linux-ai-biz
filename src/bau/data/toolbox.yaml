@@ -906,7 +906,7 @@ entries:
     licence: Apache-2.0
     stars: "~89 (2026-10-12)"
     last_activity: "2026-10-11"
-    sources: [https://github.com/WiseriaAI/pie-ai-agent, https://github.com/WiseriaAI/pie-ai-agent/commits.atom]
+    sources: [https://github.com/wiseria-ai-labs/pie-ai-agent, https://github.com/wiseria-ai-labs/pie-ai-agent/commits.atom]
     caveats: Works inside the person's logged-in browser. Young project. The Pie Link Windows installer is unsigned and changes firewall rules; the paid plan routes chats through Pie's service.
   - name: WebOperator
     repo: KazKozDev/WebOperator
@@ -967,7 +967,7 @@ entries:
     stars: "~39.2k (2026-10-12)"
     last_activity: "2026-10-09"
     sources: [https://github.com/bytedance/UI-TARS-desktop, https://github.com/bytedance/UI-TARS-desktop/commits.atom]
-    caveats: Needs a multimodal model (its examples use Volcengine Doubao or Anthropic). Changes often - pin versions. Too heavy for an 8 GB laptop to run its own model.
+    caveats: Archived by its owner on 2026-11-09 (read-only, no more fixes; seen on its GitHub page 2026-11-09). Needs a multimodal model (its examples use Volcengine Doubao or Anthropic). Too heavy for an 8 GB laptop to run its own model.
   - name: OmniParser
     repo: microsoft/OmniParser
     url: https://github.com/microsoft/OmniParser

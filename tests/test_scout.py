@@ -419,3 +419,15 @@ def test_free_open_source_still_passes_and_fair_code_readmes_are_flagged(tmp_pat
     assert detect_license(tmp_path)["verdict"] == "COMMERCIAL_OK"
     assert readme_signals("n8n is fair-code distributed under the Sustainable Use License")[
         "says_noncommercial"]
+
+
+def test_a_missing_project_or_readme_is_said_plainly_not_as_a_raw_404():
+    # the owner, 2026-11-09: Jarvis reported GitHub 404 errors
+    def gone(req, timeout=30):
+        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {},
+                                     io.BytesIO(b'{"message": "Not Found"}'))
+    gh = GitHub(token="", opener=gone, sleep=lambda s: None)
+    assert gh.readme("owner/no-readme") == ""                  # no README is not an error
+    assert gh.latest_release("owner/no-release") is None
+    with pytest.raises(SourceError, match="is not on GitHub .deleted, renamed or private"):
+        gh.repo("owner/deleted")
