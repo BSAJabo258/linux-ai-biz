@@ -20,7 +20,7 @@ to skip it for this time. A step that is done does not come back.
 | Connect Fanvue | Opens a terminal running `bau fanvue login`; Fanvue opens in the browser, you sign in and press Allow. Shown only once your Fanvue app's keys are on this computer (docs/FANVUE.md) |
 | Let Jarvis post to Fanvue on his own | Your switch, on the card: who sees the posts and how many a day. Then the autopilot posts queued posts by itself (docs/FANVUE.md). Shown once Fanvue is connected |
 | Write your explicit limits | A box on the card: type what explicit (Fanvue-only) content must never show, one limit per line. Anything about minors is refused. Until you write them, Jarvis plans sfw content only |
-| Set your Fanvue prices | Three empty boxes on the card: the monthly price and the two unlock prices, inside Fanvue's limits (shown next to each box). Accept stays grey until all three are typed. Nothing is filled in for you |
+| Set your Fanvue prices | Three boxes on the card, filled in from Fanvue's own advice: $9.99 a month, $10.99 and $14.99 for the two unlocks. The source shows under each box. Change any of them, then press Accept; nothing is set before that |
 
 You can also say or type **"do all"**, **"let's do it all"**, **"continue"** or **"what's
 waiting on me?"**. Jarvis then puts every card that is waiting for you on screen at once,

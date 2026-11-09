@@ -137,6 +137,7 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:cente
 #cform .typed{display:block;width:100%;box-sizing:border-box;border:1px solid var(--line);color:var(--ink);
   background:var(--field);padding:10px 12px;font:inherit;font-size:15px;margin:0 0 14px}
 #cform textarea.typed{min-height:110px;resize:vertical}
+#cform .why{display:block;color:var(--dim);font-size:11px;margin:4px 0 10px;overflow-wrap:anywhere}
 .about{font-size:12.5px;line-height:1.45;color:var(--dim);margin:6px 0 4px}
 .next{font-size:13px;line-height:1.45;margin:6px 0 8px;padding:6px 9px;border-left:2px solid var(--green);background:rgba(70,242,164,.07)}
 #cneed{font-size:12px;color:var(--amber);margin:0 0 10px}
@@ -1622,15 +1623,19 @@ function nextConfirm() {
     $("yes").disabled = missing.length > 0;
     need.textContent = missing.length ? "To confirm, first choose: " + missing.map(f => f.label).join(" · ") : "";
     if (notes) note.textContent = notes[picked.promotes || ""] || notes.default; };
-  for (const f of fields) {               // owner-only choices: no default is ever preselected
+  for (const f of fields) {               // filled in with Fanvue's own advice; Accept is the choice
     form.appendChild(el("label", null, f.label));
-    if (!f.options) {                     // typed by the owner (prices, limits): starts empty
+    const why = f.why ? el("small", "why", "Suggested: " + f.why) : null;
+    if (!f.options) {                     // typed boxes (prices, limits), filled in when suggested
       const box = el(f.type === "number" ? "input" : "textarea", "typed");
       if (f.type === "number") { box.type = "number"; box.step = "0.01"; box.min = f.min; box.max = f.max; }
       box.setAttribute("aria-label", f.label);
       box.oninput = () => { const v = box.value.trim();
         picked[f.name] = f.type === "number" && (v === "" || +v < f.min || +v > f.max) ? "" : v; check(); };
-      form.appendChild(box); continue;
+      form.appendChild(box);
+      if (f.value !== undefined) { box.value = f.value; box.oninput(); }
+      if (why) form.appendChild(why);
+      continue;
     }
     const row = el("div", "opts");
     for (const [v, label] of f.options) {
@@ -1638,8 +1643,10 @@ function nextConfirm() {
       b.onclick = () => { picked[f.name] = v;
         row.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === b)); check(); };
       row.appendChild(b);
+      if (f.value === v) b.click();
     }
     form.appendChild(row);
+    if (why) form.appendChild(why);
   }
   check();
   vid.style.display = "none"; vid.removeAttribute("src");

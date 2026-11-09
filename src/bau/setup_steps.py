@@ -77,11 +77,12 @@ STEPS = (
          "minors) still runs on each post, and HOLD stops it. Not now keeps your Accept on "
          "every post. Turn it off any time: bau fanvue autopost off"),
     Step("boundaries", "Write your explicit limits",
-         "What the explicit (Fanvue-only) content must never show, one limit per line, in "
-         "your words. Until you write them, Jarvis plans sfw content only."),
+         "What the explicit (Fanvue-only) content must never show, one limit per line. A "
+         "safe starting list is filled in: change it, then Accept. Until then, Jarvis plans "
+         "sfw content only."),
     Step("prices", "Set your Fanvue prices",
-         "Type your monthly price and the two unlock prices in the boxes; nothing is filled "
-         "in for you."),
+         "Filled in from Fanvue's own advice (source under each box). Change any price, "
+         "then Accept; nothing is set before that."),
 )
 BY_ID = {s.id: s for s in STEPS}
 
@@ -248,25 +249,60 @@ def _refresh_laws(home: Path) -> None:
         shutil.copytree(src, cur)
 
 
+# Filled-in boxes (the owner's choice, 2026-11-09: "fill them out"). Every value comes from
+# Fanvue's own help pages, read 2026-11-09, and the source shows under the box. Nothing is
+# set until the owner presses Accept, and every box can be changed first.
+#   https://help.fanvue.com/en/articles/16233102-subscription-pricing-retention-guide
+#     "$9.99-$15 performing best across the platform on average"; "If you're new, start on
+#     the lower end and lean on PPV"; "Post daily, or at minimum every other day"
+#   https://help.fanvue.com/en/articles/16237634-ppv-media-a-creator-s-strategy-guide
+#     "$10-15 is a sensible floor for your cheapest PPV item"; "end it in .99"
+SUB_GUIDE = "https://help.fanvue.com/en/articles/16233102-subscription-pricing-retention-guide"
+PPV_GUIDE = "https://help.fanvue.com/en/articles/16237634-ppv-media-a-creator-s-strategy-guide"
+SUGGESTED = {
+    "subscription": (9.99, "Fanvue: $9.99 to $15 does best; new creators start at the "
+                           "lower end. " + SUB_GUIDE),
+    "nude": (10.99, "Fanvue: $10 to $15 is a sensible floor for the cheapest PPV, "
+                    "ending in .99. " + PPV_GUIDE),
+    "xxx": (14.99, "Fanvue: price by what's inside; the most explicit level gets the top "
+                   "of the $10 to $15 floor. " + PPV_GUIDE),
+    "per_day": (1, "Fanvue: post daily, or at least every other day. " + SUB_GUIDE),
+    "audience": ("subscribers", "Keeps subscriber posts behind the subscription. Fanvue "
+                                "gives no advice on this one: change it if you want free "
+                                "followers to see them."),
+    "limits": ("Adults only, consenting, fictional persona\n"
+               "No real person's likeness\nNo non-consent or coercion\n"
+               "No violence, blood or injury\nNo incest or family role-play\nNo animals\n"
+               "No drugs or alcohol in sexual content",
+               "A safe starting list in plain words. Add or remove lines; minors are "
+               "always refused whatever this says."),
+}
+
+
+def _fill(field: dict[str, object]) -> dict[str, object]:
+    value, why = SUGGESTED[str(field["name"])]
+    return {**field, "value": value, "why": why}
+
+
 def form(step: str) -> dict[str, object] | None:
-    """The boxes the owner types into on the card. Empty: nothing is ever filled in."""
+    """The boxes on the card, filled in with SUGGESTED; the owner's Accept is the choice."""
     if step == "prices":
         from .virtual_creator import PRICE_LIMITS
         names = {"subscription": "Monthly subscription", "nude": "Level 2 (nude) unlock",
                  "xxx": "Level 3 (xxx) unlock"}
-        return {"fields": [{"name": k, "type": "number", "min": lo, "max": hi,
-                            "label": f"{names[k]} in dollars (${lo:.2f} to ${hi:.2f})"}
+        return {"fields": [_fill({"name": k, "type": "number", "min": lo, "max": hi,
+                                  "label": f"{names[k]} in dollars (${lo:.2f} to ${hi:.2f})"})
                            for k, (lo, hi) in PRICE_LIMITS.items()]}
     if step == "autopost":
         from .fanvue import AUDIENCES, MAX_PER_DAY
         return {"fields": [
-            {"name": "audience", "label": "Who sees the posts?",
-             "options": [[k, v] for k, v in AUDIENCES.items()]},
-            {"name": "per_day", "type": "number", "min": 1, "max": MAX_PER_DAY,
-             "label": f"Posts a day (1 to {MAX_PER_DAY})"}]}
+            _fill({"name": "audience", "label": "Who sees the posts?",
+                   "options": [[k, v] for k, v in AUDIENCES.items()]}),
+            _fill({"name": "per_day", "type": "number", "min": 1, "max": MAX_PER_DAY,
+                   "label": f"Posts a day (1 to {MAX_PER_DAY})"})]}
     if step == "boundaries":
-        return {"fields": [{"name": "limits", "type": "text",
-                            "label": "Your explicit limits, one per line"}]}
+        return {"fields": [_fill({"name": "limits", "type": "text",
+                                  "label": "Your explicit limits, one per line"})]}
     return None
 
 
