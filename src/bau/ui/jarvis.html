@@ -86,7 +86,7 @@ button.chip{background:none;color:inherit;font:inherit;cursor:pointer;letter-spa
   min-height:2.8em}
 #caption:not(:empty){width:fit-content;max-width:min(760px,calc(100% - 32px));padding:8px 16px;border-radius:12px;background:color-mix(in srgb,var(--panel) 78%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 #caption .you{color:var(--dim);font-size:15px;display:block;margin-bottom:6px}
-aside{position:fixed;top:56px;bottom:110px;width:300px;overflow:auto;padding:0 4px;scrollbar-width:thin}
+aside{position:fixed;top:56px;max-height:calc(100vh - 166px);width:300px;overflow:auto;padding:0 4px;scrollbar-width:thin}
 aside.l{left:16px}aside.r{right:16px}
 .panel{background:var(--panel);border:1px solid var(--line);border-left:2px solid var(--cyan);
   padding:10px 12px;margin-bottom:10px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
@@ -189,7 +189,7 @@ body.showmind aside.l{display:none}
 #m-queue .ln{font:10px ui-monospace,monospace;letter-spacing:.1em;text-align:center;border:1px solid;border-radius:5px;padding:1px 0;align-self:start}
 #m-queue .GO{color:var(--green)}#m-queue .VOTE{color:var(--violet)}#m-queue .ASK{color:var(--amber)}
 #m-queue small{display:block;color:var(--dim);overflow-wrap:anywhere}
-#timeline{position:fixed;top:56px;bottom:110px;right:16px;width:340px;overflow:auto;display:none}
+#timeline{position:fixed;top:56px;max-height:calc(100vh - 166px);right:16px;width:340px;overflow:auto;display:none}
 #eye{position:fixed;top:60px;left:336px;right:24px;bottom:118px;z-index:5;display:flex;flex-direction:column;gap:8px;
   background:var(--solid);border:1px solid var(--cyan);border-radius:14px;padding:12px 14px;box-shadow:0 0 40px -12px var(--cyan)}
 #eye .eyehead{display:flex;align-items:center;gap:12px;padding:0;font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--cyan)}
@@ -2386,6 +2386,7 @@ async function wake() {
   if (!$("confirm").classList.contains("show")) $("text").focus();   // never steal a card's box
 }
 $("wake").addEventListener("click", wake);
+$("confirm").addEventListener("click", () => { if (!woke) wake(); }, { capture: true });   // a card answered before waking must not leave the wake screen over everything
 addEventListener("keydown", () => { if (!woke) wake(); }, { capture: true });
 pollActivity();
 apiJson("/api/state").then(paintState).catch(e => caption(e.message));

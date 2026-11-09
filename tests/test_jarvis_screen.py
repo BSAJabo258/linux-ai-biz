@@ -229,3 +229,14 @@ def test_the_sound_layer_follows_the_voice_and_the_work():
     assert 'if (e.kind === "start") burst(CORE[0], CORE[1], nd.x, nd.y' in page   # work → sparks
     assert "REDUCED ? 4 : 18" in page and "if (!REDUCED) shock(" in page        # calm when asked
     assert "#caption:not(:empty){" in page                          # the caption always reads
+
+
+def test_nothing_invisible_covers_the_buttons():
+    # the owner, 2026-11-09: overlapping parts stopped the mouse from reaching buttons
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
+    # the side panels are only as tall as what they show, not a see-through strip to the bottom
+    assert "aside{position:fixed;top:56px;max-height:calc(100vh - 166px);" in page
+    assert "#timeline{position:fixed;top:56px;max-height:calc(100vh - 166px);" in page
+    # a card answered before waking also takes the wake screen away
+    assert '$("confirm").addEventListener("click", () => { if (!woke) wake(); }' in page
