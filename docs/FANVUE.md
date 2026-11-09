@@ -17,8 +17,9 @@ Tested against a fake Fanvue only. It has **not run against your real Fanvue acc
    hour). Every sale is counted once. Refunds and chargebacks are taken off. Fanvue's cut is
    kept apart, so you can see what you keep.
 
-Levels 0 (free teaser) and 1 (subscribers, no nudity) for now. Levels 2 and 3 come once BAU
-can draw their pictures.
+Levels 0 (free teaser) and 1 (subscribers, no nudity) are drawn by the safe-for-work picture
+model. Levels 2 (nude) and 3 (xxx) are paid unlocks drawn by Chroma (docs/PICTURES.md); each
+is posted with your unlock price from your profile (Fanvue's minimum is $3.00).
 
 ## Let Jarvis post on his own (your switch)
 
@@ -53,8 +54,10 @@ While autopost is on, the autopilot keeps the queue stocked with your number of 
 **You approve every picture.** Accept puts it in the posting queue; Not now drops it. Autopost
 only posts pictures you accepted.
 
-Subscribers-only posts are level 1. Posts for followers and subscribers are level 0. Levels 2
-and 3 are planned: they need a picture model for explicit pictures, which you choose first.
+Subscribers-only posts are level 1. Posts for followers and subscribers are level 0. Once
+Chroma is set up and you have written your explicit limits and prices, the feed takes turns:
+your base level, then a level 2 nude unlock, then a level 3 xxx unlock. Your limits are added
+to what those pictures must never show, and each unlock card shows its price.
 
 ## Set it up once
 

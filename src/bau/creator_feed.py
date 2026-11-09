@@ -60,11 +60,15 @@ def fill(home: Path) -> int:
                    and t["state"] in ("queued", "running")]
     q = Queue(home)
     need = choice["per_day"] - len(q.pending()) - len(q.review()) - len(open_drafts)
-    level = 1 if choice["audience"] == "subscribers" else 0
     _, prof = _profile(home)
+    levels = [1 if choice["audience"] == "subscribers" else 0]
+    if explicit_ready(prof):
+        levels += [2, 3]                          # the paid unlocks, in turn with the base level
+    made = len(q.items()) + len(open_drafts)
     themes = list(prof.get("themes") or THEMES)
     n = 0
-    for _ in range(max(0, need)):
+    for i in range(max(0, need)):
+        level = levels[(made + i) % len(levels)]
         theme = secrets.choice(themes)
         if A.add(home, "draft", f"Fanvue post: {theme} ({secrets.token_hex(2)})",
                  {"job": "fanvue_post", "theme": theme, "level": level,
@@ -72,6 +76,14 @@ def fill(home: Path) -> int:
                  source="autopilot (feed)"):
             n += 1
     return n
+
+
+def explicit_ready(prof: dict[str, Any]) -> bool:
+    """Levels 2 and 3 only with Chroma installed, the owner's limits and his prices."""
+    from .media import comfy
+    prices = prof.get("prices") or {}
+    return bool(prof.get("explicit_boundaries") and prices.get("nude") and prices.get("xxx")
+                and comfy.chroma_ready())
 
 
 def caption(home: Path, prof: dict[str, Any], theme: str, factory: Any = None) -> str:
@@ -105,8 +117,23 @@ def make_post(home: Path, task: dict[str, Any], draw: Any = None,
     level, parts = int(d["level"]), d.get("parts") or {}
     scene = ", ".join(parts.values()) or d["theme"]
     negative = comfy.NEGATIVE + ", " + tiers()[level]["negative"]
+    price = None
+    if level >= 2:                               # the owner's limits never leave the picture
+        negative += ", " + ", ".join(_limit_words(prof.get("explicit_boundaries") or []))
+        price = round(float(prof["prices"]["nude" if level == 2 else "xxx"]) * 100)
     pic = (draw or comfy.draw)(home, comfy.creator_prompt(prof, scene, d["shot"]), name,
-                               negative=negative)
+                               negative=negative, lane="explicit" if level >= 2 else "sfw")
     item = Queue(home).add(pic["file"], caption(home, prof, d["theme"], factory), level,
-                           "autopilot", review=True)
+                           "autopilot", review=True, price_cents=price)
     return {"ok": True, "evidence": f"waiting for the owner: {item['item_id']} ({pic['file']})"}
+
+
+def _limit_words(limits: list[str]) -> list[str]:
+    """'No animals' -> 'animals': what a limit forbids, for the negative prompt."""
+    out = []
+    for line in limits:
+        t = str(line).strip()
+        low = t.lower()
+        if low.startswith("no "):
+            out.append(t[3:].strip())
+    return out

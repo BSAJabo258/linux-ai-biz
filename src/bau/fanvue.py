@@ -71,7 +71,9 @@ PORT = 3456
 AUDIENCES = {"subscribers": "Subscribers only",
              "followers-and-subscribers": "Followers and subscribers"}
 AI_LABEL = "AI-generated: a fictional AI character, not a real person."
-LEVELS = {0: "teaser (free, sfw)", 1: "subscriber (no nudity)"}
+LEVELS = {0: "teaser (free, sfw)", 1: "subscriber (no nudity)", 2: "nude unlock",
+          3: "xxx unlock"}
+MIN_PRICE_CENTS = 300                    # POST /v1/posts price: USD cents, >= 300, needs media
 IMAGE_TYPES = {".png", ".jpg", ".jpeg"}
 
 
@@ -221,9 +223,12 @@ class FanvueClient:
             self.sleep(2)
         raise FanvueError("Fanvue is still processing the picture; try again in a minute")
 
-    def create_post(self, text: str, audience: str, media: list[str]) -> dict[str, Any]:
-        return self.call("POST", "/v1/posts", {"text": text, "audience": audience,
-                                               "mediaUuids": media})
+    def create_post(self, text: str, audience: str, media: list[str],
+                    price: int | None = None) -> dict[str, Any]:
+        body: dict[str, Any] = {"text": text, "audience": audience, "mediaUuids": media}
+        if price is not None:                     # an unlock: USD cents, >= 300, needs media
+            body["price"] = int(price)
+        return self.call("POST", "/v1/posts", body)
 
     def earnings(self, start: str, end: str) -> list[dict[str, Any]]:
         rows, cursor = [], None
@@ -337,11 +342,14 @@ class Queue:
     def picture(self, item: dict[str, Any]) -> Path:
         return self.home / "artifacts" / "media" / item["picture"]
 
-    def check(self, picture: str, caption: str, level: int) -> list[str]:
+    def check(self, picture: str, caption: str, level: int,
+              price_cents: int | None = None) -> list[str]:
         from .virtual_creator import MINOR_REFERENCE
         problems = []
         if level not in LEVELS:
-            problems.append("levels 0 and 1 only for now (2 and 3 need their own pictures)")
+            problems.append("the level is 0, 1, 2 or 3")
+        if level >= 2 and (price_cents is None or price_cents < MIN_PRICE_CENTS):
+            problems.append("a level 2 or 3 unlock needs your price ($3.00 or more)")
         if MINOR_REFERENCE.search(caption):
             problems.append("the caption refers to minors or youth-coded words")
         p = self.home / "artifacts" / "media" / Path(picture).name
@@ -357,20 +365,23 @@ class Queue:
             problems.append("the picture has no provenance record with a passed age check")
         elif prov.get("file_sha256") != _sha256(p):
             problems.append("the picture changed after it was checked")
+        elif level >= 2 and prov.get("lane") != "explicit":
+            problems.append("levels 2 and 3 take only pictures from the explicit lane")
         return problems
 
     def add(self, picture: str, caption: str, level: int, by: str,
-            review: bool = False) -> dict[str, Any]:
+            review: bool = False, price_cents: int | None = None) -> dict[str, Any]:
         caption = caption.strip()
         if AI_LABEL not in caption:                  # Fanvue's rule and BAU's: always on
             caption = f"{caption}\n\n{AI_LABEL}".strip()
-        problems = self.check(picture, caption, level)
+        problems = self.check(picture, caption, level, price_cents)
         if len(caption) > 5000:
             problems.append("the caption is longer than Fanvue's 5000 characters")
         if problems:
             raise ValueError("; ".join(problems))
         item = {"item_id": "fv_" + secrets.token_hex(5), "picture": picture,
                 "caption": caption, "level": level, "status": "REVIEW" if review else "QUEUED",
+                "price_cents": price_cents if level >= 2 else None,
                 "picture_sha256": _sha256(self.home / "artifacts" / "media" / picture),
                 "queued_by": by, "queued_at": dt.datetime.now(dt.UTC).isoformat(),
                 "result": {}}
@@ -390,7 +401,8 @@ class Queue:
             raise FanvueError(f"{item['item_id']} is {item['status']}; it is posted only once")
         if audience not in AUDIENCES:
             raise FanvueError("the owner must choose the audience")
-        if problems := self.check(item["picture"], item["caption"], item["level"]):
+        if problems := self.check(item["picture"], item["caption"], item["level"],
+                                  item.get("price_cents")):
             raise FanvueError("; ".join(problems))
         if _sha256(self.picture(item)) != item["picture_sha256"]:
             raise FanvueError("the picture changed since it was queued - queue it again")
@@ -398,7 +410,8 @@ class Queue:
         self.save(item)
         try:
             media = client.upload_image(self.picture(item))
-            out = client.create_post(item["caption"], audience, [media])
+            out = client.create_post(item["caption"], audience, [media],
+                                     price=item.get("price_cents"))
         except Exception as e:
             item["status"], item["result"] = "FAILED", {"error": str(e)[:300]}
             self.save(item)

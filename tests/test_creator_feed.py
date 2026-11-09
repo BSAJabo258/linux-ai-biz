@@ -101,13 +101,15 @@ def test_the_autopilot_runs_the_draft_job_through_its_real_handler(home, monkeyp
 def test_every_level_has_its_own_prompt_sections_and_no_youth_words():
     from bau.virtual_creator import MINOR_REFERENCE
     tiers = C.tiers()
-    assert set(tiers) == {0, 1}                        # 2 and 3 wait for their own model
+    assert set(tiers) == {0, 1, 2, 3}
     for level, t in tiers.items():
-        assert {"setting", "outfit", "pose", "light", "camera"} <= set(t["sections"])
+        assert {"setting", "pose", "light", "camera"} <= set(t["sections"])
         lines = [x for v in t["sections"].values() for x in v] + [t["negative"]]
         assert not any(MINOR_REFERENCE.search(x) for x in lines), level
-        assert "nude" in t["negative"]                  # levels 0 and 1 never show nudity
+    assert "nude" in tiers[0]["negative"] and "nude" in tiers[1]["negative"]   # sfw levels
     assert "lingerie" in tiers[0]["negative"]          # the free teaser stays everyday wear
+    for level in (2, 3):                               # one fictional adult, alone
+        assert "second person" in tiers[level]["negative"]
 
 
 def test_each_picture_uses_its_levels_prompt_and_negative(home, monkeypatch):
@@ -147,3 +149,57 @@ def test_the_owner_accepts_or_drops_each_picture_on_its_card(home, monkeypatch):
     q = F.Queue(home)
     assert len(q.pending()) == 1 and q.review() == []                 # one posts, one dropped
     assert [i["status"] for i in q.items()].count("DROPPED") == 1
+
+
+def test_with_chroma_and_his_limits_the_feed_takes_turns_through_the_paid_levels(home,
+                                                                                    monkeypatch):
+    import yaml
+
+    from bau import team
+    from bau.media import comfy
+    p = home / "creators" / "aria.yaml"
+    prof = yaml.safe_load(p.read_text())
+    prof["explicit_boundaries"] = ["No animals", "No real person's likeness"]
+    prof["prices"] = {"subscription": 9.99, "nude": 10.99, "xxx": 14.99}
+    p.write_text(yaml.safe_dump(prof))
+    monkeypatch.setattr(team, "show", lambda h: {"boss": None})
+    monkeypatch.setattr(comfy, "chroma_ready", lambda: False)
+    F.set_autopost(home, True, "human:owner", "subscribers", 3)
+    assert C.fill(home) == 3
+    assert {t["detail"]["level"] for t in A._load(home)["tasks"]} == {1}    # no Chroma: sfw only
+    st = A._load(home)
+    st["tasks"] = []                                  # start the day again, now with Chroma
+    A._save(home, st)
+    monkeypatch.setattr(comfy, "chroma_ready", lambda: True)
+    assert C.fill(home) == 3
+    tasks = [t for t in A._load(home)["tasks"] if t["kind"] == "draft"]
+    assert sorted(t["detail"]["level"] for t in tasks) == [1, 2, 3]
+    seen = []
+
+    def draw(home_, prompt, name, **kw):
+        seen.append(kw)
+        out = fake_draw([])(home_, prompt, name)
+        prov = home_ / "artifacts" / "media" / f"{name}.png.provenance.json"
+        prov.write_text(json.dumps({**json.loads(prov.read_text()), "lane": kw["lane"]}))
+        return out
+    t3 = next(t for t in tasks if t["detail"]["level"] == 3)
+    C.make_post(home, t3, draw=draw)
+    assert seen[0]["lane"] == "explicit"
+    assert "animals" in seen[0]["negative"] and "child" in seen[0]["negative"]
+    item = F.Queue(home).review()[0]
+    assert item["level"] == 3 and item["price_cents"] == 1499 and item["status"] == "REVIEW"
+
+
+def test_the_paid_levels_setup_card_comes_after_pictures_and_his_limits(tmp_path):
+    from bau import setup_steps as S
+    facts = {"nvidia": True, "driver": True, "pictures": True, "explicit": False}
+    probe = facts.__getitem__
+    (tmp_path / "creators").mkdir()
+    (tmp_path / "creators" / "aria.yaml").write_text("id: aria\n")
+    assert S._done("explicit", tmp_path, probe) is None          # no limits written yet
+    (tmp_path / "creators" / "aria.yaml").write_text(
+        "id: aria\nexplicit_boundaries: [No animals]\n")
+    assert S._done("explicit", tmp_path, probe) is False         # waiting: the card shows
+    facts["explicit"] = True
+    assert S._done("explicit", tmp_path, probe) is True
+    assert "bau-explicit-setup.sh" in S._command("explicit", tmp_path)

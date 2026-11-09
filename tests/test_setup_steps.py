@@ -29,7 +29,7 @@ class Box:
         (self.home / "creators" / "aria.yaml").write_text(yaml.safe_dump(prof))
         self.facts = {"nvidia": nvidia, "driver": driver, "pictures": pictures,
                       "search": search, "update": update, "autopilot": autopilot,
-                      "room": False}
+                      "room": False, "explicit": False}
         self.opened = []
 
     def probe(self, what):
@@ -58,6 +58,7 @@ def test_done_steps_disappear(tmp_path):
     b = Box(tmp_path, driver=True, pictures=True, search=True, update="auto",
             laws_new=True, autopilot=True,
             profile_prices={"subscription": 9.99, "nude": 14.99, "xxx": 29.99})
+    b.facts["explicit"] = True                       # Chroma is in place too
     assert ids(b) == []
 
 

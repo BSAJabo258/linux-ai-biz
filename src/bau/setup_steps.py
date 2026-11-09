@@ -80,6 +80,11 @@ STEPS = (
          "What the explicit (Fanvue-only) content must never show, one limit per line. A "
          "safe starting list is filled in: change it, then Accept. Until then, Jarvis plans "
          "sfw content only."),
+    Step("explicit", "Set up pictures for paid levels 2 and 3",
+         "Chroma, the free picture model you chose for nude and xxx unlocks (about 23 GB "
+         "download, once, checked file by file). It joins the picture maker on this computer; "
+         "every picture still gets the age check and waits for your Accept. A terminal "
+         "opens; type your password."),
     Step("prices", "Set your Fanvue prices",
          "Filled in from Fanvue's own advice (source under each box). Change any price, "
          "then Accept; nothing is set before that."),
@@ -126,6 +131,9 @@ def _probe(what: str) -> object:
         big = [d for d in ("/var/lib/bau/models", "/usr/local/comfyui", "/opt/llama.cpp-cuda")
                if os.path.isdir(d) and not os.path.ismount(d)]
         return used.used / used.total > ROOM_FULL and bool(big)
+    if what == "explicit":
+        from .media import comfy
+        return comfy.chroma_ready()
     if what == "update":
         from . import update
         return update.mode() or "off"
@@ -182,6 +190,13 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         if fanvue.TokenStore(home).load() is None:
             return None
         return fanvue.autopost_choice(home) is not None
+    if step == "explicit":                # after pictures and the owner's explicit limits
+        import yaml
+        prof = _profile(home)
+        limits = prof and (yaml.safe_load(prof.read_text()) or {}).get("explicit_boundaries")
+        if not limits or _done("pictures", home, probe) is not True:
+            return None
+        return bool(probe("explicit"))
     if step in ("boundaries", "prices"):
         import yaml
         prof = _profile(home)
@@ -230,6 +245,8 @@ def _command(step: str, home: Path) -> str:
         return f"sudo bash {q(str(script('bau-pictures-setup.sh')))}"
     if step == "room":
         return f"sudo bash {q(str(script('bau-make-room.sh')))}"
+    if step == "explicit":
+        return f"sudo bash {q(str(script('bau-explicit-setup.sh')))}"
     if step == "search":
         return f"sudo bash {q(str(script('bau-search-setup.sh')))}"
     if step == "updates":

@@ -1008,7 +1008,10 @@ class Assistant:
                 self.pending[pid] = Pending(
                     pid, "fanvue_review", {"item": item["item_id"]},
                     f"New picture for Fanvue, level {item['level']} "
-                    f"({LEVELS[item['level']]}).\n{item['caption']}\n\n"
+                    f"({LEVELS[item['level']]})"
+                    + (f", unlock price ${item['price_cents'] / 100:.2f}"
+                       if item.get("price_cents") else "")
+                    + f".\n{item['caption']}\n\n"
                     "Accept: it joins the posting queue. Not now: it is dropped.",
                     _now(), preview=str(q.picture(item)))
         return [p.public() for p in self.pending.values()

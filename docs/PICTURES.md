@@ -37,6 +37,25 @@ the prompt and the file. Every picture is also recorded in the audit log.
 clearly adult. Fanvue's rule is that how she looks counts, not her stated age. Then list the
 good ones in a week plan (docs/WEEK.md).
 
+## Pictures for paid levels 2 and 3 (Chroma)
+
+Your choice (2026-11-09): Chroma1-HD, a free picture model (Apache-2.0) made without a safety
+filter, draws the nude and xxx unlocks for Fanvue. Set it up once, after the pictures setup
+and after you have written your explicit limits (the card pops up in Jarvis by itself):
+
+```bash
+sudo bash installer/bau-explicit-setup.sh
+```
+
+It downloads three files (about 23 GB) into the picture maker and checks each against its
+pinned fingerprint. If the disk is short of room, it stops and asks you to run Make room first
+(docs/MAKE-ROOM.md). It uses the model card's own ComfyUI recipe, shrunk to 8-bit as it loads
+so it can fit your 12 GB card; that fit is not measured yet, so the first pictures are the
+test.
+
+Every Chroma picture still gets the age check below, adds your explicit limits to what it must
+never show, is always one fictional adult alone, and waits on a card in Jarvis for your Accept.
+
 ## The age check on every picture
 
 Every picture is checked by an age model before it is kept. The model is
@@ -60,8 +79,8 @@ guard, and you still look at every picture. Videos are not age-checked yet.
 - Anything about minors is never sent to the picture model.
 - Every prompt is plain visual facts that start with her adult age. Things like "childlike",
   "cartoon" or "teen" are pushed away in every picture.
-- `bau creator draw` makes safe-for-work pictures only. Explicit pictures for Fanvue are not
-  built yet.
+- `bau creator draw` makes safe-for-work pictures only. Explicit pictures (levels 2 and 3)
+  are made only by the autopilot's Fanvue feed, with Chroma, and only for Fanvue.
 - The picture program is only reached on this computer (127.0.0.1).
 
 ## Still to do
@@ -69,5 +88,4 @@ guard, and you still look at every picture. Videos are not age-checked yet.
 - **Same face every time.** The prompt describes her the same way each time, but SDXL
   alone does not keep one exact face across pictures. A face-lock step is the next thing to
   add. Until then, pick the pictures that match her best.
-- Explicit pictures for Fanvue.
 - Showing the pictures themselves on the week's card.
