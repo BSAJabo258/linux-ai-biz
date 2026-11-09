@@ -26,12 +26,8 @@ def test_energy_streams_and_circuit_traces_run_to_every_node():
 
 def test_voice_bar_speaking_pill_and_chat_voice_toggle():
     assert 'id="wave"' in PAGE and "function drawWave" in PAGE
-    pill = re.search(r'<button[^>]*id="speakpill"[^>]*>', PAGE)
-    assert pill and 'data-key="S"' in pill.group(0)
-    mode = re.search(r'<button[^>]*id="modepill"[^>]*>', PAGE)
-    assert mode and 'data-key="V"' in mode.group(0)
-    help_box = PAGE[PAGE.index('id="help"'):]
-    assert "<kbd>S</kbd>" in help_box and "<kbd>V</kbd>" in help_box
+    assert re.search(r'<button[^>]*id="speakpill"[^>]*>', PAGE)     # tap to stop speaking
+    assert re.search(r'<button[^>]*id="modepill"[^>]*>', PAGE)      # chat or voice
 
 
 def test_motion_is_calm_for_reduced_motion_and_the_page_stays_accessible():

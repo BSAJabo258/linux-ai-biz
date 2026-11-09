@@ -233,14 +233,15 @@ def static_buttons():
     return re.findall(r"<button\b[^>]*>", body)
 
 
-def test_every_button_has_a_key_listed_in_the_help():
-    btns = static_buttons()
-    assert len(btns) >= 8
-    help_box = PAGE[PAGE.index('id="help"'):]
-    for b in btns:
-        key = re.search(r'data-key="([^"]+)"', b)
-        assert key, f"button without a keyboard shortcut: {b}"
-        assert f"<kbd>{key.group(1)}</kbd>" in help_box, f"key {key.group(1)} not in help"
+def test_every_key_types_to_jarvis_with_no_letter_shortcuts():
+    # the owner, 2026-11-09: typing fired the controls instead of going into the chat
+    assert len(static_buttons()) >= 8
+    keys = PAGE[PAGE.index("keys for everything"):PAGE.index("wake + briefing")]
+    assert 'if (e.key.length === 1) $("text").focus();' in keys
+    assert "c-time" not in keys and "openNode" not in keys and "setZoom" not in keys
+    assert not re.search(r'data-key="[A-Z?]"', PAGE)            # no single-letter keys left
+    assert 'e.code === "Space"' not in PAGE                    # Space types; the mic is a button
+    assert "<kbd>Any key</kbd>Type to Jarvis" in PAGE
 
 
 def test_page_passes_the_accessibility_lint():
