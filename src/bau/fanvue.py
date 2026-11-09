@@ -308,6 +308,25 @@ class Queue:
     def pending(self) -> list[dict[str, Any]]:
         return [i for i in self.items() if i["status"] == "QUEUED"]
 
+    def review(self) -> list[dict[str, Any]]:
+        """Drafted by the autopilot, waiting for the owner's Accept before it can post."""
+        return [i for i in self.items() if i["status"] == "REVIEW"]
+
+    def decide(self, item_id: str, approve: bool, by: str) -> dict[str, Any]:
+        if not by.startswith("human:"):
+            raise PermissionError("only the owner approves a picture")
+        item = self.get(item_id)
+        if item is None or item["status"] != "REVIEW":
+            raise FanvueError(f"{item_id} is not waiting for review")
+        if approve and _sha256(self.picture(item)) != item["picture_sha256"]:
+            raise FanvueError("the picture changed after it was drafted")
+        item["status"] = "QUEUED" if approve else "DROPPED"
+        item["reviewed_by"], item["reviewed_at"] = by, dt.datetime.now(dt.UTC).isoformat()
+        self.save(item)
+        self.audit.append("fanvue.approved" if approve else "fanvue.dropped", by,
+                          {"item": item_id})
+        return item
+
     def get(self, item_id: str) -> dict[str, Any] | None:
         return next((i for i in self.items() if i["item_id"] == item_id), None)
 
@@ -340,7 +359,8 @@ class Queue:
             problems.append("the picture changed after it was checked")
         return problems
 
-    def add(self, picture: str, caption: str, level: int, by: str) -> dict[str, Any]:
+    def add(self, picture: str, caption: str, level: int, by: str,
+            review: bool = False) -> dict[str, Any]:
         caption = caption.strip()
         if AI_LABEL not in caption:                  # Fanvue's rule and BAU's: always on
             caption = f"{caption}\n\n{AI_LABEL}".strip()
@@ -350,7 +370,7 @@ class Queue:
         if problems:
             raise ValueError("; ".join(problems))
         item = {"item_id": "fv_" + secrets.token_hex(5), "picture": picture,
-                "caption": caption, "level": level, "status": "QUEUED",
+                "caption": caption, "level": level, "status": "REVIEW" if review else "QUEUED",
                 "picture_sha256": _sha256(self.home / "artifacts" / "media" / picture),
                 "queued_by": by, "queued_at": dt.datetime.now(dt.UTC).isoformat(),
                 "result": {}}

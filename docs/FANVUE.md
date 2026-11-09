@@ -41,13 +41,20 @@ bau fanvue autopost on --audience subscribers --per-day 3          # or set it i
 While autopost is on, the autopilot keeps the queue stocked with your number of posts a day
 (`src/bau/creator_feed.py`). For each one it:
 
-1. picks an everyday scene (or one of yours, if you add a `themes:` list to Aria's profile);
+1. builds the picture prompt from its level's library (`src/bau/data/creator_prompts.yaml`):
+   Aria's look first, then one line each for setting, outfit, pose, light and camera, plus
+   what that level must never show (no nudity at levels 0 and 1; no lingerie at level 0);
 2. draws the picture on your desktop with ComfyUI, and the age check runs as always;
 3. has your local model write the caption in Aria's voice. Without a local model, the
    caption is a plain line;
-4. queues it. The AI label is added, and a caption that refers to minors is refused.
+4. puts it on a card in Jarvis with the picture and the caption. The AI label is added, and
+   a caption that refers to minors is refused.
 
-Subscribers-only posts are level 1. Posts for followers and subscribers are level 0.
+**You approve every picture.** Accept puts it in the posting queue; Not now drops it. Autopost
+only posts pictures you accepted.
+
+Subscribers-only posts are level 1. Posts for followers and subscribers are level 0. Levels 2
+and 3 are planned: they need a picture model for explicit pictures, which you choose first.
 
 ## Set it up once
 

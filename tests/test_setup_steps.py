@@ -199,7 +199,7 @@ def test_the_page_shows_them_when_jarvis_opens():
     text = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis_server.py").read_text()
     assert "setup_waiting()" in text
     page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
-    assert '/^(setup_step|autopilot_answer)$/.test(showing.tool) ? "Accept"' in page
+    assert '/^(setup_step|autopilot_answer|fanvue_review)$/.test(showing.tool) ? "Accept"' in page
     # typed boxes on cards come filled in from Fanvue's advice, and the greeting never takes
     # the keyboard from them
     assert "if (f.value !== undefined) { box.value = f.value; box.oninput(); }" in page

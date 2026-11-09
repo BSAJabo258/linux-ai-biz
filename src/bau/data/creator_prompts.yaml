@@ -1,0 +1,75 @@
+# The creator's picture prompts, by paid level (the owner's ask, 2026-11-09: "manage the
+# prompts by tier"). Each picture takes one line from every section of its level, after the
+# identity lock (the profile's age, appearance and style). Short visual facts work best for
+# the picture model: an instruction-style prompt drew a character sheet (comfy.creator_prompt).
+# Levels 2 and 3 are not here: they need an explicit-capable model the owner has not chosen.
+# Every line is checked against virtual_creator.MINOR_REFERENCE by the tests.
+levels:
+  0:
+    name: teaser (free, sfw)
+    sections:
+      setting:
+        - sunny cafe window seat
+        - city street in autumn
+        - rooftop terrace at golden hour
+        - beach boardwalk at sunset
+        - art gallery with white walls
+        - farmers market stall
+        - cozy living room with plants
+        - hotel lobby with marble floor
+      outfit:
+        - fitted jeans and a cropped knit sweater
+        - long camel coat over a black turtleneck
+        - floral summer dress
+        - tailored blazer and wide-leg trousers
+        - denim jacket and white sundress
+        - satin slip dress with a cardigan
+      pose:
+        - looking over her shoulder, smiling
+        - walking toward the camera, mid-step
+        - sitting cross-legged, holding a coffee cup
+        - leaning on a railing, relaxed
+        - laughing, hand in her hair
+      light:
+        - soft natural window light
+        - warm golden hour backlight
+        - bright overcast daylight
+        - city lights at dusk, bokeh background
+      camera:
+        - 50mm lens, shallow depth of field
+        - 35mm lens, candid street photo
+        - 85mm portrait lens, creamy background
+    negative: nude, nudity, topless, nipples, lingerie, underwear, cleavage, explicit
+  1:
+    name: subscriber (no nudity)
+    sections:
+      setting:
+        - luxury hotel suite with city view
+        - sunlit bedroom with white linen
+        - infinity pool at a villa
+        - candlelit bathroom with marble tub, fully clothed
+        - yacht deck on blue water
+        - velvet sofa in a dim lounge
+      outfit:
+        - black lace lingerie set with a silk robe
+        - red satin slip dress
+        - white bikini with a sheer cover-up
+        - oversized button-down shirt and thigh-high socks
+        - bodycon evening dress
+        - silk pajama set
+      pose:
+        - lying on her side, looking at the camera
+        - sitting on the edge of the bed, legs crossed
+        - standing in a doorway, one hand on the frame
+        - stretching, arms above her head
+        - glancing back over her shoulder
+      light:
+        - soft warm lamp light, intimate mood
+        - morning sun through sheer curtains
+        - moody low-key light with soft shadows
+        - golden hour glow on skin
+      camera:
+        - 85mm portrait lens, shallow depth of field
+        - 50mm lens, editorial glamour photo
+        - high-end boudoir photography
+    negative: nude, nudity, topless, bare breasts, nipples, genitals, see-through, explicit

@@ -127,7 +127,7 @@ def _call(opener: Any, url: str, body: dict[str, Any] | None = None, raw: bool =
 
 def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str = BASE,
          opener: Any = None, wait: float = 2.0, max_wait: float = 900.0,
-         checker: Any = None, **size: int) -> dict[str, Any]:
+         checker: Any = None, negative: str = NEGATIVE, **size: int) -> dict[str, Any]:
     """Draw one picture into BAU_HOME/artifacts/media/NAME.png and record where it came from."""
     if not LOCAL.match(base):
         raise ComfyError("pictures are drawn only by a model server on this computer")
@@ -137,7 +137,8 @@ def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str 
         raise ComfyError(f"refers to minors ({m.group(0)!r}); BAU never draws that")
     opener = opener or urllib.request.urlopen
     seed = random.randrange(2**32) if seed is None else int(seed)
-    job = _call(opener, base + "/prompt", {"prompt": graph(prompt, seed, **size)})
+    job = _call(opener, base + "/prompt",
+                {"prompt": graph(prompt, seed, negative=negative, **size)})
     if not job.get("prompt_id"):
         err = job.get("error")
         why = err.get("message") if isinstance(err, dict) else err

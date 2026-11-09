@@ -322,7 +322,11 @@ class Assistant:
             # The autopilot's questions (src/bau/autopilot.py): Accept is yes, Not now is no.
             "autopilot_answer": Tool("autopilot_answer", "The owner answers the autopilot.",
                                      _schema({"task": {"type": "string"}}),
-                                     self.t_autopilot_yes, kind="confirm")}
+                                     self.t_autopilot_yes, kind="confirm"),
+            # A picture the autopilot drafted for Fanvue: Accept lets it post, Not now drops it.
+            "fanvue_review": Tool("fanvue_review", "The owner approves a drafted picture.",
+                                  _schema({"item": {"type": "string"}}),
+                                  self.t_fanvue_approve, kind="confirm")}
 
     def _gateway(self, trust: Callable[[], Any] | None) -> tuple[Any, dict[str, str]]:
         """The same gateway the agents use: HOLD, permissions, network trust, budget and the
@@ -995,8 +999,25 @@ class Assistant:
                 self.pending[pid] = Pending(pid, "autopilot_answer", {"task": q["id"]},
                                             f"Jarvis asks: {q['question']}\n"
                                             "Accept = yes, Not now = no.", _now())
+        from .fanvue import LEVELS, Queue
+        q, shown = Queue(self.home), {p.args["item"] for p in self.pending.values()
+                                      if p.tool == "fanvue_review"}
+        for item in q.review():
+            if item["item_id"] not in shown:
+                pid = "fr_" + secrets.token_hex(4)
+                self.pending[pid] = Pending(
+                    pid, "fanvue_review", {"item": item["item_id"]},
+                    f"New picture for Fanvue, level {item['level']} "
+                    f"({LEVELS[item['level']]}).\n{item['caption']}\n\n"
+                    "Accept: it joins the posting queue. Not now: it is dropped.",
+                    _now(), preview=str(q.picture(item)))
         return [p.public() for p in self.pending.values()
-                if p.tool in ("setup_step", "autopilot_answer")]
+                if p.tool in ("setup_step", "autopilot_answer", "fanvue_review")]
+
+    def t_fanvue_approve(self, item: str) -> dict[str, Any]:
+        from .fanvue import Queue
+        Queue(self.home).decide(item, True, self.owner)
+        return {"done": True, "said": "Approved: it joins the posting queue."}
 
     def t_autopilot_yes(self, task: str) -> dict[str, Any]:
         from . import autopilot
@@ -1128,6 +1149,9 @@ class Assistant:
             p.args = {**p.args, **picked}
         if not approve and p.tool == "setup_step":           # Not now: not again for a while
             self.setup_snoozed[p.args["step"]] = time.monotonic()
+        if not approve and p.tool == "fanvue_review":        # Not now on a picture = dropped
+            from .fanvue import Queue
+            Queue(self.home).decide(p.args["item"], False, by)
         if not approve and p.tool == "autopilot_answer":     # Not now on a question = no
             from . import autopilot
             autopilot.answer(self.home, p.args["task"], "no", by)
