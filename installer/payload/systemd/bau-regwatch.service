@@ -10,6 +10,8 @@ Group=bau
 Environment=BAU_HOME=/var/lib/bau
 Environment=BAU_AUDIT_KEY=/etc/bau/audit.key
 ExecStart=/usr/local/bin/bau reg watch
+# 2 = "a source page changed, the owner should review": the watch worked, it is not a failure
+SuccessExitStatus=2
 ExecStartPost=/bin/sh -c '/usr/local/bin/bau status --brief > /var/lib/bau/reports/status-latest.json || true'
 UMask=0007
 NoNewPrivileges=yes

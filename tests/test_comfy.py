@@ -186,3 +186,13 @@ def test_explicit_setup_is_pinned_needs_the_picture_maker_and_room():
         assert sha in text
     assert "sha256sum -c" in text and "bau-pictures-setup.sh" in text and "Make room" in text
     assert "/resolve/main/" not in text                    # every file at a pinned revision
+
+
+def test_pictures_setup_brings_cuda_and_stops_a_crash_loop():
+    # The owner's RTX 3060 (2026-11-09): driver 550 worked for nvidia-smi and Vulkan, but
+    # libcuda1 was missing, so torch said "Found no NVIDIA driver" and the service restarted
+    # 3761 times. Setup now installs libcuda1, checks torch sees CUDA, and the unit backs off.
+    text = SETUP.read_text()
+    assert "apt-get install -y libcuda1" in text
+    assert "torch.cuda.is_available()" in text
+    assert "StartLimitBurst=5" in text and "RestartSec=30" in text

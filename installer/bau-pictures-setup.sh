@@ -56,6 +56,12 @@ fi
 
 say "1/5 Packages (Debian)..."
 apt-get install -y python3-venv git curl >/dev/null
+# PyTorch talks to the card through libcuda.so, which Debian ships apart from the driver
+# (libcuda1). Without it nvidia-smi and Vulkan work but torch says "Found no NVIDIA driver"
+# (the owner's RTX 3060, 2026-11-09: 3761 restarts). Same version as the driver, from apt.
+if [[ ${BAU_PICTURES_CPU:-} != 1 ]] && ! compgen -G '/usr/lib/x86_64-linux-gnu/libcuda.so*' >/dev/null; then
+  apt-get install -y libcuda1 >/dev/null || { say "Could not install libcuda1 (NVIDIA's CUDA library)."; exit 1; }
+fi
 
 say "2/5 The comfyui account (no login, no password)..."
 id comfyui >/dev/null 2>&1 || useradd --shell /usr/sbin/nologin --system \
@@ -78,6 +84,11 @@ runuser -u comfyui -- "${VENV}/bin/pip" install --quiet -U pip
 runuser -u comfyui -- "${VENV}/bin/pip" install --quiet --index-url "${TORCH_INDEX}" \
   torch torchvision torchaudio
 runuser -u comfyui -- "${VENV}/bin/pip" install --quiet -r "${SRC}/requirements.txt"
+if [[ ${BAU_PICTURES_CPU:-} != 1 ]] && ! runuser -u comfyui -- "${VENV}/bin/python" -c \
+    'import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then
+  say "PyTorch cannot see the NVIDIA card (CUDA). Check: nvidia-smi, and apt install libcuda1."
+  exit 1
+fi
 
 say "5/5 The picture model (6.9 GB, checked), the service (this computer only)..."
 DEST="${SRC}/models/checkpoints/${MODEL_FILE}"
@@ -115,6 +126,9 @@ cat > "${UNIT}" <<EOF
 [Unit]
 Description=Local pictures for BAU (ComfyUI on 127.0.0.1:8188)
 After=network.target
+# A start that keeps failing stops after 5 tries in 10 minutes instead of looping forever.
+StartLimitIntervalSec=600
+StartLimitBurst=5
 
 [Service]
 User=comfyui
@@ -123,6 +137,7 @@ SupplementaryGroups=video render
 WorkingDirectory=${SRC}
 ExecStart=${VENV}/bin/python ${SRC}/main.py --listen 127.0.0.1 --port 8188 --disable-auto-launch ${EXTRA[*]}
 Restart=on-failure
+RestartSec=30
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
