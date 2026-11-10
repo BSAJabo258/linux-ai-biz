@@ -1138,3 +1138,39 @@ entries:
     last_activity: "2026-10-09"
     sources: [https://github.com/temporalio/sdk-python, https://github.com/temporalio/sdk-python/pull/1923]
     caveats: Heavy to run on a laptop; BAU's own job checkpoints already survive reboots.
+  - name: REA (Reverse Engineer Anything)
+    repo: morluto/rea
+    url: https://github.com/morluto/rea
+    category: agents
+    checked: "2026-11-10"
+    problem: "Understanding how an app, website or program works without its source code, down to the binary, with the evidence for each conclusion."
+    how_used: "An MCP server plus terminal commands (npm package rea-agents, `npx rea-agents setup`); static JavaScript/Electron analysis needs no extra engine, native binaries use Ghidra, Hopper, IDA or Kuna. Analysis runs locally."
+    licence: MIT
+    stars: "~450k (2026-11-10)"
+    last_activity: "2026-11-10"
+    sources: [https://github.com/morluto/rea, https://rea.tools/]
+    caveats: "Needs Node.js and npm, not on the desktop yet. Many look-alike repos copy its name and README; only morluto/rea, rea.tools and the rea-agents npm package are official (its own README). Studying how a feature works is fine; using a platform's hidden API to post, scrape or pay breaks its terms and can close the account (Fanvue, Instagram, TikTok)."
+  - name: Integuru
+    repo: Integuru-AI/Integuru
+    url: https://github.com/Integuru-AI/Integuru
+    category: connect
+    checked: "2026-11-10"
+    problem: "An AI agent that builds integrations by reverse engineering a platform's internal API from recorded browser traffic."
+    how_used: "Record a browser session (HAR file and cookies), then the agent writes code that calls the internal requests it found."
+    licence: AGPL-3.0
+    stars: "~4.8k (2026-11-10)"
+    last_activity: "2026-06-24"
+    sources: [https://github.com/Integuru-AI/Integuru]
+    caveats: "AGPL-3.0 is not on the owner's free-licence list (MIT, Apache-2.0, BSD, ISC, MPL); his call before it joins. Internal APIs change without notice and using them usually breaks the platform's terms; BAU uses official APIs only."
+  - name: Conway Automaton
+    repo: Conway-Research/automaton
+    url: https://github.com/Conway-Research/automaton
+    category: agents
+    checked: "2026-11-10"
+    problem: "An agent that must earn its own running costs or stop; survival tiers by balance, self-modification and self-replication."
+    how_used: "Node.js runtime on Conway Cloud with its own Ethereum wallet. BAU took the ideas, not the code (src/bau/automaton.py: earned budget, survival tiers, growing on the owner's Accept)."
+    licence: MIT
+    stars: "~7.8k (2026-11-10)"
+    last_activity: "2026-08-26"
+    sources: [https://github.com/Conway-Research/automaton]
+    caveats: "Its own wallet, self-copying and self-editing skip a human's approval of money and changes, which the owner's rules require. Runs on a paid cloud."

@@ -40,6 +40,32 @@ class Box:
         return True
 
 
+@pytest.fixture(autouse=True)
+def no_fanvue_keys(monkeypatch):
+    """This computer's own /etc/bau/platforms.env must not decide what a test sees."""
+    from bau import fanvue
+    monkeypatch.setattr(fanvue, "_env_file", lambda path: {})
+    monkeypatch.delenv("FANVUE_CLIENT_ID", raising=False)
+    monkeypatch.delenv("FANVUE_CLIENT_SECRET", raising=False)
+
+
+def fanvue_done(home, monkeypatch, automaton=True):
+    """Fanvue's app keys here, logged in, autopost chosen and (optionally) the automaton on."""
+    import json
+    monkeypatch.setenv("FANVUE_CLIENT_ID", "id")
+    monkeypatch.setenv("FANVUE_CLIENT_SECRET", "secret")
+    (home / "secrets").mkdir(exist_ok=True)
+    (home / "secrets" / "fanvue.json").write_text(json.dumps(
+        {"access_token": "a", "refresh_token": "r", "expires_at": 9e12}))
+    (home / "fanvue").mkdir(exist_ok=True)
+    (home / "fanvue" / "autopost.json").write_text(json.dumps(
+        {"on": True, "audience": "subscribers", "per_day": 2, "by": "human:owner"}))
+    if automaton:
+        (home / "automaton").mkdir(exist_ok=True)
+        (home / "automaton" / "state.json").write_text(json.dumps(
+            {"on": True, "started_at": "2026-11-10T00:00:00+00:00", "budget_usd": 0}))
+
+
 @pytest.fixture
 def box(tmp_path):
     return Box(tmp_path)
@@ -50,15 +76,16 @@ def ids(box):
 
 
 def test_everything_still_waiting_is_listed_in_order(box):
-    assert ids(box) == ["laws", "nvidia", "search", "updates", "autopilot", "boundaries",
-                        "prices"]
+    assert ids(box) == ["laws", "nvidia", "search", "updates", "autopilot", "fanvue_app",
+                        "boundaries", "prices"]
 
 
-def test_done_steps_disappear(tmp_path):
+def test_done_steps_disappear(tmp_path, monkeypatch):
     b = Box(tmp_path, driver=True, pictures=True, search=True, update="auto",
             laws_new=True, autopilot=True,
             profile_prices={"subscription": 9.99, "nude": 14.99, "xxx": 29.99})
     b.facts["explicit"] = True                       # Chroma is in place too
+    fanvue_done(b.home, monkeypatch)
     assert ids(b) == []
 
 
@@ -166,10 +193,10 @@ def test_jarvis_pops_every_waiting_step_up_once_and_accept_runs_it(tmp_path, mon
     monkeypatch.setattr(S, "_terminal", b.terminal)
     j = Assistant(b.home)
     first = j.setup_waiting()
-    assert [p["tool"] for p in first] == ["setup_step"] * 7
+    assert [p["tool"] for p in first] == ["setup_step"] * 8
     assert "Accept" in first[0]["summary"] or first[0]["summary"]
     again = j.setup_waiting()                          # not stacked twice
-    assert len([p for p in j.pending.values() if p.tool == "setup_step"]) == 7
+    assert len([p for p in j.pending.values() if p.tool == "setup_step"]) == 8
     assert {p["id"] for p in again} == {p["id"] for p in first}
     nvidia = next(p for p in first if "NVIDIA" in p["summary"])
     with pytest.raises(PermissionError):
@@ -279,3 +306,29 @@ def test_the_picture_service_loads_cuda_before_it_starts():
     text = (Path(__file__).resolve().parents[1] / "installer" / "bau-pictures-setup.sh").read_text()
     assert 'PRE="ExecStartPre=+$(command -v nvidia-modprobe) -u -c=0"' in text
     assert "WorkingDirectory=${SRC}\n${PRE}\nExecStart=" in text
+
+
+# ------------------------------------------------------------------ the money loop's cards
+def test_without_fanvue_app_keys_a_card_says_how_and_types_them_in(box):
+    assert "fanvue_app" in ids(box) and "fanvue" not in ids(box)
+    S.run("fanvue_app", box.home, probe=box.probe, terminal=box.terminal)
+    cmd = box.opened[-1][1]
+    assert cmd == ("sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET && "
+                   "bau fanvue login")
+    assert "127.0.0.1:3456/callback" in S.BY_ID["fanvue_app"].why
+
+
+def test_once_fanvue_and_autopost_are_on_the_automaton_card_starts_it(box, monkeypatch):
+    fanvue_done(box.home, monkeypatch, automaton=False)
+    assert "automaton" in ids(box) and "fanvue_app" not in ids(box)
+    assert all("value" not in f for f in S.form("automaton")["fields"])   # his numbers only
+    out = S.run("automaton", box.home, owner="human:owner", values={"days": "5"})
+    assert "fill in every box" in out["error"]
+    with pytest.raises(PermissionError):
+        from bau import automaton
+        automaton.start(box.home, "jarvis", "subscribers", 2)
+    out = S.run("automaton", box.home, owner="human:owner",
+                values={"days": "30", "budget": "0", "reinvest": "50", "cap": "20",
+                        "grow_at": "100"})
+    assert out["done"] and "30 days" in out["said"]
+    assert "automaton" not in ids(box) and "grow" not in ids(box)

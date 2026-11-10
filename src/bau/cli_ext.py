@@ -602,6 +602,18 @@ def cmd_keys(a):
         if a.keys_cmd == "list":
             _out(K.names(etc))
             return 0
+        if a.keys_cmd == "set":
+            if not a.etc and os.geteuid() != 0:
+                raise SystemExit("run with sudo: sudo bau keys set " + " ".join(a.names))
+            typed = {}
+            for name in a.names:
+                try:
+                    typed[name] = getpass.getpass(f"Paste {name} (it is not shown), then Enter: ")
+                except (EOFError, KeyboardInterrupt):
+                    raise K.KeyFileError("stopped, so nothing was saved") from None
+            who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
+            _out(K.set_keys(typed, etc, AuditLog(), who))
+            return 0
         if not a.etc and os.geteuid() != 0:
             raise SystemExit("run with sudo: sudo bau keys import " + a.file)
         passphrase = _passphrase(Path(a.file).name)
@@ -709,7 +721,11 @@ def cmd_automaton(a):
     from .home import bau_home
     home = bau_home()
     if a.am_cmd == "start":
-        out = automaton.start(home, _human(), a.audience, a.per_day, a.budget, a.days)
+        out = automaton.start(home, _human(), a.audience, a.per_day, a.budget, a.days,
+                              reinvest_pct=a.reinvest, reinvest_cap_usd=a.cap,
+                              grow_at_usd=a.grow_at)
+    elif a.am_cmd == "grow":
+        out = automaton.grow(home, _human(), a.per_day)
     elif a.am_cmd == "stop":
         out = automaton.stop(home, _human())
     else:
@@ -1892,6 +1908,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--etc", help=argparse.SUPPRESS)
     x = w.add_parser("list", help="which key names BAU has (never the values)")
     x.add_argument("--etc", help=argparse.SUPPRESS)
+    x = w.add_parser("set", help="sudo: type keys in here (hidden), e.g. FANVUE_CLIENT_ID")
+    x.add_argument("names", nargs="+")
+    x.add_argument("--etc", help=argparse.SUPPRESS)
     s.set_defaults(fn=cmd_keys)
 
     s = sub.add_parser("pack", help="the BAU Pack: models and keys from a USB stick "
@@ -1948,6 +1967,14 @@ def register(sub: argparse._SubParsersAction) -> None:
                    help="dollars it may spend from its start (0: free and local tools only)")
     x.add_argument("--days", type=int, default=30,
                    help="it must earn something every this many days, or it stops")
+    x.add_argument("--reinvest", type=float, default=0.0,
+                   help="percent of what it really earned it may spend too (0: none)")
+    x.add_argument("--cap", type=float, default=0.0,
+                   help="most dollars of its earnings it may spend (0: none)")
+    x.add_argument("--grow-at", type=float, default=0.0,
+                   help="dollars earned before it may ask to post more (0: never asks)")
+    x = w.add_parser("grow", help="you: more posts a day, once it has earned --grow-at")
+    x.add_argument("--per-day", type=int, required=True)
     w.add_parser("stop", help="you: switch it off")
     s.set_defaults(fn=cmd_automaton)
 

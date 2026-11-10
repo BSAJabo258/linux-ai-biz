@@ -102,3 +102,52 @@ def test_a_zero_budget_uses_only_this_computers_models(home, monkeypatch):  # no
     M.stop(home, "human:owner")
     _, rec = assistant.pick_model(home)
     assert rec["deployment"] == "hosted"                         # off: the owner's usual order
+
+
+# The owner's ask (2026-11-10, after Conway-Research/automaton, MIT): give it a fighting chance
+# and the means, the safe way: earnings it may reinvest, survival tiers, and growing on Accept.
+def test_it_may_spend_a_share_of_what_it_really_earned_up_to_the_cap(home):  # noqa: F811
+    M.start(home, "human:owner", "subscribers", 3, now=T0, reinvest_pct=50,
+            reinvest_cap_usd=20)
+    s = M.status(home, day(1))
+    assert s["tier"] == "low_compute" and s["money_left_usd"] == 0 and M.free_only(home)
+    ledger(home, "revenue.jsonl", day(1), 10.0)
+    s = M.status(home, day(2))
+    assert s["earned_budget_usd"] == 5.0 and s["tier"] == "normal" and not M.free_only(home)
+    ledger(home, "revenue.jsonl", day(2), 100.0)
+    assert M.status(home, day(3))["earned_budget_usd"] == 20.0        # the cap holds
+    ledger(home, "costs.jsonl", day(3), 21.0)
+    assert M.check(home, day(3))["dead"]["why"].startswith("spent $21.00, over its $20.00")
+
+
+def test_no_reinvest_chosen_means_no_money_from_earnings(home):  # noqa: F811
+    M.start(home, "human:owner", "subscribers", 3, now=T0)
+    ledger(home, "revenue.jsonl", day(1), 50.0)
+    s = M.status(home, day(2))
+    assert s["earned_budget_usd"] == 0 and s["tier"] == "low_compute"
+
+
+def test_the_last_week_without_income_is_critical(home):  # noqa: F811
+    M.start(home, "human:owner", "subscribers", 3, now=T0)
+    assert M.status(home, day(22))["tier"] == "low_compute"
+    assert M.status(home, day(23))["tier"] == "critical"
+    M.check(home, day(30))
+    assert M.status(home, day(30))["tier"] == "dead"
+
+
+def test_it_grows_only_after_earning_and_only_on_the_owners_word(home):  # noqa: F811
+    M.start(home, "human:owner", "subscribers", 2, now=T0, grow_at_usd=25)
+    assert not M.status(home, day(1))["grow_ready"]
+    with pytest.raises(ValueError):
+        M.grow(home, "human:owner", 4)
+    ledger(home, "revenue.jsonl", day(1), 30.0)
+    assert M.status(home, day(2))["grow_ready"]
+    with pytest.raises(PermissionError):
+        M.grow(home, "automaton", 4)                                  # never by itself
+    with pytest.raises(ValueError, match="more than 2"):
+        M.grow(home, "human:owner", 2)
+    s = M.grow(home, "human:owner", 4)
+    assert s["per_day"] == 4 and F.autopost_choice(home)["per_day"] == 4
+    assert not s["grow_ready"]                    # next time only after twice as much
+    ledger(home, "revenue.jsonl", day(3), 30.0)
+    assert M.status(home)["grow_ready"]
