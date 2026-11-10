@@ -1640,11 +1640,14 @@ def load_env_file(path: Path = Path("/etc/bau/models.env")) -> None:
 
 
 class Voice:
-    """Text to speech through ElevenLabs when a key is configured; otherwise the
-    browser's own voice is used. Audio is cached by text, so repeats cost nothing."""
+    """Text to speech through ElevenLabs when a key is configured, or through Jarvis's own
+    voice on this computer (Kokoro + Whisper, bau-voice.service, docs/VOICE.md) when the
+    owner chose `speak: local` / `listen: local`; otherwise the browser's own voice is used.
+    Audio is cached by text, so repeats cost nothing."""
 
     URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128"
     STT_URL = "https://api.elevenlabs.io/v1/speech-to-text"
+    LOCAL_URL = "http://127.0.0.1:8767"     # installer/bau-voice-server.py
 
     def __init__(self, home: Path | None = None, opener: Any = None):
         self.home = home or bau_home()
@@ -1654,19 +1657,24 @@ class Voice:
         self.stt_model = cfg.get("elevenlabs_stt_model") or "scribe_v2"
         # The owner's voice only leaves the machine when they have chosen ElevenLabs
         # (a key is configured) and have not switched listening off.
-        self.listen_enabled = cfg.get("listen", "elevenlabs") == "elevenlabs"
+        self.listen_mode = cfg.get("listen", "elevenlabs")
+        self.listen_enabled = self.listen_mode in ("elevenlabs", "local")
+        self.local_speak = cfg.get("speak") == "local"
+        self.local_voice = cfg.get("local_voice") or "bm_george"
         self.key = _env("ELEVENLABS_API_KEY")
         self.cache = self.home / "jarvis" / "tts"
         self.open = opener or urllib.request.urlopen
 
     @property
     def available(self) -> bool:
-        return bool(self.key)
+        return bool(self.key) or self.local_speak
 
     def speak(self, text: str) -> bytes | None:
-        if not self.key or not text.strip():
+        if not self.available or not text.strip():
             return None
         text = text.strip()[:2500]
+        if self.local_speak:
+            return self._speak_local(text)
         h = hashlib.sha256(f"{self.voice_id}|{self.model_id}|{text}".encode()).hexdigest()
         cached = self.cache / f"{h}.mp3"
         if cached.exists():
@@ -1685,14 +1693,41 @@ class Voice:
         cached.write_bytes(audio)
         return audio
 
+    def _speak_local(self, text: str) -> bytes | None:
+        h = hashlib.sha256(f"local|{self.local_voice}|{text}".encode()).hexdigest()
+        cached = self.cache / f"{h}.wav"
+        if cached.exists():
+            return cached.read_bytes()
+        req = urllib.request.Request(self.LOCAL_URL + "/speak", method="POST",
+                                     data=json.dumps({"text": text, "voice": self.local_voice})
+                                     .encode(), headers={"Content-Type": "application/json"})
+        try:
+            with self.open(req, timeout=60) as r:
+                audio = r.read()
+        except (urllib.error.URLError, OSError):
+            return None                 # not installed or stopped: the browser's voice
+        self.cache.mkdir(parents=True, exist_ok=True)
+        cached.write_bytes(audio)
+        return audio
+
     @property
     def can_listen(self) -> bool:
+        if self.listen_mode == "local":
+            return True
         return bool(self.key) and self.listen_enabled
 
     def listen(self, audio: bytes, mime: str = "audio/webm") -> str | None:
         """Speech to text for one push-to-talk clip. Nothing is stored."""
         if not self.can_listen or not audio:
             return None
+        if self.listen_mode == "local":
+            req = urllib.request.Request(self.LOCAL_URL + "/listen", method="POST", data=audio,
+                                         headers={"Content-Type": mime.split(";")[0]})
+            try:
+                with self.open(req, timeout=60) as r:
+                    return str(json.loads(r.read()).get("text") or "").strip()
+            except (urllib.error.URLError, OSError, ValueError):
+                return None
         boundary = "bau" + secrets.token_hex(12)
         ext = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a",
                "audio/wav": "wav", "audio/mpeg": "mp3"}.get(mime.split(";")[0], "webm")

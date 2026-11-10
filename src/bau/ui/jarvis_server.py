@@ -384,7 +384,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 if audio is None:
                     self._send(204, b"", "text/plain")
                 else:
-                    self._send(200, audio, "audio/mpeg")
+                    self._send(200, audio, "audio/wav" if audio[:4] == b"RIFF" else "audio/mpeg")
             else:
                 self._send(404, b"not found", "text/plain")
 
