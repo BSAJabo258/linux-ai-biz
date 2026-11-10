@@ -203,3 +203,23 @@ def test_the_paid_levels_setup_card_comes_after_pictures_and_his_limits(tmp_path
     facts["explicit"] = True
     assert S._done("explicit", tmp_path, probe) is True
     assert "bau-explicit-setup.sh" in S._command("explicit", tmp_path)
+
+
+def test_gods_eye_sky_gives_the_days_first_post_a_timely_theme(home, monkeypatch):
+    # The owner's ask (2026-11-10): God's Eye helps the money loop with timely post ideas.
+    import datetime as dt
+
+    from bau import spatial
+    assert [m["name"] for m in spatial.sky_moments(dt.date(2026, 8, 12))] == [
+        "new moon", "Perseid meteor shower"]               # the 2026 Perseids at new moon
+    assert spatial.sky_moments(dt.date(2026, 8, 16)) == []
+    assert spatial.moon_age(spatial.NEW_MOON) == 0.0
+    F.set_autopost(home, True, "human:owner", "subscribers", 3)
+    monkeypatch.setattr(spatial, "sky_moments", lambda day: [
+        {"kind": "meteors", "name": "Perseid meteor shower",
+         "theme": "watching the Perseid meteor shower under the night sky"}])
+    assert C.fill(home) == 3
+    drafts = [t for t in A._load(home)["tasks"] if t["kind"] == "draft"]
+    timely = [t for t in drafts if t["detail"].get("timely")]
+    assert len(timely) == 1 and "Perseid" in timely[0]["detail"]["theme"]   # one post, not all
+    assert C._timely(home) == []                           # used today: not again
