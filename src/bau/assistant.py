@@ -1788,6 +1788,8 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
     hosted: list[tuple[Provider, dict[str, Any], str]] = []
     local: tuple[Provider, dict[str, Any], str] | None = None
     first: tuple[Provider, dict[str, Any], str] | None = None
+    from .automaton import free_only
+    free = free_only(home)                   # the $0 automaton: only this computer's models
     for mid in dict.fromkeys(m for m in order if m):
         try:
             provider, rec = provider_for(mid, home)
@@ -1795,6 +1797,8 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             continue
         if rec.get("lane") == "content_only":
             continue                         # content-lane models never run Jarvis
+        if free and rec.get("deployment") != "local":
+            continue
         key = rec.get("api_key_env")
         if key and not os.environ.get(key):
             continue                         # no key on this computer: it cannot answer

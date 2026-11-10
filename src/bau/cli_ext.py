@@ -686,6 +686,20 @@ def cmd_update(a):
     return 0 if out["result"] in ("off", "up to date", "installed", "no answer") else 1
 
 
+def cmd_automaton(a):
+    from . import automaton
+    from .home import bau_home
+    home = bau_home()
+    if a.am_cmd == "start":
+        out = automaton.start(home, _human(), a.audience, a.per_day, a.budget, a.days)
+    elif a.am_cmd == "stop":
+        out = automaton.stop(home, _human())
+    else:
+        out = automaton.status(home)
+    _out(out)
+    return 0
+
+
 def cmd_autopilot(a):
     from . import autopilot as A
     from . import autopilot_jobs as J
@@ -702,7 +716,16 @@ def cmd_autopilot(a):
             posted = fanvue.autopost_tick(home)
         except Exception as e:  # noqa: BLE001 - the autopilot's own work is already done
             posted = {"autopost": f"error: {e}"[:200]}
-        _out({"seeded": seeded, **out, "fanvue": posted, "status": A.status(home)})
+        from . import automaton
+        alive = None
+        if automaton.running(home):          # make money or die: count the money, then judge
+            try:
+                fanvue.sync_if_due(home)
+            except Exception:  # noqa: BLE001 - offline or not connected: judged on what we have
+                pass
+            alive = automaton.check(home)
+        _out({"seeded": seeded, **out, "fanvue": posted, "automaton": alive,
+              "status": A.status(home)})
     elif c == "digest":
         print(A.digest(home))
     elif c == "questions":
@@ -1890,6 +1913,22 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("wheel")
     x.add_argument("commit")
     s.set_defaults(fn=cmd_update)
+
+    s = sub.add_parser("automaton", help="make money or die: Jarvis runs the Fanvue loop by "
+                       "himself on a budget and a deadline (docs/AUTOMATON.md)")
+    w = s.add_subparsers(dest="am_cmd")
+    w.add_parser("status", help="day, money in, money spent, days left to earn")
+    x = w.add_parser("start", help="you: switch it on (posts without asking you)")
+    from .fanvue import AUDIENCES
+    x.add_argument("--audience", required=True, choices=sorted(AUDIENCES),
+                   help="who sees the posts (no default: your choice)")
+    x.add_argument("--per-day", type=int, required=True, help="posts a day, 1 to 10")
+    x.add_argument("--budget", type=float, default=0.0,
+                   help="dollars it may spend from its start (0: free and local tools only)")
+    x.add_argument("--days", type=int, default=30,
+                   help="it must earn something every this many days, or it stops")
+    w.add_parser("stop", help="you: switch it off")
+    s.set_defaults(fn=cmd_automaton)
 
     s = sub.add_parser("autopilot", help="Jarvis works on his own: lanes, vote, compass "
                                          "(docs/AUTOPILOT.md)")
