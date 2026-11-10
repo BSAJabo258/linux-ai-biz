@@ -51,3 +51,19 @@ or start it again with `sudo systemctl restart bau-search`.
   engines keep answering.
 - Tested 2026-10-21: the setup ran in a clean Debian 13 in about a minute and Jarvis's
   search returned real results. Not yet tested on your laptop itself.
+
+## Watching a video
+
+Paste a video link into Jarvis (YouTube, Shorts, TikTok, Vimeo, Instagram reel, X, Rumble),
+or type "youtube shorts" and the video's id. He watches it first, then answers: the title,
+channel, description and the words said in it. The words come from the video's captions; if
+it has none, only the sound is downloaded and the local Whisper (bau-voice) writes it down on
+this computer. He hears a video but does not see its pictures: the local model reads text
+only. Links to other sites are refused. Every video watched is audited with its purpose.
+
+It needs the video downloader yt-dlp (public domain), installed once:
+
+```bash
+sudo curl -L -o /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp
+sudo chmod a+rx /usr/local/bin/yt-dlp
+```

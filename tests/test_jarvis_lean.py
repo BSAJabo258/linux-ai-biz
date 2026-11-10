@@ -384,3 +384,24 @@ def test_yes_after_jarvis_offered_to_run_them_stages_them_too(tmp_path):
     b = lean(tmp_path, ["Fine.", "ok"])
     b.ask("how are you?")
     assert b.ask("yes").pending == []                 # a yes to something else stages nothing
+
+
+def test_a_video_link_is_watched_before_a_small_model_answers(tmp_path, monkeypatch):
+    # Owner's desktop, 2026-11-10: asked about a YouTube Short, Jarvis said he could not
+    # watch videos. Now the link is watched first and the words come to the model as data.
+    a = lean(tmp_path, ["It is about an automaton."])
+    seen = []
+    h = a.gateway.handlers[a.caps["watch_video"]]
+    monkeypatch.setattr(h, "fn", lambda url, why: seen.append(url) or
+                        {"title": "Automaton AI", "transcript": "it makes money or dies"})
+    r = a.ask("watch this https://youtube.com/shorts/j2WbZSPYKQI and tell me")
+    first = str(a.provider.calls[0]["messages"][-1]["content"])
+    assert seen == ["https://youtube.com/shorts/j2WbZSPYKQI"]
+    assert "it makes money or dies" in first and "<untrusted_data" in first
+    assert r.cards[0]["tool"] == "watch_video" and a.tainted        # outside content
+    b = lean(tmp_path, ["ok"])
+    h = b.gateway.handlers[b.caps["watch_video"]]
+    monkeypatch.setattr(h, "fn", lambda url, why: (_ for _ in ()).throw(
+        ValueError("the video downloader (yt-dlp) is not installed")))
+    b.ask("what is in youtube shorts j2WbZSPYKQI")
+    assert "could_not_watch" in str(b.provider.calls[0]["messages"][-1]["content"])
