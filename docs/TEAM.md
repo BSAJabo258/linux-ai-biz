@@ -38,6 +38,10 @@ bau team set --boss qwen3.5-4b --thinker qwen3-4b-heretic-content \
 bau team show
 ```
 
+To keep every model on your computer, run `bau privacy local-only` first and pick a local
+specialist (for example `--specialist qwen3.5-9b`); then Claude is refused as the
+specialist. See [LOCAL-ONLY.md](LOCAL-ONLY.md).
+
 The boss also becomes the model Jarvis thinks with. Change any part later with the same
 command, for example `bau team set --takeover ask`.
 

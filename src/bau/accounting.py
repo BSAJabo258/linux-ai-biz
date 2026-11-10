@@ -89,7 +89,7 @@ class Books:
             limit = th.get(cat, th["other"])
             if amt >= limit:
                 form = "1099-MISC" if cat in ("royalties", "rents", "other") else "1099-NEC"
-                if p.get("form", "").startswith("W-8"):
+                if (p.get("form") or "").startswith("W-8"):     # form may be None
                     form = "1042-S (foreign payee - CPA review)"
                 out.append({"payee": payee, "category": cat, "total": str(amt),
                             "threshold": str(limit), "form": form,

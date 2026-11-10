@@ -86,21 +86,27 @@ class AnthropicProvider(Provider):
             client = anthropic.Anthropic()
         self.client = client
 
+    # The API refuses a request with more than 20 strict tools (400 on the desktop,
+    # 2026-10-28: "Too many strict tools (36). The maximum number of strict tools supported
+    # is 20."); Jarvis offers more, so only the first 20 are strict.
+    MAX_STRICT_TOOLS = 20
+
     @staticmethod
-    def _tool(t: ToolSpec) -> dict[str, Any]:
+    def _tool(t: ToolSpec, strict: bool = True) -> dict[str, Any]:
         schema = dict(t.input_schema)
         schema.setdefault("type", "object")
         schema.setdefault("additionalProperties", False)
         schema.setdefault("required", list(schema.get("properties", {})))
         return {"name": t.name, "description": t.description, "input_schema": schema,
-                "strict": True}
+                "strict": strict}
 
     def complete(self, system, messages, tools=None, max_tokens=16000):
         kwargs: dict[str, Any] = dict(
             model=self.model, max_tokens=max_tokens, system=system, messages=messages,
             output_config={"effort": self.effort})
         if tools:
-            kwargs["tools"] = [self._tool(t) for t in tools]
+            kwargs["tools"] = [self._tool(t, i < self.MAX_STRICT_TOOLS)
+                               for i, t in enumerate(tools)]
         if self.fallbacks:
             resp = self.client.beta.messages.create(
                 betas=["server-side-fallback-2026-07-01"],
@@ -161,6 +167,7 @@ class LocalHTTPProvider(Provider):
         self.timeout = timeout
         self._open = opener or urllib.request.urlopen
         self.last_limits: dict[str, str] = {}
+        self.last_timings: dict[str, Any] | None = None
 
     def _headers(self) -> dict[str, str]:
         return {"Content-Type": "application/json"}
@@ -187,13 +194,28 @@ class LocalHTTPProvider(Provider):
                 "name": t.name, "description": t.description,
                 "parameters": t.input_schema}} for t in tools]
         data = self._post(self.chat_path, body)
-        choice = data["choices"][0]
-        msg = choice["message"]
-        calls = []
-        for tc in msg.get("tool_calls") or []:
-            args = tc["function"].get("arguments") or "{}"
-            calls.append(ToolCall(tc.get("id", tc["function"]["name"]), tc["function"]["name"],
-                                  json.loads(args) if isinstance(args, str) else args))
+        # llama-server's own measurements (prompt_ms, predicted_ms, predicted_n,
+        # predicted_per_second), read by the model lab.
+        self.last_timings = data.get("timings") if isinstance(data, dict) else None
+        # A reply BAU cannot use is this model failing, so a backup can answer and the
+        # turn is not lost (audit 2026-10-25: a cut-off tool call or an error body without
+        # "choices" crashed Jarvis's turn).
+        try:
+            msg = data["choices"][0]["message"]
+            calls = []
+            for tc in msg.get("tool_calls") or []:
+                args = tc["function"].get("arguments") or "{}"
+                args = json.loads(args) if isinstance(args, str) else args
+                if not isinstance(args, dict):
+                    raise TypeError("tool arguments are not an object")
+                calls.append(ToolCall(tc.get("id", tc["function"]["name"]),
+                                      tc["function"]["name"], args))
+        except (KeyError, IndexError, TypeError, ValueError, AttributeError) as e:
+            said = str((data.get("error") or {}).get("message", "")) if isinstance(
+                data, dict) and isinstance(data.get("error"), dict) else ""
+            raise ProviderError(f"{self.model} sent a reply BAU cannot use "
+                                f"({type(e).__name__}{': ' + said[:200] if said else ''})"
+                                ) from e
         usage = data.get("usage") or {}
         # Reasoning models (GLM, Qwen3...) may inline their thinking; never speak it.
         text = re.sub(r"<think>.*?</think>", "", msg.get("content") or "", flags=re.S).strip()
@@ -347,7 +369,7 @@ class ScriptedProvider(Provider):
 
     def complete(self, system, messages, tools=None, max_tokens=16000):
         self.calls.append({"system": system, "messages": list(messages),
-                           "tools": [t.name for t in tools or []]})
+                           "tools": [t.name for t in tools or []], "max_tokens": max_tokens})
         if not self.script:
             return ModelResponse("done", [], "end_turn", "scripted",
                                  raw_assistant=[{"type": "text", "text": "done"}])
@@ -371,6 +393,8 @@ class ScriptedProvider(Provider):
 
 def build(record: dict[str, Any]) -> Provider:
     """Instantiate a provider from a model-registry record."""
+    from ..localonly import check
+    check(record)                     # the owner's local-only switch: every model comes here
     kind = record.get("adapter", "local_http")
     if kind == "anthropic":
         return AnthropicProvider(model=record.get("api_model", "claude-opus-5-5"),

@@ -54,6 +54,12 @@ SAY = {"making things up": "hallucination grounded faithfulness",
        "offline": "local-models local", "free model": "local-models local",
        "test": "evals evaluation", "check answer": "evals evaluation",
        "structured": "structured-output schema", "json": "structured-output schema",
+       "confidence": "structured-output schema", "decide": "structured-output schema",
+       "decision": "structured-output schema", "fixed choice": "structured-output schema",
+       "pick an answer": "structured-output schema",
+       "picking an answer": "structured-output schema",
+       "choosing": "structured-output schema", "classify": "structured-output schema",
+       "choose from": "structured-output schema", "format": "structured-output schema",
        "agent": "agents agent", "workflow": "automation workflow",
        "up to date docs": "docs-grounding documentation"}
 

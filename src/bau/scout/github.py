@@ -26,6 +26,16 @@ BAU does all of that: one request at a time, paced per limit, and the wait GitHu
 for is stored in ``scout/github-rate.json`` so a second run (or Jarvis) honours it too.
 While a wait is in force no request is sent at all.
 
+Blueprint reads (src/bau/blueprint.py), checked on 2026-11-02 at docs.github.com/en/rest:
+- ``GET /repos/{owner}/{repo}/git/trees/{tree_sha}`` (git/trees): "The SHA1 value or ref
+  (branch or tag) name of the tree"; ``recursive`` set to any value returns the whole tree;
+  items carry path, type, size; "If truncated is true ... the number of items in the tree
+  array exceeded our maximum limit" (100,000 entries, 7 MB).
+- ``GET /repos/{owner}/{repo}/contents/{path}`` (repos/contents) with
+  ``application/vnd.github.raw+json`` "Returns the raw file contents"; raw works up to 100 MB.
+- ``GET /repos/{owner}/{repo}/releases/latest`` (releases/releases): "the most recent
+  non-prerelease, non-draft release"; 404 when there is none.
+
 The optional token (``GITHUB_TOKEN``) only raises the rate limit; it needs no scopes for
 public repositories, and it is never passed to anything a candidate repository runs.
 """
@@ -179,6 +189,9 @@ class GitHub:
                 err = RateLimited(f"GitHub rate limit (HTTP {e.code}): {str(msg)[:120]}", until)
                 raise RateLimited(f"{err}. BAU will not ask again before {err.when}",
                                   until) from None
+            if e.code == 404:           # deleted, renamed or private since BAU last saw it
+                raise SourceError(f"GitHub HTTP 404: {path.split('?')[0]} is not on GitHub "
+                                  "(deleted, renamed or private)") from None
             raise SourceError(f"GitHub HTTP {e.code}: {str(msg)[:160]}") from None
         except (urllib.error.URLError, OSError, TimeoutError) as e:
             raise SourceError(f"could not reach GitHub: {e}"[:200]) from None
@@ -202,8 +215,34 @@ class GitHub:
         src = r.get("source") or r.get("parent") or {}
         return src.get("full_name")
 
+    def tree(self, full_name: str, ref: str) -> dict[str, Any]:
+        q = urllib.parse.quote
+        return self._get(f"/repos/{q(full_name, safe='/')}/git/trees/{q(ref, safe='')}"
+                         "?recursive=1")
+
+    def file(self, full_name: str, path: str, limit: int = 20000) -> str:
+        q = urllib.parse.quote
+        return self._get(f"/repos/{q(full_name, safe='/')}/contents/{q(path, safe='/')}",
+                         raw=True)[:limit]
+
+    def latest_release(self, full_name: str) -> dict[str, Any] | None:
+        try:
+            return self._get(f"/repos/{urllib.parse.quote(full_name, safe='/')}"
+                             "/releases/latest")
+        except SourceError as e:
+            if "HTTP 404" in str(e):
+                return None
+            raise
+
     def readme(self, full_name: str) -> str:
-        text = self._get(f"/repos/{urllib.parse.quote(full_name, safe='/')}/readme", raw=True)
+        """The README, or "" when the project has none (GitHub answers 404)."""
+        try:
+            text = self._get(f"/repos/{urllib.parse.quote(full_name, safe='/')}/readme",
+                             raw=True)
+        except SourceError as e:
+            if "HTTP 404" in str(e):
+                return ""
+            raise
         return text[:20000]
 
 

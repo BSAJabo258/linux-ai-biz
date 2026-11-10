@@ -108,6 +108,16 @@ def test_only_plain_key_names_and_one_line_values_are_accepted():
             K.parse(K.HEADER + "\n" + bad + "\n")
 
 
+def test_a_bad_line_is_named_by_its_number_never_by_its_text():
+    # A key spread over several lines (a PEM) leaves a line with no "=": the error must
+    # not print the start of that line, which is part of a secret.
+    pem_line = "MIIE" + "x" * 40                 # looks like the middle of a PEM key
+    for bad in (pem_line, pem_line + "==", "lower_case=" + pem_line):
+        with pytest.raises(K.KeyFileError) as e:
+            K.parse(K.HEADER + "\nGOOD_API_KEY=1\n" + bad + "\n")
+        assert pem_line[:12] not in str(e.value) and "line 3" in str(e.value)
+
+
 # ------------------------------------------------------------------ the other computer
 
 def _check_export(r, out: Path, tmp_path: Path):
@@ -139,6 +149,20 @@ def test_windows_export_round_trip(tmp_path):
                        env={**os.environ, **SECRETS, "BAU_KEYS_PASSPHRASE": PASS},
                        capture_output=True, text=True, timeout=120)
     _check_export(r, out, tmp_path)
+
+
+@needs_pwsh
+def test_windows_export_the_documented_way_reads_the_env_and_never_overwrites_it(tmp_path):
+    # Usage in the script: bau-keys-export.ps1 [path\\to\\.env ...] - a bare path is a
+    # file to read, never the output (it used to replace the .env with the locked file).
+    env = _dotenv(tmp_path)
+    before = env.read_bytes()
+    r = subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-File", str(PS1), str(env),
+                        "-Yes"],
+                       env={**os.environ, **SECRETS, "BAU_KEYS_PASSPHRASE": PASS},
+                       capture_output=True, text=True, timeout=120, cwd=tmp_path)
+    assert env.read_bytes() == before
+    _check_export(r, tmp_path / "BAU-KEYS.enc", tmp_path)
 
 
 @needs_openssl
@@ -201,3 +225,18 @@ def test_ships_with_openssl_and_is_explained():
     doc = (ROOT / "docs" / "KEYS.md").read_text()
     assert "BAU-Keys-Export.cmd" in doc and "sudo bau keys import" in doc
     assert "never" in doc.lower()
+
+
+def test_no_passphrase_is_a_plain_message_not_a_traceback(monkeypatch, tmp_path):
+    # 2026-10-27: Ctrl+D at the passphrase question ended in an EOFError traceback.
+    import argparse
+
+    from bau import cli_ext
+    def eof(prompt=""):
+        raise EOFError
+    monkeypatch.setattr("getpass.getpass", eof)
+    a = argparse.Namespace(keys_cmd="import", file=str(tmp_path / "BAU-KEYS.enc"),
+                           etc=str(tmp_path / "etc"))
+    with pytest.raises(SystemExit, match="no passphrase given, so nothing was imported"):
+        cli_ext.cmd_keys(a)
+    assert not (tmp_path / "etc").exists()

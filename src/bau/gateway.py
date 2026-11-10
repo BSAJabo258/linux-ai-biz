@@ -12,6 +12,10 @@ allowed or denied - is written to the audit chain:
   6. blast radius; HIGH/CRITICAL need approval     (spec §54)
   7. budget has room                               (spec §102)
   8. execute, record cost, record evidence
+
+Plus one rule from the owner's automation roadmap (docs/research/JARVIS-AUTOMATION-ROADMAP.md,
+step 1, an idea from LocalHarness): a run that has read outside content (a web page, an MCP
+answer, a browser) is "tainted", and a tainted call may only read until the owner approves.
 """
 
 from __future__ import annotations
@@ -53,6 +57,10 @@ class Handler:
     provider: str | None = None          # external provider id, if data leaves the machine
     estimate_usd: Callable[[dict[str, Any]], float] = field(default=lambda args: 0.0)
     description: str = ""
+    # The gateway's network check does not apply: the tool works on this computer, or (Jarvis's
+    # drafting and agents) reaches its model through the model layer, which has its own checks.
+    local: bool = False
+    safe_on_hold: bool = False           # only makes BAU safer (hold_everything): runs on HOLD
 
 
 @dataclass
@@ -65,6 +73,7 @@ class CallRequest:
     approval: Approval | None = None
     job_id: str = ""
     mission_id: str = ""
+    tainted: bool = False                # this run has read outside content
 
 
 class Gateway:
@@ -108,9 +117,15 @@ class Gateway:
         if allowed is not None and req.capability not in allowed:
             raise self._deny(req, "agent_tools", f"{req.agent} is not granted {req.capability}")
         held = self.hold()
-        if held and self.table.levels.get(req.capability, h.level) != "READ_ONLY":
+        if held and self.table.levels.get(req.capability, h.level) != "READ_ONLY" \
+                and not h.safe_on_hold:
             raise self._deny(req, "governor_hold", f"BAU is on HOLD ({held}); "
                              "only read-only actions run until a human releases it")
+        if req.tainted and req.approval is None and not h.safe_on_hold \
+                and self.table.levels.get(req.capability, h.level) != "READ_ONLY":
+            raise self._deny(req, "untrusted_read", "this run read outside content (a web "
+                             "page, a screen, a tool's answer), so it may only read until the "
+                             "owner approves this action")
         b = blast.score(req.blast) if req.blast else {"level": "LOW",
                                                        "requires_approval": False}
         try:
@@ -119,21 +134,27 @@ class Gateway:
                 min_level="APPROVAL_REQUIRED" if b["requires_approval"] else None)
         except PermissionDenied as e:
             raise self._deny(req, "permission", str(e)) from e
-        trust = self.trust()
-        if h.needs_network and trust == network.Trust.OFFLINE:
-            raise self._deny(req, "network", "offline - job must WAIT_FOR_NETWORK",
-                             WaitingForNetwork)
-        if not network.allows(trust, level):
-            raise self._deny(req, "network", f"{trust} network cannot run {level} actions")
+        trust = None if h.local else self.trust()
+        if trust is not None:
+            if h.needs_network and trust == network.Trust.OFFLINE:
+                raise self._deny(req, "network", "offline - job must WAIT_FOR_NETWORK",
+                                 WaitingForNetwork)
+            if not network.allows(trust, level):
+                raise self._deny(req, "network",
+                                 f"{trust} network cannot run {level} actions")
         if h.provider is not None:
             ok, why = provider_allows(self.providers.get(h.provider), req.data_classes)
             if not ok:
                 raise self._deny(req, "data_boundary", why)
         est = float(h.estimate_usd(req.args))
-        ok, why = self.budgets.check(self.ledger, req.agent, est, req.job_id, req.mission_id)
+        # A call that costs nothing cannot break a budget: over budget, the free and safety
+        # tools must still run (code review 2026-11-01: hold_everything was refused).
+        ok, why = self.budgets.check(self.ledger, req.agent, est, req.job_id,
+                                     req.mission_id) if est > 0 else (True, "")
         if not ok:
             raise self._deny(req, "budget", why)
-        return {"level": level, "blast": b["level"], "trust": str(trust), "estimate_usd": est}
+        return {"level": level, "blast": b["level"], "trust": str(trust or "local"),
+                "estimate_usd": est}
 
     def invoke(self, req: CallRequest) -> Any:
         info = self.check(req)
@@ -159,6 +180,12 @@ class Gateway:
             "ms": int((time.monotonic() - started) * 1000),
             "at": dt.datetime.now(dt.UTC).isoformat()})
         return result
+
+    def brings_outside_content(self, capability: str) -> bool:
+        """Its answer comes from outside this computer: a page, a server, a browser."""
+        h = self.handlers.get(capability)
+        return bool(h and (h.needs_network or h.provider)) \
+            or capability.startswith(("run.mcp__", "browser."))
 
     def catalog(self) -> list[dict[str, Any]]:
         return [{"capability": c, "level": self.table.levels.get(c, h.level),

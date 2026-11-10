@@ -1,0 +1,7 @@
+{
+  "policies": {
+    "Preferences": {
+      "browser.cache.disk.enable": {"Value": false, "Status": "default"}
+    }
+  }
+}

@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from dataclasses import asdict
 from decimal import Decimal
 from pathlib import Path
@@ -73,12 +74,91 @@ def cmd_models(a):
             return EXIT_BLOCKED
         _out(res)
         return EXIT_OK if res["reply_ok"] else EXIT_BLOCKED
+    elif a.models_cmd == "lab":
+        from .models import lab
+        from .models.providers import ProviderError
+        try:
+            res = lab.record(a.model, f"human:{getpass.getuser()}", audit=AuditLog(),
+                             run_code=a.run_code, long_context=not a.no_long,
+                             repeat=a.repeat, tag=a.tag)
+        except KeyError:
+            print(f"model {a.model} not registered", file=sys.stderr)
+            return EXIT_ERROR
+        except (PermissionError, ProviderError, ValueError) as e:
+            print(f"lab: {e}", file=sys.stderr)
+            return EXIT_BLOCKED
+        _out(res if a.full else {k: v for k, v in res.items() if k != "details"})
+        return EXIT_OK if res["meets_bar"] else EXIT_BLOCKED
+    elif a.models_cmd == "use":
+        # Which file the model server runs (to test a candidate). Root: /etc/bau/llm.env
+        # is root:bau 0640. It never approves the model and never names it the boss.
+        from . import pack as P
+        rec = reg.data["model"].get(a.model)
+        if rec is None or rec.get("deployment") != "local" or not rec.get("download"):
+            print(f"{a.model} is not a registered local model file", file=sys.stderr)
+            return EXIT_ERROR
+        if os.geteuid() != 0:
+            raise SystemExit(f"run with sudo: sudo bau models use {a.model}")
+        who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
+        if not sys.stdin.isatty():
+            raise PermissionError("this action must be taken by a human at a terminal")
+        models = bau_home() / "models"
+        if not (models / rec["download"]["file"]).exists():
+            print(f"not downloaded yet: bau models fetch {a.model}", file=sys.stderr)
+            return EXIT_BLOCKED
+        if not P._start(a.model, rec, models, Path("/etc/bau"), P.run_cmd, print):
+            print("the model service did not start (systemctl status bau-llm)", file=sys.stderr)
+            return EXIT_BLOCKED
+        AuditLog().append("model.served", who, {"model": a.model})
+        _out({"serving": a.model, "next": f"wait a minute for it to load, then: "
+              f"bau models lab {a.model}"})
+    elif a.models_cmd == "tune":
+        # The owner's speed settings for the model server (docs/GPU.md section 4). Root:
+        # /etc/bau is root's. Measure before and after: bau models lab MODEL --tag NAME.
+        from . import pack as P
+        if os.geteuid() != 0:
+            raise SystemExit("run with sudo: sudo bau models tune ...")
+        if not sys.stdin.isatty():
+            raise PermissionError("this action must be taken by a human at a terminal")
+        try:
+            now = P.tune(Path("/etc/bau"), P.run_cmd, draft=a.draft, kv=a.kv, reset=a.reset)
+        except ValueError as e:
+            print(f"tune: {e}", file=sys.stderr)
+            return EXIT_ERROR
+        who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
+        AuditLog().append("model.tuned", who, now)
+        _out({"settings": now or "llama.cpp's own defaults",
+              "next": "wait a minute for the model to load, then measure: "
+                      "bau models lab MODEL --tag NAME"})
+    elif a.models_cmd == "compare":
+        from .models import lab
+        a_res, b_res = lab.latest(a.baseline, bau_home()), lab.latest(a.candidate, bau_home())
+        # MODEL@TAG names a tagged run (e.g. qwen3.5-9b@cuda)
+        missing = [m for m, r in ((a.baseline, a_res), (a.candidate, b_res)) if r is None]
+        if missing:
+            print(f"no lab result yet for {', '.join(missing)}: bau models lab MODEL",
+                  file=sys.stderr)
+            return EXIT_BLOCKED
+        _out(lab.compare(a_res, b_res))
     elif a.models_cmd == "fetch":
         from .models.fetch import FetchError, fetch
         rec = reg.data["model"].get(a.model)
         if rec is None:
             print(f"model {a.model} not registered", file=sys.stderr)
             return EXIT_ERROR
+        # Check before a download of many GB (the owner's evaluation rules, 2026-10-26).
+        from . import machine
+        size = int((rec.get("download") or {}).get("size") or 0)
+        dest = Path(a.dir) if a.dir else bau_home() / "models"
+        prof = {**machine.saved(), "disk": machine._disk(dest)}
+        fit = machine.fits(size, prof) if size else None
+        if fit and not fit["disk_ok"]:
+            print(f"not enough free disk space in {dest} for {size >> 20} MB",
+                  file=sys.stderr)
+            return EXIT_BLOCKED
+        if fit and prof.get("memory"):
+            print(f"estimate for this computer: {fit['where']} ({fit['why']})",
+                  file=sys.stderr)
         last = [-1]
 
         def progress(done: int, total: int) -> None:
@@ -88,7 +168,7 @@ def cmd_models(a):
                 print(f"\r{done >> 20} MB of {total >> 20} MB ({pct}%)", end="",
                       file=sys.stderr)
         try:
-            path = fetch(rec, Path(a.dir) if a.dir else bau_home() / "models", progress=progress)
+            path = fetch(rec, dest, progress=progress)
         except FetchError as e:
             print(f"\n{e}", file=sys.stderr)
             return EXIT_BLOCKED
@@ -369,24 +449,74 @@ def cmd_scout(a):
 
 # ------------------------------------------------------------------ video studio
 
-def cmd_series(a):
-    from . import workspace as W
-    from .series import Series
-    if a.series_cmd == "formats":
-        ws_dir = W.open_ws(a.workspace) if a.workspace else Path(".")
-        _out({k: v["about"] for k, v in Series(ws_dir).formats().items()})
+def cmd_creator(a):
+    from .home import shipped_data
+    from .virtual_creator import CreatorError, VirtualCreator, write_markdown
+
+    if a.creator_cmd == "init":
+        import shutil
+
+        from .home import bau_home
+        starter = shipped_data() / "virtual_creator_profile.example.yaml"
+        # Jarvis looks in BAU_HOME/creators: put it there unless the owner names a path.
+        dst = Path(a.out) if a.out else bau_home() / "creators" / (
+            yaml.safe_load(starter.read_text())["id"] + ".yaml")
+        if dst.exists():
+            raise ValueError(f"{dst} already exists; choose another path")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(starter, dst)
+        _out({"profile": str(dst), "jarvis": f"Jarvis can draft for {dst.stem} now",
+              "next": f"edit the profile, then run `bau creator check {dst}`"})
         return EXIT_OK
-    ws = W.open_ws(a.workspace)
-    sr = Series(ws)
-    if a.series_cmd == "check":
-        probs = sr.problems()
-        _out({"characters": sorted(sr.chars), "problems": probs})
-        return EXIT_OK if not probs else EXIT_BLOCKED
-    if a.series_cmd == "prompt":
-        print(sr.prompt(a.scene, a.cast.split(",")))
+    if a.creator_cmd == "prices":         # the owner's choice: never a model, never a default
+        from .virtual_creator import set_prices
+        who = _human()
+        prices = {"subscription": a.subscription, "nude": a.nude, "xxx": a.xxx}
+        try:
+            set_prices(Path(a.profile), prices)
+        except CreatorError as exc:
+            raise ValueError(str(exc)) from exc
+        AuditLog().append("creator.prices", who, {"profile": Path(a.profile).name, **prices})
+        _out({"profile": str(a.profile), "prices_usd": prices,
+              "you_keep_about": {k: round(v * 0.8, 2) for k, v in prices.items()},
+              "note": "Fanvue keeps 20% (help.fanvue.com, read 2026-11-01); before tax"})
         return EXIT_OK
-    cast = a.cast.split(",") if a.cast else None
-    _out(sr.plan(W.find_episode(ws, a.episode), a.format, a.seconds, cast))
+    creator = VirtualCreator(Path(a.profile))
+    if a.creator_cmd == "draw":          # pictures on this computer (docs/PICTURES.md)
+        import datetime as dt
+
+        from .home import bau_home
+        from .media import comfy
+        batch = creator.batch(a.theme, "instagram", a.count, tier="sfw")
+        stamp = dt.date.today().isoformat()
+        made = []
+        for post in batch["posts"]:
+            prompt = comfy.creator_prompt(creator.profile, a.theme, post["format"])
+            name = f"{creator.profile['id']}-{stamp}-{post['number']}"
+            made.append(comfy.draw(bau_home(), prompt, name))
+        _out({"pictures": made, "folder": str(bau_home() / "artifacts" / "media"),
+              "next": "look at every picture, then list the good ones in a week plan "
+                      "(docs/WEEK.md)"})
+        return EXIT_OK
+    if a.creator_cmd == "check":
+        problems = creator.problems()
+        _out({"profile": str(a.profile), "id": creator.profile.get("id"),
+              "problems": problems})
+        return EXIT_OK if not problems else EXIT_BLOCKED
+    try:
+        batch = creator.batch(a.theme, a.platform, a.count, tier=a.tier, level=a.level)
+    except CreatorError as exc:
+        raise ValueError(str(exc)) from exc
+    text = write_markdown(batch)
+    if a.out:
+        out = Path(a.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        _out({"batch": str(out), "posts": len(batch["posts"]), "platform": a.platform,
+              "tier": a.tier,
+              "notice": batch["notice"]})
+    else:
+        print(text)
     return EXIT_OK
 
 
@@ -437,6 +567,16 @@ def cmd_usage(a):
     return EXIT_OK
 
 
+def _passphrase(name: str) -> str:
+    """Ctrl+D or Ctrl+C at the question is a plain "nothing imported", not a traceback
+    (seen 2026-10-27 in the import round trip)."""
+    from .keys import KeyFileError
+    try:
+        return getpass.getpass(f"Passphrase for {name}: ")
+    except (EOFError, KeyboardInterrupt):
+        raise KeyFileError("no passphrase given, so nothing was imported") from None
+
+
 def cmd_keys(a):
     from . import keys as K
     etc = Path(a.etc) if a.etc else K.ETC
@@ -446,11 +586,141 @@ def cmd_keys(a):
             return 0
         if not a.etc and os.geteuid() != 0:
             raise SystemExit("run with sudo: sudo bau keys import " + a.file)
-        passphrase = getpass.getpass(f"Passphrase for {Path(a.file).name}: ")
+        passphrase = _passphrase(Path(a.file).name)
         who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
         _out(K.import_file(Path(a.file), passphrase, etc, AuditLog(), who))
     except (K.KeyFileError, OSError) as e:
         raise SystemExit(f"bau keys: {e}") from None
+    return 0
+
+
+def cmd_pack(a):
+    from . import pack as P
+    from .home import bau_home
+    try:
+        if a.path:
+            found = [Path(a.path)]
+        else:                       # as root, also opens sticks and Windows drives read-only
+            found = P.locate(P.run_cmd) if os.geteuid() == 0 else P.find()
+        if not found:
+            raise P.PackError("no BAU Pack found. Plug in the stick and run it with sudo "
+                              "(it opens sticks and Windows drives read-only to look), or "
+                              "give the pack's path")
+        if len(found) > 1:
+            raise P.PackError("more than one BAU Pack: give the path of the one to use")
+        pack = P.root(found[0])
+        if a.pack_cmd == "check":
+            _out(P.scan(pack, P.records(bau_home())))
+            return 0
+        if a.pack_cmd == "report":
+            text, dest = P.laptop_report(P.run_cmd), pack / P.REPORT
+            try:
+                P._safe_write(dest, text)   # never follows a link planted on the stick
+            except OSError:                 # the pack's drive is open read-only
+                dest = bau_home() / "reports" / P.REPORT
+                P._safe_write(dest, text)
+            print(f"written: {dest}")
+            return 0
+        if os.geteuid() != 0:
+            raise SystemExit("run with sudo: sudo bau pack install")
+        if not sys.stdin.isatty():
+            raise PermissionError("bau pack install asks you questions: run it at a terminal")
+
+        def ask(q: str) -> bool:
+            return input(f"{q} [y/N] ").strip().lower().startswith("y")
+
+        home = bau_home()
+        who = f"human:{os.environ.get('SUDO_USER') or getpass.getuser()}"
+        out = P.install(pack, home, Path(a.etc) if a.etc else Path("/etc/bau"), ask,
+                        P.run_cmd, who, AuditLog(),
+                        read_pass=lambda: _passphrase("BAU-KEYS.enc"))
+        _out(out)
+    except (P.PackError, OSError, ValueError) as e:
+        raise SystemExit(f"bau pack: {e}") from None
+    return 0
+
+
+def cmd_look(a):
+    from . import look as L
+    try:
+        if a.look_cmd == "set":
+            _out(L.set_look(None, art=a.name))
+        elif a.look_cmd == "alive":
+            _out(L.set_look(None, alive=a.state == "on"))
+        elif a.look_cmd == "flow":
+            names = {"default": [], "all": [n for n in L.show()["choices"] if n != "none"]}
+            _out(L.set_look(None, flow=names.get(a.names[0], a.names) if len(a.names) == 1
+                            else a.names))
+        elif a.look_cmd == "add":
+            L.add(None, Path(a.file), a.name)
+            _out(L.show())
+        else:
+            _out(L.show())
+    except (ValueError, OSError) as e:
+        raise SystemExit(f"bau look: {e}") from None
+    return 0
+
+
+def cmd_update(a):
+    from . import update as U
+    if a.update_cmd in (None, "status"):
+        _out(U.status())
+        return 0
+    if os.geteuid() != 0:
+        raise SystemExit(f"bau update {a.update_cmd}: run it with sudo")
+    if a.update_cmd in ("auto", "off"):
+        who = _human()
+        U.set_mode(a.update_cmd, U.CONF)
+        AuditLog().append("update.mode", who, {"mode": a.update_cmd})
+        _out(U.status())
+        return 0
+    if a.update_cmd == "keep":
+        try:
+            U.keep(Path(a.wheel), a.commit)
+        except ValueError as e:
+            raise SystemExit(f"bau update keep: {e}") from None
+        _out(U.status())
+        return 0
+    out = U.run(audit=lambda ev: AuditLog().append(ev[0], "bau-update", ev[1]))
+    _out(out)
+    return 0 if out["result"] in ("off", "up to date", "installed", "no answer") else 1
+
+
+def cmd_autopilot(a):
+    from . import autopilot as A
+    from . import autopilot_jobs as J
+    from .home import bau_home
+    home = bau_home()
+    c = a.ap_cmd or "status"
+    if c == "run":
+        from .assistant import load_env_file
+        load_env_file()                   # an optional GITHUB_TOKEN raises GitHub's limit
+        seeded = J.seed(home)
+        out = A.run(home, J.handlers(home), max_steps=a.steps)
+        try:                              # the owner's Fanvue autopost, if he switched it on
+            from . import fanvue
+            posted = fanvue.autopost_tick(home)
+        except Exception as e:  # noqa: BLE001 - the autopilot's own work is already done
+            posted = {"autopost": f"error: {e}"[:200]}
+        _out({"seeded": seeded, **out, "fanvue": posted, "status": A.status(home)})
+    elif c == "digest":
+        print(A.digest(home))
+    elif c == "questions":
+        _out(A.questions(home))
+    elif c in ("pause", "resume"):
+        getattr(A, c)(home, _human())
+        _out(A.status(home))
+    elif c == "focus":
+        what = " ".join(a.what)
+        A.focus(home, "" if what.lower() == "none" else what, _human())
+        _out(A.status(home))
+    elif c == "skip":
+        A.skip(home, a.task, _human())
+        _out(A.status(home))
+    elif c == "answer":
+        _out(A.answer(home, a.task, a.choice, _human()))
+    else:
+        _out(A.status(home))
     return 0
 
 
@@ -466,6 +736,23 @@ def cmd_team(a):
             _out(T.show())
     except (ValueError, PermissionError) as e:
         raise SystemExit(f"bau team: {e}") from None
+    return 0
+
+
+def cmd_privacy(a):
+    from . import localonly as L
+    if a.choice:
+        try:
+            L.set_mode(None, a.choice, _human(), AuditLog())
+        except (ValueError, PermissionError) as e:
+            raise SystemExit(f"bau privacy: {e}") from None
+    m = L.mode()
+    _out({"models": m or "not chosen yet: `bau privacy local-only` keeps every model on "
+          "this computer; `bau privacy cloud` allows approved cloud models",
+          "means": {"local-only": "Claude, OpenAI-style hosted models and model servers on "
+                                  "other computers are refused everywhere in BAU",
+                    "cloud": "approved cloud models may be used, within your daily limits"
+                    }.get(m or "", "")})
     return 0
 
 
@@ -497,26 +784,6 @@ def cmd_agents(a):
     except (AF.AgentFolderError, PermissionError, ValueError) as e:
         print(f"agents: {e}", file=sys.stderr)
         return EXIT_BLOCKED
-    return EXIT_OK
-
-
-def cmd_results(a):
-    from .results import Results
-    r = Results(audit=AuditLog())
-    if a.res_cmd == "link":
-        clips = [c.strip() for c in (a.clips or "").split(",") if c.strip()]
-        try:
-            _out(r.link(a.platform, a.item, f"cli:{getpass.getuser()}", clips=clips,
-                        episode=a.episode or ""))
-        except ValueError as e:
-            print(f"bau: {e}", file=sys.stderr)
-            return EXIT_ERROR
-        return EXIT_OK
-    if a.res_cmd == "refresh":
-        out = r.refresh(force=a.force, by=f"cli:{getpass.getuser()}")
-        _out({**r.report(), "refresh": out})
-        return EXIT_OK
-    _out(r.report())
     return EXIT_OK
 
 
@@ -563,8 +830,8 @@ def cmd_ws(a):
             _out(W.templates())
         elif a.ws_cmd == "create":
             ws = W.create(a.template, a.name)
-            _out({"workspace": str(ws), "next": f"fill in {ws / '_shared' / 'series-bible.md'} "
-                  f"(questions in setup/questionnaire.md), then: bau ws episode {ws.name} "
+            _out({"workspace": str(ws), "next": f"fill in {ws / '_shared'} (questions in "
+                  f"setup/questionnaire.md), then: bau ws episode {ws.name} "
                   '"your idea"'})
         elif a.ws_cmd == "episode":
             ws = W.open_ws(a.name)
@@ -700,9 +967,11 @@ def cmd_factory_run(a):
         if a.fr_cmd == "confirm":
             fr.confirm(run, a.item, _human())
         elif a.fr_cmd == "facts":
+            _human()
             run.gate_facts[a.domain] = _load(a.file)
             fr._save(run)
         elif a.fr_cmd == "approval":
+            _human()
             run.approvals[a.capability] = str(Path(a.file).resolve())
             fr._save(run)
         if a.fr_cmd != "show":
@@ -926,6 +1195,24 @@ def cmd_chats(a):
     return EXIT_OK
 
 
+def cmd_hands(a):
+    """The local model does a job in the terminal; you say y to every command."""
+    from . import hands as H
+    from .assistant import load_env_file, pick_model
+    owner = _human()
+    load_env_file()
+    provider, rec = pick_model()
+    if provider is None:
+        print("No approved model yet: approve one first (docs/PACK.md).", file=sys.stderr)
+        return 1
+    print(f"Hands, on {rec.get('model_id')}. Every command is shown to you first; "
+          "nothing runs without your y.", file=sys.stderr)
+    out = H.Hands(provider, H.ask_at_terminal, audit=AuditLog(), workdir=Path(a.dir),
+                  owner=owner).do(a.task)
+    print(H.show(out))
+    return 0 if out["done"] else 1
+
+
 def cmd_jarvis(a):
     from .assistant import Voice, build_assistant, load_env_file, save_config
     if a.jv_cmd == "config":
@@ -970,6 +1257,8 @@ def cmd_jarvis(a):
         owner = _human()
     load_env_file()
     jv = build_assistant(owner=owner)
+    # A local model reads Jarvis's prompt once now, so the first question is fast.
+    threading.Thread(target=jv.warm, daemon=True).start()
     if a.text:
         return _jarvis_terminal(jv)
     from .ui.jarvis_server import serve, service_key
@@ -1142,62 +1431,17 @@ def _previewer():
         os.environ.get("DISPLAY") else None
 
 
-def cmd_youtube(a):
-    from . import youtube
-    q = youtube.YouTubeQueue()
-    if a.yt_cmd == "login":
-        _human()
-        client = youtube.YouTubeClient()
-        youtube.login(client, port=a.port)
-        ch = client.channel()
-        AuditLog().append("youtube.connected", _human(), {})
-        _out({"connected": ch["title"], "handle": ch.get("handle")})
-    elif a.yt_cmd == "logout":
-        youtube.TokenStore().clear()
-        _out({"connected": None})
-    elif a.yt_cmd == "add":
-        desc = Path(a.description_file).read_text() if a.description_file else a.description
-        item = q.add(Path(a.video), a.title, f"human:{getpass.getuser()}", desc or "",
-                     [t for t in (a.tags or "").split(",") if t.strip()], kids=a.kids,
-                     licensed=a.licensed, paid_promotion=a.paid_promotion,
-                     category_id=a.category, is_aigc=False if a.not_ai else None,
-                     engine=_engine())
-        _out(asdict(item))
-        return EXIT_OK if item.checks["ok"] else EXIT_BLOCKED
-    elif a.yt_cmd == "queue":
-        _out([{"item_id": i.item_id, "title": i.title, "kids": i.kids, "status": i.status,
-               "ok": i.checks.get("ok"), "problems": i.checks.get("problems"),
-               "warnings": i.checks.get("warnings")}
-              for i in (q.items() if a.all else q.pending())])
-    elif a.yt_cmd == "review":
-        done = youtube.review(q, youtube.YouTubeClient(), _human(), preview=_previewer())
-        _out([{"item_id": i.item_id, "status": i.status, "result": i.result} for i in done])
-    elif a.yt_cmd == "status":
-        client = youtube.YouTubeClient()
-        out = []
-        for i in q.items():
-            if i.video_id:
-                i.result = {**i.result, **client.status(i.video_id)}
-                q.save(i)
-            out.append({"item_id": i.item_id, "status": i.status, "youtube": i.result})
-        _out(out)
-    return EXIT_OK
-
-
 def cmd_publish(a):
     from .publishing import ADAPTERS, Hub
     hub = Hub()
     if a.pub_cmd == "platforms":
-        _out([{"platform": k, "label": v.label, "kids": v.allows_kids,
-               "note": v.kids_note or None} for k, v in ADAPTERS.items()])
+        _out([{"platform": k, "label": v.label} for k, v in ADAPTERS.items()])
     elif a.pub_cmd == "queue":
         _out(hub.pending())
     elif a.pub_cmd == "add":
         desc = Path(a.description_file).read_text() if a.description_file else a.description
         out = hub.queue(Path(a.video), [p.strip() for p in a.to.split(",") if p.strip()],
                         f"human:{getpass.getuser()}", title=a.title, description=desc or "",
-                        tags=[t for t in (a.tags or "").split(",") if t.strip()], kids=a.kids,
-                        licensed=a.licensed, paid_promotion=a.paid_promotion,
                         is_aigc=False if a.not_ai else None, engine=_engine())
         _out(out)
         return EXIT_OK if all(r.get("ok", True) for r in out) else EXIT_BLOCKED
@@ -1247,6 +1491,44 @@ def cmd_tiktok(a):
     return EXIT_OK
 
 
+def cmd_fanvue(a):
+    from . import fanvue
+    if a.fv_cmd == "login":
+        who = _human()
+        client = fanvue.FanvueClient()
+        import webbrowser
+        fanvue.login(client, port=a.port, open_browser=lambda u: (
+            print(f"Opening Fanvue to connect. If nothing opens, open this link:\n{u}"),
+            webbrowser.open(u)))
+        me = client.me()
+        AuditLog().append("fanvue.connected", who, {})
+        _out({"connected": me.get("handle"), "creator": me.get("isCreator"),
+              "ai_creator": me.get("isAiCreator")})
+    elif a.fv_cmd == "logout":
+        fanvue.TokenStore().clear()
+        _out({"connected": None})
+    elif a.fv_cmd == "add":
+        try:
+            item = fanvue.Queue().add(a.picture, a.caption, a.level, _human())
+        except ValueError as e:
+            print(e, file=sys.stderr)
+            return EXIT_BLOCKED
+        _out(item)
+    elif a.fv_cmd == "queue":
+        q = fanvue.Queue()
+        _out(q.items() if a.all else q.pending())
+    elif a.fv_cmd == "autopost":
+        try:
+            _out(fanvue.set_autopost(bau_home(), a.state == "on", _human(), a.audience or "",
+                                     a.per_day or 0))
+        except (ValueError, PermissionError) as e:
+            print(e, file=sys.stderr)
+            return EXIT_BLOCKED
+    elif a.fv_cmd == "sync":
+        _out(fanvue.sync_earnings(bau_home(), fanvue.FanvueClient(), days=a.days))
+    return EXIT_OK
+
+
 # ------------------------------------------------------------------ parser
 
 def register(sub: argparse._SubParsersAction) -> None:
@@ -1257,6 +1539,30 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = ms.add_parser("bench", help="measure a model on this machine (required before a "
                       "local model can be approved)")
     x.add_argument("model")
+    x = ms.add_parser("lab", help="the full test on this machine: known-answer questions, "
+                      "tool calls, JSON, long prompts, speed and memory (docs/MODEL-LAB.md)")
+    x.add_argument("model")
+    x.add_argument("--run-code", action="store_true",
+                   help="also run the model's two small code fixes, in a locked-down Python")
+    x.add_argument("--no-long", action="store_true", help="skip the long-prompt part")
+    x.add_argument("--repeat", type=int, default=1,
+                   help="run it this many times: middle value, range and failed runs")
+    x.add_argument("--tag", help="name this setup (e.g. cuda): stored as MODEL@TAG for "
+                   "bau models compare")
+    x.add_argument("--full", action="store_true", help="show every answer")
+    x = ms.add_parser("use", help="sudo: the model server runs this downloaded model "
+                      "(to test it); never approves it or makes it the boss")
+    x.add_argument("model")
+    x = ms.add_parser("tune", help="sudo: speed settings for the model server: how far an "
+                      "MTP model guesses ahead, the KV cache's format (docs/GPU.md)")
+    x.add_argument("--draft", help="words an MTP model guesses ahead (1-16), or off")
+    x.add_argument("--kv", help="KV cache format: f16 (llama.cpp's default), q8_0 (half the "
+                   "memory)")
+    x.add_argument("--reset", action="store_true", help="forget earlier settings first")
+    x = ms.add_parser("compare", help="two models' latest lab results side by side "
+                      "(e.g. a compressed file against a bigger one)")
+    x.add_argument("baseline")
+    x.add_argument("candidate")
     x = ms.add_parser("fetch", help="download a registered model file, verified against "
                       "its pinned SHA-256 (resumes if interrupted)")
     x.add_argument("model")
@@ -1388,7 +1694,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("brains", help="which model is each brain (small, strong, content)")
     x.add_argument("--small", help="you: the free local model for routine steps")
     x.add_argument("--strong", help="you: the model for steps that need judgement")
-    x.add_argument("--content", help="you: a content-lane model (text only, never kids)")
+    x.add_argument("--content", help="you: a content-lane model (text only, never minors)")
     x = w.add_parser("run", help="draft the next stage with the brain its folder names")
     x.add_argument("name")
     x.add_argument("episode")
@@ -1449,23 +1755,34 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--top", type=int, default=20)
     s.set_defaults(fn=cmd_video)
 
-    s = sub.add_parser("series", help="kids series: same characters and look in every clip")
-    w = s.add_subparsers(dest="series_cmd", required=True)
-    x = w.add_parser("check", help="are the character and style sheets filled in?")
-    x.add_argument("workspace")
-    x = w.add_parser("prompt", help="a clip prompt with the characters locked in")
-    x.add_argument("workspace")
-    x.add_argument("scene")
-    x.add_argument("--cast", required=True, help="character ids, e.g. pip,mo")
-    x = w.add_parser("plan", help="an episode's clips from a story format")
-    x.add_argument("workspace")
-    x.add_argument("episode")
-    x.add_argument("--format", required=True)
-    x.add_argument("--seconds", type=int, default=60)
-    x.add_argument("--cast", help="character ids (default: all)")
-    x = w.add_parser("formats", help="the story formats")
-    x.add_argument("workspace", nargs="?")
-    s.set_defaults(fn=cmd_series)
+
+    s = sub.add_parser("creator", help="fictional adult virtual-model content drafts")
+    w = s.add_subparsers(dest="creator_cmd", required=True)
+    x = w.add_parser("init", help="copy a starter fictional adult creator profile")
+    x.add_argument("--out", help="new YAML profile path (default: where Jarvis looks)")
+    x = w.add_parser("check", help="validate age, identity, disclosure, and platform rules")
+    x.add_argument("profile")
+    x = w.add_parser("draw", help="draw sfw pictures for a batch on this computer")
+    x.add_argument("profile")
+    x.add_argument("theme")
+    x.add_argument("--count", type=int, default=7)
+    x = w.add_parser("batch", help="draft a consistent multi-post content batch")
+    x.add_argument("profile")
+    x.add_argument("theme")
+    x.add_argument("--platform", required=True,
+                   choices=["instagram", "tiktok", "fanvue"])
+    x.add_argument("--count", type=int, default=7)
+    x.add_argument("--tier", choices=["sfw", "explicit"], default="sfw",
+                   help="explicit: adult platforms only (fanvue), needs explicit_boundaries")
+    x.add_argument("--level", type=int, choices=[0, 1, 2, 3],
+                   help="paid level: 0 teaser, 1 subscriber, 2 nude, 3 xxx (sets the tier)")
+    x.add_argument("--out", help="write Markdown to a file instead of stdout")
+    x = w.add_parser("prices", help="you: your Fanvue prices in US dollars")
+    x.add_argument("profile")
+    x.add_argument("--subscription", type=float, required=True, help="a month")
+    x.add_argument("--nude", type=float, required=True, help="level 2, each unlock")
+    x.add_argument("--xxx", type=float, required=True, help="level 3, each unlock")
+    s.set_defaults(fn=cmd_creator)
 
     s = sub.add_parser("toolbox", help="researched open-source tools; ask before guessing")
     w = s.add_subparsers(dest="toolbox_cmd", required=True)
@@ -1515,6 +1832,66 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--etc", help=argparse.SUPPRESS)
     s.set_defaults(fn=cmd_keys)
 
+    s = sub.add_parser("pack", help="the BAU Pack: models and keys from a USB stick "
+                                    "(docs/PACK.md)")
+    w = s.add_subparsers(dest="pack_cmd", required=True)
+    x = w.add_parser("install", help="sudo: check, copy and set up what is on the stick; "
+                                     "asks yes or no before each change")
+    x.add_argument("path", nargs="?", help="the stick or its BAU-PACK folder (found if left out)")
+    x.add_argument("--etc", help=argparse.SUPPRESS)
+    x = w.add_parser("check", help="check every model on the stick against its pinned hash")
+    x.add_argument("path", nargs="?")
+    x = w.add_parser("report", help="write the laptop report (network card, firmware) to it")
+    x.add_argument("path", nargs="?")
+    s.set_defaults(fn=cmd_pack)
+
+    s = sub.add_parser("look", help="your art behind Jarvis and Mission Control (docs/LOOK.md)")
+    w = s.add_subparsers(dest="look_cmd")
+    w.add_parser("show", help="the art in use, whether it is alive, and the choices")
+    x = w.add_parser("set", help="use one of the choices (dusk, summer, your own, or none)")
+    x.add_argument("name")
+    x = w.add_parser("alive", help="the gentle animation on or off")
+    x.add_argument("state", choices=["on", "off"])
+    x = w.add_parser("flow", help="which pictures melt into each other in Jarvis "
+                                  "(or: all, default)")
+    x.add_argument("names", nargs="+")
+    x = w.add_parser("add", help="bring in your own image (JPEG or PNG) and use it")
+    x.add_argument("file")
+    x.add_argument("--name", help="what to call it (default: the file's name)")
+    s.set_defaults(fn=cmd_look)
+
+    s = sub.add_parser("update", help="automatic nightly updates on this computer "
+                                      "(docs/UPDATES.md)")
+    w = s.add_subparsers(dest="update_cmd")
+    w.add_parser("status", help="on or off, the build installed, what happened last")
+    w.add_parser("now", help="root: check for a tested update and install it now")
+    w.add_parser("auto", help="you, with sudo: install tested updates by themselves each night")
+    w.add_parser("off", help="you, with sudo: stop automatic updates")
+    x = w.add_parser("keep", help="root: record an installed build as the one to go back to "
+                                  "(bau-update-first.sh)")
+    x.add_argument("wheel")
+    x.add_argument("commit")
+    s.set_defaults(fn=cmd_update)
+
+    s = sub.add_parser("autopilot", help="Jarvis works on his own: lanes, vote, compass "
+                                         "(docs/AUTOPILOT.md)")
+    w = s.add_subparsers(dest="ap_cmd")
+    w.add_parser("status", help="what is queued, done, waiting on you")
+    x = w.add_parser("run", help="work through the queue now (the timer does this by itself)")
+    x.add_argument("--steps", type=int, default=20)
+    w.add_parser("digest", help="what happened in the last 24 hours")
+    w.add_parser("questions", help="what it is waiting to ask you")
+    w.add_parser("pause", help="you: stop starting new work")
+    w.add_parser("resume", help="you: carry on")
+    x = w.add_parser("focus", help="you: put this first (or 'none')")
+    x.add_argument("what", nargs="+")
+    x = w.add_parser("skip", help="you: drop one task")
+    x.add_argument("task")
+    x = w.add_parser("answer", help="you: answer a question yes or no")
+    x.add_argument("task")
+    x.add_argument("choice", choices=["yes", "no"])
+    s.set_defaults(fn=cmd_autopilot)
+
     s = sub.add_parser("team", help="who runs the show: boss, thinker, specialist (docs/TEAM.md)")
     w = s.add_subparsers(dest="team_cmd")
     w.add_parser("show", help="the team and whether the specialist may take over by itself")
@@ -1528,16 +1905,11 @@ def register(sub: argparse._SubParsersAction) -> None:
     w.add_parser("score", help="the score sheet: jobs, loops, handovers, unchecked facts, cost")
     s.set_defaults(fn=cmd_team)
 
-    s = sub.add_parser("results", help="how posted videos are doing: views, earnings, profit")
-    w = s.add_subparsers(dest="res_cmd")
-    x = w.add_parser("refresh", help="read the latest numbers from YouTube and TikTok")
-    x.add_argument("--force", action="store_true", help="even if read in the last hour")
-    x = w.add_parser("link", help="tie a posted video to the clips it used and its episode")
-    x.add_argument("platform", choices=["youtube", "tiktok"])
-    x.add_argument("item", help="the queue item id (bau results lists them)")
-    x.add_argument("--clips", help="studio clip ids, comma-separated (bau video clips)")
-    x.add_argument("--episode", help="workspace/episode, e.g. kids-channel/ep-001")
-    s.set_defaults(fn=cmd_results)
+    s = sub.add_parser("privacy", help="keep every model on this computer (docs/LOCAL-ONLY.md)")
+    s.add_argument("choice", nargs="?", choices=["local-only", "cloud"],
+                   help="you choose; leave out to see the current choice")
+    s.set_defaults(fn=cmd_privacy)
+
 
     s = sub.add_parser("factory", help="business factories")
     fs = s.add_subparsers(dest="fac_cmd", required=True)
@@ -1759,41 +2131,20 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--out")
     s.set_defaults(fn=cmd_brain)
 
-    s = sub.add_parser("youtube", help="review-and-upload to YouTube, made-for-kids built in")
-    yt = s.add_subparsers(dest="yt_cmd", required=True)
-    x = yt.add_parser("login", help="connect your YouTube channel (opens Google sign-in)")
-    x.add_argument("--port", type=int, default=3456)
-    yt.add_parser("logout")
-
     def video_args(x, many=False):
         x.add_argument("video")
         x.add_argument("--title", required=True)
         x.add_argument("--description", default="")
         x.add_argument("--description-file")
-        x.add_argument("--tags", help="comma-separated")
-        x.add_argument("--kids", action="store_true",
-                       help="made for kids: runs the kids checks and sets the audience")
-        x.add_argument("--licensed", action="store_true",
-                       help="you hold a licence for any third-party characters used")
-        x.add_argument("--paid-promotion", action="store_true")
         x.add_argument("--not-ai", action="store_true", help="only for human-made videos")
-    x = yt.add_parser("add", help="queue a finished video for review")
-    video_args(x)
-    x.add_argument("--category", help="1 Film & Animation, 10 Music, 24 Entertainment, "
-                   "27 Education")
-    x = yt.add_parser("queue")
-    x.add_argument("--all", action="store_true")
-    yt.add_parser("review", help="review queued videos; your 'y' uploads")
-    yt.add_parser("status", help="refresh processing status of uploaded videos")
-    s.set_defaults(fn=cmd_youtube)
 
-    s = sub.add_parser("publish", help="one video to several platforms (YouTube, TikTok...)")
+    s = sub.add_parser("publish", help="one video to several platforms (TikTok...)")
     ps = s.add_subparsers(dest="pub_cmd", required=True)
     ps.add_parser("platforms", help="platforms BAU can publish to")
     ps.add_parser("queue", help="everything waiting for review, all platforms")
     x = ps.add_parser("add", help="queue one video to several platforms")
     video_args(x)
-    x.add_argument("--to", required=True, help="comma-separated, e.g. youtube,tiktok")
+    x.add_argument("--to", required=True, help="comma-separated, e.g. tiktok")
     s.set_defaults(fn=cmd_publish)
 
     s = sub.add_parser("tiktok", help="review-and-post to TikTok (your click posts it)")
@@ -1812,8 +2163,35 @@ def register(sub: argparse._SubParsersAction) -> None:
     tt.add_parser("status", help="refresh processing status of posted videos")
     s.set_defaults(fn=cmd_tiktok)
 
+    s = sub.add_parser("fanvue", help="Fanvue: queue pictures, your Accept in Jarvis posts "
+                       "them; earnings into the ledger (docs/FANVUE.md)")
+    fv = s.add_subparsers(dest="fv_cmd", required=True)
+    x = fv.add_parser("login", help="connect your Fanvue account (opens Fanvue)")
+    x.add_argument("--port", type=int, default=3456)
+    fv.add_parser("logout")
+    x = fv.add_parser("add", help="queue a picture from artifacts/media with its caption")
+    x.add_argument("picture", help="file name in $BAU_HOME/artifacts/media")
+    x.add_argument("--caption", required=True)
+    x.add_argument("--level", type=int, choices=[0, 1], required=True)
+    x = fv.add_parser("queue")
+    x.add_argument("--all", action="store_true")
+    x = fv.add_parser("autopost", help="your switch: the autopilot posts queued posts by "
+                      "itself, up to your number a day, to the audience you pick")
+    x.add_argument("state", choices=["on", "off"])
+    x.add_argument("--audience", choices=["subscribers", "followers-and-subscribers"])
+    x.add_argument("--per-day", type=int)
+    x = fv.add_parser("sync", help="bring Fanvue's earnings into the ledger now")
+    x.add_argument("--days", type=int, default=30)
+    s.set_defaults(fn=cmd_fanvue)
+
     s = sub.add_parser("gateway", help="list gateway capabilities")
     s.set_defaults(fn=cmd_gateway)
+
+    s = sub.add_parser("hands", help="the local model does a job in the terminal; you "
+                       "say y to every command (docs/HANDS.md)")
+    s.add_argument("task", help="the job, in plain words")
+    s.add_argument("--dir", default=".", help="the work folder (default: here)")
+    s.set_defaults(fn=cmd_hands)
 
     s = sub.add_parser("jarvis", help="talk to Jarvis: spoken briefing, conversation, "
                        "actions you confirm")

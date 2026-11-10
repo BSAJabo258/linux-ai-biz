@@ -371,6 +371,8 @@ def cmd_audit(a: argparse.Namespace) -> int:
 
 def cmd_secrets(a: argparse.Namespace) -> int:
     from .security.secrets_scan import scan_path
+    if not Path(a.path).exists():          # a typo is not "clean" (audit 2026-10-25)
+        raise FileNotFoundError(f"{a.path} does not exist: nothing was scanned")
     found = scan_path(Path(a.path))
     _out({"findings": found})
     return EXIT_BLOCKED if found else EXIT_OK
@@ -392,8 +394,18 @@ def cmd_registry(a: argparse.Namespace) -> int:
     from .registry import CapabilityRegistry
     reg = CapabilityRegistry()
     if a.registry_cmd == "add":
+        from .registry import ROUTABLE
+        if not sys.stdin.isatty():
+            print("registry changes must be made by a human at a terminal", file=sys.stderr)
+            return EXIT_BLOCKED
+        rec = _load(a.file)
+        # Approving is `bau set-status` (checked, human-only); adding never approves.
+        if isinstance(rec, dict) and rec.get("status") in ROUTABLE:
+            print(f"add it as REGISTERED, then approve it with: bau set-status {a.kind} ... "
+                  "APPROVED", file=sys.stderr)
+            return EXIT_BLOCKED
         try:
-            reg.add(a.kind, _load(a.file))
+            reg.add(a.kind, rec)
         except ValueError as e:
             print(str(e), file=sys.stderr)
             return EXIT_BLOCKED
@@ -442,8 +454,21 @@ def cmd_recover(a: argparse.Namespace) -> int:
 
 
 def cmd_hw(a: argparse.Namespace) -> int:
-    paths = hardware.audit(Path(a.out))
-    _out({k: str(v) for k, v in paths.items()})
+    if a.action == "audit":
+        if not a.out:
+            raise SystemExit("bau hw audit: --out FOLDER is needed")
+        paths = hardware.audit(Path(a.out))
+        _out({k: str(v) for k, v in paths.items()})
+        return EXIT_OK
+    from . import machine
+    prof = machine.profile()
+    machine.save(prof)
+    if a.action == "fit":
+        if a.size is None:
+            raise SystemExit("bau hw fit: --size BYTES is needed (e.g. a model's file size)")
+        _out(machine.fits(a.size, prof))
+        return EXIT_OK
+    _out(prof if a.full else machine.summary(prof))
     return EXIT_OK
 
 
@@ -484,6 +509,9 @@ def cmd_wipe_gate(a: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+SBIN = ("/usr/sbin", "/sbin")     # where Debian puts admin tools such as nft and aa-status
+
+
 def cmd_selftest(a: argparse.Namespace) -> int:
     """On-machine acceptance subset: everything that can be checked without a human."""
     import shutil
@@ -499,8 +527,11 @@ def cmd_selftest(a: argparse.Namespace) -> int:
     results["memory_chain"] = "ok" if MemoryLane().verify()[0] else "FAIL"
     container = os.environ.get("BAU_IN_CONTAINER") == "1"
     host_only = ("podman", "nft", "aa-status", "chronyc")   # the laptop's hardening layer
+    # nft and aa-status live in /usr/sbin, which the owner's own PATH leaves out (desktop,
+    # 2026-10-28: "missing" while nftables and AppArmor were both active)
+    path = os.pathsep.join([os.environ.get("PATH", ""), *SBIN])
     for tool in (*host_only, "ssh-keygen", "ffmpeg"):
-        results[f"tool:{tool}"] = "ok" if shutil.which(tool) else \
+        results[f"tool:{tool}"] = "ok" if shutil.which(tool, path=path) else \
             "laptop only (not in the container)" if container and tool in host_only else "missing"
     for key, env in (("audit.key", "BAU_AUDIT_KEY"), ("unsubscribe.key", "BAU_UNSUB_KEY")):
         p = Path(os.environ.get(env) or Path("/etc/bau") / key)
@@ -693,9 +724,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("recover", help="boot-time recovery sequence").set_defaults(fn=cmd_recover)
     sub.add_parser("selftest", help="on-machine acceptance subset").set_defaults(fn=cmd_selftest)
 
-    s = sub.add_parser("hw", help="read-only hardware audit")
-    s.add_argument("action", choices=["audit"])
-    s.add_argument("--out", required=True)
+    s = sub.add_parser("hw", help="read-only: profile (memory, graphics card, engine for "
+                       "models), fit (would a model file run here?), audit (pre-wipe)")
+    s.add_argument("action", nargs="?", default="profile", choices=["profile", "fit", "audit"])
+    s.add_argument("--out", help="audit: folder for the baseline files")
+    s.add_argument("--size", type=int, help="fit: the model file's size in bytes")
+    s.add_argument("--full", action="store_true", help="profile: every detail, not the summary")
     s.set_defaults(fn=cmd_hw)
 
     s = sub.add_parser("backup", help="backup manifest and verification")
@@ -737,6 +771,9 @@ def main(argv: list[str] | None = None) -> int:
     except (FileNotFoundError, json.JSONDecodeError, yaml.YAMLError, ValueError, KeyError,
             TypeError) as e:
         print(f"error: {e}", file=sys.stderr)
+        return EXIT_ERROR
+    except RuntimeError as e:      # BAU's own errors (workspace, audit key, storage...):
+        print(f"error: {e}", file=sys.stderr)        # a plain line, not a traceback
         return EXIT_ERROR
 
 

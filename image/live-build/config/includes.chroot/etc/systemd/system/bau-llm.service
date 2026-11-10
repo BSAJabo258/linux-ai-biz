@@ -1,16 +1,54 @@
 [Unit]
 Description=My Jarvis local model (llama.cpp llama-server on 127.0.0.1:8080)
 ConditionPathExists=/etc/bau/llm.env
+# Bad settings or port 8080 taken: give up after 3 tries in 5 minutes instead of
+# reloading the model from the stick every 5 seconds forever.
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
 User=bau
 Group=bau
+# Qwen3.5 thinks out loud by default: on this laptop CPU "Say hello" took 190 s and
+# came back empty (llama-server v0.6.0, 2026-10-21). Off, it answered and used a tool in
+# 15 s. LLAMA_ARG_REASONING is llama-server's env for --reasoning; /etc/bau/llm.env can
+# set it back to on.
+Environment=LLAMA_ARG_REASONING=off
+# The server keeps old prompts in RAM to reuse them; its default allowance is 8 GB, the
+# laptop's whole memory (llama-server v0.6.0 --help, 2026-10-21). 1 GB is plenty for
+# Jarvis's prompt.
+Environment=LLAMA_ARG_CACHE_RAM=1024
+# By default any website open in the browser may call this server (CORS "*") and read
+# /slots (what is in the prompts). Checked 2026-10-25 against the stick's v0.6.0: with
+# these two, a foreign Origin gets no CORS header and /slots answers 501. BAU itself
+# calls the server from Python (no Origin) and never uses /slots.
+Environment=LLAMA_ARG_CORS_ORIGINS=localhost
+Environment=LLAMA_ARG_ENDPOINT_SLOTS=false
 # BAU_LLM_MODEL (path to the .gguf) and BAU_LLM_ALIAS, written by jarvis-setup.
 EnvironmentFile=/etc/bau/llm.env
+# The engine: the stick's (Vulkan) unless sudo bau-llm-cuda use cuda wrote this file; it
+# sets BAU_LLAMA_SERVER and LD_LIBRARY_PATH, which win over the lines here ("Settings from
+# these files override settings made with Environment=", systemd.exec(5), systemd 257 in
+# Debian 13, read 2026-10-27).
+EnvironmentFile=-/etc/bau/llm-engine.env
+# The owner's speed settings (sudo bau models tune: draft length, KV cache format), read
+# last so they win over the model's own settings in llm.env.
+EnvironmentFile=-/etc/bau/llm-tune.env
 Environment=LD_LIBRARY_PATH=/opt/llama.cpp
-ExecStart=/opt/llama.cpp/llama-server --model ${BAU_LLM_MODEL} --alias ${BAU_LLM_ALIAS} \
+# bau-llm-start leaves one processor core free for the desktop and the Jarvis page (on every
+# core the model ran 30 times slower while the page was open, 2026-10-21).
+# The desktop: Debian's NVIDIA driver makes /dev/nvidia0 only when something with root
+# opens the card (nvidia-modprobe is setuid, which NoNewPrivileges blocks), so the model
+# could start on the processor after a reboot (audit 2026-10-25). "+": as root, "-": the
+# laptop has no nvidia-modprobe. -c 0 creates the device file (nvidia-modprobe 570.133.07
+# --help, Debian 13.7, 2026-10-25); "-" and "+" may be combined (systemd.service(5)).
+ExecStartPre=-+/usr/bin/nvidia-modprobe -c 0
+ExecStart=/usr/local/bin/bau-llm-start --model ${BAU_LLM_MODEL} --alias ${BAU_LLM_ALIAS} \
   --jinja --host 127.0.0.1 --port 8080 --ctx-size 8192 --no-webui
 Restart=on-failure
+# When memory runs out (the live stick's system space is RAM too), Linux stops this
+# model first instead of the desktop or the terminal; it restarts by itself.
+OOMScoreAdjust=500
 RestartSec=5
 UMask=0007
 NoNewPrivileges=yes

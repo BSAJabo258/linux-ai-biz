@@ -16,6 +16,19 @@ python3 -m venv --system-site-packages /opt/bau/venv
 /opt/bau/venv/bin/pip install --quiet --no-index --find-links /opt/bau/wheels anthropic
 /opt/bau/venv/bin/python -c 'import anthropic'
 rm -rf /opt/bau/wheels
+# The BAU look: the art that ships in the package goes on the desktop and login screen.
+art="$(/opt/bau/venv/bin/python -c 'from importlib import resources; print(resources.files("bau.ui") / "art")')"
+install -d /usr/share/backgrounds/bau
+install -m 0644 "${art}"/wall-*.jpg /usr/share/backgrounds/bau/
+# The volume control in the top bar: installed (xfce4-pulseaudio-plugin) but not in Xfce
+# 4.20's default panel (Debian 13's /etc/xdg/xfce4/panel/default.xml, read 2026-10-28). New
+# logins (the installed laptop's or desktop's first one included) get it beside the tray.
+panel=/etc/xdg/xfce4/panel/default.xml
+sed -i 's|^        <value type="int" value="6"/>$|&\n        <value type="int" value="19"/>|' "${panel}"
+sed -i 's|^    <property name="plugin-18" type="string" value="directorymenu"/>$|&\n    <property name="plugin-19" type="string" value="pulseaudio"/>|' "${panel}"
+grep -q 'value="pulseaudio"' "${panel}" && grep -q '<value type="int" value="19"/>' "${panel}"
+chmod 0755 /usr/local/bin/bau-look-desktop /usr/local/bin/bau-install-to-disk \
+  /usr/local/bin/bau-llm-start
 ln -sf /opt/bau/venv/bin/bau /usr/local/bin/bau
 ln -sf /opt/bau/venv/bin/jarvis-storage /usr/local/bin/jarvis-storage
 cat > /etc/profile.d/bau.sh <<'EOF'
@@ -47,6 +60,19 @@ EOF
 done
 systemctl enable bau-live-init.service bau-recover.service bau-ui.service bau-llm.service \
   bau-governor.timer bau-regwatch.timer
+
+# A system that runs from a USB stick writes less and never swaps onto it (bau-usb-guard,
+# zram); it stays enabled on the installed laptop (live-to-disk.sh leaves it).
+chmod 0755 /usr/local/sbin/bau-usb-guard
+systemctl enable bau-usb-guard.service
+
+# The health console on Ctrl+Alt+F9: Wi-Fi, memory, heat, the stick, kernel warnings; it
+# keeps going when the stick drops out, so a crash leaves proof on screen.
+chmod 0755 /usr/local/sbin/bau-health-console
+
+# The desktop's NVIDIA driver, run by the owner on the installed desktop (docs/DESKTOP.md).
+chmod 0755 /usr/local/sbin/bau-gpu-setup /usr/local/sbin/bau-llm-cuda
+systemctl enable bau-health-console.service
 
 chmod 0755 /usr/local/sbin/bau-live-init /usr/local/bin/jarvis-setup /opt/llama.cpp/llama-server
 LD_LIBRARY_PATH=/opt/llama.cpp /opt/llama.cpp/llama-server --version

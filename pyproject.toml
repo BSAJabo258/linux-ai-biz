@@ -27,7 +27,8 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 bau = ["data/*.yaml", "data/**/*.yaml", "data/**/*.json", "data/**/*.txt", "data/**/*.md",
-       "ui/*.html"]
+       "data/setup/*.sh",
+       "ui/*.html", "ui/*.svg", "ui/art/*.jpg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

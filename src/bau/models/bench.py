@@ -45,8 +45,6 @@ def record(model_id: str, actor: str, home: Any = None, audit: Any = None) -> di
     """Benchmark a registered model and store the result on its record. Never approves:
     approval stays the owner's typed ``bau set-status``. Raises KeyError for an unknown
     model; anything the model server does wrong propagates and nothing is recorded."""
-    import yaml
-
     from ..assistant import load_env_file
     from ..audit import AuditLog
     from ..home import bau_home
@@ -58,8 +56,12 @@ def record(model_id: str, actor: str, home: Any = None, audit: Any = None) -> di
     if rec is None:
         raise KeyError(f"model {model_id} not registered")
     res = benchmark(rec)
-    rec["benchmark"] = res
-    reg.path.write_text(yaml.safe_dump(reg.data, sort_keys=True))
+    # Read the list again: the owner may have changed it (e.g. REVOKED) during the minutes
+    # the benchmark took, and only the result is ours to write (audit 2026-10-25).
+    fresh = CapabilityRegistry(reg.path)
+    if model_id in fresh.data["model"]:
+        fresh.data["model"][model_id]["benchmark"] = res
+        fresh.save()
     (audit or AuditLog(home / "audit" / "chain.jsonl")).append(
         "model.benchmarked", actor, {"model": model_id, "reply_ok": res["reply_ok"],
                                      "tool_calls": res["tool_calls"]})

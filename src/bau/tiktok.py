@@ -390,6 +390,11 @@ class TikTokQueue:
             problems.append("provenance says AI-generated: the TikTok AI label cannot be "
                             "turned off")
         is_aigc = True if ai else bool(is_aigc)
+        # The creator is a fictional adult (CLAUDE.md): nothing that refers to minors.
+        from .virtual_creator import MINOR_REFERENCE
+        if MINOR_REFERENCE.search(item.caption):
+            problems.append("the caption refers to minors: BAU's creator is a fictional adult "
+                            "and never posts anything aimed at or about children")
         claims = scan(item.caption)
         if claims:
             problems.append("caption makes claims that need evidence: "
@@ -425,6 +430,9 @@ class TikTokQueue:
         """Called only from the interactive review, after the owner confirmed."""
         if not approver.startswith("human:"):
             raise PermissionError("only a human at the review screen can post to TikTok")
+        from .governor import hold_reason
+        if (why := hold_reason(self.home)) is not None:
+            raise TikTokError(f"BAU is on HOLD ({why}): nothing is posted until it is released")
         if item.status != "QUEUED":
             raise TikTokError(f"{item.item_id} is {item.status}; it can be posted only once")
         video = self.path(item)

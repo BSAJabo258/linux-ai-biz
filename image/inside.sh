@@ -5,9 +5,14 @@ set -euo pipefail
 
 WORK=$1
 VERSION=${VERSION:?}
-# llama.cpp v0.6.0 (checked 2026-10-07: tag v0.6.0 -> this commit on github.com/ggml-org).
-LLAMA_TAG=v0.6.0
-LLAMA_COMMIT=d81235049384534c167caea52b85a694f6103d14
+# llama.cpp build b11747 (checked 2026-10-26 with git ls-remote: tag b11747 -> this commit on
+# github.com/ggml-org, 2026-10-20; reports "0.7.0-dev"). Newer than release v0.7.0
+# (2026-10-15), which lacks the Mellum fixes of 15-16 October; JetBrains names b11747 for
+# Mellum2.1's files. Before switching, BAU's model lab ran on it and on v0.6.0 with
+# Qwen3.5-4B: the same scores, the same speed; the stick's six LLAMA_ARG_* settings exist in
+# its common/arg.cpp, CORS and /slots stay closed, Vulkan works (docs/MODEL-LAB.md).
+LLAMA_TAG=b11747
+LLAMA_COMMIT=f711c8f3038020d71f69b8ced09162b014fd7335
 
 export DEBIAN_FRONTEND=noninteractive
 if [[ -f ${WORK}/extra-ca.crt ]]; then          # build machine's proxy only, not the image
@@ -17,10 +22,10 @@ if [[ -f ${WORK}/extra-ca.crt ]]; then          # build machine's proxy only, no
 fi
 apt-get update -q
 apt-get install -y -q live-build cmake build-essential git libssl-dev ca-certificates \
-  python3 >/dev/null
+  python3 libvulkan-dev glslc spirv-headers >/dev/null
 
 # ---------------------------------------------------------------- llama.cpp
-llama="${WORK}/llama-${LLAMA_COMMIT}"
+llama="${WORK}/llama-${LLAMA_COMMIT}-vulkan"
 if [[ ! -x ${llama}/llama-server ]]; then
   src="${WORK}/llama-src"
   rm -rf "${src}"
@@ -28,13 +33,17 @@ if [[ ! -x ${llama}/llama-server ]]; then
     "${src}"
   [[ $(git -C "${src}" rev-parse HEAD) == "${LLAMA_COMMIT}" ]] \
     || { echo "llama.cpp ${LLAMA_TAG} is not commit ${LLAMA_COMMIT}: refusing" >&2; exit 1; }
-  # Portable: one CPU backend per instruction-set level, picked at run time on the owner's PC.
+  # Portable: one CPU backend per instruction-set level, picked at run time on the owner's PC,
+  # plus the Vulkan backend for the desktop's NVIDIA card (docs/DESKTOP.md); it is a separate
+  # loadable part, and bau-llm-start keeps it off unless NVIDIA's driver is loaded.
   cmake -S "${src}" -B "${src}/build" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
-    -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON \
+    -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_VULKAN=ON \
     -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON >/dev/null
   cmake --build "${src}/build" --target llama-server -j "$(nproc)" >/dev/null
   rm -rf "${llama}"
   mkdir -p "${llama}"
+  [[ -f ${src}/build/bin/libggml-vulkan.so ]] \
+    || { echo "llama.cpp built without its Vulkan part: refusing" >&2; exit 1; }
   cp -a "${src}"/build/bin/llama-server "${src}"/build/bin/*.so* "${llama}/"
   cp "${src}/LICENSE" "${llama}/LICENSE"
   rm -rf "${src}"

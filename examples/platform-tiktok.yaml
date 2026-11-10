@@ -24,7 +24,10 @@ api_policy: >-
 automation_policy: >-
   Per-post express user consent is required before upload: show the account nickname,
   a preview, privacy chosen by the user with no default (from creator_info options),
-  and the music/branded confirmation. No unattended or scheduled posting.
+  and the music/branded confirmation. No unattended or scheduled posting through BAU's own
+  TikTok app. Through Ayrshare (src/bau/week.py, 2026-11-01): the owner sees every post of
+  the week on one card and picks the visibility (no default) before confirming once;
+  Ayrshare's own TikTok app does the scheduled posting.
 account_limits: Video length capped by creator_info.max_video_post_duration_sec.
 appeal_process: Through the TikTok app (Settings > Support) for removed posts.
 requires_ai_label: true

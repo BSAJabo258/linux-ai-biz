@@ -16,16 +16,40 @@ from typing import Any
 import yaml
 
 
+def fresh_line(fh: Any) -> bytes:
+    """A newline if the file does not end with one: a record cut off by a power cut stays
+    on its own line instead of swallowing the next one (audit 2026-10-25)."""
+    fh.seek(0, os.SEEK_END)
+    if fh.tell() == 0:
+        return b""
+    fh.seek(-1, os.SEEK_END)
+    return b"" if fh.read(1) == b"\n" else b"\n"
+
+
+def read_lines(path: Path) -> Iterator[dict[str, Any] | None]:
+    """Each record of a JSONL file; None for a line that was cut off mid-write."""
+    if not path.exists():
+        return
+    with path.open() as fh:
+        for line in fh:
+            if line.strip():
+                try:
+                    yield json.loads(line)
+                except ValueError:
+                    yield None
+
+
 class JsonlStore:
     def __init__(self, path: Path):
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def append(self, rec: dict[str, Any]) -> dict[str, Any]:
-        with self.path.open("a") as fh:
+        with self.path.open("ab+") as fh:
             fcntl.flock(fh, fcntl.LOCK_EX)
             try:
-                fh.write(json.dumps(rec, sort_keys=True, default=str) + "\n")
+                fh.write(fresh_line(fh) + (json.dumps(rec, sort_keys=True, default=str)
+                                           + "\n").encode())
                 fh.flush()
                 os.fsync(fh.fileno())
             finally:
@@ -33,12 +57,7 @@ class JsonlStore:
         return rec
 
     def __iter__(self) -> Iterator[dict[str, Any]]:
-        if not self.path.exists():
-            return
-        with self.path.open() as fh:
-            for line in fh:
-                if line.strip():
-                    yield json.loads(line)
+        yield from (r for r in read_lines(self.path) if r is not None)
 
     def all(self) -> list[dict[str, Any]]:
         return list(self)

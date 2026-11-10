@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=BAU look
+Comment=Puts BAU's art on the desktop at your first login
+Exec=/usr/local/bin/bau-look-desktop
+OnlyShowIn=XFCE;
+NoDisplay=true

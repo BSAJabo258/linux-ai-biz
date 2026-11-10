@@ -24,20 +24,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -e '.[dev]' shellcheck-py
-      - name: lint
-        run: ruff check src tests
-      - name: secret scan
-        run: bau secrets .
-      - name: regulation registry and policies
-        run: bau reg validate
-      - name: tests
-        run: python -m pytest -q
-      - name: shellcheck installer
-        run: >-
-          shellcheck -x installer/*.sh installer/lib/*.sh installer/payload/*.sh
-          installer/firstboot/*.sh installer/cloud/*.sh docker/*.sh vm/*.sh image/*.sh image/live-build/auto/config
-          image/live-build/config/hooks/live/*.chroot
-          image/live-build/config/includes.chroot/usr/local/sbin/bau-live-init
-          image/live-build/config/includes.chroot/usr/local/bin/jarvis-setup
+      - name: every check (lint, secrets, regulations, shellcheck on every script, tests)
+        run: bash scripts/check.sh
       - name: build payload
         run: installer/make-payload.sh --skip-tests

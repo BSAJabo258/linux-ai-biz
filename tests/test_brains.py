@@ -1,7 +1,7 @@
 """Brains per stage: each workspace stage folder says which brain drafts it - `small` (the
 free local model, for routine steps), `strong` (Claude or Jarvis's best model, for the
 steps that need judgement) or `content` (a local uncensored model in the sealed content
-lane: no tools, never a kids workspace, only the content jobs its record lists). The owner
+lane: no tools, never minors, only the content jobs its record lists). The owner
 picks once which model each brain means. Written before the code it tests."""
 
 import json
@@ -54,7 +54,7 @@ def registry(home, *recs):
     return reg
 
 
-def workspace(home, stages, kids=False):
+def workspace(home, stages):
     ws = W.root(home) / "shop"
     t = ws / "_templates" / "episode"
     for n, (name, brain) in enumerate(stages, 1):
@@ -64,8 +64,6 @@ def workspace(home, stages, kids=False):
     (t / "brief.md").write_text("# {{idea}}\n")
     (ws / "_shared").mkdir(parents=True)
     (ws / "CLAUDE.md").write_text("# A test workspace\n")
-    if kids:
-        (ws / "_shared" / "kids-rules.md").write_text("Kids rules.\n")
     (ws / "episodes").mkdir()
     return ws
 
@@ -101,20 +99,17 @@ def test_stage_folders_declare_their_brain(tmp_path):
 
 
 def test_a_stage_with_no_brain_line_uses_the_strong_brain(tmp_path):
-    ws = W.create("kids-channel", home=tmp_path)
-    W.contracts(W.new_episode(ws, "Pip finds an acorn"))         # parses
+    ws = W.create("creator-week", home=tmp_path)
+    W.contracts(W.new_episode(ws, "Rooftop sunset week"))        # parses
     ws2 = workspace(tmp_path / "o", [("x", "")])
     assert W.contracts(W.new_episode(ws2, "idea"))[0].brain == "strong"
 
 
-def test_kids_template_uses_the_small_brain_for_routine_steps_and_never_content(tmp_path):
-    ws = W.create("kids-channel", home=tmp_path)
-    by = {c.stage: c.brain for c in W.contracts(W.new_episode(ws, "Pip counts"))
+def test_creator_template_uses_the_small_brain_for_routine_steps(tmp_path):
+    ws = W.create("creator-week", home=tmp_path)
+    by = {c.stage: c.brain for c in W.contracts(W.new_episode(ws, "Gallery week"))
           if c.agent}
-    assert by["01_pitch"] == "small" and by["05_metadata"] == "small"
-    assert by["02_script"] == "strong" and by["04_video-prompts"] == "strong"
-    assert "content" not in by.values()
-    assert W.for_kids(ws)
+    assert by == {"01_plan": "small", "02_captions": "strong", "03_prompts": "small"}
 
 
 # ------------------------------------------------------------------ the owner picks the models
@@ -172,9 +167,6 @@ def test_content_brain_is_walled_off(tmp_path):
         B.resolve("content", tmp_path, shop, JARVIS, factory=f, kind="ad_copy")
     with pytest.raises(ValueError, match="which content job"):
         B.resolve("content", tmp_path, shop, JARVIS, factory=f, kind="")
-    kids = workspace(tmp_path / "k", [("lyrics", "content lyrics")], kids=True)
-    with pytest.raises(ValueError, match="kids"):
-        B.resolve("content", tmp_path, kids, JARVIS, factory=f, kind="lyrics")
 
 
 # ------------------------------------------------------------------ Jarvis and the CLI

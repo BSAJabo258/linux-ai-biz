@@ -233,3 +233,27 @@ def test_login_rejects_forged_state(tmp_path):
     with pytest.raises(tiktok.TikTokError, match="state"):
         tiktok.login(client, port=port, open_browser=browser, timeout=10)
     assert client.tokens.load() is None
+
+
+# ------------------------------------------------------------------ audit 2026-10-25
+# The creator is a fictional adult (CLAUDE.md): nothing aimed at or about children; a HOLD
+# stops every post.
+
+def test_a_child_directed_caption_cannot_go_to_tiktok(tmp_path, engine):
+    video, client, q = setup(tmp_path)
+    for caption in ("A counting song for toddlers", "Bedtime story for 4-year-olds",
+                    "For little ones aged 3 to 5"):
+        item = q.add(video, caption, "human:owner", engine=engine)
+        assert not item.checks["ok"], caption
+
+
+def test_nothing_posts_to_tiktok_while_bau_is_on_hold(tmp_path, engine):
+    video, client, q = setup(tmp_path)
+    item = q.add(video, "New lyric video out now #music", "human:owner", engine=engine)
+    assert item.checks["ok"]
+    hold = tmp_path / "governor" / "hold.json"
+    hold.parent.mkdir(parents=True, exist_ok=True)
+    hold.write_text(json.dumps({"reason": "spending cap breached"}))
+    with pytest.raises(tiktok.TikTokError, match="HOLD"):
+        q.post(item, client, "human:owner", "SELF_ONLY", {}, {"privacy_level_options":
+                                                               ["SELF_ONLY"]})

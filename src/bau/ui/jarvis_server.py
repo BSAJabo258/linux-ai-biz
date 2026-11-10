@@ -47,18 +47,23 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
     # GitHub wants requests one at a time, so one search or inspection at a time; testing
     # a model has its own lane. Neither holds up the conversation.
     lanes = {"scout": threading.Lock(), "models": threading.Lock(),
-             "studio": threading.Lock(), "godseye": threading.Lock(),
-             "results": threading.Lock()}
+             "studio": threading.Lock(), "godseye": threading.Lock()}
     jobs: dict[str, dict[str, Any]] = {}  # slow answers the page is checking back on
+    last_overview: dict[str, Any] = {}    # served while a model turn holds the lock
 
     def state() -> dict[str, Any]:
-        return {"call_me": assistant.cfg["call_me"],
+        from ..look import brief
+        try:
+            assistant.setup_waiting()     # setup steps pop up by themselves (owner, 2026-11-02)
+        except Exception:                 # a probe that fails must not break the page
+            pass
+        return {"call_me": assistant.cfg["call_me"], "look": brief(assistant.home),
                 "mode": "model" if assistant.provider else "plain",
                 "model": assistant.model.get("id") or assistant.model.get("api_model"),
                 "backups": list(assistant.model.get("fallbacks") or []),
                 "answered_by": assistant.last_model,
                 "voice": voice.available, "listen": voice.can_listen,
-                "pending": [p.public() for p in assistant.pending.values()]}
+                "pending": [p.public() for p in list(assistant.pending.values())]}
 
     def waiting() -> list[dict[str, Any]]:
         """What already waits for the owner while a slow answer is still being written: a
@@ -117,7 +122,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
             self.send_header("Content-Security-Policy",
                              "default-src 'none'; script-src 'unsafe-inline'; "
                              "style-src 'unsafe-inline'; connect-src 'self'; "
-                             "media-src 'self' blob:; frame-ancestors 'none'")
+                             "media-src 'self' blob:; img-src 'self' blob:; frame-ancestors 'none'")
             self.end_headers()
             self.wfile.write(body)
 
@@ -165,6 +170,21 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     return
                 self._send(200, page, "text/html; charset=utf-8")
                 return
+            if path == "/icon.svg":                 # the tab icon
+                self._send(200, (resources.files("bau.ui") / "icon.svg").read_bytes(),
+                           "image/svg+xml")
+                return
+            if path == "/art" or path.startswith("/art/"):   # the owner's art (bau look)
+                if not self._guard(api=False):
+                    return
+                from ..look import art_file, art_named
+                got = art_file(assistant.home) if path == "/art" \
+                    else art_named(assistant.home, path[5:])
+                if got is None:
+                    self._send(404, b"no art chosen", "text/plain")
+                else:
+                    self._send(200, got[0].read_bytes(), got[1])
+                return
             if not path.startswith("/api/"):
                 self._send(404, b"not found", "text/plain")
                 return
@@ -184,7 +204,10 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 with f:
                     size = os.fstat(f.fileno()).st_size
                     self.send_response(200)
-                    self.send_header("Content-Type", "video/mp4")
+                    kind = {".png": "image/png", ".jpg": "image/jpeg",
+                            ".jpeg": "image/jpeg"}.get(Path(p.preview).suffix.lower(),
+                                                       "video/mp4")
+                    self.send_header("Content-Type", kind)
                     self.send_header("Content-Length", str(size))
                     self.send_header("Cache-Control", "no-store")
                     self.send_header("X-Content-Type-Options", "nosniff")
@@ -192,10 +215,22 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     shutil.copyfileobj(f, self.wfile, 1024 * 1024)
             elif path == "/api/state":
                 self._json(200, self._state())
+            elif path == "/api/autopilot":           # the mind panel (docs/AUTOPILOT.md)
+                from .. import autopilot
+                self._json(200, autopilot.view(assistant.home))
             elif path == "/api/overview":
+                # Never wait for a long model turn: the page polls this, and waiting
+                # requests use up the browser's few connections and stall the live feed.
                 from ..overview import overview
-                with lock:
-                    self._json(200, overview(assistant))
+                if lock.acquire(blocking=False):
+                    try:
+                        last_overview["data"] = overview(assistant)
+                    finally:
+                        lock.release()
+                elif "data" not in last_overview:
+                    with lock:
+                        last_overview["data"] = overview(assistant)
+                self._json(200, last_overview["data"])
             elif path == "/api/activity":
                 q = dict(p.partition("=")[::2] for p in query.split("&") if p)
                 try:
@@ -211,8 +246,6 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     q.get("q", ""))))
             elif path == "/api/usage":
                 self._json(200, screen.usage_summary(assistant))
-            elif path == "/api/results":
-                self._json(200, screen.results_summary(assistant))
             elif path == "/api/studio":
                 self._json(*answer(lambda: screen.studio_summary(assistant), lanes["studio"]))
             elif path.startswith("/api/studio/clip/"):
@@ -327,10 +360,6 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
             elif self.path == "/api/godseye":
                 self._json(*answer(lambda: screen.godseye_screen(assistant, data),
                                    lanes["godseye"]))
-            elif self.path == "/api/results/refresh":
-                force = bool(data.get("force"))
-                self._json(*answer(lambda: screen.results_summary(assistant, True, force),
-                                   lanes["results"]))
             elif self.path == "/api/studio/stage":
                 # Prices the clip and puts it on screen; only the owner's Confirm starts it.
                 self._json(*answer(lambda: screen.studio_stage(assistant, data),

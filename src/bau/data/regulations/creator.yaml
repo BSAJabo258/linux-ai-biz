@@ -1,0 +1,85 @@
+# The owner's business (2026-11-01): one fictional adult (21+) virtual creator run from
+# Michigan; sfw posts to Instagram and TikTok, explicit content to Fanvue. Each record was read
+# on the official page on its last_verified date. Requirements and evidence only: counsel
+# decides what applies and how.
+
+- reg_id: us-take-it-down-act
+  jurisdiction: US
+  authority: US Congress (FTC enforces the platform duties)
+  law: TAKE IT DOWN Act, Public Law 119-12 (47 U.S.C. 223(h) and platform notice-and-removal)
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 2025-05-19
+  covered_entities: Anyone who publishes through an interactive computer service; covered platforms (removal process due one year after enactment)
+  obligations:
+    - Never knowingly publish an intimate visual depiction or a "digital forgery" (AI-made, indistinguishable from real) of an identifiable individual without that person's consent
+    - Depictions of minors are a separate, stricter offense with no consent defence
+    - Covered platforms remove reported depictions within 48 hours of a valid request (platform duty; Fanvue, Instagram and TikTok carry it, not the creator)
+  penalties: Criminal - fines and up to 2 years (adults) or 3 years (minors) per the Act; FTC enforcement against non-complying platforms
+  source_url: https://www.congress.gov/119/plaws/publ12/PLAW-119publ12.pdf
+  source_type: statute
+  last_verified: 2026-11-01
+  next_review: 2027-05-01
+  legal_review_required: true
+  notes: "Read 2026-11-01 (enacted May 19, 2025). It reaches identifiable real people. BAU's controls: a fictional persona with an identity lock, no real person's likeness (pub.likeness_consent), MINOR_REFERENCE. Counsel: confirm a fully fictional character is outside 'identifiable individual'."
+
+- reg_id: us-mi-intimate-deepfakes
+  jurisdiction: US-MI
+  authority: Michigan Legislature
+  law: Protection from Intimate Deep Fakes Act, 2025 PA 11 (HB 4047), with the criminal companion 2025 PA 12 (HB 4048)
+  legal_status: effective
+  bau_status: MAPPED
+  effective_date: 2025-08-26
+  covered_entities: Anyone who creates or disseminates a sexual deep fake of a depicted individual
+  obligations:
+    - Do not create or disseminate a sexual deep fake of a depicted individual (identifiable by face, likeness or another distinguishing characteristic) without consent
+    - Consent counts only in a plain-language written agreement signed knowingly and voluntarily by the depicted individual, with a general description of the deep fake
+    - Civil action by the depicted individual; criminal penalties under PA 12
+  penalties: Civil damages and other relief (PA 11); misdemeanor or felony (PA 12)
+  source_url: https://www.legislature.mi.gov/documents/2025-2026/publicact/htm/2025-PA-0011.htm
+  source_type: statute
+  last_verified: 2026-11-01
+  next_review: 2027-05-01
+  legal_review_required: true
+  notes: "Read 2026-11-01: PA 11 approved and effective 2025-08-26; HB 4048 is PA 12 (bill page). It reaches depicted (real, identifiable) individuals. Same BAU controls as us-take-it-down-act. PA 12's exact penalties were not read here: counsel."
+
+- reg_id: us-2257-records
+  jurisdiction: US
+  authority: US Congress; Department of Justice (28 CFR Part 75)
+  law: 18 U.S.C. 2257 and 2257A - record keeping for depictions of actual human beings in sexually explicit conduct
+  legal_status: effective
+  bau_status: MAPPED
+  covered_entities: Producers of depictions, including digital or computer-manipulated images, of an actual human being in actual (2257) or simulated (2257A) sexually explicit conduct
+  obligations:
+    - Producers of covered depictions of actual human beings keep age and identity records and label each depiction with where the records are kept
+    - "DOJ's compliance guide: the rule does not include computer-generated images that do not depict real human beings"
+    - A real person's photo or video used as the base of an image makes it a depiction of an actual human being - never do that
+  penalties: Criminal - fines and imprisonment
+  source_url: https://www.govinfo.gov/content/pkg/USCODE-2020-title18/html/USCODE-2020-title18-partI-chap110-sec2257.htm
+  source_type: statute
+  last_verified: 2026-11-01
+  next_review: 2027-05-01
+  legal_review_required: true
+  notes: "Read 2026-11-01: the statute's 'actual human being' wording and DOJ's guide (justice.gov 2257compliance.pdf) on computer-generated images. Fanvue also verifies the human operator (KYC). Counsel: confirm for this creator before any explicit post."
+
+- reg_id: industry-fanvue-ai-media
+  jurisdiction: ANY
+  authority: Fanvue
+  law: Fanvue rules for AI content (help centre article and Community Guidelines, Section D)
+  legal_status: industry_requirement
+  bau_status: MAPPED
+  covered_entities: Every Fanvue account posting AI content
+  obligations:
+    - Disclose AI media clearly and prominently (profile bio, caption or watermark); every AI account type shows the AI label
+    - A fully AI account never tells fans it is a real person
+    - No AI content that looks like a real, identifiable person unless that person is verified and gave documented consent
+    - AI characters must look clearly adult; prompts, captions or stated ages do not override how the content looks
+    - No AI content made from other people's photos or videos; no copyrighted characters
+    - The human behind a fully AI account completes Fanvue's ID verification (KYC)
+  penalties: Content removal, warnings, held payouts, deducted earnings, suspension or closure
+  source_url: https://help.fanvue.com/en/articles/9538738-is-ai-content-allowed-on-fanvue
+  source_type: industry_policy
+  last_verified: 2026-11-01
+  next_review: 2027-02-01
+  legal_review_required: true
+  notes: "Read 2026-11-01 (page 'Updated over 2 weeks ago'). The Acceptable Use Policy (legal.fanvue.com/acceptable-use-policy) also requires the disclosure. Policy record: examples/platform-fanvue.yaml."

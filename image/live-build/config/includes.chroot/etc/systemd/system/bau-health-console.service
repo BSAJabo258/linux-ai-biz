@@ -1,0 +1,17 @@
+[Unit]
+Description=BAU health console on Ctrl+Alt+F9 (Wi-Fi, memory, heat, the USB stick, kernel warnings)
+After=systemd-user-sessions.service
+
+[Service]
+ExecStart=/usr/local/sbin/bau-health-console
+StandardInput=null
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty9
+TTYReset=yes
+TTYVHangup=yes
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

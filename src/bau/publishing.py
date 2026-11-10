@@ -2,7 +2,7 @@
 
 Each platform is an ``Adapter`` with the same four abilities: list what is waiting,
 build the card the owner confirms (summary, owner-only choices, preview), post after
-the owner confirms, and say whether it accepts child-directed content. Jarvis, the CLI
+the owner confirms. Jarvis, the CLI
 and Mission Control talk to the hub, so adding a platform (Instagram, Facebook,
 Snapchat...) means writing one adapter and registering it in ``ADAPTERS``.
 
@@ -22,8 +22,6 @@ from .home import bau_home
 class Adapter:
     name = "base"
     label = "Platform"
-    allows_kids = False          # may child-directed (made for kids) videos go here?
-    kids_note = ""
 
     def __init__(self, home: Path, audit: AuditLog, client: Any = None):
         self.home, self.audit, self._client = home, audit, client
@@ -41,8 +39,6 @@ class Adapter:
 
 class TikTokAdapter(Adapter):
     name, label = "tiktok", "TikTok"
-    kids_note = ("TikTok is for ages 13 and up, so BAU never posts child-directed videos "
-                 "there. Kids videos go to YouTube, marked made for kids.")
 
     @property
     def queue(self):
@@ -59,7 +55,7 @@ class TikTokAdapter(Adapter):
 
     def pending(self) -> list[dict[str, Any]]:
         return [{"platform": self.name, "item_id": i.item_id, "video": i.video,
-                 "title": i.caption, "ai_label": i.is_aigc, "made_for_kids": False,
+                 "title": i.caption, "ai_label": i.is_aigc,
                  "checks_ok": i.checks.get("ok"), "problems": i.checks.get("problems", [])}
                 for i in self.queue.pending()]
 
@@ -120,81 +116,56 @@ class TikTokAdapter(Adapter):
                 "result": done.result, "account": creator.get("creator_username")}
 
 
-class YouTubeAdapter(Adapter):
-    name, label = "youtube", "YouTube"
-    allows_kids = True
+class FanvueAdapter(Adapter):
+    """Fanvue (src/bau/fanvue.py): a queued picture and caption; the owner picks the
+    audience with no default and Accept uploads and posts it."""
+    name, label = "fanvue", "Fanvue"
 
     @property
     def queue(self):
-        from .youtube import YouTubeQueue
-        return YouTubeQueue(self.home, self.audit)
+        from .fanvue import Queue
+        return Queue(self.home, self.audit)
 
     @property
     def client(self):
-        from .youtube import YouTubeClient
-        return self._client or YouTubeClient(self.home)
-
-    def _item(self, item_id: str):
-        return next((i for i in self.queue.pending() if i.item_id == item_id), None)
+        from .fanvue import FanvueClient
+        return self._client or FanvueClient(self.home)
 
     def pending(self) -> list[dict[str, Any]]:
-        return [{"platform": self.name, "item_id": i.item_id, "video": i.video,
-                 "title": i.title, "ai_label": i.is_aigc, "made_for_kids": i.kids,
-                 "checks_ok": i.checks.get("ok"), "problems": i.checks.get("problems", []),
-                 "warnings": i.checks.get("warnings", [])}
+        return [{"platform": self.name, "item_id": i["item_id"], "picture": i["picture"],
+                 "title": i["caption"][:120], "level": i["level"], "ai_label": True}
                 for i in self.queue.pending()]
 
     def card(self, item_id: str) -> dict[str, Any]:
-        from .youtube import PRIVACY_LABELS, YouTubeError, duration_sec
-        item = self._item(item_id)
-        if item is None:
-            raise ValueError(f"{item_id} is not waiting in the YouTube queue")
-        if not item.checks.get("ok"):
-            why = item.checks.get("problems") or [f"compliance gate {item.checks.get('gate')}"]
-            raise ValueError("blocked by checks: " + "; ".join(why))
+        from .fanvue import AUDIENCES, LEVELS, FanvueError
+        q = self.queue
+        item = q.get(item_id)
+        if item is None or item["status"] != "QUEUED":
+            raise ValueError(f"{item_id} is not waiting in the Fanvue queue")
+        if problems := q.check(item["picture"], item["caption"], item["level"]):
+            raise ValueError("blocked by checks: " + "; ".join(problems))
         try:
-            ch = self.client.channel()
-        except (YouTubeError, OSError) as e:
-            raise ValueError(f"YouTube is not connected ({e}); run: bau youtube login") from e
-        secs = duration_sec(self.queue.path(item))
-        summary = (f"Upload to YouTube now?\nChannel: {ch['title']} {ch.get('handle', '')}"
-                   .rstrip() + f"\nTitle: {item.title}\n"
-                   + (f"Length: {secs:.1f}s\n" if secs is not None else "")
-                   + f"AI label: {'ON' if item.is_aigc else 'off'}\n"
-                   + ("Audience: MADE FOR KIDS (comments, personalised ads, notifications and "
-                      "end screens off)\n" if item.kids else "")
-                   + ("Paid promotion: choose Private, then tick 'includes paid promotion' in "
-                      "YouTube Studio before making it public.\n" if item.paid_promotion else "")
-                   + "".join(f"Note: {w}\n" for w in item.checks.get("warnings", [])))
-        privacy = {"name": "privacy", "label": "Who can see it?",
-                   "options": [[k, v] for k, v in PRIVACY_LABELS.items()]}
-        if item.kids:
-            fields = [{"name": "watched", "label": "Did you watch the whole video?",
-                       "options": [["yes", "Yes, I watched all of it"]]}, privacy]
-        else:
-            fields = [{"name": "audience", "label": "Is this video made for kids? "
-                       "(you are legally responsible for this answer)",
-                       "options": [["no", "No, it's not made for kids"],
-                                   ["yes", "Yes, it's made for kids"]]}, privacy]
-        return {"summary": summary.rstrip(), "form": {"fields": fields},
-                "preview": str(self.queue.path(item))}
+            me = self.client.me()
+        except (FanvueError, OSError) as e:
+            raise ValueError(f"Fanvue is not connected ({e}); run: bau fanvue login") from e
+        summary = (f"Post to Fanvue now?\nAccount: {me.get('displayName', '?')} "
+                   f"(@{me.get('handle', '?')})\nLevel {item['level']}: "
+                   f"{LEVELS[item['level']]}\nCaption:\n{item['caption']}")
+        form = {"fields": [{"name": "audience", "label": "Who sees this post?",
+                            "options": [[k, v] for k, v in AUDIENCES.items()]}]}
+        return {"summary": summary, "form": form, "preview": str(q.picture(item))}
 
     def post(self, item_id: str, choices: dict[str, Any], approver: str) -> dict[str, Any]:
-        from .youtube import YouTubeError
-        item = self._item(item_id)
+        q = self.queue
+        item = q.get(item_id)
         if item is None:
-            return {"error": f"{item_id} is not waiting in the queue"}
-        mfk = item.kids or choices.get("audience") == "yes"
-        try:
-            done = self.queue.post(item, self.client, approver, choices.get("privacy", ""),
-                                   mfk, choices.get("watched") == "yes")
-        except YouTubeError as e:
-            return {"error": str(e)}
-        return {"platform": self.name, "item_id": done.item_id, "status": done.status,
-                "result": done.result}
+            return {"error": f"{item_id} is not in the Fanvue queue"}
+        done = q.post(item, self.client, approver, choices.get("audience", ""))
+        return {"platform": self.name, "item_id": item_id, "status": done["status"],
+                "result": done["result"]}
 
 
-ADAPTERS: dict[str, type[Adapter]] = {"tiktok": TikTokAdapter, "youtube": YouTubeAdapter}
+ADAPTERS: dict[str, type[Adapter]] = {"tiktok": TikTokAdapter, "fanvue": FanvueAdapter}
 
 
 class Hub:
@@ -220,23 +191,13 @@ class Hub:
         return out
 
     def queue(self, video: Path, platforms: list[str], by: str, *, title: str,
-              description: str = "", tags: list[str] | None = None, kids: bool = False,
-              licensed: bool = False, paid_promotion: bool = False, is_aigc: bool | None = None,
+              description: str = "", is_aigc: bool | None = None,
               engine: Any = None) -> list[dict[str, Any]]:
-        """Fan one finished video out to several platform queues. Kids videos only go
-        where the platform accepts child-directed content."""
+        """Fan one finished video out to several platform queues."""
         out: list[dict[str, Any]] = []
         for name in platforms:
-            ad = self.adapter(name)
-            if kids and not ad.allows_kids:
-                out.append({"platform": name, "skipped": ad.kids_note})
-                continue
-            if name == "youtube":
-                from .youtube import YouTubeQueue
-                it = YouTubeQueue(self.home, self.audit).add(
-                    video, title, by, description, tags, kids=kids, licensed=licensed,
-                    paid_promotion=paid_promotion, is_aigc=is_aigc, engine=engine)
-            elif name == "tiktok":
+            self.adapter(name)                       # unknown platform: a plain error
+            if name == "tiktok":
                 from .tiktok import TikTokQueue
                 caption = title + (f"\n{description}" if description else "")
                 it = TikTokQueue(self.home, self.audit).add(video, caption[:2200], by,

@@ -163,3 +163,13 @@ def test_cli_and_screen(tmp_path, monkeypatch, capsys):
     from importlib import resources
     page = (resources.files("bau.ui") / "jarvis.html").read_text()
     assert "/api/toolbox" in page
+
+
+def test_plain_words_for_decisions_find_the_structured_output_tools():
+    # Found on the laptop model (2026-10-19): asked in plain words, Jarvis got a workflow
+    # tool and a chat model back; the tools that lock answers to a list never came up.
+    tb = Toolbox()
+    want = {"Outlines", "Instructor", "Guidance"}
+    for q in ("make decisions with a confidence score", "pick an answer from fixed choices",
+              "classify an email into a folder"):
+        assert want & {h["name"] for h in tb.ask(q)[:3]}, q

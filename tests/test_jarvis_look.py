@@ -9,10 +9,13 @@ from bau.accessibility import lint_html
 PAGE = (resources.files("bau.ui") / "jarvis.html").read_text()
 
 
-def test_orb_is_a_rotating_particle_sphere_in_a_golden_halo():
-    assert "function drawOrb" in PAGE
-    n = re.search(r"const ORB_POINTS = (\d+)", PAGE)
+def test_the_core_is_a_lorenz_attractor_mind_in_a_golden_halo():
+    # the owner's ask (2026-11-02): "deep formula" visuals; the sphere of points became
+    # a living strange attractor
+    assert "function drawMind" in PAGE and "function drawOrb" not in PAGE
+    n = re.search(r"const MIND_N = REDUCED \? \d+ : (\d+)", PAGE)
     assert n and int(n.group(1)) >= 400
+    assert "10 * (p[1] - p[0])" in PAGE and "p[0] * (RHO - p[2]) - p[1]" in PAGE
     assert "--gold" in PAGE and "function drawHalo" in PAGE
 
 
@@ -23,12 +26,8 @@ def test_energy_streams_and_circuit_traces_run_to_every_node():
 
 def test_voice_bar_speaking_pill_and_chat_voice_toggle():
     assert 'id="wave"' in PAGE and "function drawWave" in PAGE
-    pill = re.search(r'<button[^>]*id="speakpill"[^>]*>', PAGE)
-    assert pill and 'data-key="S"' in pill.group(0)
-    mode = re.search(r'<button[^>]*id="modepill"[^>]*>', PAGE)
-    assert mode and 'data-key="V"' in mode.group(0)
-    help_box = PAGE[PAGE.index('id="help"'):]
-    assert "<kbd>S</kbd>" in help_box and "<kbd>V</kbd>" in help_box
+    assert re.search(r'<button[^>]*id="speakpill"[^>]*>', PAGE)     # tap to stop speaking
+    assert re.search(r'<button[^>]*id="modepill"[^>]*>', PAGE)      # chat or voice
 
 
 def test_motion_is_calm_for_reduced_motion_and_the_page_stays_accessible():

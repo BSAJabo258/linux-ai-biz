@@ -20,6 +20,55 @@ lightdm-gtk-greeter
 firefox-esr
 network-manager
 network-manager-gnome
+# Wi-Fi: network-manager only recommends these, and auto/config turns recommends off.
+# Without wpasupplicant NetworkManager cannot use Wi-Fi at all.
+wpasupplicant
+wireless-regdb
+iw
+# Sticks and Windows drives open by themselves when plugged in (Thunar), exFAT and NTFS
+# included; screen and power handled (without it the screen blanks after 10 minutes).
+thunar-volman
+gvfs-backends
+exfatprogs
+ntfs-3g
+xfce4-power-manager
+# Compressed swap in memory instead of on disk (/etc/systemd/zram-generator.conf).
+systemd-zram-generator
+# Sound, Bluetooth, cooling, video (named because recommends are off; checked against the
+# owner's Dell XPS 13 9380): a sound server for Jarvis's voice and the browser, Bluetooth
+# for speakers and controllers, Intel's thermal daemon against overheating and throttling,
+# and Intel video decoding for playback and ffmpeg.
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+alsa-utils
+# Only Recommends/Suggests in Debian 13.7, so recommends-off never installed them (checked
+# 2026-10-20 with apt in a clean trixie; packages.debian.org/trixie/alsa-ucm-conf): the
+# sound routing for laptop chips like the XPS's ("absolutely necessary to make some sound
+# hardware work"), and PipeWire's Bluetooth audio (headphones and speakers).
+alsa-ucm-conf
+alsa-topology-conf
+# PipeWire never started on the stick (VM with an Intel HD Audio card, 2026-10-28): its user
+# service "Requires=pipewire.socket dbus.service", and the user dbus.service comes only with
+# dbus-user-session, which pipewire-bin merely Recommends (with rtkit, which gives the sound
+# real-time priority so it does not crackle while the model runs). Installed by hand in that
+# VM, PipeWire started and listed "Built-in Audio Analog Stereo".
+dbus-user-session
+rtkit
+# Jarvis's voice without an ElevenLabs key is Firefox's own (speechSynthesis), which needs
+# Speech Dispatcher (support.mozilla.org "Speech Dispatcher required for SpeechSynthesis
+# API"). On the desktop, 2026-10-28, Debian 13: Jarvis silent; Speech Dispatcher 0.12.0-5
+# with espeak-ng gave only the "dummy" voice (spd-say -L); the espeak-ng voices came only
+# with its espeak-ng output module (0.12.0-5, the package below).
+speech-dispatcher
+speech-dispatcher-espeak-ng
+libspa-0.2-bluetooth
+pavucontrol
+bluez
+blueman
+thermald
+intel-media-va-driver
 fonts-dejavu
 dbus-x11
 
@@ -78,3 +127,7 @@ firmware-intel-sound
 firmware-sof-signed
 intel-microcode
 amd64-microcode
+
+# The desktop's graphics card (docs/DESKTOP.md): llama.cpp's Vulkan part needs the Vulkan
+# loader to start; the NVIDIA driver itself comes later, with sudo bau-gpu-setup.
+libvulkan1

@@ -90,6 +90,31 @@ model:
     cost_in_per_mtok: 4.0
     cost_out_per_mtok: 20.0
     status: REGISTERED
+  claude-haiku-5-5:
+    model_id: claude-haiku-5-5
+    name: Claude Haiku 5.5 - the cheap Claude for routine steps and takeovers
+    version: "5.5"
+    provider: anthropic
+    # Checked 2026-10-21 (platform.claude.com pricing): $0.10 in / $0.50 out per million
+    # tokens for prompts up to 100K ($0.50 / $2.50 above), cache hits $0.01; Opus 5.5 is
+    # $4 / $20. Accepts output_config.effort (low..max, default medium).
+    source: Anthropic API
+    license: Anthropic commercial terms
+    commercial_use: true
+    deployment: cloud
+    adapter: anthropic
+    api_model: claude-haiku-5-5
+    effort: medium
+    trust_level: OFFICIAL
+    privacy: cloud
+    context: 1000000
+    tools: true
+    input_types: [text, image, pdf]
+    quality: 0.8
+    latency_ms: 3000
+    cost_in_per_mtok: 0.10
+    cost_out_per_mtok: 0.50
+    status: REGISTERED
   local-llm:
     model_id: local-llm
     name: Local model via llama.cpp llama-server
@@ -221,6 +246,217 @@ model:
     cost_in_per_mtok: 0
     cost_out_per_mtok: 0
     status: REGISTERED
+  lfm2.5-2.6b:
+    model_id: lfm2.5-2.6b
+    name: LFM2.5-2.6B - fast small brain with tool calling for 8 GB CPU machines (llama.cpp)
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-21: LiquidAI/LFM2.5-2.6B-GGUF (official), LFM Open License v1.0: free
+    # commercial use below $10M annual revenue; no content rules; keep the licence and
+    # notices when passing it on. Measured the same day on the stick's llama-server v0.6.0
+    # against Qwen3.5-4B with Jarvis's real prompt: bench reply and tool call OK, 9.5 tok/s
+    # (Qwen 3.1), both Jarvis questions answered right (Granite-4.2-3B got one wrong).
+    source: huggingface.co/LiquidAI/LFM2.5-2.6B-GGUF
+    license: LFM-Open-1.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: lfm2.5-2.6b
+    download:
+      url: https://huggingface.co/LiquidAI/LFM2.5-2.6B-GGUF/resolve/main/LFM2.5-2.6B-Q4_K_M.gguf
+      file: LFM2.5-2.6B-Q4_K_M.gguf
+      size: 1674455040
+      sha256: 02a8b7e17487d326e46d68ce0ba24211e1b80a14c4cd0597fa73c1cd697f52ed
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.6
+    latency_ms: 5000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    notes: Free below $10M yearly revenue (LFM Open License v1.0). Bench it before approving.
+  qwen3.5-9b:
+    model_id: qwen3.5-9b
+    name: Qwen3.5-9B - the desktop's boss, on the RTX 3060's 12 GB (llama.cpp, Vulkan)
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-25 (HF API model + tree): Qwen/Qwen3.5-9B, Apache-2.0, released
+    # 2026-02-27, 9.65B parameters, tool calling, 262K native context (capped for 12 GB).
+    # Pinned file: unsloth's quantisation, as for the 4B. See docs/DESKTOP.md.
+    source: huggingface.co/Qwen/Qwen3.5-9B (GGUF by unsloth/Qwen3.5-9B-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.5-9b
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf
+      file: Qwen3.5-9B-Q4_K_M.gguf
+      size: 5680522464
+      sha256: 03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.75
+    latency_ms: 3000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    # Thinking off, as for the 4B (same family; with it on the 4B spent 190 s thinking).
+    chat_template_kwargs: {enable_thinking: false}
+    notes: For the desktop's graphics card (docs/DESKTOP.md). On a processor only it is
+      slow; bench it on the machine that will run it before approving.
+  qwen3.5-9b-mtp:
+    model_id: qwen3.5-9b-mtp
+    name: Qwen3.5-9B with its own draft head (MTP) - the 9B, guessing ahead to write faster; to be measured
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-27 (HF tree + README): unsloth/Qwen3.5-9B-MTP-GGUF keeps Qwen's own
+    # multi-token-prediction layer inside the file, so no second model is needed. README:
+    # --spec-type draft-mtp --spec-draft-n-max 6, about 1.5-2x faster writing (their claim),
+    # "-np > 1 and --mmproj are not yet supported with MTP". In llama.cpp since 16 May 2026,
+    # so in the stick's b11747. Speculative decoding checks every guessed word with the
+    # model itself: the answers are the model's own; only the speed changes.
+    source: huggingface.co/Qwen/Qwen3.5-9B (GGUF with MTP by unsloth/Qwen3.5-9B-MTP-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.5-9b-mtp
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.5-9B-MTP-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf
+      file: Qwen3.5-9B-MTP-Q4_K_M.gguf
+      size: 5868826976
+      sha256: e8dd94817e95d6c0939102049d068418269978377b13616c4726235e232841fe
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.75
+    latency_ms: 3000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    chat_template_kwargs: {enable_thinking: false}
+    # Draft length 3: on the 4B (processor, 2026-10-27) 3 was the best middle ground; 6
+    # made plain prose twice as slow. Change it with sudo bau models tune --draft N.
+    server_env: {LLAMA_ARG_SPEC_TYPE: draft-mtp, LLAMA_ARG_SPEC_DRAFT_N_MAX: "3",
+                 LLAMA_ARG_N_PARALLEL: "1"}
+    notes: For the desktop's card. Not measured on the card yet; compare with qwen3.5-9b in
+      bau models lab before using it (docs/GPU.md section 4).
+  qwen3.8-27b-q2:
+    model_id: qwen3.8-27b-q2
+    name: Qwen3.8-27B UD-Q2_K_XL - candidate for the desktop's card, to be measured (bau models lab)
+    version: UD-Q2_K_XL
+    provider: local
+    # Checked 2026-10-26 (HF API): Qwen/Qwen3.8-27B, Apache-2.0, created 2026-08-05,
+    # 27.8B parameters, architecture qwen3_5 (same as Qwen3.5, which the stick's llama.cpp
+    # runs), thinking on by default (turned off below, as the model card shows). File and
+    # SHA-256 from unsloth/Qwen3.8-27B-GGUF's tree. 2-bit: the most likely to fit on the 12 GB card.
+    source: huggingface.co/Qwen/Qwen3.8-27B (GGUF by unsloth/Qwen3.8-27B-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.8-27b-q2
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-Q2_K_XL.gguf
+      file: Qwen3.8-27B-UD-Q2_K_XL.gguf
+      size: 9828981664
+      sha256: fd4730dd8aad070517978752b63d530aeb1740d2283cab9fa24f1e404032ddb0
+    trust_level: QUANTIZED
+    privacy: local
+    context: 8192
+    tools: true
+    input_types: [text]
+    quality: 0.8
+    latency_ms: 4000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    chat_template_kwargs: {enable_thinking: false}
+    notes: Not tested yet. Desktop only (needs the graphics card). Steps in
+      docs/MODEL-LAB.md; approve only after `bau models lab` meets the bar on the desktop.
+  qwen3.8-27b-iq3:
+    model_id: qwen3.8-27b-iq3
+    name: Qwen3.8-27B UD-IQ3_XXS - candidate for the desktop's card, to be measured (bau models lab)
+    version: UD-IQ3_XXS
+    provider: local
+    # Checked 2026-10-26 (HF API): Qwen/Qwen3.8-27B, Apache-2.0, created 2026-08-05,
+    # 27.8B parameters, architecture qwen3_5 (same as Qwen3.5, which the stick's llama.cpp
+    # runs), thinking on by default (turned off below, as the model card shows). File and
+    # SHA-256 from unsloth/Qwen3.8-27B-GGUF's tree. 3-bit: better answers, close to the card's limit.
+    source: huggingface.co/Qwen/Qwen3.8-27B (GGUF by unsloth/Qwen3.8-27B-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.8-27b-iq3
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-IQ3_XXS.gguf
+      file: Qwen3.8-27B-UD-IQ3_XXS.gguf
+      size: 10934860704
+      sha256: c0b7c3038681ed2e3040456c1dd45f9858b6c2290bed172c70388a94874f3eee
+    trust_level: QUANTIZED
+    privacy: local
+    context: 8192
+    tools: true
+    input_types: [text]
+    quality: 0.8
+    latency_ms: 4000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    chat_template_kwargs: {enable_thinking: false}
+    notes: Not tested yet. Desktop only (needs the graphics card). Steps in
+      docs/MODEL-LAB.md; approve only after `bau models lab` meets the bar on the desktop.
+  mellum2.1-12b:
+    model_id: mellum2.1-12b
+    name: Mellum2.1 12B-A2.5B Thinking (JetBrains) - coding candidate for the desktop, to be measured
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-26 (HF API): JetBrains/Mellum2.1-12B-A2.5B-Thinking, Apache-2.0,
+    # created 2026-09-20; 12B parameters, 2.5B working per token (64 experts, 8 active),
+    # 131,072 context. GGUF and SHA-256 from JetBrains/Mellum2.1-12B-A2.5B-Thinking-GGUF's
+    # tree. Its own table (2026-10): LiveCodeBench v6 82.0 and BFCL v4 62.3 against
+    # Qwen3.5-9B's 75.4 and 58.5, but SWE-bench Verified 47.0 against 50.0. A thinking
+    # model: it writes its reasoning first (BAU never speaks it), so it is slower per answer.
+    # Needs the stick's llama.cpp b11747 or newer (Mellum fixes of 15-16 October).
+    source: huggingface.co/JetBrains/Mellum2.1-12B-A2.5B-Thinking-GGUF
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: mellum2.1-12b
+    download:
+      url: https://huggingface.co/JetBrains/Mellum2.1-12B-A2.5B-Thinking-GGUF/resolve/main/Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf
+      file: Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf
+      size: 8071295264
+      sha256: ecc4d5b8107fc219e23c494b2d107552137637b6c6002ee713e0ba8af7fa2755
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.75
+    latency_ms: 6000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    notes: Not tested yet. Desktop (graphics card). Steps in docs/MODEL-LAB.md; approve only
+      after `bau models lab mellum2.1-12b --run-code` meets the bar on the desktop.
   qwen3.5-4b:
     model_id: qwen3.5-4b
     name: Qwen3.5-4B - best small brain for 8 GB CPU machines, with tool calling (llama.cpp)
@@ -252,8 +488,47 @@ model:
     cost_in_per_mtok: 0
     cost_out_per_mtok: 0
     status: REGISTERED
+    # Thinking off (checked 2026-10-21 on the stick's llama-server v0.6.0): with it on,
+    # "Say hello" spent all 1024 tokens thinking (190 s, empty reply); off, 5 s.
+    chat_template_kwargs: {enable_thinking: false}
     notes: Needs a llama.cpp with the qwen35 architecture (bench it first). Run with
       --ctx-size 8192 to 16384 on 8 GB; turn thinking off for routine steps.
+  qwen3.5-4b-mtp:
+    model_id: qwen3.5-4b-mtp
+    name: Qwen3.5-4B with its own draft head (MTP) - measured on a processor, mixed result
+    version: Q4_K_M
+    provider: local
+    # Checked 2026-10-27: unsloth/Qwen3.5-4B-MTP-GGUF, same method as qwen3.5-9b-mtp.
+    # Measured 2026-10-27 on the stick's llama.cpp b11747, 3 processor threads: plain 4B
+    # 6.0 words/s; this file with draft 3: 9.4 on a list of numbers, 7.9 on code, 4.5 on
+    # free prose. On a processor, guessing costs as much as it saves for prose.
+    source: huggingface.co/Qwen/Qwen3.5-4B (GGUF with MTP by unsloth/Qwen3.5-4B-MTP-GGUF)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8080
+    api_model: qwen3.5-4b-mtp
+    download:
+      url: https://huggingface.co/unsloth/Qwen3.5-4B-MTP-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf
+      file: Qwen3.5-4B-MTP-Q4_K_M.gguf
+      size: 2834975040
+      sha256: 3874209241c9a397e2f62cd3f70f80fd2dfbf0dfccb6838416bdb48a714e8630
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.65
+    latency_ms: 6000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    chat_template_kwargs: {enable_thinking: false}
+    server_env: {LLAMA_ARG_SPEC_TYPE: draft-mtp, LLAMA_ARG_SPEC_DRAFT_N_MAX: "3",
+                 LLAMA_ARG_N_PARALLEL: "1"}
+    notes: The laptop keeps the plain qwen3.5-4b (faster for Jarvis's everyday prose on a
+      processor). Here to measure on other machines.
   qwen3.5-0.8b:
     model_id: qwen3.5-0.8b
     name: Qwen3.5-0.8B - ultra-tiny local model (half a gigabyte) for the simplest steps

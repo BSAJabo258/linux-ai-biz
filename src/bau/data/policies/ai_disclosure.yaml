@@ -9,7 +9,7 @@ policies:
   scope: artifact
   stage: 10
   title: Consent/licence for any real person's likeness or voice
-  regs: [us-right-of-publicity]
+  regs: [us-right-of-publicity, us-take-it-down-act, us-mi-intimate-deepfakes]
   jurisdictions: [ANY]
   when: {fact: artifact.likeness_used, eq: true}
   require:
@@ -148,7 +148,7 @@ policies:
   scope: session
   stage: 10
   title: People are told they are talking to AI at the start
-  regs: [eu-ai-act-art50, us-ca-ab1609-chatbot, us-ca-sb243-companion-chatbot]
+  regs: [eu-ai-act-art50, us-ca-sb243-companion-chatbot]
   jurisdictions: [ANY]
   require:
     - {fact: bot.discloses_ai_at_start, eq: true}

@@ -10,30 +10,47 @@ stand and what is next.
 | Path | What |
 |---|---|
 | `src/bau/` | the package. `cli.py` + `cli_ext.py` = the `bau` command; `policy.py`/`regulations.py` = rule engine; `data/` = regulations, policies, factories, registry defaults |
-| `src/bau/assistant.py`, `ui/jarvis_server.py`, `ui/jarvis.html` | Jarvis: briefing, conversation, tools, voice HUD |
-| `src/bau/publishing.py` | publishing hub; platforms are adapters (`tiktok.py`, `youtube.py`); `kids.py` = made-for-kids rules |
-| `src/bau/workspace.py`, `src/bau/brains.py`, `data/workspaces/` | ICM workspaces (`bau ws`): numbered stage folders one agent walks, owner checks each stage; kids-channel pilot. Each stage's `## Brain` says who drafts it: `small` (free local model), `strong` (Claude/Jarvis's model) or `content` (sealed content lane, never kids); the owner maps brains to models with `bau ws brains` |
-| `src/bau/series.py`, `data/series_formats.yaml` | kids series engine (`bau series`): character and style sheets in `_shared/`, the same "lock" text in every clip prompt, story formats scaled to clip-sized scenes, drift check on stage 04 (`series_lock`), sameness warnings. See `docs/SERIES.md` |
+| `src/bau/assistant.py`, `ui/jarvis_server.py`, `ui/jarvis.html` | Jarvis: briefing, conversation, tools, voice HUD. `pick_model`: online, the approved hosted models with keys answer first and the local model backs them up; offline, only the local model (the owner's rule, 2026-11-02); every request trimmed to the local server's real window (`LOCAL_SERVER_CTX`) |
+| `src/bau/publishing.py` | publishing hub; platforms are adapters (`tiktok.py`, `fanvue.py`; Instagram planned) |
+| `src/bau/fanvue.py` | Fanvue (`bau fanvue`, the owner's ask 2026-11-03): OAuth PKCE login (no API keys exist), a queue of age-checked pictures from `artifacts/media` with the AI label in every caption (levels 0 and 1), Jarvis `fanvue_queue` queues and `post_video` stages the card, the owner picks the audience (no default) and Accept uploads and posts once; earnings (`/v1/insights/earnings`, USD cents) into `economics/revenue.jsonl` once each, refunds negative, synced by the money tool at most hourly; Connect Fanvue setup card; autopost (the owner's switch, `bau fanvue autopost`, a setup card with his audience and number a day): the autopilot timer posts the oldest queued post, at most his number a day, a failure stops it for the day; the feed (`creator_feed.py`) keeps the queue stocked to his number a day while autopost is on: autopilot `draft` jobs draw from the level's prompt library (`data/creator_prompts.yaml`, levels 0 and 1: sections and a no-nudity negative) (ComfyUI, age check), the boss model writes the caption, the queue labels and checks it, and the picture waits on a `fanvue_review` card in Jarvis: Accept queues it for posting, Not now drops it (the owner's ask, 2026-11-09); with Chroma, his limits and prices, the feed takes turns through levels 2 and 3 (explicit lane, his limits in the negative, posted with his unlock price as `price` in cents, >= 300). Facts read 2026-11-03 in the module docstring. See `docs/FANVUE.md` |
+| `src/bau/media/comfy.py`, `installer/bau-pictures-setup.sh`, `installer/bau-explicit-setup.sh` | Local pictures (`bau creator draw`): ComfyUI (pinned commit) on 127.0.0.1:8188 with SDXL base 1.0 (pinned SHA-256) on the desktop's card; short adult visual prompts (`creator_prompt`), minors refused before sending, provenance record (with its `lane`) and audit row per picture; sfw lane for levels 0-1. Explicit lane (the owner's choice 2026-11-09, levels 2-3, Fanvue only, autopilot feed only): Chroma1-HD (Apache-2.0) with the model card's ComfyUI workflow (`chroma_graph`), fp8 at load, three files pinned by SHA-256 and revision, setup card `explicit` after pictures and the owner's limits; age check on every picture. See `docs/PICTURES.md` |
+| `src/bau/week.py` | A week of posts (Jarvis `schedule_week`): a plan in `weeks/NAME.yaml`, one card shows every post, the owner picks TikTok visibility and confirms once; Ayrshare schedules each with the AI label. sfw on Instagram/TikTok only, AI disclosure, no minors, any change voids the card, sent once. See `docs/WEEK.md` |
+| `src/bau/workspace.py`, `src/bau/brains.py`, `data/workspaces/` | ICM workspaces (`bau ws`): numbered stage folders one agent walks, owner checks each stage; the `creator-week` template plans a week of posts (`no_minors` check on every drafted stage). Each stage's `## Brain` says who drafts it: `small` (free local model), `strong` (Claude/Jarvis's model) or `content` (sealed content lane, never minors); the owner maps brains to models with `bau ws brains` |
+| `src/bau/virtual_creator.py`, `data/virtual_creator_profile.example.yaml` | Virtual creator (`bau creator`): a fictional adult (21+) persona with an identity lock in every prompt; tiers `sfw` (every platform) and `explicit` (adult platforms only, `fanvue`, needs the owner's `explicit_boundaries`, local content lane); Jarvis `creator_batch` is sfw only; youth-coded words refused (`MINOR_REFERENCE`, also used by the thinker and TikTok). Paid levels (`--level`): 0 teaser (free, sfw), 1 subscriber (Fanvue subscription, no nudity), 2 nude and 3 xxx (Fanvue unlocks, need `explicit_boundaries`); prices only the owner's (`bau creator prices` at a terminal, or Accept on the setup card, which comes filled in from Fanvue's own advice), inside Fanvue's limits read 2026-11-01. Platforms: Fanvue (explicit), Instagram and TikTok (sfw). See `docs/VIRTUAL-CREATOR.md` |
 | `src/bau/scout/`, `data/scout.yaml` | Repo Scout (`bau scout`): finds open-source projects for a capability, keeps claims apart from inspected and tested facts, licence/security gates; never installs or runs them. Weekly open-source watch (`bau scout watch`/`shortlist`, `scout/watch.py`, `data/scout_watch.yaml`, `bau-scout-watch.timer`): nine categories, star trends, already-have vs new, ranked test next / watch / ignore; Jarvis `open_source_watch`. See `docs/engineering/repo-intelligence.md` |
 | `src/bau/studio.py`, `src/bau/media/higgsfield.py` | Video studio (`bau video`): paid Higgsfield clips under the owner's budget; priced first, owner-confirmed, downloaded with provenance, cost in the ledger. See `docs/STUDIO.md` |
 | `src/bau/usage.py` | Usage meter (`bau usage`): every model call's tokens and dollars per model (free ones too), owner-set daily limits, busy replies, rate-limit headers, GitHub's wait. See `docs/USAGE.md` |
-| `src/bau/results.py` | Results tracker (`bau results`): read-only views, watch time and YouTube's estimated earnings per posted video, clip cost and profit per video (`bau results link`), which story formats get watched. See `docs/RESULTS.md` |
 | `src/bau/toolbox.py`, `data/toolbox.yaml` | Toolbox (`bau toolbox`): 100 researched open-source tools (connectors, grounding, evals, agents, skills, automation, memory, local models, voice, video, browsers, computer use, documents) with sources and check date; Jarvis's `toolbox` tool; `check` hands one to Repo Scout. Capability map (`data/capability_map.yaml`, `bau toolbox map`, Jarvis's `capability_map` tool): Jarvis's abilities by layer, what BAU has, gaps, how each tool would join, build order. See `docs/TOOLBOX.md`, `docs/CAPABILITY-MAP.md` |
 | `src/bau/spatial.py`, `ui/screen.py` (`godseye_*`), `data/world-land.json` | God's Eye: public earthquakes / aircraft (wide named regions only, private planes unnamed) / satellites on a world map in Jarvis; 5-min cache, honours 429, every query audited with its purpose; `world_watch` tool. See `docs/GODS-EYE.md` |
 | `src/bau/agentfolders.py`, `data/agents/` | Agents as folders (`bau agents`): `AGENT.md` (name, description, brain, tools, mcp, skills, max_steps + instructions) and `skills/NAME/SKILL.md` in the open Agent Skills format (only name + description load until `inspect.skill` opens one). Owner approval is tied to the folder's sha256; tools only via the gateway; community skills come in text only (`add-skill`). Jarvis: `agents`, `ask_agent`. See `docs/AGENT-FOLDERS.md` |
-| `src/bau/team.py`, `src/bau/supervisor.py` | The team (`bau team`): the owner names a boss (tool-using model that runs Jarvis and the agents, e.g. local Qwen), a thinker (local uncensored model: ideas only, never tools, never kids; Jarvis `ask_thinker`) and a specialist on call (Claude). The supervisor stops loops (`agents.LOOP_LIMIT`), hands a stuck job to the specialist (`--takeover auto`, within the daily limit, or `ask`), flags facts no tool result backs, and keeps a score sheet. See `docs/TEAM.md` |
+| `src/bau/team.py`, `src/bau/supervisor.py` | The team (`bau team`): the owner names a boss (tool-using model that runs Jarvis and the agents, e.g. local Qwen), a thinker (local uncensored model: ideas only, never tools, never minors; Jarvis `ask_thinker`) and a specialist on call (Claude). The supervisor stops loops (`agents.LOOP_LIMIT`), hands a stuck job to the specialist (`--takeover auto`, within the daily limit, or `ask`), flags facts no tool result backs, and keeps a score sheet. See `docs/TEAM.md` |
+| `src/bau/web.py`, `installer/bau-search-setup.sh` | Web research (Jarvis `web_search`, `read_page`): private search through SearXNG on 127.0.0.1:8888 (pinned commit, set up by the script on an installed laptop), pages read as text with the stdlib parser; never this computer or the home network, every redirect checked, audited, results untrusted. See `docs/RESEARCH.md` |
+| `src/bau/hands.py` | Hands (`bau hands`): the local model does a terminal job one command at a time (mini-swe-agent's method); every command shown with its reason and a change/delete warning, runs only on the owner's y; sudo, approvals and key files refused; refuses to start as root; loops and steps capped; audited. See `docs/HANDS.md` |
+| `image/.../usr/local/sbin/bau-gpu-setup`, `image/.../usr/local/bin/bau-llm-start` | The desktop (RTX 3060, `docs/DESKTOP.md`): `sudo bau-gpu-setup` installs Debian's closed NVIDIA driver 550 on the installed desktop (y first; refuses on the live stick), dkms signs it with this computer's own key, Secure Boot key enrolled once with mokutil. llama.cpp carries its Vulkan part; `bau-llm-start` uses the card only when NVIDIA's driver is loaded (else `LLAMA_ARG_DEVICE=none`) and leaves one core free. The pack's `qwen3.5-9b` is copied and made boss only there |
+| `src/bau/update.py`, `.github/workflows/update-wheel.yml`, `installer/bau-update-first.sh` | Automatic updates (`bau update`): the owner's choice (2026-11-01, fully automatic, replaces human promotion for BAU's own program only). CI builds the wheel only after ci passed on a push to main, release `bau-update` with `bau-update.json` (commit, wheel, sha256); `bau-update.timer` (root) nightly: SHA-256 checked, pip into `/opt/bau/venv`, health check (imports, Mission Control answers), else the previous wheel back (`/opt/bau/update/current`, first time `/opt/bau-payload/wheels`); audited; briefing says it. Off until `sudo bau update auto`; never on the live stick. See `docs/UPDATES.md` |
+| `installer/bau-wifi-rescue.sh`, `.github/workflows/wifi-kit.yml` | Wi-Fi rescue for the desktop's MT7921 and the laptop's Killer 1435 / QCA6174 (the owner's ask, 2026-11-02/03): finds the card, then offline tries fixes in order (radio, firmware from the kit's pinned Debian `firmware-mediatek` / `firmware-atheros` .deb, power saving off, driver restart, `disable_aspm` only if `modinfo -p` lists it, scan MAC, region, full restart), checks the Wi-Fi after each and stops at the first that works; `--install` keeps it watching; never edits the boot loader. The workflow builds `bau-wifi-kit.zip` on the `bau-wifi-kit` release. See `docs/WIFI-RESCUE.md` |
+| `installer/bau-make-room.sh` | Make room (the owner's desktop, 2026-11-08: "/" full, /home empty): moves `/var/lib/bau/models`, `/usr/local/comfyui`, `/opt/llama.cpp-cuda` to an encrypted folder on another part (default `/home/bau-data`), copy checked, bind-mounted back via fstab, old copy removed; refuses unencrypted targets and targets on "/"; `--undo`; setup card `room` above 85% full. New installs: preseed recipe `atomic` (one partition). See `docs/MAKE-ROOM.md` |
+| `src/bau/setup_steps.py`, `data/setup/` | Setup pop-ups (the owner's ask, 2026-11-02): every setup step not done on this computer (API keys whose hosted models are not approved yet, current rules, NVIDIA driver, pictures, search, nightly updates, autopilot, explicit limits, prices) pops up in Jarvis as a card with Accept (`setup_waiting`, owner tool `setup_step`, never offered to a model); only password steps open a terminal with the exact command; API keys switch on with the owner as reviewer, explicit limits, prices and the autopost audience and number come filled in on the card from Fanvue's own help pages (`setup_steps.SUGGESTED`, the owner's choice 2026-11-09, the source under each box), changeable, set only on the owner's Accept (checked again in `confirm`); `data/setup/*.sh` must equal `installer/`'s. See `docs/SETUP-POPUPS.md` |
+| `src/bau/autopilot.py`, `autopilot_jobs.py`, `data/autopilot_compass.yaml` | Autopilot (`bau autopilot`, the owner's ask 2026-11-02): a queue Jarvis works by himself (`bau-autopilot.timer`, every 30 min, 20 jobs); lanes GO (scan, inspect, sandbox_test, research, draft), VOTE (add_tool, enable_ability: 2 of 3 of rules, evidence, judge; the rules veto alone: minors, never list, licence, untested), ASK (everything else: one question card, the rest keeps going); the compass scores and orders every job; follow-ups continue the work; owner talk-back in Jarvis (pause, resume, focus on, what are you working on, look into ...); blueprints (`blueprint.py`): a project read from GitHub's tree, manifests and latest release without downloading (kind, layout, dependencies, how BAU could use it), README only as untrusted data; the screen (`/api/autopilot`, AUTOPILOT panel, key P): a Lorenz-attractor mind in the core, live equations, compass radar, vote simplex, job list; answers human-only; no handler = blocked, never faked. See `docs/AUTOPILOT.md` |
+| `src/bau/localonly.py` | Local only (`bau privacy local-only`/`cloud`): the owner's switch, checked in `models.providers.build()` where every model starts; refuses Claude, hosted API models and model servers not on 127.0.0.1/::1/localhost (the test drive's `BAU_LLM_ENDPOINT` counts as local). Owner only, no default. See `docs/LOCAL-ONLY.md` |
+| `src/bau/machine.py`, `src/bau/models/lab.py`, `data/model_lab.yaml` | Measure first (`bau hw`, `bau hw fit --size`): memory, the card's memory from `nvidia-smi` (unknown without NVIDIA's driver, never guessed), disk, engine; fit estimate, also checked by `bau models fetch`. The model lab (`bau models lab MODEL [--run-code]`, `compare A B`, `sudo bau models use MODEL`): known-answer questions, tool calls checked against their schemas, JSON, long prompts, gated code runs, time to first word, words/s, peak memory; stored with the suite fingerprint and file SHA-256; never approves. Qwen3.8-27B 2-bit/3-bit and Mellum2.1 registered as candidates. The stick's llama.cpp is build b11747 (`image/inside.sh`); every `LLAMA_ARG_*` BAU sets must be checked in the pinned build (`tests/test_stick_health.py`). See `docs/MODEL-LAB.md` |
+| `docs/GPU.md`, `image/.../usr/local/sbin/bau-llm-cuda` | The desktop's card: `bau hw` reads its exact PCI ID, temperature, power, load and Secure Boot; the lab samples them (`--repeat`, `--tag`). `sudo bau-llm-cuda build` makes a CUDA llama.cpp (Debian's nvidia-cuda-toolkit, the stick's commit) in `/opt/llama.cpp-cuda` beside the Vulkan one, `use cuda`/`use vulkan` switch via `/etc/bau/llm-engine.env`. Speed settings: `sudo bau models tune` (`--draft N|off` for the MTP files' built-in guessing ahead, `--kv f16|q8_0`) writes `/etc/bau/llm-tune.env`, read last; a model record's `server_env` passes only `pack.SERVER_ENV` names. TensorFlow not installed (no workload). "GPU unlock" kernel modules reviewed and not used |
 | `src/bau/governor.py` | watchdog (hold / quarantine / resume, never approves) |
+| `src/bau/executive.py`, `src/bau/adapters/` | Executive controller (prototype): one task, one adapter, one existing job; in-memory by default, `JobStore` injected explicitly; records an approval reference but never approves. Not wired into Jarvis yet. See `docs/ARCHITECTURE_RFC.md` |
 | `src/bau/brain.py` | Second Brain (Markdown vault, nouns + verbs graph) |
 | `src/bau/chats.py` | chat library (`bau chats`): the owner's Claude/ChatGPT exports in SQLite FTS5; Jarvis reads them per `bau chats sharing` |
 | `src/bau/models/` | providers (Claude, llama.cpp, hosted OpenAI-compatible e.g. Z.ai), router, `bench.py`, `fetch.py` |
 | `installer/bau-laptop-check.ps1` (+ double-click `BAU-Laptop-Check.cmd`), `installer/bau-laptop-check.sh` | Laptop check: read-only, Windows (no Python) and from the stick (drivers that really load, missing firmware); a summary safe to share with a verdict (READY / READY, AFTER THESE STEPS / NOT READY) and a private full report. See `docs/LAPTOP-CHECK.md` |
 | `src/bau/keys.py`, `installer/bau-keys-export.{ps1,sh}` (+ `BAU-Keys-Export.cmd`) | Keys transfer (`bau keys import/list`): the export scripts on the owner's other computer lock API keys into `BAU-KEYS.enc` (openssl AES-256, PBKDF2-SHA256); the import routes them to `/etc/bau/models.env` / `platforms.env` (root:bau 0640). Names only, ever; only credential-shaped names accepted. See `docs/KEYS.md` |
+| `src/bau/pack.py`, `installer/bau-pack-make.ps1` (+ `BAU-Pack-Make.cmd`) | The BAU Pack (`bau pack install/check/report`): a Windows computer fills a stick the owner picks with the local models (pinned SHA-256) and `BAU-KEYS.enc`; on the laptop `sudo bau pack install` re-checks while copying, then asks yes/no before starting the model, approving it after a real benchmark, naming the boss and importing keys; writes a redacted `laptop-report.txt` (Wi-Fi card, firmware) back to the stick. Never runs on plug-in. See `docs/PACK.md` |
+| `src/bau/look.py`, `src/bau/ui/art/`, `image/.../bau-look-desktop` | The BAU look (`bau look show/set/alive/add`): the owner's art behind Jarvis and Mission Control (`/art`, `img-src 'self'`), alive by CSS only (breathing glow, rising pulse, embers; faster while thinking; off for reduced motion); owner images checked by content (JPEG/PNG, 15 MB). The stick: wallpapers in `/usr/share/backgrounds/bau` (10-minute slideshow), dark theme and login screen, set once at first login. See `docs/LOOK.md` |
 | `installer/` | USB #1 image builder, USB #2 payload (`make-payload.sh`), `payload/install.sh` |
 | `image/`, `src/bau/live.py` | My Jarvis live USB, also the full stick: `build-live.sh` (Debian Live + BAU + llama.cpp + Debian's installer in live mode), `live-build/` config (`includes.installer/preseed.cfg` = the BAU preseed for installing from the stick; `live-to-disk.sh` removes live-only startup on the installed laptop), `/BAU-PAYLOAD` on the stick, `jarvis-storage` (encrypted persistence); see `docs/MY-JARVIS.md`, `docs/LIVE-USB.md` |
 | `installer/cloud/` | the owner's own cloud server (DigitalOcean, Debian 13): `cloud-init.yaml` + `prepare.sh` (admin login from the droplet key, SSH keys only), then `install.sh --cloud` (SSH the one open port, `bau-jarvis.service` on 127.0.0.1). See `docs/CLOUD-VM.md` |
 | `Dockerfile`, `docker-compose.yml`, `docker/` | test drive in containers |
 | `vm/` | VirtualBox rehearsal scripts (`create-vm.ps1`, `create-vm.sh`) |
 | `docs/` | `INSTALL.md` (owner guide), `LIVE-USB.md`, `CLOUD-TEST.md` (free Codespaces + Z.ai), `WORKSPACES.md`, `MY-JARVIS.md` (spec + build order), `ARCHITECTURE.md`, `HANDOFF.md` |
+| `.claude/skills/real-model-check/`, `.claude/skills/platform-facts/`, `.claude/skills/stick-change/` | Skills any coding agent follows: prove Jarvis on the real local model (`run.py` grades each answer by what he did), verify platform and law facts from official pages with dates, change the stick image safely (the PR checks do not build the stick) |
 | `.claude/skills/grow-bau/SKILL.md`, `docs/BUILD-ISO.md` | Growing BAU from any terminal: the loop any coding agent follows (ask itself, find, inspect, sandbox test, owner decides, add, rebuild) and its best-case targets; building the stick image without VS Code (GitHub button or WSL + Docker) |
 | `tests/` | pytest suite |
 
@@ -41,7 +58,8 @@ stand and what is next.
 
 ```bash
 python3 -m pip install -e '.[dev]'        # once
-python3 -m pytest -q                      # all tests (~30 s)
+bash scripts/check.sh                     # every check, one line each (~2 min)
+python3 -m pytest -q                      # all tests
 ruff check .                              # lint (line length 100)
 bau reg validate                          # regulations + policies cross-check
 bau secrets .                             # secret scan (CI runs it)
@@ -51,8 +69,9 @@ bash image/build-live.sh --out /tmp/live                    # live USB image (Do
 docker compose up -d --build                                # test drive: http://localhost:8765
 ```
 
-Run tests, ruff, `bau reg validate` and shellcheck before every commit. CI
-(`.github/workflows/ci.yml`, `docker.yml`) runs the same on Python 3.11 and 3.13.
+`bash scripts/check.sh` runs every check (ruff, secret scan, `bau reg validate`, shellcheck
+on every shell script it finds, all tests) and prints one line each. Run it before every
+commit; CI (`.github/workflows/ci.yml`) runs the same script on Python 3.11 and 3.13.
 
 ## Rules that must not be broken
 
@@ -63,16 +82,22 @@ These are the product's safety model, not style preferences:
   approve, and none of them may be given a tool that does.
 - **Consequential actions are confirmed by the owner.** Posting to any platform, releasing a
   HOLD, and similar actions are only *staged* by Jarvis; they run on the owner's click or
-  `y`. Owner-only choices (privacy, audience, made-for-kids, commercial disclosure) never
-  come from a model and never have defaults.
+  `y`. A week of posts may be confirmed with one click on one card that shows every post
+  (the owner's choice, 2026-11-01, `src/bau/week.py`). Fanvue posts may go out by themselves once the owner switches autopost on (his choice, 2026-11-03, `fanvue.autopost_tick`): his audience and number a day, every content check on every post, HOLD stops it. Owner-only choices (privacy, audience, commercial disclosure) never
+  come from a model and never have defaults. The one exception (the owner's choice, 2026-11-09):
+  the setup cards for prices, explicit limits and autopost come filled in from Fanvue's own
+  help pages (`setup_steps.SUGGESTED`), and nothing is set until the owner presses Accept.
 - **Never weaken the host.** Don't open firewall ports, disable AppArmor or encryption,
   or bind servers beyond localhost (containers bind their interface only with
   `BAU_IN_CONTAINER=1`; ports are published on 127.0.0.1). The one exception is the
   owner's cloud server (`install.sh --cloud`): SSH on 22, key login only, rate-limited.
 - **Untrusted data stays data.** Tool results go to models wrapped by `agents.untrusted()`;
-  Jarvis never reads `<untrusted_data>` blocks aloud.
-- **Kids content** goes only to platforms with `allows_kids` (YouTube, made for kids). Never
-  route child-directed videos to TikTok or other 13+ platforms.
+  Jarvis never reads `<untrusted_data>` blocks aloud. A run that has read outside content (web, MCP, browser) may only
+  read until the owner approves (`gateway` step `untrusted_read`, roadmap step 1, 2026-11-04).
+- **Adults only.** The business is one fictional adult (21+) virtual creator. Nothing may
+  involve, depict or refer to minors (`virtual_creator.MINOR_REFERENCE` refuses it), no real
+  person's likeness, AI disclosure on every post. Explicit content goes only to Fanvue;
+  Instagram and TikTok get sfw only.
 - **Local models need a real benchmark** (`bau models bench`) before approval; never fake
   availability. Abliterated models stay in the content lane (no tools, local only).
 - **No compliance claims.** BAU reports requirements, controls and evidence; it never says
@@ -81,15 +106,52 @@ These are the product's safety model, not style preferences:
   record facts with the date in the module docstring and an `examples/platform-*.yaml`
   policy record, and cite regulations by `reg_id` in `data/policies/`.
 
+## Check yourself (the owner's rule: AI makes things up, so prove it)
+
+Cheap checks that run on their own beat rereading. Before telling the owner anything is done:
+
+- **One command:** `bash scripts/check.sh` must say `ALL PASS`. Never report "checks pass"
+  from a narrower command.
+- **Docs cannot invent:** `tests/test_docs_truth.py` fails on any `bau` command, link or repo
+  path in README, CLAUDE.md or `docs/` that does not exist. A planned feature is written as
+  "planned", never as a command.
+- **Tested or not, said plainly:** every report to the owner separates what ran (with the
+  command or the run) from what was only written. "Works" only after it ran on the real
+  machine or in CI; before that, "should work, not tested on your hardware yet".
+- **Hardware and driver facts come from evidence:** the owner's check report
+  (`docs/LAPTOP-CHECK.md`) or an official page, with the link and date in a comment next
+  to the code. Never a package name, version or driver from memory; the stick build in CI
+  is the proof a package exists.
+- **Prove a new check catches the mistake:** plant the bad case once, see it fail, remove it.
+
+## Working habits
+
+Adapted from github.com/forrestchang/andrej-karpathy-skills (MIT, read 2026-10-27). Rule 4
+there (prove it) is already "Check yourself" above.
+
+- **Think before coding.** Say your assumptions. If a request can mean two things, ask or
+  name both; don't pick one silently. If something simpler would do, say so.
+- **Simplest thing that works.** Nothing the owner did not ask for: no extra features, no
+  settings "for later", no layers for one use, no handling for cases that cannot happen.
+- **Surgical changes.** Every changed line traces to the request. Don't reformat, rename
+  or "improve" code next to it. Remove only what your own change left unused; mention
+  other dead code instead of deleting it.
+
 ## Conventions
 
 - Before building something new, look for what others already built: `bau toolbox ask "..."`
   (and `bau scout find` for more). Prefer a vetted tool behind an adapter to writing it again.
+- **Only free open source** (the owner's rule, 2026-11-04): a project joins BAU only under a
+  licence that lets the business use it freely (MIT, Apache-2.0, BSD, ISC, MPL and the like,
+  read in its LICENSE file). Fair-code and source-available licences are out, whatever the
+  project calls itself (Sustainable Use, FSL, BUSL, Elastic, SSPL, Commons Clause, "modified
+  Apache"); Scout blocks them (`security/sentinel.py`). Every link written into a research
+  note is opened first; a dead address is reported, never replaced with a guess.
 - Match the surrounding code: stdlib first, small functions, comments only where the
   reason is not obvious. New policy rules go in `src/bau/data/policies/*.yaml` and must
   reference existing `reg_id`s (the loader refuses dangling references).
-- Every behaviour change gets a test. Tests use fakes (`ScriptedProvider`, `FakeTikTok`,
-  `FakeYouTube`), never real network or keys.
+- Every behaviour change gets a test. Tests use fakes (`ScriptedProvider`, `FakeTikTok`),
+  never real network or keys.
 - The owner prefers **few commits**: one finished commit per feature on a branch, a
   draft PR, squash-merge when CI is green. Don't push half-finished work.
 - Docs are written for a non-technical owner: plain words, exact commands.

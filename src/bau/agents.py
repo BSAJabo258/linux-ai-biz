@@ -41,7 +41,7 @@ INJECTION = re.compile(
 def untrusted(source: str, text: str) -> tuple[str, bool]:
     """Wrap external content as data; flag likely injection attempts for the audit log."""
     flagged = bool(INJECTION.search(text))
-    safe = text.replace("</untrusted_data>", "</untrusted_data_>")
+    safe = re.sub(r"<\s*/\s*untrusted_data\s*>", "</untrusted_data_>", text, flags=re.I)
     return (f'<untrusted_data source="{source}" injection_suspected="{str(flagged).lower()}">'
             f"\n{safe}\n</untrusted_data>"), flagged
 
@@ -117,6 +117,7 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
     final = ""
     evidence: list[str] = []
     seen: Counter[str] = Counter()
+    tainted = False                  # set once a tool brings outside content into this run
     for step in range(1, spec.max_steps + 1):
         est = estimate_usd(spec.model, 4000, 1000)
         ok, why = gateway.budgets.check(gateway.ledger, spec.agent_id, est, job.job_id,
@@ -167,7 +168,8 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
             try:
                 out = gateway.invoke(CallRequest(agent=spec.agent_id, capability=cap,
                                                  args=call.input, job_id=job.job_id,
-                                                 mission_id=mission_id))
+                                                 mission_id=mission_id, tainted=tainted))
+                tainted = tainted or gateway.brings_outside_content(cap)
                 text = out if isinstance(out, str) else json.dumps(out, default=str)[:20000]
                 wrapped, flagged = untrusted(cap, text)
                 flags += flagged
@@ -179,7 +181,11 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
                 results.append((call, f"DENIED by BAU gateway at {e.step}: {e.reason}", True))
             except Exception as e:  # tool crashed: report, do not hide
                 entry.update(ok=False, error=type(e).__name__)
-                results.append((call, f"tool error: {type(e).__name__}: {e}"[:2000], True))
+                # The error text can come from outside (an MCP server's own message): data.
+                wrapped, flagged = untrusted(f"{cap} error",
+                                             f"{type(e).__name__}: {e}"[:2000])
+                flags += flagged
+                results.append((call, wrapped, True))
             log.append(entry)
         msg = provider.tool_result_message(results)
         if msg.get("role") == "_multi":

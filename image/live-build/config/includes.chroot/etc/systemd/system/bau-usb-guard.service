@@ -1,0 +1,11 @@
+[Unit]
+Description=BAU: ease the load when the system runs from a USB stick
+After=local-fs.target swap.target
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/bau-usb-guard
+
+[Install]
+WantedBy=multi-user.target

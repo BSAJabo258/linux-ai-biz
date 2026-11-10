@@ -41,7 +41,7 @@ Both ways of running are supported:
 | §6-7 Controlled, encrypted persistence | `persistence-encryption=lukslabel`: live-boot opens only a LUKS2 container labelled `persistence` and never uses plain storage. `persistence.conf` lists exactly what persists. `jarvis-storage setup` creates it and never deletes a partition. |
 | §7 No unprotected substitute | `bau-live-init`: without unlocked encrypted storage it is LIMITED mode, where no keys are created and BAU services stay off |
 | §53 Boot menu | My Jarvis, limited mode, safe graphics, recovery, UEFI firmware settings, integrity check |
-| §23 Lightweight local model | Qwen2.5-1.5B-Instruct Q4_K_M, about 1.1 GB, Apache-2.0. Downloaded to the encrypted storage and pinned by SHA-256 (`bau models fetch`). Served by llama.cpp v0.6.0, which is built from pinned source with per-CPU backends. It must pass `bau models bench`, then the owner approves it. |
+| §23 Lightweight local model | Qwen2.5-1.5B-Instruct Q4_K_M, about 1.1 GB, Apache-2.0. Downloaded to the encrypted storage and pinned by SHA-256 (`bau models fetch`). Served by llama.cpp (build b11747 since 2026-10-26, v0.6.0 before), which is built from pinned source with per-CPU backends. It must pass `bau models bench`, then the owner approves it. |
 | §55-56 Image versioning and pipeline | `image/VERSION` and `image/build-live.sh` → ISO, `.sha256` and `.manifest.json` (git commit, kernel, llama.cpp, package list); `.github/workflows/build-live.yml` |
 | §57 Boot test | QEMU/OVMF test of the real image: boot, create storage, unlock, Jarvis answers, reboot, memory still there |
 
@@ -88,6 +88,37 @@ How this changes the plan:
 What ICM doesn't replace in BAU: the signed approvals, the tamper-evident audit chain,
 the locked core (no agent edits `_shared/`, policies or regulations), and `untrusted()`
 wrapping of anything from outside.
+
+## Jarvis on a small local model (lean mode)
+
+Measured on 2026-10-19 with the laptop's backup model (Qwen2.5-1.5B) and the stick's own
+llama.cpp, on a 4-core CPU like the laptop's:
+
+| | Before | After |
+|---|---|---|
+| Read before every answer | ~4,400 tokens (34 tools in full) | ~2,100 (7 tools + a menu) |
+| First answer | about a minute; one question timed out after 5 minutes | 4 to 15 seconds |
+| "What did the models cost today?" | "I don't have access to that" | the real numbers |
+| "What tools do we have for ...?" | searched GitHub, failed, said "none" | the toolbox's real answer |
+
+What Jarvis does differently when its model runs on the laptop (a "local" model):
+
+- **A short menu.** It sees seven everyday tools in full (status, memory, notes, toolbox,
+  missions, usage, hold) and the others as one line each (`tool_menu`), run with
+  `use_tool`. Every tool still works the same way: actions that need you are still only
+  put on your screen for your click.
+- **Facts first.** For the common questions (cost, status, tools, memory) Jarvis looks
+  the facts up itself, with plain code, and hands them to the model with your question;
+  the model only has to say them.
+- **The same instructions all session**, so the model does not re-read them every time.
+- **Short answers**: at most about 300 words, so it cannot talk itself into a loop.
+- **No "let me check" without checking**: if it says it will look something up and does
+  not, Jarvis tells it once to do it now.
+- **Only your earlier questions** carry over between sessions, not its own answers (a
+  small model copies its own mistakes).
+
+A hosted model (Claude) keeps every tool in full. To force either way for a model, add
+`lean: true` or `lean: false` to its record in the registry.
 
 ## Build order from here (spec §87)
 

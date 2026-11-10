@@ -13,8 +13,9 @@ layers:
   - id: web
     name: Web interaction
     what: Open websites, read them, fill in forms, save drafts and, only on the owner's click, submit.
-    status: gap
+    status: partial
     in_bau:
+      - {path: src/bau/web.py, does: "private search (SearXNG on 127.0.0.1) and reading a page as text, audited, never the home network"}
       - {path: src/bau/scout/github.py, does: reads GitHub's API only; no general browsing}
       - {path: src/bau/gateway.py, does: the one path from an agent to a capability, with audit}
       - {path: src/bau/blast.py, does: scores how bad an action could be before it runs}
@@ -63,8 +64,9 @@ layers:
   - id: computer-use
     name: Computer use
     what: Work apps that have no API by looking at the screen and using mouse and keyboard.
-    status: gap
+    status: partial
     in_bau:
+      - {path: src/bau/hands.py, does: "terminal jobs by the local model, one command at a time, each on the owner's y (bau hands)"}
       - {path: src/bau/sandbox.py, does: rootless containers with no network by default, for untrusted code}
     tools:
       - {name: Cua, plan: adapter, why: "Sandboxed desktops for computer-use agents; use only its MIT parts (some parts are FSL or AGPL)."}
@@ -238,16 +240,16 @@ layers:
     status: have
     in_bau:
       - {path: src/bau/studio.py, does: paid clips under the owner's budget, priced first}
-      - {path: src/bau/series.py, does: the same characters in every clip}
+      - {path: src/bau/virtual_creator.py, does: the same fictional adult persona in every post}
       - {path: src/bau/media, does: the media gateway with provenance records}
     tools:
       - {name: FFmpeg, plan: direct, why: "Already used for video checks and edits."}
-      - {name: ComfyUI, plan: later, why: "Local image and video generation; needs a GPU, so a rented one."}
+      - {name: ComfyUI, plan: adapter, why: "Built 2026-11-01: pictures on the desktop's RTX 3060 (src/bau/media/comfy.py, bau creator draw, docs/PICTURES.md)."}
       - {name: Remotion, plan: later, why: "Videos written as code; useful for repeatable templates."}
-      - {name: MoneyPrinterTurbo, plan: skip, why: "Mass-produced short videos are what YouTube refuses to pay for; BAU's series engine avoids exactly that."}
+      - {name: MoneyPrinterTurbo, plan: skip, why: "Mass-produced short videos get accounts limited; BAU's identity lock keeps every post deliberate."}
     risk: medium
     rules:
-      - Kids videos go only to platforms that allow them, marked made for kids.
+      - The creator is a fictional adult; nothing ever involves minors. Explicit content goes only to Fanvue.
       - Every AI-made file carries a provenance record and an AI label.
     next: ""
 
@@ -257,7 +259,6 @@ layers:
     status: have
     in_bau:
       - {path: src/bau/economics.py, does: costs, real sales and budgets}
-      - {path: src/bau/results.py, does: views, estimated earnings and profit per video}
       - {path: src/bau/publishing.py, does: posting only on the owner's confirm}
       - {path: src/bau/factories.py, does: business factories run stage by stage}
     tools: []

@@ -14,7 +14,168 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 | #8-#11 | This handoff; VM scripts size memory from the host, fix an existing VM, stop with BIOS steps when virtualisation is off; VS Code task |
 | next | **My Jarvis OS, MVP #1**: live USB (`image/`, `docs/LIVE-USB.md`), encrypted persistence (`jarvis-storage`), Qwen2.5-1.5B local model (`bau models fetch`), spec mapping and build order (`docs/MY-JARVIS.md`) |
 
-State: 505 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+State: 632 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
+
+Latest (2026-10-27): merged #97-#105: the stick's llama.cpp is b11747; desktop art fixed
+(Xfce's own picture no longer shows); seven live scenes; GPU work (`bau hw` card details,
+lab `--repeat`/`--tag`, `sudo bau-llm-cuda`, docs/GPU.md); speed settings (MTP files,
+`sudo bau models tune`); the pack carries the 9B MTP file; CLAUDE.md "Working habits".
+Stick image
+[live-v0.1.0-76bc200](https://github.com/BSAJabo258/linux-ai-biz/releases/tag/live-v0.1.0-76bc200)
+(sha256 `5a612283628d4476998e5678e5392653fdbf40ba3a3618c8890fc4f9c8079d90`): it reaches its
+menu in a Secure Boot virtual PC (OVMF, Microsoft keys). On the desktop it first went gray
+and back to Windows; the owner got it to start after the F8 / Secure Boot OS Type steps
+(docs/DESKTOP.md step 2). Not yet installed on the desktop.
+
+Full test run (2026-10-27, owner: "test everything"). Ran: the suite as root and as a normal
+user (all 841 run between them); the released stick in a Secure Boot VM to the desktop (BAU
+art on screen, no failed services); the Docker test drive (selftest, Governor tick) and a
+browser through all 9 Mission Control views and all 22 Jarvis parts at desktop and phone
+width; qwen3.5-4b fetched by `bau models fetch`, served by the stick's start script, `bau
+models bench` (answers, uses a tool) and Jarvis on it; the Windows pack script (real
+PowerShell, real model, the 7 Debian Wi-Fi files from Debian) into `bau pack check` and
+`bau pack install` as root; keys export (sh) -> import as root; the payload build (257
+files, checksums OK); `--help` of all 210 bau commands and the 56 that need no input.
+Fixed (each with a test that fails without it): `bau hw` reads Secure Boot from the
+firmware (the stick has no mokutil); Mission Control scrolled sideways on a phone; Jarvis on
+the real model answered "the Governor watchdog" from the toolbox and refused a plain post as
+a kids video (both now get their facts first); Ctrl+D at a passphrase was a traceback; no
+systemctl waited 6 minutes; docs said `bau-llm-cuda status` without sudo (it is in sbin).
+Not run here: encrypted storage and the disk install on the VM (TCG too slow, tested
+before), anything on the RTX 3060. Owner's decision: no cloud models, so local only
+(`bau privacy local-only`, `docs/LOCAL-ONLY.md`); candidate stronger local specialist for the
+desktop: Qwen3.5-35B-A3B, planned, needs a desktop run first.
+
+Overhaul check (2026-10-20, owner: "check everything before the next stick"). Ran: full
+suite, ruff, reg validate, secrets, shellcheck on all 25 shell scripts (incl. the image's
+own), every stick package and install.sh package against the trixie indexes (all exist;
+the 7 pinned Wi-Fi debs still current), a real payload build (checksums OK), systemd-analyze
+verify on every unit, the Docker test drive (Mission Control healthy, selftest ok), a
+browser click-through of Jarvis (desktop + phone) and all 9 Mission Control views, a 9-min
+soak, and three code reviews. Fixed (each with a test):
+- pack install as root followed links planted in /var/lib/bau (bau account -> root):
+  O_EXCL|O_NOFOLLOW writes, chown without following, refuse linked models dir;
+- install.sh installed payload files SHA256SUMS does not list (an added wheel ran as root);
+- keys: errors named a bad line by its text (part of a secret): now by line number;
+  bau-keys-export.ps1's documented call overwrote the .env (PositionalBinding off);
+  pack README's /media/$USER was eaten by PowerShell; USB drives reporting "Fixed" missed;
+- pack: wrong passphrase was a traceback (now a problem, report still written); Wi-Fi said
+  "installed" when apt refused; a missing bau-llm.service is said plainly, not waited for;
+- Jarvis: a refusal after a tool call broke the history until restart; confirmed results
+  reached the model without untrusted(); </untrusted_data> closable in other spellings;
+  /api/overview waited for whole model turns (page stalled): serves the last one instead;
+- page: mic played through the speakers; a failed draft left "thinking"; map loops stacked;
+  the art gave up for good after sleep; textures never freed; wave canvas reallocated per
+  frame; audio sources and clip URLs leaked; wake word retried forever; tab icon (404);
+  phones: readable caption, full hint, scene fills the still picture;
+- stick: a typo in the second passphrase left an empty partition ("0 MB free" for good);
+  bau-llm restarted forever (start limit); storage from another image handed back to bau;
+  Setup no longer opens at every login once done; menu entry removed after install.
+Left (minor, noted): bau-look-desktop marks done even if xfdesktop names its monitor
+differently; pending cards never expire; pack README's pip install of bau-main.zip is
+unpinned; nftables enabled before its config check.
+
+The BAU Pack (2026-10-18, `docs/PACK.md`): BAU is installed on the owner's laptop (boots
+from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no AI model
+and no Wi-Fi yet (Killer 1435 / QCA6174, ath10k). `BAU-Pack-Make.cmd` fills a stick on
+Windows with the three pinned models and `BAU-KEYS.enc`; `sudo bau pack install` on the
+laptop copies, starts, benchmarks and (on yes) approves the boss, and writes a redacted
+`laptop-report.txt` to the stick.
+
+No Wi-Fi, found 2026-10-18: `auto/config` builds with `--apt-recommends false`, and
+network-manager only *recommends* `wpasupplicant`, so the image had no Wi-Fi login program
+at all (the firmware, firmware-atheros, was there). The package list now names
+`wpasupplicant`, `wireless-regdb` and `iw`; the pack carries the same seven .debs (pinned
+SHA-256, deb.debian.org then snapshot.debian.org) for the laptop already installed, plus
+`bau-main.zip` so that laptop gets `bau pack`. Not yet confirmed on the laptop itself.
+
+Freezes after ~15 minutes (2026-10-19): BAU runs installed onto a USB stick; files stop
+working and the screen goes black. Nothing in BAU stops or locks the system (firewall,
+sysctl, auditd, Governor all read-only/harmless; checked). Most likely the stick drops out
+and Linux remounts / read-only - not yet confirmed (asked for `dmesg` lines). The image
+now: `bau-usb-guard.service` (noatime, commit=60, no swap on the stick, longer dirty
+writeback) when / is on a USB disk; zram swap (systemd-zram-generator); journald capped at
+100 MB; Firefox disk cache off; thunar-volman, gvfs-backends, exfatprogs, ntfs-3g so sticks
+and Windows drives open by themselves; xfce4-power-manager. `bau pack install` (as root)
+opens unopened exFAT/vfat/NTFS partitions read-only under /run/bau-pack to find a pack,
+matches the folder name in any case, and writes the report to /var/lib/bau/reports when
+the pack is read-only.
+
+The BAU look (2026-10-19, `docs/LOOK.md`): the owner's two clean artworks (moonlit, white
+BAU) ship in `bau/ui/art` (plus 1920x1080 wallpapers); `bau look` chooses or adds art;
+Jarvis and Mission Control show it behind the page, alive by CSS only. The orange artwork
+was left out: its AI lettering is scrambled. The white one reads "pi = 3.33" (pi is 3.14);
+the owner was told and decides whether to fix it.
+Added 2026-10-19: three more owner artworks (watercolor, gold, earth) as choices and
+wallpapers; gold and earth have scrambled small lettering, all read "pi = 3.33" (owner told).
+
+Jarvis lean mode (2026-10-19, docs/MY-JARVIS.md): ran real Jarvis on Qwen2.5-1.5B with the
+stick's llama.cpp (v0.6.0, d812350) in a scratch sandbox. Found: 34 tool specs = 3,155
+tokens, ~52 s reading per question; the system prompt changed every turn (recent
+conversation inside) so the prompt cache never helped; answers ran past 1,400 tokens; it
+announced lookups without doing them, ignored the toolbox, misread nested JSON, copied its
+own earlier wrong answers. Lean mode (deployment: local) fixes each: 7 core tools +
+tool_menu/use_tool, facts-first grounding (GROUND), stable prompt, 400-token cap, one nudge,
+owner-only continuity, short toolbox answers, usage "say" line; toolbox synonyms for plain
+words. After: 4-15 s, grounded answers. The 1.5B still lists in numbers and pads; the boss
+(Qwen3.5-4B) not yet measured this way. Decision lock test: llama.cpp grammar keeps answers
+in the list (<1 s each) but the 1.5B is order-biased and confidently wrong (quote request ->
+billing at 0.98), so bau decide must ask in shuffled orders and calibrate on owner answers.
+
+Anime scenes (2026-10-20): the owner disliked the inkblot art ("a rat") and asked for an
+anime loop. Two original procedural scenes in jarvis.html SCENE_FS (dusk city: moon,
+stars, shooting star, puff clouds lit from below, windows, tower light, power lines,
+petals; summer: cumulus banks painted puff by puff in two tones, sun flare, hills, grass),
+painted every frame into a 1024x512 FBO texture and melted/refracted like a picture
+(uFullA/uFullB); 40 s per scene. Default art "dusk", default flow dusk + summer + own;
+inkblots stay as choices only; their wallpapers removed; desktop/login now wall-dusk and
+wall-summer (stills rendered from the same shader); bau-look-desktop marker v2 re-applies.
+Then (owner: "grown art active women", read as grown, attractive women): an adult woman
+seen from behind in each scene (woman(): SDF figure, eight heads tall, hair and hem in
+the wind; dusk silhouette on a rooftop rim-lit by the sunset, summer sundress and straw
+hat on the hill). Page guard: failIfMajorPerformanceCaveat plus a renderer check
+(SwiftShader/llvmpipe/softpipe) keep the shaders off software GL; under 12 fps for 5 s it
+draws at 0.3 scale, a second time giveUp() shows the still. Soak (9 min, headless
+Chromium): JS heap 2-7 MB sawtooth, DOM 220 nodes flat, server 44 MB flat: no leak.
+
+Stick steady (2026-10-20): the owner's XPS 13 9380 still dies a few minutes after unlock
+on the new live stick (taskbar first, then everything; RAID->AHCI made no difference; no
+logs survive because /var/log is not persisted). Boot options added on the live stick and
+via preseed add-kernel-opts: i915.enable_psr=0, usbcore.autosuspend=-1, pcie_port_pm=off.
+bau-health-console on tty9 (Ctrl+Alt+F9): Wi-Fi diagnosis, vitals every 30 s from /proc
+and /sys with bash builtins only, STICK GONE / MEMORY / HOT banners, dmesg -w. Cause not
+yet proven: waiting for the owner's photo of tty9 after the next crash. Wi-Fi still not
+working on the real laptop (Bluetooth adapter shows); the tty9 header should say why.
+Then: bau-usb-guard did nothing on the live stick (/ is an overlay), yet the system,
+the encrypted storage and downloads all sit on that one stick. With 8 GB RAM the default
+dirty_ratio lets ~1.6 GB of unwritten data build up (model download, pack copy) and the
+flush blocks every read from the stick: the desktop "dies". The guard now also finds the
+live medium; on any USB stick it caps vm.dirty_bytes at 48 MB (background 16 MB) and on
+the live stick remounts /run/live/persistence/* noatime,commit=60. tty9 shows MB waiting
+to be written and DISK BUSY at 256 MB. Leading suspect, still unproven.
+
+Liquid look (2026-10-19, docs/LOOK.md): Jarvis's art is now a WebGL shader (jarvis.html
+LIQUID_FS): domain-warped noise current, the picture sharp in the middle over a mipmap glow
+of its own colours, a noise front that melts one picture into the next every 14 s with an
+edge in the state colour, white paper keyed out in the dark theme, voice ripples, pointer
+lens, scan line while thinking. Half resolution, 30 fps cap, stops when hidden; still CSS
+picture without WebGL, on context loss or with reduced motion. `bau look flow` picks the
+pictures (`/art/<name>` serves each). Tested in headless Chromium (SwiftShader); not yet
+seen on the UHD 620. Then "glass mind" (owner: "you could do better"): the core is
+a refracting glass drop in the shader at the 2D orb's place (CORE from frame(); the 2D
+orb skips its fill when LIQ), ball-lens inversion, dispersion, fresnel rim, shine,
+voice ripples, inner stir while thinking; transitions are a vortex (old picture spirals
+into the core, the next unfurls out); bloom from the ink; parallax between glow and
+picture; up to 2,600 embers (point sprites, colours fetched in the vertex shader, only if
+MAX_VERTEX_TEXTURE_IMAGE_UNITS >= 2, off in the light theme).
+
+Laptop features (2026-10-19, owner's Dell XPS 13 9380 from its laptop check): the image
+(recommends off) had no sound server, no Bluetooth stack, no thermald and no Intel VA-API
+driver. Now listed: pipewire(-pulse/-alsa), wireplumber, alsa-utils, pavucontrol, bluez,
+blueman, thermald, intel-media-va-driver (43 packages, ~18.5 MB). Fingerprint (Goodix
+27c6:5385) left out (not supported as far as known). The internal NVMe is in Intel RST
+"RAID On" mode, invisible to Linux; docs/LIVE-USB.md explains the AHCI switch (owner's
+choice, Windows must be prepared first).
 
 The owner's direction (2026-10-07): grow BAU into **My Jarvis OS** here, following their
 spec (`docs/MY-JARVIS.md`): live USB first, install-to-disk kept, one phase per PR. Next is
@@ -73,14 +234,8 @@ the repo (a test fails if they go stale: rerun `python3 assets/make_art.py`), Gi
 [!IMPORTANT]/[!TIP] notices. Jarvis answer cards for usage_today, toolbox, plan_episode
 and clip_prompt now use readable layouts instead of raw fields.
 
-The kids series engine (2026-10-10, tests first in `tests/test_series.py`): `series.py`
-reads `_shared/characters/*.yaml` + `_shared/style.yaml` (templates with placeholders in
-the kids-channel workspace); `lock(id)` is the fixed character sentence every prompt
-carries; `prompt()` = style + locks + scene + avoid (kids scan, 2500-char cap); `drift()`
-flags off-sheet colours/"never" traits and names without their lock (stage 04 check
-`series_lock`, active once sheets are filled); `plan()` scales `data/series_formats.yaml`
-beats to 3-15 s clips, writes `series.yaml` + `series-plan.md`, warns on four same formats
-in a row or a near-duplicate idea. Jarvis tools `clip_prompt`, `plan_episode`; `bau series`.
+The kids series engine (2026-10-10): removed on 2026-10-31 with the kids channel; the
+owner's business is now one fictional adult virtual creator (docs/VIRTUAL-CREATOR.md).
 
 The repo's look (2026-10-10, tests in `tests/test_repo_look.py`): README opens with an
 animated banner and feature cards (`assets/*.svg`, dark and light via `<picture>`, drawn by
@@ -265,19 +420,8 @@ Owner decisions (2026-10-12):
 
 Next build: the browser lane (map layer 1), then the one-stick installer.
 
-The results tracker (2026-10-10, tests first in `tests/test_results.py`): `results.py`
-reads numbers back for every POSTED queue item, read only. YouTube uses Analytics
-`reports.query`, `dimensions=video`, batches of 200, with `estimatedRevenue` asked
-separately; a refusal means "no earnings" and views still count. TikTok uses
-`/v2/video/query/`, 20 per request. Both clients gained the read scopes, so owners log in
-once more. Other behaviour:
-- snapshots go to `results/snapshots.jsonl`, one refresh per platform an hour;
-- `bau results link` ties a video to its studio clips and episode; cost comes from the
-  ledger's `job_id`, and the format from the episode's `series.yaml`;
-- the report shows profit per video, unlinked clip spend, `by_format` and `what_works`;
-- it is reachable through the `results` tool, a Results node and panel, `/api/results`
-  and `/api/results/refresh`.
-Owner guide: `docs/RESULTS.md`.
+The results tracker (2026-10-10): removed on 2026-10-31 (it read YouTube's numbers);
+results for Fanvue, Instagram and TikTok are planned.
 
 The usage meter (2026-10-10, tests first in `tests/test_usage.py`):
 - `usage.py`: `Metered` wraps the provider for Jarvis's turns, workspace drafts and Scout;
@@ -364,6 +508,42 @@ reads back what `remember` saved (memory used to be write-only for him).
 
 ## Next steps (in order)
 
+**2026-11-01:** the universal-harness plan is in [HARNESS-MAP.md](HARNESS-MAP.md). Build its steps 1 to 3 first (one tool list through the gateway, tool search, tool-call fitness on the model record), each on its own branch, merged only after the owner reviews it.
+
+### Laptop "best setup" (owner's go, 2026-10-21): what was searched, tested and built
+
+Two research rounds (8 researchers, primary sources only) plus real tests on the stick's
+own llama-server (v0.6.0, d812350) with the pinned GGUFs. Built and measured:
+
+- **Speed:** the server's prompt cache already works (first question 42 s, later ones
+  3.5 s; follow-up turns reuse it). Jarvis now warms it at start (`Assistant.warm`, first
+  real question 23 s with a tool call, ~60 s without). `LLAMA_ARG_CACHE_RAM=1024` (the
+  default was 8 GB, the whole laptop).
+- **Team:** head-to-head on BAU's bench + two real Jarvis questions: Qwen3.5-4B stays boss
+  (both right); LFM2.5-2.6B registered as the fast alternative (both right, 9.5 tok/s, LFM
+  Open License: free under $10M revenue); Granite-4.2-3B rejected (one wrong answer).
+  Claude Haiku 5.5 registered ($0.10/$0.50, 40x cheaper than Opus 5.5).
+- **Web research:** `web_search` + `read_page` (src/bau/web.py); `bau-search-setup.sh`
+  installs SearXNG (pinned 81371861f) on 127.0.0.1:8888, tested in a clean Debian 13 (that
+  run caught a git ownership bug, fixed).
+- **Hands:** `bau hands` (mini-swe-agent's method); real Qwen runs: right answer in 39 s
+  after telling it its folder; sudo never offered.
+- **Skipped on evidence:** dsh-purge (a jailbreak, removed from GitHub), REA (not a harness,
+  inflated stars), IndexTTS / Fish / Spark / Higgs v3 (non-commercial), Pi (no permission
+  checks), Vane (tells users to bind 0.0.0.0).
+- **Next, in order:** voice (Kyutai Pocket TTS / phonon-31m for Jarvis, Moonshine or
+  Parakeet for listening; NeuTTS Air / Chatterbox for narration, watermark, consent only);
+  fal.ai Wan 2.2 as a second studio adapter (~$0.20 per 5 s clip at 480p vs Higgsfield
+  ~$0.35+); desktop: Qwen3-TTS, ComfyUI + Wan 2.2 / Z-Image, LFM2.5-24B-A2B, Ternary-Bonsai.
+
+### 0. Desktop edition (owner's decision, 2026-10-20)
+
+The owner's desktop (12 GB graphics card, spare 1 TB drive, one USB stick) gets **its own
+design**: its own model, tools, workflows and look, with the same `CLAUDE.md` rules. Design
+waits for the owner's desktop check report (`installer/BAU-Desktop-Check.cmd`). The plan and
+open questions are in [DESKTOP.md](DESKTOP.md). Follow the "Check yourself" rules in
+`CLAUDE.md`: no driver, package or model choice from memory.
+
 ### 1. VM rehearsal on this computer (the owner's current goal)
 
 Files the owner needs in `Downloads`:
@@ -410,11 +590,27 @@ It needs about 24 GB RAM. Check `reply_ok` and `tool_calls` are true before appr
 
 ### 3. Owner setup still to do
 - **Claude:** `ANTHROPIC_API_KEY` in `/etc/bau/models.env` (laptop) or `.env` (Docker), then `bau set-status model claude-opus-5-5 APPROVED`.
-- **YouTube:** Google Cloud "Desktop app" OAuth client, then `YOUTUBE_CLIENT_ID`/`_SECRET` in `/etc/bau/platforms.env`, then `bau youtube login`. Apply for Google's API audit; until it passes, uploads stay private. See INSTALL Phase 8b.
 - **TikTok:** app keys plus TikTok's app audit (INSTALL Phase 8).
+- **Automatic updates on the desktop** (owner's choice 2026-11-01, `docs/UPDATES.md`): once, `sudo bash bau-update-first.sh` (from `installer/`); not run on the desktop yet.
 - **ElevenLabs:** the owner's account was blocked ("unusual activity", free tier disabled). Voice falls back to the browser's, and nothing in code is needed.
 
 ## Known gaps / ideas (not started)
+
+- **Grow-BAU review, 2026-11-03: the creator's feed.** The job: "fill the Fanvue queue by
+  itself so the loop makes money without me". The answer was mostly glue between parts BAU
+  already has (ComfyUI, the local model, the autopilot timer, the Fanvue queue), so
+  `src/bau/creator_feed.py` was built (PR #135). Candidates looked at for keeping Aria's
+  face the same across pictures:
+  - AHEKOT/ComfyUI_VNCCS (MIT): not a fit. It makes anime and visual-novel sprites on
+    Illustrious/Qwen models, and its "Character Cloner" copies characters from pictures
+    taken from the internet (real-likeness risk).
+  - cubiq/ComfyUI_IPAdapter_plus (GPL-3.0): works with SDXL from a reference picture, and
+    the non-FaceID adapter needs no insightface. But it has been in maintenance-only mode
+    since 2025-04-14, and its page states no licence for the h94/IP-Adapter weights. Next
+    step, only if the owner says yes: read the weights' licence on Hugging Face, then test
+    it in a sandbox on the desktop.
+  - Workflow tools (Activepieces, from the toolbox) were not needed, because the autopilot
+    timer already schedules the work.
 
 - Instagram, Facebook and Snapchat adapters for the publishing hub. Each needs one adapter class in `publishing.py`, a client module, an `examples/platform-*.yaml`, and tests. Verify each platform's current API and posting rules first (consent screens, AI labels, age limits).
 - The `ghcr.io/bsajabo258/bau` image is private by default. Make it public in the package settings if the owner wants `docker pull` to work without logging in.

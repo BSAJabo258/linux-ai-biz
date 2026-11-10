@@ -2,6 +2,8 @@
 
 import hashlib
 import io
+import shutil
+import subprocess
 import urllib.error
 
 import pytest
@@ -241,7 +243,9 @@ def run_setup(tmp_path, answers, bench_exit=0):
         (bin_dir / name).write_text("#!/bin/bash\n" + body + "\n")
         (bin_dir / name).chmod(0o755)
     (tmp_path / "state").write_text("NOT_EVALUATED")
+    # BAU_SETUP_HOME: an installed machine's /var/lib/bau/models must not change the answers
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "BAU_ETC": str(etc),
+           "BAU_SETUP_HOME": str(tmp_path / "home"),
            "LOG": str(tmp_path / "log"), "STATE": str(tmp_path / "state"),
            "BENCH_EXIT": str(bench_exit)}
     r = subprocess.run(["bash", str(script)], input=answers, env=env, capture_output=True,
@@ -279,3 +283,24 @@ def test_live_setup_never_approves_claude_without_the_owner_or_a_working_key(tmp
     r, _, log, state = run_setup(tmp_path / "b", "y\nsk-ant-test\n", bench_exit=1)
     assert "set-status" not in log and state == "NOT_EVALUATED"
     assert "cannot be approved" in r.stdout
+
+
+def test_a_disk_with_data_but_no_partition_table_is_never_called_empty():
+    # Audit 2026-10-25: a filesystem written to the whole disk (ext4, exFAT, NTFS, a
+    # BitLocker or LUKS device) has no partition table, and was planned over as "empty".
+    sectors = 16 * GiB // 512
+    for sig in (["ext4"], ["crypto_LUKS"], ["BitLocker"]):
+        with pytest.raises(live.StorageError, match="holds"):
+            live.plan_empty_disk("/dev/sdc", None, sectors, 512, False, signatures=sig)
+    with pytest.raises(live.StorageError, match="whole disk"):
+        live.plan_empty_disk("/dev/sdc1", None, sectors, 512, False, kind="part")
+
+
+@pytest.mark.skipif(not shutil.which("wipefs") or not shutil.which("mkfs.ext4"),
+                    reason="needs util-linux and e2fsprogs")
+def test_signatures_are_read_from_the_disk_itself(tmp_path):
+    img = tmp_path / "disk.img"
+    img.write_bytes(b"\0" * (8 << 20))
+    assert live._signatures(str(img)) == []
+    subprocess.run(["mkfs.ext4", "-q", "-F", str(img)], check=True)
+    assert live._signatures(str(img)) == ["ext4"]

@@ -42,7 +42,8 @@ for your encrypted storage.
    Choose the USB stick (sometimes shown as "UEFI: <stick name>").
 3. The My Jarvis menu appears. Choose **My Jarvis**.
 
-If the PC refuses to start from USB, turn off *Secure Boot* in the firmware settings, or
+If the PC refuses to start from USB (on the ASUS desktop: a gray screen, then Windows), turn
+off *Secure Boot* in the firmware settings (ASUS: *Secure Boot > OS Type > Other OS*), or
 choose *Utilities... > UEFI Firmware Settings* from the My Jarvis menu to get there.
 
 ## 3. First start: setup
@@ -86,6 +87,28 @@ see the dashboard. Setup can be run again any time; it only does what is still m
 This menu is what UEFI PCs (nearly every PC from the last ten years) show. Older BIOS-only
 PCs show a simpler menu: choose the first entry for a normal start.
 
+## Installing programs while running from the stick
+
+Running from the stick, the system's "disk" is a slice of the laptop's **memory**: about
+half of it (3.7 GB on an 8 GB laptop). Only your files and settings are kept on the
+encrypted storage. So, on the live stick:
+
+- **programs you install are gone at the next restart;**
+- **big installs fill memory.** When that slice is full, nothing more installs (apt says
+  *"You don't have enough free space in /var/cache/apt/archives/"*), and the laptop is
+  short of memory for Jarvis and the desktop. Linux may then stop a program. The stick
+  tells Linux to stop the local model first (it restarts by itself), so your terminal and
+  the desktop are spared where possible.
+
+The laptop check shows how full it is (`system space (in memory, live stick)`).
+
+**To install programs that stay, put BAU on a disk:** open **Install BAU to a disk**
+from the applications menu (System). It lists the disks, marks the stick BAU started
+from (never pick that one), and on your `y` restarts to the start menu.
+
+`bau pack install` refuses to copy the models into this memory: start My Jarvis normally
+and unlock your encrypted storage first, or install BAU to a disk.
+
 ## Install BAU on this laptop
 
 When you want BAU on a laptop's own drive instead of running it from the stick:
@@ -101,6 +124,14 @@ When you want BAU on a laptop's own drive instead of running it from the stick:
    - your **time zone**.
 
    Everything else is set the BAU way: full-disk encryption, root login off, network time.
+
+   **"Use entire disk" is right.** BAU encrypts the whole drive it installs to, and the
+   Debian installer can only do that on a whole drive, so "use the largest continuous free
+   space" does not work here. "Entire disk" means **only the drive you pick**: the other
+   drives (Windows, the stick you started from) are not touched. That drive is also your
+   storage: the system takes about 15 GB, the rest holds your files, BAU's data and the
+   AI models (about 6.5 GB). A 128 GB SanDisk is plenty. Pick it by its **name and size**
+   in the list; never the one that holds Windows, never the stick you started from.
 
    **Where the boot loader goes.** Near the end the installer asks **Install the GRUB boot
    loader to your primary drive?** Answer **No** unless BAU goes on the laptop's own
@@ -145,7 +176,90 @@ When you want BAU on a laptop's own drive instead of running it from the stick:
 Your encrypted storage on the stick is not touched by the install: keep the stick as your
 portable Jarvis and recovery stick.
 
+## Your laptop: Dell XPS 13 9380
+
+From your laptop check (October 2026):
+
+| Part | On BAU |
+|---|---|
+| Wi-Fi (Killer 1435 / Qualcomm QCA6174) | works: firmware and the Wi-Fi login program are on the stick |
+| Bluetooth (Qualcomm QCA61x4A) | works: pair speakers and controllers with the Bluetooth icon at the top |
+| Sound (speakers, headphones, Jarvis's voice) | works: volume in the sound icon, or `pavucontrol` |
+| Screen (Intel UHD 620), brightness keys | work |
+| Webcam | works (standard USB camera driver) |
+| Fingerprint reader (Goodix 27c6:5385) | not supported by Linux's fingerprint software as far as we know: use your password |
+| Heat | Intel's thermal service (`thermald`) keeps the CPU from overheating and throttling |
+| Internal SSD (Intel 512 GB) | **hidden from Linux** while the firmware's storage mode is "RAID On" |
+
+**The internal SSD.** Dell ships this laptop with the storage mode set to "RAID On", and
+in that mode Linux cannot see the internal drive at all, which is why the installer only
+offers the USB stick. To ever install BAU on the internal drive next to Windows, the mode
+must be "AHCI" (F2 at start > System Configuration > SATA Operation). **Do not switch it
+straight away**: Windows set up in RAID mode may then not start. Windows must be prepared
+first (start it once in Safe Mode, switch to AHCI, start Windows again). This is your
+choice; running BAU from the SanDisk does not need it.
+
+## If the desktop dies after a few minutes
+
+On the owner's Dell XPS 13 9380 the taskbar disappeared a few minutes after unlocking and
+then nothing worked. The stick now starts with three settings against the two known
+causes on that laptop:
+
+| Setting | What it stops |
+|---|---|
+| `i915.enable_psr=0` | the screen's power saving, which freezes parts of the picture on this laptop |
+| `usbcore.autosuspend=-1` | USB power saving that can put the stick to sleep |
+| `pcie_port_pm=off` | power saving on the USB-C / Thunderbolt ports, which can make a stick behind them drop out |
+
+They cost a little battery. A stick installed with the BAU installer gets them too.
+
+**Big copies no longer freeze the desktop.** With 8 GB of memory, Linux normally gathers
+over a gigabyte of data before writing it out (a model download, the BAU Pack). It then
+writes all of it to the stick in one go. On a slow stick that takes minutes, and every
+program that needs to read from the stick waits, so the desktop seems dead. The stick now
+writes in small steps (at most 48 MB waiting), on the live stick as well as on a stick
+BAU is installed on. To try this on a stick made before the change, type once after
+unlocking:
+
+```bash
+sudo sysctl vm.dirty_background_bytes=16777216 vm.dirty_bytes=50331648
+```
+
+**Plug the stick into the port on the right side.** The two ports on the left are
+Thunderbolt; the right one is plain USB-C and is the steadiest place for the stick.
+
+**If it still happens: press Ctrl+Alt+F9.** That is the health console. It keeps working
+even when the rest of the system has stopped, and shows:
+
+- why Wi-Fi is off (no driver, switched off, or the card's firmware complaining);
+- every 30 seconds: free memory, heat, how much is waiting to be written, and whether
+  the stick is still there;
+- **STICK GONE**, **DISK BUSY**, **MEMORY ALMOST FULL** or **HOT** in capitals when one of
+  those is the cause;
+- the kernel's warnings as they happen.
+
+Take a photo of that screen and send it: it says which of the causes it is.
+**Ctrl+Alt+F7** goes back to the desktop.
+
+BAU already installed on a stick before this change? Add the settings once:
+
+```bash
+sudo sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="/&i915.enable_psr=0 usbcore.autosuspend=-1 pcie_port_pm=off /' /etc/default/grub
+sudo update-grub
+```
+
 ## Good to know
+
+- **BAU installed onto a USB stick:** it works, but ordinary sticks are not made for an
+  operating system's constant writes. A stick that overheats or drops out makes Linux
+  switch it to read-only: programs fail and the screen goes black. The stick image
+  therefore eases the load by itself when it finds it is running from a USB stick (fewer
+  writes, swap in memory instead of on the stick). For daily use, the laptop's own drive
+  (next to Windows) or a USB **SSD** (built for constant writes) are much more reliable.
+  To check whether the stick dropped out, run `sudo dmesg -T | grep -iE "i/o error|read-only|usb.*reset"`
+  after it happens: any lines mean the stick.
+- **Sticks open by themselves** when plugged in (they show in the file manager), exFAT and
+  Windows (NTFS) drives included.
 
 - **No Wi-Fi? Use your phone.** Plug your phone into the laptop with its USB cable, then
   turn on **USB tethering** (Android: Settings > Network > Hotspot & tethering > USB

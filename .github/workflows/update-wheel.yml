@@ -1,0 +1,65 @@
+name: update-wheel
+
+# The desktop's automatic updates (docs/UPDATES.md): after the ci workflow passed on a push to
+# main, build BAU's wheel from that exact commit and put it, with bau-update.json (commit,
+# wheel, sha256), on the release "bau-update". The desktop checks it once a night.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-wheel
+  cancel-in-progress: false
+
+jobs:
+  wheel:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: build the wheel and its manifest
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          python -m pip wheel --quiet --no-deps -w dist .
+          set -- dist/bau-*.whl
+          [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected one BAU wheel"; exit 1; }
+          python - "$1" "$SHA" <<'PY'
+          import datetime, hashlib, json, pathlib, sys
+          wheel = pathlib.Path(sys.argv[1])
+          json.dump({"commit": sys.argv[2], "wheel": wheel.name,
+                     "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
+                     "built": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")},
+                    open("dist/bau-update.json", "w"), indent=1)
+          PY
+          cat dist/bau-update.json
+      - name: replace the bau-update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # Never delete the release: a desktop checking at that moment would get a 404.
+          # The wheel goes up first, the record naming it last; a desktop in between finds
+          # the old record and a new file, refuses the SHA-256 mismatch, and tries next night.
+          notes="Built from ${SHA} after every check passed on main. The desktop installs it by itself at night when the owner turned updates on (docs/UPDATES.md)."
+          if gh release view bau-update >/dev/null 2>&1; then
+            gh release upload bau-update dist/bau-*.whl --clobber
+            gh release upload bau-update dist/bau-update.json --clobber
+            gh release edit bau-update --title "BAU update (${SHA:0:7})" --notes "$notes"
+          else
+            gh release create bau-update dist/bau-*.whl dist/bau-update.json \
+              --target "$SHA" --prerelease --title "BAU update (${SHA:0:7})" --notes "$notes"
+          fi

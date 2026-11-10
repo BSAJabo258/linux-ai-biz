@@ -77,10 +77,18 @@ def plan_free_space(disk: str, table: dict, disk_sectors: int, sector: int,
 
 
 def plan_empty_disk(disk: str, table: dict | None, disk_sectors: int, sector: int,
-                    mounted: bool, min_bytes: int = MIN_BYTES) -> Plan:
-    """A separate disk is used only when it holds no partitions at all."""
+                    mounted: bool, min_bytes: int = MIN_BYTES, *, kind: str = "disk",
+                    signatures: list[str] | tuple[str, ...] = ()) -> Plan:
+    """A separate disk is used only when it is a whole disk holding nothing at all: no
+    partitions and no filesystem or encryption written straight onto it (audit
+    2026-10-25: those have no partition table and were treated as empty)."""
+    if kind != "disk":
+        raise StorageError(f"{disk} is not a whole disk ({kind}); give the disk itself")
     if mounted:
         raise StorageError(f"{disk} is in use (mounted); refusing")
+    if signatures:
+        raise StorageError(f"{disk} holds {', '.join(signatures)} data; jarvis-storage never "
+                           "deletes data. Choose an empty disk")
     if table and table["partitiontable"].get("partitions"):
         raise StorageError(f"{disk} already has partitions; jarvis-storage never deletes "
                            "data. Choose an empty disk")
@@ -128,6 +136,17 @@ def _geometry(disk: str) -> tuple[int, int]:
     return int(_out(["blockdev", "--getsize64", disk])) // sector, sector
 
 
+def _signatures(disk: str) -> list[str]:
+    """What is written on the disk itself (filesystems, LUKS, BitLocker, RAID...), read
+    only: `wipefs --no-act` lists and changes nothing (util-linux, Essential in Debian)."""
+    out = _out(["wipefs", "--no-act", "--noheadings", "--output", "TYPE", disk])
+    return [x.strip() for x in out.splitlines() if x.strip()]
+
+
+def _kind(disk: str) -> str:
+    return _out(["lsblk", "-dno", "TYPE", disk]).splitlines()[0].strip()
+
+
 def _mounted(disk: str) -> bool:
     rows = _out(["lsblk", "-rno", "MOUNTPOINTS", disk])
     return any(r.strip() for r in rows.splitlines())
@@ -150,7 +169,8 @@ def setup(device: str | None, passphrase_file: str | None, yes: bool) -> int:
     if device:
         table = _table(device)
         sectors, sector = _geometry(device)
-        plan = plan_empty_disk(device, table, sectors, sector, _mounted(device))
+        plan = plan_empty_disk(device, table, sectors, sector, _mounted(device),
+                               kind=_kind(device), signatures=_signatures(device))
     else:
         disk = boot_disk()
         if not disk:
@@ -183,7 +203,8 @@ def setup(device: str | None, passphrase_file: str | None, yes: bool) -> int:
           "--wipe-partitions", "never"] + ([] if plan.new_table else ["--append"]) + [plan.disk],
          input=plan.sfdisk_input(), capture_output=True)
     after = _table(plan.disk) or {}
-    new = [p for p in after["partitiontable"]["partitions"] if p["node"] not in before]
+    new = [p for p in after.get("partitiontable", {}).get("partitions", [])
+           if p["node"] not in before]
     if len(new) != 1:
         raise StorageError("could not find the new partition; nothing was encrypted")
     part = new[0]["node"]
@@ -193,8 +214,19 @@ def setup(device: str | None, passphrase_file: str | None, yes: bool) -> int:
     _run(["udevadm", "settle"])
 
     key = ["--key-file", passphrase_file] if passphrase_file else []
-    _run(["cryptsetup", "luksFormat", "--batch-mode", "--type", "luks2", "--label", LABEL,
-          *([] if passphrase_file else ["--verify-passphrase"]), *key, part])
+    fmt = ["cryptsetup", "luksFormat", "--batch-mode", "--type", "luks2", "--label", LABEL,
+           *([] if passphrase_file else ["--verify-passphrase"]), *key, part]
+    for _ in range(1 if passphrase_file else 3):        # a typo in the second passphrase
+        if subprocess.run(fmt, text=True).returncode == 0:
+            break
+        print("The passphrases did not match (or encryption failed). Try again.")
+    else:
+        # Take the empty partition away again, or setup would find no free space next time.
+        subprocess.run(["sfdisk", "--no-reread", "--no-tell-kernel", "--delete", plan.disk,
+                        number], capture_output=True)
+        subprocess.run(["partx", "-d", "--nr", number, plan.disk], capture_output=True)
+        raise StorageError("encryption did not start, so the new partition was removed "
+                           "again; nothing else changed. Run jarvis-setup again.")
     _run(["cryptsetup", "open", *key, part, MAPPER])
     mnt = Path("/run") / MAPPER
     try:

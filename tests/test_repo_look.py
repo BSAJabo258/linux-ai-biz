@@ -63,16 +63,24 @@ def test_mission_control_has_the_jarvis_look_and_stays_accessible():
     assert "@import" not in page and "https://" not in page   # works offline on the laptop
 
 
+def test_mission_control_never_scrolls_sideways_on_a_phone():
+    # 2026-10-27, 390 px wide: Regulations was 812 px wide, Governor 437, Economics 392.
+    # Measured after the fix: every view fits; a wide table scrolls inside its card.
+    page = (resources.files("bau.ui") / "page.html").read_text()
+    assert ".wide, pre { overflow-x:auto; }" in page and "td { overflow-wrap:anywhere; }" in page
+    assert 'return el("div", { class: "wide" }, t);' in page    # every table() is wrapped
+
+
 # ------------------------------------------------------------------ the page, round two
 
 def facts():
     from bau.policy import PolicyEngine
     from bau.regulations import Registry
-    from bau.series import Series
     from bau.toolbox import Toolbox
+    from bau.virtual_creator import PLATFORMS
     reg = Registry.load()
     return {"regulations": len(reg.regs), "policies": len(PolicyEngine.load(reg).policies),
-            "tools": len(Toolbox().entries), "formats": len(Series(ROOT).formats())}
+            "tools": len(Toolbox().entries), "platforms": len(PLATFORMS)}
 
 
 def test_stats_panel_shows_the_repo_as_it_really_is():
@@ -91,7 +99,7 @@ def test_terminal_demo_types_real_commands():
     for theme in ("dark", "light"):
         text = (ART / f"terminal-{theme}.svg").read_text()
         assert "@keyframes" in text and "prefers-reduced-motion" in text
-        for cmd in ("bau toolbox ask", "bau series plan", "bau usage"):
+        for cmd in ("bau toolbox ask", "bau creator batch", "bau usage"):
             assert cmd in text, cmd
 
 

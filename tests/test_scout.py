@@ -396,3 +396,38 @@ def test_a_run_stops_asking_the_moment_github_says_wait(tmp_path):
     assert sum("not read: waiting for GitHub" in n for n in run["notes"]) == 1
     text = S.report(sc)
     assert "NOT SENT" in text and "GitHub asked BAU to wait until" in text
+
+
+# The owner's rule (2026-11-04): only free open source. Wording from the projects' own
+# LICENSE files, read 2026-11-04 (n8n, Cua's FSL parts, Dify).
+@pytest.mark.parametrize("text", [
+    "Sustainable Use License\nVersion 1.0\nYou may use or modify the software only for your "
+    "own internal business purposes or for non-commercial or personal use.",
+    "Functional Source License, Version 1.1, MIT Future License",
+    "Dify is licensed under a modified version of the Apache License 2.0, with the "
+    "following additional conditions:\n\n Apache License, Version 2.0, January 2004"])
+def test_fair_code_and_source_available_licences_are_blocked(tmp_path, text):
+    from bau.security.sentinel import detect_license
+    (tmp_path / "LICENSE").write_text(text)
+    assert detect_license(tmp_path)["verdict"] == "NONCOMMERCIAL_BLOCK"
+
+
+def test_free_open_source_still_passes_and_fair_code_readmes_are_flagged(tmp_path):
+    from bau.scout.evaluate import readme_signals
+    from bau.security.sentinel import detect_license
+    (tmp_path / "LICENSE").write_text("Apache License, Version 2.0, January 2004")
+    assert detect_license(tmp_path)["verdict"] == "COMMERCIAL_OK"
+    assert readme_signals("n8n is fair-code distributed under the Sustainable Use License")[
+        "says_noncommercial"]
+
+
+def test_a_missing_project_or_readme_is_said_plainly_not_as_a_raw_404():
+    # the owner, 2026-11-09: Jarvis reported GitHub 404 errors
+    def gone(req, timeout=30):
+        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {},
+                                     io.BytesIO(b'{"message": "Not Found"}'))
+    gh = GitHub(token="", opener=gone, sleep=lambda s: None)
+    assert gh.readme("owner/no-readme") == ""                  # no README is not an error
+    assert gh.latest_release("owner/no-release") is None
+    with pytest.raises(SourceError, match="is not on GitHub .deleted, renamed or private"):
+        gh.repo("owner/deleted")
