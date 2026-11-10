@@ -65,6 +65,8 @@ cp "${HERE}/payload/install.sh" "${P}/install.sh"
 cp -r "${HERE}/payload/systemd" "${HERE}/payload/hardening" "${P}/"
 cp "${HERE}/hw-audit.sh" "${HERE}/hw-audit-windows.ps1" "${P}/"
 cp "${HERE}/bau-laptop-check.sh" "${HERE}/bau-laptop-check.ps1" "${HERE}/BAU-Laptop-Check.cmd" "${HERE}/BAU-Desktop-Check.cmd" "${P}/"   # docs/LAPTOP-CHECK.md
+mkdir -p "${P}/lib"
+cp "${HERE}/lib/laptop-evidence.sh" "${P}/lib/"       # verdict and BAU evidence, sourced by the laptop check
 cp "${HERE}/bau-keys-export.sh" "${HERE}/bau-keys-export.ps1" "${HERE}/BAU-Keys-Export.cmd" "${P}/"   # docs/KEYS.md
 cp "${HERE}/bau-pack-make.ps1" "${HERE}/BAU-Pack-Make.cmd" "${P}/"   # docs/PACK.md
 cp "${HERE}/bau-search-setup.sh" "${P}/"   # docs/RESEARCH.md
