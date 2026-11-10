@@ -281,7 +281,8 @@ def test_the_tapestry_is_sacred_geometry_that_never_takes_a_click():
                  "L * Math.sin(th) ** 2", "HERMETIC", "JITTER"):
         assert part in page
     assert 'id="c-geo"' in page and 'localStorage.setItem("jarvis-tapestry"' in page
-    assert "REDUCED ? 100 : 33" in page                                      # ~30 fps
+    assert "REDUCED ? 100 : 50" in page                                      # 20 fps
+    assert "scale: soft ? 0.35 : 0.5," in page                # light on the GPU (Xid 79)
 
 
 def test_the_fifth_dimension_is_a_real_slice_with_a_safe_fallback():
@@ -358,3 +359,14 @@ def test_e8_folds_into_two_600_cells_by_the_golden_ratio():
     assert {sum(abs(math.dist(a, b) - edge) < 1e-6 for b in inner) for a in inner} == {12}
     assert "const CHAIN = [4, 3, 1, 10, 2, 0, 8, 5, 6, 7, 9];" in page
     assert "BRIDGE[SAC.stance]" in page
+
+
+def test_a_mic_that_sends_no_sound_is_named_not_blamed_on_the_owner():
+    # The owner's desktop, 2026-11-10: the fifine USB mic was unplugged, the empty front jack
+    # sent a flat DC line at +30 dB, Whisper heard nothing and Jarvis said "Didn't catch that."
+    page = _page()
+    assert "const MIC_SILENT = 6;" in page and "Your microphone sends no sound." in page
+    assert 'micMeasured && micSwing < MIC_SILENT ? NO_SOUND : "Didn\'t catch that."' in page
+    # a paused audio engine reads nothing, so it can never raise a false "no sound"
+    assert 'if (!actx || actx.state !== "running") return;' in page
+    assert "measureMic(); } } catch (e) {}" in page and "clearInterval(swingTimer)" in page

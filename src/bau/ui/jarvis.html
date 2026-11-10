@@ -712,7 +712,9 @@ void main() {
   try { const ext = gl.getExtension("WEBGL_debug_renderer_info");
     const who = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
     soft = /llvmpipe|swiftshader|software|softpipe/i.test(who); } catch (e) {}
-  return { gl, cv, U, scale: soft ? 0.4 : 0.75, phase: 0, frac: 0, Na: 5, Nb: 5, mix: 1, slow: 0, ema: 33, checkAt: 0, lost: false };
+  // Half the screen's pixels at most: the owner's RTX 3060 fell off the bus (Xid 79, 2026-11-10)
+  // while this canvas drew beside the local model and ComfyUI; the field is kept light.
+  return { gl, cv, U, scale: soft ? 0.35 : 0.5, phase: 0, frac: 0, Na: 5, Nb: 5, mix: 1, slow: 0, ema: 33, checkAt: 0, lost: false };
 })();
 function fifthResize() { if (!FIFTH) return;
   FIFTH.cv.width = Math.max(2, Math.round(W * FIFTH.scale)); FIFTH.cv.height = Math.max(2, Math.round(H * FIFTH.scale));
@@ -1146,7 +1148,7 @@ function sacPaint(now) {
   g.restore();
 }
 function sacFrame(now) {
-  if (SAC.on && !document.hidden && now - SAC.last > (REDUCED ? 100 : 33)) {
+  if (SAC.on && !document.hidden && now - SAC.last > (REDUCED ? 100 : 50)) {   // 20 frames a second
     const dt = Math.min(250, now - (SAC.last || now)); SAC.last = now;
     try { fifthPaint(now, dt, FIELD_N[SAC.stance]); } catch (e) {}
     try { sacPaint(now); } catch (e) { /* one bad frame never stops it */ } }
@@ -2271,6 +2273,23 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 function paintMic() { const ok = canListen || !!SR; $("mic").disabled = !ok;
   $("mic").title = ok ? "Hold to talk" : "Voice input needs an ElevenLabs key or a browser with speech recognition - type instead";
   $("hint").textContent = ok ? "Type to talk · Hold the mic to speak · Enter to send" : "Type to talk · Enter to send · Esc to stop speaking"; }
+// How much the microphone's signal moves while the button is held (0-255, the analyser's byte
+// scale). A dead or empty input sends a flat line: the owner's desktop, 2026-11-10, recorded a
+// constant DC level from an empty front mic jack at +30 dB boost, and Whisper heard nothing, so
+// "Didn't catch that." blamed the owner. Below this swing there was no sound to catch.
+const MIC_SILENT = 6;
+let micSwing = 0, micMeasured = false, swingTimer = null;
+const NO_SOUND = "Your microphone sends no sound. Check it is plugged in and chosen as the input " +
+  "in the computer's sound settings, then try again.";
+function measureMic() {
+  micSwing = 0; micMeasured = false; clearInterval(swingTimer);
+  if (!micAnalyser) return;
+  const tb = new Uint8Array(micAnalyser.fftSize);
+  swingTimer = setInterval(() => { try { if (!actx || actx.state !== "running") return;   // paused: no reading
+    micAnalyser.getByteTimeDomainData(tb); let lo = 255, hi = 0;
+    for (const v of tb) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    micSwing = Math.max(micSwing, hi - lo); micMeasured = true; } catch (e) {} }, 100);
+}
 async function startListening() {
   if (live || busy || $("mic").disabled) return;
   stopSpeaking(); live = true; $("mic").classList.add("live"); setState("listening"); caption("");
@@ -2278,7 +2297,7 @@ async function startListening() {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
       if (!live) { stream.getTracks().forEach(t => t.stop()); return; }
-      try { if (actx) { if (micSrc) micSrc.disconnect(); micSrc = actx.createMediaStreamSource(stream); micSrc.connect(micAnalyser); } } catch (e) {}
+      try { if (actx) { if (micSrc) micSrc.disconnect(); micSrc = actx.createMediaStreamSource(stream); micSrc.connect(micAnalyser); measureMic(); } } catch (e) {}
       const type = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
       rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined); chunks = [];
       rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
@@ -2301,13 +2320,15 @@ async function stopListening() {
   if (!rec) { setState("idle"); return; }
   const r = rec; rec = null;
   const done = new Promise(res => { r.onstop = res; }); try { r.stop(); } catch (e) {}
-  await done; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null;
+  await done; clearInterval(swingTimer); swingTimer = null;
+  if (stream) stream.getTracks().forEach(t => t.stop()); stream = null;
   try { if (micSrc) { micSrc.disconnect(); micSrc = null; } } catch (e) {}
   const blob = new Blob(chunks, { type: (r.mimeType || "audio/webm") });
   if (blob.size < 2000) { setState("idle"); caption("Hold the button while you talk."); return; }
   setState("thinking"); caption("…");
   try { const out = await apiJson("/api/stt", blob, blob.type || "audio/webm");
-    if (out.text) ask(out.text); else { setState("idle"); caption("Didn't catch that."); }
+    if (out.text) ask(out.text);
+    else { setState("idle"); caption(micMeasured && micSwing < MIC_SILENT ? NO_SOUND : "Didn't catch that."); }
   } catch (e) { setState("idle"); caption(e.message); }
 }
 const mic = $("mic");
