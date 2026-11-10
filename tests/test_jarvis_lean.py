@@ -297,3 +297,17 @@ def test_a_nested_use_tool_is_unwrapped(tmp_path):
     assert not (isinstance(out, dict) and out.get("error"))
     menu = a.t_tool_menu("use_tool")
     assert "error" not in menu and "use_tool" in menu["how"]
+
+
+def test_promising_to_draft_without_doing_it_gets_the_nudge(tmp_path):
+    # Real-model check, 2026-11-10 (qwen3.5-9b): "I will draft seven SFW Instagram posts ...
+    # Should I proceed?" and no tool was called. Making things counts, not only looking.
+    a = lean(tmp_path, ["I will draft seven SFW Instagram posts themed around a cozy autumn "
+                        "week for your creator. Should I proceed?",
+                        {"tool": "workspaces", "input": {}},
+                        "Done: drafted."])
+    r = a.ask("Plan seven Instagram posts for my creator about a cozy autumn week.")
+    assert r.text == "Done: drafted." and r.cards[0]["tool"] == "workspaces"
+    nudge = [m for m in a.messages if m.get("role") == "user"
+             and "call the tool now" in str(m.get("content"))]
+    assert len(nudge) == 1 and "cannot do it yet" in str(nudge[0]["content"])
