@@ -1196,6 +1196,14 @@ class Assistant:
                 f[key] = {"error": f"{type(e).__name__}: {e}"[:200]}
         from . import update
         f["update"] = update.last(update.STATE)     # read at call time (tests point it away)
+        try:                                         # God's Eye: sky, big quakes, brand safety
+            from .spatial import world_now
+            f["world"] = world_now(self.home)
+        except Exception as e:  # noqa: BLE001 - the world view must not silence the briefing
+            f["world"] = {"error": f"{type(e).__name__}: {e}"[:200]}
+        from . import automaton
+        if automaton.load(self.home).get("started_at"):
+            f["automaton"] = automaton.status(self.home)
         from . import autopilot
         f["autopilot"] = autopilot.digest(self.home) if autopilot._load(self.home)["tasks"] \
             else None

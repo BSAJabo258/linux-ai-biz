@@ -10,7 +10,8 @@ Every 30 minutes the autopilot:
 1. draws the creator's pictures on this computer (with their age check),
 2. has the local model write each caption (the AI label is added to every one),
 3. queues them **without** waiting for your Accept,
-4. posts up to your number a day to Fanvue (autopost),
+4. posts up to your number a day to Fanvue (autopost), in the audience's evening, and holds
+   them on the day of a major disaster (God's Eye, see `docs/GODS-EYE.md`),
 5. brings Fanvue's earnings into the ledger.
 
 ## Its two lines

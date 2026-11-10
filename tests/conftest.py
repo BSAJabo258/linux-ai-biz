@@ -23,6 +23,15 @@ def no_real_network(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def no_live_world(monkeypatch):
+    """God's Eye's live checks never reach USGS in tests: always the audience's evening, no
+    disaster, no earthquakes. tests/test_godseye_business.py tests the pure checks."""
+    from bau import spatial
+    monkeypatch.setattr(spatial, "significant_quakes", lambda *a, **k: [])
+    monkeypatch.setattr(spatial, "posting_time_ok", lambda home, now: True)
+
+
+@pytest.fixture(autouse=True)
 def setup_all_done(monkeypatch):
     """Tests never probe this computer's card or services for setup steps: everything is
     set up unless a test says else (tests/test_setup_steps.py)."""

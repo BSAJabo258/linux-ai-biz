@@ -172,3 +172,78 @@ def sky_moments(day: dt.date) -> list[dict[str, str]]:
         if abs((day - dt.date(day.year, m, d)).days) <= 1:
             out.append({"kind": "season", "name": name, "theme": theme})
     return out
+
+
+# ------------------------------------------------------------------ God's Eye for the business
+# The owner's ask (2026-11-10): God's Eye in the money loop and every other field. Pure checks
+# first (tested directly); the *_now wrappers do the live lookups and fail open (offline means
+# no pause, never a stuck business).
+MAJOR_MAG = 7.0              # a disaster big enough that a sexy post beside it draws backlash
+SIGNIFICANT_MAG = 6.0        # worth a line in the owner's briefing
+# The audience's evening, 18:00 to 23:00 local, in the regions the posts are for. US and UK
+# by default; the creator profile can list its own `posting_zones`.
+POSTING_ZONES = ("America/New_York", "America/Chicago", "America/Los_Angeles", "Europe/London")
+EVENING = (18, 23)
+BUSINESS_PURPOSE = "BAU business world watch: brand safety and the owner's briefing"
+
+
+def significant_quakes(opener: Any = None, timeout: int = 6) -> list[dict[str, Any]] | None:
+    """M6+ earthquakes of the last 24 hours (USGS, public domain), strongest first; None when
+    the feed cannot be reached."""
+    url, _ = SOURCES["earthquakes"]
+    try:
+        data = _get_json(url.format(window="4.5_day"), opener, timeout)
+    except Exception:  # noqa: BLE001 - offline, slow or odd: no data, never an error
+        return None
+    out = []
+    for f in data.get("features", []) if isinstance(data, dict) else []:
+        p = f.get("properties") or {}
+        mag = p.get("mag")
+        if isinstance(mag, (int, float)) and mag >= SIGNIFICANT_MAG:
+            out.append({"mag": float(mag), "place": str(p.get("place") or "")[:120]})
+    return sorted(out, key=lambda q: -q["mag"])
+
+
+def brand_pause(quakes: list[dict[str, Any]] | None) -> str | None:
+    """The reason to hold today's posts, or None."""
+    major = [q for q in quakes or [] if q["mag"] >= MAJOR_MAG]
+    return f"M{major[0]['mag']:.1f} earthquake, {major[0]['place']}" if major else None
+
+
+def is_evening(now: dt.datetime, zones: tuple[str, ...] | list[str] = POSTING_ZONES) -> bool:
+    from zoneinfo import ZoneInfo
+    return any(EVENING[0] <= now.astimezone(ZoneInfo(z)).hour < EVENING[1] for z in zones)
+
+
+def _audit(home: Path, actor: str, layer: str) -> None:
+    from .audit import AuditLog
+    AuditLog(home / "audit" / "chain.jsonl").append(
+        "godseye.query", actor, {"layer": layer, "purpose": BUSINESS_PURPOSE})
+
+
+def brand_pause_now(home: Path, actor: str = "autopost") -> str | None:
+    _audit(home, actor, "earthquakes")
+    return brand_pause(significant_quakes())
+
+
+def posting_time_ok(home: Path, now: dt.datetime) -> bool:
+    zones = POSTING_ZONES
+    try:
+        import yaml
+        found = sorted((home / "creators").glob("*.yaml"))
+        prof = yaml.safe_load(found[0].read_text()) if found else {}
+        zones = tuple(prof.get("posting_zones") or POSTING_ZONES)
+    except (OSError, ValueError, AttributeError):
+        pass
+    return is_evening(now, zones)
+
+
+def world_now(home: Path, today: dt.date | None = None) -> dict[str, Any]:
+    """God's Eye for the owner's briefing: tonight's sky, big earthquakes, brand safety."""
+    today = today or dt.datetime.now(dt.UTC).date()
+    _audit(home, "jarvis", "earthquakes")
+    quakes = significant_quakes()
+    return {"tonight_sky": [m["name"] for m in sky_moments(today)],
+            "big_earthquakes_24h": None if quakes is None else
+            [f"M{q['mag']:.1f} {q['place']}" for q in quakes[:3]],
+            "posting_paused_for_brand_safety": brand_pause(quakes)}
