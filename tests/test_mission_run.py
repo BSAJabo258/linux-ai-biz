@@ -101,3 +101,25 @@ def test_repeating_the_task_back_is_not_a_finding(tmp_path):
         'Memory shows a mission "research open source video tools" was done.',
         ['mission "research open source video tools" COMPLETED'])))
     assert m.status == "PAUSED"
+
+
+def test_a_paused_mission_says_so_instead_of_done(tmp_path):
+    # The owner's screen said "Done." after both missions came back PAUSED (2026-11-10).
+    j = jarvis(tmp_path)
+    mid = j.plan("research open source video tools", "research", {}).mission_id
+    a = make(tmp_path, ["ok"], clients={"mission_runner": agent("What kind of video?", [])})
+    out = a.t_run_mission(mid)
+    assert list(out)[0] == "say" and out["say"].startswith(f"Mission {mid} is paused, not done")
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
+    assert '(r.result && r.result.say) || "Done."' in page
+
+
+def test_the_researcher_can_search_the_web_and_then_only_reads(tmp_path):
+    from bau.home import shipped_data
+    from bau.runtime import TOOL_SPECS, build_gateway
+    gw = build_gateway(tmp_path)
+    assert "search.web" in TOOL_SPECS and gw.handlers["search.web"].level == "READ_ONLY"
+    assert gw.brings_outside_content("search.web")           # the run may then only read
+    text = (shipped_data() / "agents" / "researcher" / "AGENT.md").read_text()
+    assert "search.web" in text.split("---")[1] and "do not stop to ask" in text

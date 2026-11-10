@@ -2237,7 +2237,8 @@ async function answer(approve) {
   setState("thinking");
   try { const r = await settle(await apiJson("/api/confirm", { id: item.id, approve, choices }));
     if (r.retry) { setState("idle"); caption(r.error); confirmQ.unshift(item); nextConfirm(); return; }
-    const msg = !approve ? "Understood. I won't." : r.done ? "Done." : "That didn't go through: " + fmt((r.result || r).error || "unknown error");
+    // A finished action may say what really happened (a mission that ran but PAUSED is not "Done.").
+    const msg = !approve ? "Understood. I won't." : r.done ? ((r.result && r.result.say) || "Done.") : "That didn't go through: " + fmt((r.result || r).error || "unknown error");
     logLine("sys", (approve ? "Confirmed: " : "Declined: ") + item.tool);
     if (r.result) renderCard({ tool: item.tool, data: r.result });
     loadNodes();
