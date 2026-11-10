@@ -92,9 +92,19 @@ def dashboard(home: Path | None = None, on: dt.date | None = None) -> dict[str, 
                 add("ORANGE", f"governor: {f['check']} {f['subject']}: {f['detail']}"[:300])
 
     for b in build_state(home):
-        if b["status"] != "done":
-            add("RED" if b.get("critical") else "YELLOW",
-                f"build: {b['item']} [{b['status']}]")
+        if b["status"] == "done":
+            continue
+        # The owner may defer a checklist item to a date (2026-11-09: compliance moved to the
+        # next year). Until then it is a note, not a red; on that date it turns red again by
+        # itself, so a deferral can never quietly become "forgotten".
+        until = b.get("deferred_until")
+        until = until if isinstance(until, dt.date) else (
+            dt.date.fromisoformat(str(until)) if until else None)
+        if until and on < until:
+            add("YELLOW", f"build: {b['item']} [{b['status']}, deferred by the owner until "
+                          f"{until.isoformat()}]")
+            continue
+        add("RED" if b.get("critical") else "YELLOW", f"build: {b['item']} [{b['status']}]")
 
     order = ["BLACK", "RED", "ORANGE", "YELLOW", "GREEN"]
     items.sort(key=lambda i: order.index(i["color"]))
