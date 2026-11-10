@@ -27,7 +27,7 @@ NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*(API_KEY[A-Z0-9_]*|_KEY|_TOKEN|_SECRET|_C
                      r"|_KEY_ID)$")
 NEVER = ("BAU_", "LD_", "PYTHON")
 PLATFORMS = ("TIKTOK_", "YOUTUBE_", "INSTAGRAM_", "FACEBOOK_", "META_", "PINTEREST_",
-             "TWITTER_", "X_", "LINKEDIN_", "AYRSHARE_")
+             "TWITTER_", "X_", "LINKEDIN_", "AYRSHARE_", "FANVUE_")
 
 
 class KeyFileError(ValueError):
@@ -130,6 +130,24 @@ def import_file(path: Path, passphrase: str, etc: Path = ETC, audit: Any = None,
     return {"written": written,
             "next": "delete the key file from the USB stick; then log out and in, so "
                     "Jarvis and BAU's services see the keys"}
+
+
+def set_keys(keys: dict[str, str], etc: Path = ETC, audit: Any = None,
+             actor: str = "human:owner") -> dict[str, Any]:
+    """Keys the owner types at a terminal (`sudo bau keys set NAME ...`): the same name and
+    value checks as a key file, routed and written the same way. A Fanvue app's two keys had
+    no way in without a second computer (2026-11-10)."""
+    lines = "\n".join([HEADER, *(f"{n}={v}" for n, v in keys.items())])
+    keys = parse(lines)
+    if not keys:
+        raise KeyFileError("no key typed, so nothing was saved")
+    written = {}
+    for fname, group in sorted(route(keys).items()):
+        merge(Path(etc) / fname, group)
+        written[fname] = sorted(group)
+    if audit is not None:
+        audit.append("keys.set", actor, {"names": written})
+    return {"written": written}
 
 
 def names(etc: Path = ETC) -> dict[str, list[str]]:

@@ -68,6 +68,13 @@ STEPS = (
          "The autopilot: every 30 minutes Jarvis scans GitHub, inspects what he finds and "
          "votes on what to add, and asks you only about money, posting and legal. A "
          "terminal opens; type your password."),
+    Step("fanvue_app", "Make your Fanvue app (once)",
+         "The money starts on Fanvue, and Jarvis can't reach it yet. On fanvue.com, open the "
+         "Developer Area and create an app; on its Authentication tab add the redirect "
+         "http://127.0.0.1:3456/callback and turn on read:self, read:media, write:media, "
+         "write:creator, write:post and read:insights. Then press Accept: a terminal asks for "
+         "the app's Client ID and Client Secret (not shown as you paste), then Fanvue opens: "
+         "sign in and press Allow."),
     Step("fanvue", "Connect Fanvue",
          "So Jarvis can put Aria's pictures on Fanvue (each one only after your Accept) and "
          "count what she earns. Fanvue opens in the browser: sign in and press Allow."),
@@ -76,6 +83,15 @@ STEPS = (
          "to your number a day, to the audience you pick. Every check (age, AI label, no "
          "minors) still runs on each post, and HOLD stops it. Not now keeps your Accept on "
          "every post. Turn it off any time: bau fanvue autopost off"),
+    Step("automaton", "Start the automaton: make money or die",
+         "Jarvis runs the Fanvue loop by himself: draws, captions, posts and counts the money, "
+         "without asking you each time. Your numbers: how many days it gets to earn something, "
+         "dollars it may spend, the share of what it really earns it may spend too (and the "
+         "most), and how much it must earn before it asks to post more. Every content check "
+         "still runs; HOLD or bau automaton stop ends it."),
+    Step("grow", "It earned money: grow it",
+         "The automaton has earned what you set. More posts a day of what is working? Type "
+         "the new number; Not now keeps it as it is."),
     Step("boundaries", "Write your explicit limits",
          "What the explicit (Fanvue-only) content must never show, one limit per line. A "
          "safe starting list is filled in: change it, then Accept. Until then, Jarvis plans "
@@ -186,6 +202,23 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         return probe("update") == "auto"
     if step == "autopilot":
         return bool(probe("autopilot"))
+    if step == "fanvue_app":              # the money loop's first link (found 2026-11-10)
+        from . import fanvue
+        if _profile(home) is None:
+            return None
+        try:
+            fanvue.app_credentials()
+        except fanvue.FanvueError:
+            return False
+        return None                       # keys are here: the Connect Fanvue card takes over
+    if step in ("automaton", "grow"):     # after Fanvue is connected and autopost is chosen
+        from . import automaton, fanvue
+        if (fanvue.TokenStore(home).load() is None
+                or not (fanvue.autopost_choice(home) or {}).get("on")):
+            return None
+        if step == "automaton":
+            return bool(automaton.load(home).get("started_at"))
+        return None if not automaton.status(home).get("grow_ready") else False
     if step == "fanvue":                  # only once the app's keys are on this computer
         from . import fanvue
         try:
@@ -247,6 +280,8 @@ def _command(step: str, home: Path) -> str:
     q = shlex.quote
     if step == "fanvue":
         return "bau fanvue login"
+    if step == "fanvue_app":
+        return "sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET && bau fanvue login"
     if step == "nvidia":
         return "sudo bau-gpu-setup"
     if step == "pictures":
@@ -325,6 +360,22 @@ def form(step: str) -> dict[str, object] | None:
                    "options": [[k, v] for k, v in AUDIENCES.items()]}),
             _fill({"name": "per_day", "type": "number", "min": 1, "max": MAX_PER_DAY,
                    "label": f"Posts a day (1 to {MAX_PER_DAY})"})]}
+    if step == "automaton":               # the owner's own numbers: no suggestions
+        return {"fields": [
+            {"name": "days", "type": "number", "min": 1, "max": 365,
+             "label": "Days it gets to earn something, or it dies"},
+            {"name": "budget", "type": "number", "min": 0,
+             "label": "Dollars it may spend from its start (0: free tools only)"},
+            {"name": "reinvest", "type": "number", "min": 0, "max": 100,
+             "label": "Percent of what it really earns it may spend too"},
+            {"name": "cap", "type": "number", "min": 0,
+             "label": "Most dollars of its earnings it may spend"},
+            {"name": "grow_at", "type": "number", "min": 0,
+             "label": "Dollars earned before it asks to post more (0: never)"}]}
+    if step == "grow":
+        from .fanvue import MAX_PER_DAY
+        return {"fields": [{"name": "per_day", "type": "number", "min": 1,
+                            "max": MAX_PER_DAY, "label": f"Posts a day (up to {MAX_PER_DAY})"}]}
     if step == "boundaries":
         return {"fields": [_fill({"name": "limits", "type": "text",
                                   "label": "Your explicit limits, one per line"})]}
@@ -378,6 +429,23 @@ def run(step: str, home: Path, probe: Probe | None = None,
             return {"error": str(e)}
         return {"done": True, "said": f"Autopost on: up to {rec['per_day']} a day to "
                                       f"{fanvue.AUDIENCES[rec['audience']].lower()}."}
+    if step in ("automaton", "grow"):
+        from . import automaton, fanvue
+        v = values or {}
+        try:
+            if step == "grow":
+                s = automaton.grow(home, owner, int(float(v.get("per_day", 0))))
+                return {"done": True, "said": f"Growing: {s['per_day']} posts a day now."}
+            choice = fanvue.autopost_choice(home) or {}
+            s = automaton.start(home, owner, str(choice.get("audience", "")),
+                                int(choice.get("per_day", 0)), float(v["budget"]),
+                                int(float(v["days"])), reinvest_pct=float(v["reinvest"]),
+                                reinvest_cap_usd=float(v["cap"]),
+                                grow_at_usd=float(v["grow_at"]))
+        except (KeyError, ValueError, TypeError, PermissionError) as e:
+            return {"error": f"fill in every box: {e}" if isinstance(e, KeyError) else str(e)}
+        return {"done": True, "said": f"The automaton is running: {s['die_after_days']} days "
+                                      "to earn something. Tier: " + s["tier"] + "."}
     if step in ("prices", "boundaries"):
         from . import virtual_creator as V
         prof, values = _profile(home), values or {}

@@ -75,9 +75,10 @@ Fanvue gives out no API keys. Every app signs in through Fanvue's own Allow page
 
    Not known yet: Fanvue's pages do not say whether they accept a `127.0.0.1` address. If
    the Authentication tab refuses it, tell me what it says.
-2. Put the app's Client ID and Client Secret into your keys file on your other computer as
-   `FANVUE_CLIENT_ID` and `FANVUE_CLIENT_SECRET`, then bring them in with
-   `bau keys import` (docs/KEYS.md). Never paste them into a chat.
+2. Jarvis shows a **Make your Fanvue app** card: press Accept and a terminal asks for the
+   app's Client ID and Client Secret (nothing shows as you paste). Or in a terminal:
+   `sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET`. From another computer,
+   `bau keys import` works too (docs/KEYS.md). Never paste them into a chat.
 3. Jarvis then shows a **Connect Fanvue** card. Press Accept: a terminal opens, then Fanvue
    opens in the browser. Sign in and press **Allow**. Or, in a terminal:
 

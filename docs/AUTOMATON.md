@@ -22,6 +22,22 @@ Every 30 minutes the autopilot:
 - **Time:** it must earn something every 30 days (`--days`). Each payment resets the clock.
   No income for 30 days and it dies.
 
+## Its means: earnings it may spend, tiers, growing
+
+Your ask (2026-11-10), after reading the open-source Conway Automaton (MIT): give it a
+fighting chance, the safe way.
+
+- **Earnings it may spend:** `--reinvest 50 --cap 20` lets it also spend half of what it
+  has really earned, up to $20. Only money that is in the ledger counts.
+- **Survival tiers** (from its own numbers, like Conway's): **normal** (money left: paid
+  models may help), **low_compute** (no money left: this computer's models only),
+  **critical** (7 days or fewer left to earn), **dead**.
+- **Growing:** with `--grow-at 100`, once it has earned $100 a card asks you to raise its
+  posts a day (then again at twice as much). Your Accept, never its own.
+
+What it does not do, unlike Conway's: hold its own crypto wallet, copy itself, or edit its
+own code. Your rules say money and changes are approved by a human.
+
 Dying puts BAU on HOLD (only read-only actions run), switches autopost off and shows
 "automaton died" in red with the reason. Only you revive it.
 
@@ -33,8 +49,15 @@ to people who never signed up.
 
 ## Before it can earn
 
-1. The pictures must work (the NVIDIA CUDA library, see `docs/PICTURES.md`).
-2. Fanvue must be connected once: `bau fanvue login` (see `docs/FANVUE.md`).
+Jarvis shows these as cards, one after the other; press Accept on each:
+
+1. **Make your Fanvue app (once)**: the card says what to click on Fanvue, then a terminal
+   asks for the app's two keys (`sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET`)
+   and logs in (see `docs/FANVUE.md`).
+2. **Let Jarvis post to Fanvue on his own**: your audience and number a day.
+3. **Start the automaton**: your days, budget, reinvest share, cap and grow-at.
+
+The pictures must work too (the NVIDIA CUDA library, see `docs/PICTURES.md`).
 
 ## Commands
 
@@ -42,6 +65,8 @@ to people who never signed up.
 bau automaton start --audience subscribers --per-day 3   # you, at a terminal
 bau automaton status                                     # day, earned, spent, days left
 bau automaton stop                                       # you
+bau automaton start --audience subscribers --per-day 3 --reinvest 50 --cap 20 --grow-at 100
+bau automaton grow --per-day 5                           # you, once it has earned grow-at
 ```
 
 `--audience` and `--per-day` have no default: they are yours to choose. `--budget` is 0 and

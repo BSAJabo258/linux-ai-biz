@@ -240,3 +240,15 @@ def test_no_passphrase_is_a_plain_message_not_a_traceback(monkeypatch, tmp_path)
     with pytest.raises(SystemExit, match="no passphrase given, so nothing was imported"):
         cli_ext.cmd_keys(a)
     assert not (tmp_path / "etc").exists()
+
+
+def test_keys_typed_at_a_terminal_land_where_fanvue_reads_them(tmp_path):
+    # FANVUE_ keys went to models.env, but Fanvue reads platforms.env (found 2026-11-10).
+    out = K.set_keys({"FANVUE_CLIENT_ID": "abc123", "FANVUE_CLIENT_SECRET": "s3cr3t"},
+                     tmp_path)
+    assert out["written"] == {"platforms.env": ["FANVUE_CLIENT_ID", "FANVUE_CLIENT_SECRET"]}
+    assert "FANVUE_CLIENT_SECRET=s3cr3t" in (tmp_path / "platforms.env").read_text()
+    with pytest.raises(K.KeyFileError):
+        K.set_keys({"BAU_HOME": "x"}, tmp_path)
+    with pytest.raises(K.KeyFileError):
+        K.set_keys({"FANVUE_CLIENT_ID": ""}, tmp_path)
