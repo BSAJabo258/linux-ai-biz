@@ -158,9 +158,15 @@ OUTSIDE_CONTENT = {"web_search", "read_page", "find_tools"}
 # Where a menu line ends: the first sentence ("e.g. the creator" is not a sentence end).
 SENTENCE_END = re.compile(r"(?<![.\s][a-z])\.\s+(?=[A-Z])")
 # Small models often announce a lookup ("Let me search...") and stop without doing it.
-ANNOUNCED = re.compile(r"\b(let me|i'll|i will|i am going to|i'm going to)\b[^.?!]{0,60}"
-                       r"\b(search|look|check|find|ask|use|see)\b", re.I)
-NUDGE = "(Go ahead: call the tool now instead of saying you will.)"
+# Saying work instead of doing it. The real-model check (2026-11-10, qwen3.5-9b) caught "I will
+# draft seven SFW Instagram posts ... Should I proceed?" with no tool called: the verbs only
+# covered looking things up, not making things. Nudging is safe: posting and money tools only
+# stage a card for the owner.
+ANNOUNCED = re.compile(r"\b(let me|i'll|i will|i am going to|i'm going to|i can)\b[^.?!]{0,60}"
+                       r"\b(search|look|check|find|ask|use|see|draft|plan|write|create|make|"
+                       r"prepare|stage|queue|schedule|save|list|pull|get|run|build)\b", re.I)
+NUDGE = ("(Go ahead: call the tool now instead of saying you will. If none of your tools does "
+         "this, say plainly that you cannot do it yet.)")
 # "Remember that ..." from the owner: saved first, then the model only confirms. A small model
 # asked to remember searched instead and said it had saved it (real-model check 2026-11-01).
 REMEMBER_CMD = re.compile(r"^\W*(?:please\W+|jarvis\W+|hey jarvis\W+)*remember\W+(?:that\W+)?"
@@ -490,7 +496,8 @@ class Assistant:
                  "validated profile. Returns identity-locked sfw visual prompts and caption "
                  "briefs; does not generate media or publish. Explicit adult batches are the "
                  "owner's own command (bau creator batch --tier explicit), never this tool. "
-                 "Pass the profile id, theme, platform and optional post count.",
+                 "Pass the theme and platform (and an optional post count); leave out the "
+                 "creator when there is one profile: it is used by itself.",
                  _schema({"creator": {"type": "string"}, "theme": {"type": "string"},
                           "platform": {"type": "string",
                                        "enum": ["instagram", "tiktok", "fanvue"]},
