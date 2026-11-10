@@ -2,8 +2,9 @@
 Description=Run the BAU autopilot every 30 minutes
 
 [Timer]
-OnBootSec=10min
-OnUnitActiveSec=30min
+# On the clock, not "30 min after the last run": after a reboot (2026-11-10) that kind of
+# timer showed no next run and the autopilot stopped without a word.
+OnCalendar=*:0/30
 RandomizedDelaySec=120
 Persistent=true
 

@@ -2,8 +2,9 @@
 Description=Run the BAU Governor every 10 minutes
 
 [Timer]
-OnBootSec=3min
-OnUnitActiveSec=10min
+# On the clock, not "10 min after the last run": after a reboot (2026-11-10) that kind of
+# timer showed no next run and the Governor stopped for hours without a word.
+OnCalendar=*:0/10
 RandomizedDelaySec=60
 Persistent=true
 
