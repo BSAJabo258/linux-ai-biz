@@ -330,3 +330,31 @@ def test_a_toolbox_card_with_missing_fields_does_not_break():
     page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
             ).read_text(encoding="utf-8")
     assert 'h = Object.assign({ name: "", repo: "", sources: [], evidence: ""' in page
+
+
+def test_e8_folds_into_two_600_cells_by_the_golden_ratio():
+    # The stances are one blueprint: E8's 240 roots, projected by H4, are two 600-cells
+    # (120 vertices each, 12 neighbours per vertex) whose sizes differ by exactly φ.
+    import json
+    import math
+    import re
+    from itertools import combinations, product
+    page = _page()
+    h4 = json.loads(re.search(r"const H4 = (\[\[.*?\]\]);", page).group(1))
+    roots = []
+    for i, j in combinations(range(8), 2):
+        for a, b in product((1, -1), repeat=2):
+            r = [0] * 8
+            r[i], r[j] = a, b
+            roots.append(r)
+    roots += [list(s) for s in product((0.5, -0.5), repeat=8) if sum(x < 0 for x in s) % 2 == 0]
+    pts = [[sum(x * y for x, y in zip(r, b, strict=True)) for b in h4] for r in roots]
+    norms = [math.sqrt(sum(x * x for x in p)) for p in pts]
+    small = min(norms)
+    inner = [p for p, n in zip(pts, norms, strict=True) if n < small * 1.1]
+    assert len(inner) == 120
+    assert abs(max(norms) / small - (1 + math.sqrt(5)) / 2) < 1e-6
+    edge = min(math.dist(a, b) for a, b in combinations(inner, 2))
+    assert {sum(abs(math.dist(a, b) - edge) < 1e-6 for b in inner) for a in inner} == {12}
+    assert "const CHAIN = [4, 3, 1, 10, 2, 0, 8, 5, 6, 7, 9];" in page
+    assert "BRIDGE[SAC.stance]" in page

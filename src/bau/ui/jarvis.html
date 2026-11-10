@@ -738,7 +738,7 @@ function fifthPaint(now, dt, N) {
   F.ema += (dt - F.ema) * 0.05;
   if (now - F.checkAt > 3000) { F.checkAt = now;
     if (F.ema > 60 && F.scale > 0.3) { F.scale *= 0.75; fifthResize(); }
-    else if (F.ema > 60) { F.lost = true; F.cv.style.display = "none"; } }    // too slow here: 2D only
+    else if (F.ema > 140) { F.lost = true; F.cv.style.display = "none"; } }   // only if truly too slow: 2D only
 }
 // ---------------------------------------------------------------- the tapestry (sacred geometry)
 // The owner's ask (2026-11-09): the screen as a psychedelic, esoteric tapestry - geometry as
@@ -779,10 +779,31 @@ const STANCES = [
 ];
 const FIELD_N = [6, 5, 4, 5, 8, 7, 5, 3, 5, 6, 6];
 const HERMETIC = ["MENTALISM", "CORRESPONDENCE", "VIBRATION", "POLARITY", "RHYTHM", "CAUSE & EFFECT", "GENDER"];
-const STANCE_PRINCIPLE = [0, 1, 3, 4, 1, 2, 3, 4, 2, 1, 5];   // the Hermetic principle each stance shows most               // the dimensions of the wave behind each stance
+const STANCE_PRINCIPLE = [0, 1, 3, 4, 1, 2, 3, 4, 2, 1, 5];   // the Hermetic principle each stance shows most
+// One blueprint, each stance turning into the next (checked mathematics, not decoration):
+const CHAIN = [4, 3, 1, 10, 2, 0, 8, 5, 6, 7, 9];
+const BRIDGE = {
+  4: "fold E8 by the golden ratio: two 600-cells, one φ times the other",
+  3: "the 12 neighbours of any vertex form an icosahedron",
+  1: "the icosahedron breathes: Fuller's jitterbug",
+  10: "the octahedron's twin is the cube; its 4D parent is the tesseract",
+  2: "seen down its diagonal, the cube is a hexagon: Metatron's Cube",
+  0: "the hexagonal lattice is a cut through a higher lattice: cut 5D",
+  8: "a standing wave in five dimensions casts its shadow on a plate",
+  5: "the same standing-wave equation holds the electron in the atom",
+  6: "light and magnetism knot along the circles of the Hopf fibration",
+  7: "repeat one rule at every scale: as above, so below",
+  9: "and back to the top: eight dimensions, E8",
+};
+// E8 → H4: the Coxeter eigenplanes for exponents 1 and 11. The first plane alone is the E8
+// mandala (8 rings of 30); all four together fold E8's 240 roots into two 600-cells whose
+// sizes differ by exactly φ.
+const H4 = [[-0, 0.119117702, 0.192736491, 0.217638872, 0.192736491, 0.119117702, 0, 0.921933055], [0.096899069, 0.46350566, 0.236930326, 0, -0.236930326, -0.46350566, -0.669823572, 0], [-0, -0.352147092, -0.569785963, 0.073618789, -0.569785963, -0.352147092, 0, 0.311854193], [0.700435986, -0.383361321, 0.286462252, 0, -0.286462252, 0.383361321, -0.226575334, 0]];
 const E8_U = [0, 0.119117702, 0.192736491, 0.217638872, 0.192736491, 0.119117702, 0, 0.921933055];
 const E8_W = [0.096899069, 0.46350566, 0.236930326, 0, -0.236930326, -0.46350566, -0.669823572, 0];
-SAC.stance = STANCES.length - 1; SAC.w = STANCES.map((_, i) => i === SAC.stance ? 1 : 0.1);
+SAC.stance = 8; SAC.chainI = CHAIN.indexOf(8); SAC.vf = -1; SAC.w = STANCES.map((_, i) => i === SAC.stance ? 1 : 0.1);
+function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+function easeAngle(a, target, s) { const d = (((target - a) % 6.2832) + 9.4248) % 6.2832 - 3.1416; return a + d * s; }
 function sacSprite(size) { const c = document.createElement("canvas"); c.width = c.height = Math.max(2, Math.ceil(size)); return c; }
 function hsl2rgb(h, s, l) {
   const k = (n) => (n + h * 12) % 12, a = s * Math.min(l, 1 - l);
@@ -817,15 +838,6 @@ const PLATONIC = (() => {
 })();
 const TESSERACT = (() => { const V = []; for (let i = 0; i < 16; i++) V.push([0, 1, 2, 3].map(b => (i >> b & 1) ? 1 : -1));
   return { V, E: edgesAt(V, 2, 1e-6) }; })();
-const CELL600 = (() => {                                   // the 600-cell (all 120 vertices, edge 1/φ)
-  const V = signs([0.5, 0.5, 0.5, 0.5]);
-  for (let i = 0; i < 4; i++) for (const s of [1, -1]) { const v = [0, 0, 0, 0]; v[i] = s; V.push(v); }
-  const even = [[0, 1, 2, 3], [0, 2, 3, 1], [0, 3, 1, 2], [1, 0, 3, 2], [1, 2, 0, 3], [1, 3, 2, 0],
-    [2, 0, 1, 3], [2, 1, 3, 0], [2, 3, 0, 1], [3, 0, 2, 1], [3, 1, 0, 2], [3, 2, 1, 0]];
-  for (const b of signs([PHI / 2, 0.5, 1 / (2 * PHI)])) for (const p of even) {
-    const src = [b[0], b[1], b[2], 0], v = [0, 0, 0, 0]; for (let k = 0; k < 4; k++) v[p[k]] = src[k]; V.push(v); }
-  return { V, E: edgesAt(V, 1 / PHI, 1e-6) };
-})();
 const JITTER = (() => {                                     // Fuller's jitterbug: (0, ±1, ±t) cycled, t breathing
   const at = (t) => cyc(signs([0, 1, t]).filter(v => v.length === 3)), ico = at(PHI);
   return { at, E: edgesAt(ico, minEdge(ico), 1e-6) };
@@ -838,9 +850,21 @@ const E8 = (() => { const V = [];
     if (neg % 2 === 0) V.push(v); }
   const E = []; for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
     let d = 0; for (let k = 0; k < 8; k++) d += V[i][k] * V[j][k]; if (Math.abs(d - 1) < 1e-9) E.push([i, j]); }
+  const Q = V.map(v => H4.map(b => v.reduce((s, x, k) => s + x * b[k], 0)));
+  const nq = Q.map(q => Math.hypot(...q)), rin = Math.min(...nq), inner = nq.map(n => n < rin * 1.1);
   return { P: V.map(v => [v.reduce((s, x, k) => s + x * E8_U[k], 0), v.reduce((s, x, k) => s + x * E8_W[k], 0)]),
-    R: V.map(v => Math.hypot(v.reduce((s, x, k) => s + x * E8_U[k], 0), v.reduce((s, x, k) => s + x * E8_W[k], 0))), E };
+    R: V.map(v => Math.hypot(v.reduce((s, x, k) => s + x * E8_U[k], 0), v.reduce((s, x, k) => s + x * E8_W[k], 0))), E,
+    Q, inner, scale: Math.max(...nq), Ein: E.filter(([i, j]) => inner[i] && inner[j]),
+    Eout: E.filter(([i, j]) => !(inner[i] && inner[j])) };
 })();
+const CELL600 = (() => {                                    // E8's inner shell: the 600-cell, 120 vertices on φ
+  const V = E8.Q.filter((_, i) => E8.inner[i]), E = edgesAt(V, minEdge(V), 1e-4);
+  const nb = V.map(() => []); for (const [i, j] of E) { nb[i].push(j); nb[j].push(i); }
+  return { V, E, nb };
+})();
+function view4(q, th, spin) { let [x, y, z, w] = q;          // turn out of the E8 mandala's plane, orthographic
+  [x, z] = rot(x, z, th); [y, w] = rot(y, w, th * 0.8); [x, y] = rot(x, y, spin); [z, w] = rot(z, w, spin * 1.3);
+  return [x, y, z]; }
 // ---- projections: 4D → 3D → screen
 function rot(a, b, t) { const c = Math.cos(t), s = Math.sin(t); return [a * c - b * s, a * s + b * c]; }
 function turn3(v, ay, ax) { let [x, y, z] = v; [x, z] = rot(x, z, ay); [y, z] = rot(y, z, ax); return [x, y, z]; }
@@ -944,8 +968,12 @@ function drawPlatonic(g, X, Y, S, t, w, light) {
     const P = s.V.map(v => toScreen(turn3(v, ay, ax), X, Y, S));
     strokeEdges(g, P, s.E, light, (near) => (s.hue + near * 40 + t * 6) % 360, w, 1.2 + w * 1.2); });
 }
-function draw4(g, poly, X, Y, S, t, w, light, hue0, width) {
-  const P = poly.V.map(v => { const p = from4(v, t); return toScreen(turn3(p, t * 0.11, 0.5), X, Y, S); });
+function draw4(g, poly, X, Y, S, t, w, light, hue0, width, settle = 0) {
+  const P = poly.V.map(v => { let [x, y, z, q] = v;            // settle: the 4D turn returns home, the cube shows its diagonal
+    [x, q] = rot(x, q, easeAngle(t * 0.7, 0, settle)); [y, q] = rot(y, q, easeAngle(t * 0.43, 0, settle));
+    [z, q] = rot(z, q, easeAngle(t * 0.29, 0, settle)); [x, y] = rot(x, y, easeAngle(t * 0.17, 0, settle));
+    const k = 2.4 / (2.4 - q * 0.9) * 0.5, p = [x * k, y * k, z * k, q];   // half size: never near the eye
+    return toScreen(turn3(p, easeAngle(t * 0.11, Math.PI / 4, settle), 0.5 + (0.6155 - 0.5) * settle), X, Y, S); });
   strokeEdges(g, P, poly.E, light, (near) => (hue0 + near * 120 + t * 10) % 360, w, width);
   if (w > 0.3) { g.fillStyle = light ? "rgba(40,20,90," + w + ")" : "rgba(255,240,200," + w * 0.9 + ")";
     for (const p of P) { g.beginPath(); g.arc(p[0], p[1], 1.2 + Math.max(0, p[2]) * 1.6, 0, 6.283); g.fill(); } }
@@ -960,7 +988,7 @@ function drawHopf(g, X, Y, S, t, w, light) {
         const x0 = f * (1 + c) * Math.cos(th), x1 = f * (a * Math.sin(th) - b * Math.cos(th)),
           x2 = f * (a * Math.cos(th) + b * Math.sin(th)), x3 = f * (1 + c) * Math.sin(th), d = 1 - x0;
         const p = [x1 / d, x2 / d, x3 / d];
-        if (Math.hypot(...p) > 5) { pen = false; continue; }
+        if (Math.hypot(...p) > 2.6) { pen = false; continue; }   // the fibre through the pole is a line to infinity
         const q = toScreen(turn3([p[0] * 0.38, p[1] * 0.38, p[2] * 0.38], t * 0.17, 0.6 + Math.sin(t * 0.1) * 0.3), X, Y, S);
         pen ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); pen = true; }
       g.strokeStyle = light ? "hsla(" + ((li * 60 + k * 9) % 360) + ",90%,35%," + w * 0.8 + ")"
@@ -981,7 +1009,8 @@ function sacPaint(now) {
   const add = light ? "source-over" : "lighter", fast = STATE === "thinking" ? 2.4 : STATE === "speaking" ? 1.6 : 1;
   // the stance steps forward in turn; thinking climbs the dimensions quickly
   const hold = STATE === "thinking" ? 6000 : STATE === "speaking" ? 11000 : 16000;
-  if (now - SAC.stanceAt > hold) { SAC.stanceAt = now; SAC.stance = (SAC.stance + 1) % STANCES.length; SAC.labelA = 0; }
+  if (now - SAC.stanceAt > hold) { SAC.stanceAt = now; SAC.chainI = (SAC.chainI + 1) % CHAIN.length;
+    SAC.stance = CHAIN[SAC.chainI]; SAC.labelA = 0; SAC.vf = -1; }
   for (let i = 0; i < SAC.w.length; i++) { const want = i === SAC.stance ? 1 : 0.1; SAC.w[i] += (want - SAC.w[i]) * 0.04; }
   const Wt = SAC.w;
   SAC.a4 += 0.016 * fast * SPEED * (1 + lv * 2 + kick * 3);       // the 4D turn, pushed by the voice
@@ -1012,7 +1041,17 @@ function sacPaint(now) {
   // the stances (each the shadow of the next), interlocked
   sacImage(g, SAC.metatron, X, Y, -t * 0.03 * fast, (0.9 + Wt[0] * 0.2) * (1 + kick * 0.04), (light ? 0.35 : 0.4) + Wt[0] * 0.55);
   const big = R * 2.35;
-  if (Wt[4] > 0.02) sacImage(g, SAC.e8, X, Y, t * 0.02 * fast, (0.7 + Wt[4] * 0.45) * (1 + kick * 0.05), Wt[4] * (light ? 0.95 : 1));
+  const tau = Math.min(1, (now - SAC.stanceAt) / hold), settle = smooth((tau - 0.62) / 0.33);
+  const spin = t * 0.02 * fast, S8 = big * 1.22 / E8.scale * (1 + kick * 0.04);
+  if (Wt[4] > 0.25) {                                       // E8 live: the mandala turns out of its plane into 4D
+    const here = SAC.stance === 4, th = here ? 1.15 * smooth(tau / 0.75) : 1.15;
+    const P = E8.Q.map(q => { const v = view4(q, th, spin); return [X + v[0] * S8, Y + v[1] * S8, v[2] / E8.scale]; });
+    strokeEdges(g, P, E8.Eout, light, (near) => (180 + near * 140 + t * 8) % 360, Wt[4] * 0.2 * (here ? 1 - settle : 1), 0.45);
+    strokeEdges(g, P, E8.Ein, light, (near) => (260 + near * 90 + t * 8) % 360, Wt[4] * 0.45, 0.7);
+    for (let i = 0; i < P.length; i++) { const a = Wt[4] * (E8.inner[i] ? 1 : (here ? 1 - settle : 1));
+      g.fillStyle = light ? "rgba(60,20,120," + a + ")" : (E8.inner[i] ? "rgba(220,200,255," : "rgba(120,230,255,") + a + ")";
+      g.beginPath(); g.arc(P[i][0], P[i][1], E8.inner[i] ? 2.2 : 1.7, 0, 6.283); g.fill(); }
+  } else if (Wt[4] > 0.02) sacImage(g, SAC.e8, X, Y, spin, 0.7 + Wt[4] * 0.45, Wt[4] * (light ? 0.95 : 1));
   if (Wt[6] > 0.02) { SAC.orbFade = Math.min(1, SAC.orbFade + 0.02);
     const os = big * 2.2 / SAC.orb.width;
     if (SAC.orbOld && SAC.orbFade < 1) sacImage(g, SAC.orbOld, X, Y, t * 0.01, os, Wt[6] * (1 - SAC.orbFade));
@@ -1029,11 +1068,22 @@ function sacPaint(now) {
     if (SAC.chlOld && SAC.chlFade < 1) sacImage(g, SAC.chlOld, X, Y, a, cs / SAC.chlOld.width, ca * (1 - SAC.chlFade) / 1.5);
     sacImage(g, SAC.chl, X, Y, a, cs / SAC.chl.width, ca * SAC.chlFade / 1.5); }
   if (Wt[1] > 0.02) drawPlatonic(g, X, Y, big * (0.75 + Wt[1] * 0.3) * (1 + kick * 0.04), t * fast, Wt[1], light);
-  if (Wt[2] > 0.02) draw4(g, TESSERACT, X, Y, big * (0.42 + Wt[2] * 0.2), SAC.a4, Wt[2], light, 170, 1.4 + Wt[2] * 1.6);
-  if (Wt[3] > 0.02) draw4(g, CELL600, X, Y, big * (0.62 + Wt[3] * 0.3), SAC.a4 * 0.6, Wt[3] * 0.9, light, 260, 0.8 + Wt[3] * 0.7);
+  if (Wt[2] > 0.02) draw4(g, TESSERACT, X, Y, big * (0.5 + Wt[2] * 0.22), SAC.a4, Wt[2], light, 170, 1.4 + Wt[2] * 1.6,
+    SAC.stance === 2 ? settle : 0);
+  if (Wt[3] > 0.02) {                                       // the 600-cell, same turn as E8; then one vertex's 12 neighbours
+    const here = SAC.stance === 3, th = 1.15 + (here ? tau * 0.9 : 0), vfs = here ? settle : 0;
+    const P = CELL600.V.map(q => { const v = view4(q, th, spin); return [X + v[0] * S8, Y + v[1] * S8, v[2] / E8.scale]; });
+    strokeEdges(g, P, CELL600.E, light, (near) => (260 + near * 120 + t * 10) % 360, Wt[3] * (1 - 0.85 * vfs), 0.8 + Wt[3] * 0.7);
+    if (vfs > 0.01) {
+      if (SAC.vf < 0) SAC.vf = P.reduce((b, p, i) => p[2] > P[b][2] ? i : b, 0);
+      const nb = CELL600.nb[SAC.vf], ring = nb.flatMap((i, a) => nb.slice(a + 1).filter(j => CELL600.nb[i].includes(j)).map(j => [i, j]));
+      g.strokeStyle = light ? "rgba(140,90,0," + vfs + ")" : "rgba(255,214,120," + vfs + ")"; g.lineWidth = 2.2;
+      for (const [i, j] of ring) { g.beginPath(); g.moveTo(P[i][0], P[i][1]); g.lineTo(P[j][0], P[j][1]); g.stroke(); }
+      g.lineWidth = 1; for (const i of nb) { g.beginPath(); g.moveTo(P[SAC.vf][0], P[SAC.vf][1]); g.lineTo(P[i][0], P[i][1]); g.stroke(); }
+    } }
   if (Wt[7] > 0.02) drawHopf(g, X, Y, big * (0.8 + Wt[7] * 0.3), t * fast, Wt[7], light);
   if (Wt[10] > 0.02) {                                     // the jitterbug, with the 12 vectors from the centre
-    const k = 0.5 - 0.5 * Math.cos(t * 0.5 * fast + kick), tt = 0.06 + (PHI - 0.06) * k, V = JITTER.at(tt);
+    const k = 0.5 + 0.5 * Math.cos((now - SAC.stanceAt) * 0.0005 * fast + kick), tt = 0.06 + (PHI - 0.06) * k, V = JITTER.at(tt);
     const rmax = Math.max(...V.map(v => Math.hypot(...v))), S2 = big * (0.75 + Wt[10] * 0.25);
     const P = V.map(v => toScreen(turn3(v.map(x => x / rmax), t * 0.2, 0.55), X, Y, S2));
     strokeEdges(g, P, JITTER.E, light, (near) => (40 + near * 60 + t * 8) % 360, Wt[10], 1.4 + Wt[10] * 1.4);
@@ -1087,9 +1137,12 @@ function sacPaint(now) {
   g.fillText(line, X, ly + 17);
   if (glOn) { g.font = "11px Rajdhani, system-ui, sans-serif"; g.fillStyle = light ? "rgba(40,60,80,.6)" : "rgba(200,220,255,.55)";
     g.fillText("field: a " + FIELD_N[SAC.stance] + "-dimensional standing wave · slice " + FIFTH.phase.toFixed(2), X, ly + 31); }
-  const dots = STANCES.length, dx = 12;                     // where in the ladder we stand
-  for (let i = 0; i < dots; i++) { g.beginPath(); g.arc(X + (i - (dots - 1) / 2) * dx, ly + (glOn ? 44 : 32), i === SAC.stance ? 3 : 1.6, 0, 6.283);
-    g.fillStyle = light ? "rgba(70,30,140," + (i === SAC.stance ? 0.9 : 0.35) + ")" : "rgba(255,226,160," + (i === SAC.stance ? 0.95 : 0.35) + ")"; g.fill(); }
+  const by = ly + (glOn ? 45 : 31), ba = smooth((tau - 0.55) / 0.2);   // the bridge: how this becomes the next
+  if (ba > 0.01) { g.globalAlpha = SAC.labelA * ba; g.font = "italic 12px Rajdhani, system-ui, sans-serif";
+    g.fillStyle = light ? "rgba(120,70,0,.95)" : "rgba(255,214,120,.95)"; g.fillText("↳ " + BRIDGE[SAC.stance], X, by); g.globalAlpha = SAC.labelA; }
+  const dots = CHAIN.length, dx = 12;                        // where on the chain we stand
+  for (let i = 0; i < dots; i++) { const on = i === SAC.chainI; g.beginPath(); g.arc(X + (i - (dots - 1) / 2) * dx, by + 14, on ? 3 : 1.6, 0, 6.283);
+    g.fillStyle = light ? "rgba(70,30,140," + (on ? 0.9 : 0.35) + ")" : "rgba(255,226,160," + (on ? 0.95 : 0.35) + ")"; g.fill(); }
   g.restore();
 }
 function sacFrame(now) {
