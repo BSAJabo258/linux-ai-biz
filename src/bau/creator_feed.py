@@ -123,9 +123,12 @@ def make_post(home: Path, task: dict[str, Any], draw: Any = None,
         price = round(float(prof["prices"]["nude" if level == 2 else "xxx"]) * 100)
     pic = (draw or comfy.draw)(home, comfy.creator_prompt(prof, scene, d["shot"]), name,
                                negative=negative, lane="explicit" if level >= 2 else "sfw")
+    from .automaton import running
+    auto = running(home)                         # the automaton: no Accept card, it posts
     item = Queue(home).add(pic["file"], caption(home, prof, d["theme"], factory), level,
-                           "autopilot", review=True, price_cents=price)
-    return {"ok": True, "evidence": f"waiting for the owner: {item['item_id']} ({pic['file']})"}
+                           "autopilot", review=not auto, price_cents=price)
+    return {"ok": True, "evidence": ("queued for posting" if auto else "waiting for the owner")
+            + f": {item['item_id']} ({pic['file']})"}
 
 
 def _limit_words(limits: list[str]) -> list[str]:

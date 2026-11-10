@@ -84,6 +84,15 @@ def dashboard(home: Path | None = None, on: dt.date | None = None) -> dict[str, 
     if held:
         add("BLACK", f"governor: BAU is on HOLD ({held}) - only read-only actions run; "
                      "`bau governor release` after you have looked")
+    from .automaton import status as automaton_status
+    am = automaton_status(home)
+    if am.get("dead"):
+        add("RED", f"automaton died ({am['dead']['at'][:10]}): {am['dead']['why']}")
+    elif am.get("on"):
+        add("GREEN" if am["income_usd"] > 0 else "YELLOW",
+            f"automaton day {am['day']}: earned ${am['income_usd']:.2f}, spent "
+            f"${am['spent_usd']:.2f} of ${am['budget_usd']:.2f}, "
+            f"{am['days_left_to_earn']} days left to earn")
     gov_dir = home / "governor"
     if (gov_dir / "findings.jsonl").exists():
         for f in Governor(home, audit=AuditLog(home / "audit" / "chain.jsonl")
