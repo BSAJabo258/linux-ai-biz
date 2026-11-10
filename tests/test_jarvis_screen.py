@@ -358,3 +358,14 @@ def test_e8_folds_into_two_600_cells_by_the_golden_ratio():
     assert {sum(abs(math.dist(a, b) - edge) < 1e-6 for b in inner) for a in inner} == {12}
     assert "const CHAIN = [4, 3, 1, 10, 2, 0, 8, 5, 6, 7, 9];" in page
     assert "BRIDGE[SAC.stance]" in page
+
+
+def test_a_mic_that_sends_no_sound_is_named_not_blamed_on_the_owner():
+    # The owner's desktop, 2026-11-10: the fifine USB mic was unplugged, the empty front jack
+    # sent a flat DC line at +30 dB, Whisper heard nothing and Jarvis said "Didn't catch that."
+    page = _page()
+    assert "const MIC_SILENT = 6;" in page and "Your microphone sends no sound." in page
+    assert 'micMeasured && micSwing < MIC_SILENT ? NO_SOUND : "Didn\'t catch that."' in page
+    # a paused audio engine reads nothing, so it can never raise a false "no sound"
+    assert 'if (!actx || actx.state !== "running") return;' in page
+    assert "measureMic(); } } catch (e) {}" in page and "clearInterval(swingTimer)" in page

@@ -23,7 +23,15 @@ if [ -r "${HERE}/lib/laptop-evidence.sh" ]; then . "${HERE}/lib/laptop-evidence.
 # Every command may be missing or refused; the check carries on either way.
 run() {
   echo "### $*"
-  if have "$1"; then "$@" 2>&1 || true; else echo "(not available)"; fi
+  # A hardware probe can hang: vulkaninfo did, 2026-11-10, while the card was busy with
+  # ComfyUI and the Jarvis screen. Each probe gets 20 s, then the check moves on.
+  local rc=0
+  if have "$1"; then
+    timeout 20 "$@" 2>&1 || rc=$?
+    if [[ ${rc} -eq 124 ]]; then echo "(no answer in 20 s)"; fi
+  else
+    echo "(not available)"
+  fi
   echo
 }
 
@@ -144,7 +152,7 @@ graphics() {
       }'
   fi
   if have nvidia-smi; then
-    nvidia-smi --query-gpu=name,memory.total,driver_version,compute_cap \
+    timeout 20 nvidia-smi --query-gpu=name,memory.total,driver_version,compute_cap \
       --format=csv,noheader 2>/dev/null | sed 's/^/  nvidia-smi: /'
     found=1
   fi
