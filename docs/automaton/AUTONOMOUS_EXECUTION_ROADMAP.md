@@ -23,8 +23,15 @@ it reaches L2, and nothing is called "working" until L3 (see `CURRENT_STATE.md`)
 2. Gap 2: keep each real-model check result as JSON under `BAU_HOME/reports/`, add the
    "claimed but not backed" check to Jarvis turns (reuse `supervisor.unchecked`).
 3. Gap 4: one retry with a recorded cause for failed autopilot tasks; resume INTERRUPTED jobs.
-4. Gap 3: wire `plan_mission` -> owner approval -> executive controller -> agents through the
-   gateway, with checkpoints; add `run` to `bau mission`.
+4. Gap 3, **first part done (2026-11-10):** a READY research mission runs (`bau mission run
+   ID` at a terminal, or Jarvis's `run_mission` card on the owner's Accept): the researcher
+   agent works it through the gateway, evidence is saved, and it counts as COMPLETED only
+   when its answer holds at least one fact found by its tools and none they do not back;
+   otherwise PAUSED with the reason. Proof on the real model: a precise mission ended
+   STEP_LIMIT (PAUSED), a vague one that only found its own title PAUSED. Still open: other
+   mission types (no agent carries them out), several agents on one mission (the executive
+   controller), single-digit claims ("8 tools") are not checked, and the researcher has no
+   web search.
 5. Gap 5: call `models/router.route` from `pick_model`, record the reason per turn.
 
 ## Owner steps (not engineering)

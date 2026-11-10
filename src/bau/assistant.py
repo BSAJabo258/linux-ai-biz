@@ -539,6 +539,11 @@ class Assistant:
             Tool("hold_everything", "Put BAU on HOLD: only read-only actions run until the "
                  "owner releases it. Use when the owner asks to stop or pause everything.",
                  _schema({"reason": {"type": "string"}}), self.t_hold, kind="act"),
+            Tool("run_mission", "Run a planned mission that is READY (see missions): its agent "
+                 "does the work through the gateway, the result is checked against what the "
+                 "tools returned, and the evidence is saved. The owner confirms on screen.",
+                 _schema({"mission_id": {"type": "string"}}, ["mission_id"]),
+                 self.t_run_mission, kind="confirm", stage=self._stage_mission),
             Tool("release_hold", "Lift a HOLD so BAU runs normally again (owner confirms "
                  "on screen).", _schema(), self.t_release, kind="confirm",
                  stage=lambda: {"summary": "Release the HOLD and let BAU run normally again?"}),
@@ -626,13 +631,49 @@ class Assistant:
                 "needs_you": [f'{r["check"]}: {r["subject"]}: {r["detail"]}'
                               for r in d["needs_you"]][:6], "counts": d["counts"]}
 
+    def _missions(self) -> Any:
+        from .jarvis import Jarvis
+        from .policy import PolicyEngine
+        from .regulations import Registry
+        return Jarvis(PolicyEngine.load(Registry.load()), home=self.home, audit=self.audit)
+
+    def _stage_mission(self, mission_id: str) -> dict[str, Any]:
+        from .jarvis import AGENT_FOR
+        m = self._missions().get(mission_id.strip())
+        if m is None:
+            raise ValueError(f"no mission {mission_id}; see missions")
+        if m.status != "READY":
+            raise ValueError(f"mission {m.mission_id} is {m.status}: {m.next_action}")
+        if m.mission_type not in AGENT_FOR:
+            raise ValueError(f"no agent carries out {m.mission_type} missions yet")
+        return {"summary": f"Run mission {m.mission_id} ({m.mission_type})?\n{m.objective}\n\n"
+                           f"The {AGENT_FOR[m.mission_type]} agent does it; it counts as done "
+                           "only if every fact in its answer is backed by what its tools found."}
+
+    def t_run_mission(self, mission_id: str) -> dict[str, Any]:
+        from .jarvis import agent_executor
+        j = self._missions()
+        m = j.get(mission_id.strip())
+        if m is None:
+            raise ValueError(f"no mission {mission_id}")
+        runner = self.clients.get("mission_runner")
+        m = j.run(m, agent_executor(self.home, self.audit, jarvis=(self.provider, self.model),
+                                    factory=self.clients.get("model_factory"),
+                                    run_agent=runner))
+        ex = m.steps.get("execute") or {}
+        return {"mission_id": m.mission_id, "status": m.status, "verified": m.steps.get("verify"),
+                "report": ex.get("report", ""), "why_not_verified": ex.get("why_not_verified"),
+                "evidence": m.evidence[-1:], "next_action": m.next_action}
+
     def t_missions(self) -> list[dict[str, Any]]:
         latest: dict[str, dict[str, Any]] = {}
         for r in JsonlStore(self.home / "jobs" / "missions.jsonl"):
             latest[r["mission_id"]] = r
         return [{"mission_id": m["mission_id"], "type": m["mission_type"],
                  "objective": m["objective"][:120], "status": m["status"],
-                 "next_action": m.get("next_action", "")} for m in latest.values()][-10:]
+                 "next_action": m.get("next_action", ""),
+                 **({"how": "run_mission (the owner confirms on screen)"}
+                    if m["status"] == "READY" else {})} for m in latest.values()][-10:]
 
     def t_publish_queue(self) -> list[dict[str, Any]]:
         return self.hub().pending()

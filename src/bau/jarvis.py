@@ -59,6 +59,55 @@ class Mission:
     next_action: str = ""
 
 
+# Mission types an approved agent folder can carry out (the audit, 2026-11-10: missions were
+# planned and never ran; `bau mission` had no run and nothing executed a plan).
+AGENT_FOR = {"research": "researcher"}
+
+
+def agent_executor(home: Path, audit: Any, jarvis: Any = None, factory: Any = None,
+                   run_agent: Any = None) -> Any:
+    """The executor for a mission an agent can do: the agent folder works the objective (every
+    tool through the gateway). Verified only when it completed with an answer and every fact in
+    that answer (links, quotes, amounts, numbers) appears in what its tools returned; anything
+    else ends PAUSED for the owner's review, never COMPLETED on the agent's word."""
+    from .supervisor import facts, unchecked
+
+    def execute(m: Mission) -> dict[str, Any]:
+        name = AGENT_FOR.get(m.mission_type)
+        if name is None:
+            raise PermissionError(f"no agent carries out {m.mission_type} missions yet")
+        if run_agent is None:
+            from . import agentfolders as AF
+            res = AF.run(name, m.objective, home, audit, jarvis=jarvis, factory=factory,
+                         mission_id=m.mission_id)
+        else:
+            res = run_agent(name, m.objective, m.mission_id)
+        loose = unchecked(res.final_text, [m.objective, *res.evidence])
+        # At least one fact the tools backed: on the real model (2026-11-10) an answer of only
+        # questions back to the owner had nothing false in it, and counted as done.
+        # Backed by what the TOOLS returned: on the real model a quoted mission title counted
+        # as found, because the task's own words were in the pool (2026-11-10).
+        def norm(t: str) -> str:
+            return "".join(t.split()).rstrip(".,;:").lower()
+        found, asked = norm(" ".join(res.evidence)), norm(m.objective)
+        backed = [f for f in facts(res.final_text)
+                  if norm(f) in found and norm(f) not in asked]
+        answered = bool((res.final_text or "").strip())
+        verified = res.status == "COMPLETED" and answered and bool(backed) and not loose
+        return {"agent": name, "status": res.status, "report": (res.final_text or "")[:4000],
+                "unbacked_facts": loose[:10], "verified": verified,
+                "cost_usd": res.cost_usd,
+                "tools_used": [c.get("capability") for c in res.tool_calls if c.get("ok")],
+                "why_not_verified": None if verified else (
+                    f"the agent ended {res.status}" if res.status != "COMPLETED" else
+                    "no answer" if not answered else
+                    f"{len(loose)} fact(s) no tool result backs: {', '.join(loose[:5])}"
+                    if loose else "no fact in the answer is backed by what the tools found "
+                    "(it may be asking you questions: answer them, or plan the mission again "
+                    "more precisely)")}
+    return execute
+
+
 class Jarvis:
     def __init__(self, engine: PolicyEngine, home: Path | None = None,
                  memory: MemoryLane | None = None, legal: LegalQueue | None = None,

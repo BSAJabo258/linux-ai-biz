@@ -247,6 +247,24 @@ def cmd_mission(a):
     elif a.mission_cmd == "show":
         m = j.get(a.mission_id)
         _out(asdict(m) if m else None)
+    elif a.mission_cmd == "run":
+        from .assistant import load_env_file
+        from .jarvis import agent_executor
+        load_env_file()
+        _human()
+        m = j.get(a.mission_id)
+        if m is None:
+            print(f"no mission {a.mission_id}", file=sys.stderr)
+            return EXIT_BLOCKED
+        try:
+            m = j.run(m, agent_executor(j.home, j.audit))
+        except PermissionError as e:
+            print(str(e), file=sys.stderr)
+            return EXIT_BLOCKED
+        ex = m.steps.get("execute") or {}
+        _out({"mission_id": m.mission_id, "status": m.status, "verified": m.steps.get("verify"),
+              "why_not_verified": ex.get("why_not_verified"), "report": ex.get("report"),
+              "evidence": m.evidence[-1:]})
     elif a.mission_cmd == "approve":
         from .security.permissions import SshApprovals, load_approval
         m = j.get(a.mission_id)
@@ -1641,6 +1659,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--facts", help="JSON/YAML: {gate_domain: facts}")
     x.add_argument("--blast", help="JSON/YAML blast-radius factors")
     x = js.add_parser("show")
+    x.add_argument("mission_id")
+    x = js.add_parser("run", help="you: run a READY mission (its agent does it; checked "
+                                  "against what its tools found)")
     x.add_argument("mission_id")
     x = js.add_parser("approve")
     x.add_argument("mission_id")
