@@ -353,3 +353,34 @@ def test_the_true_sentence_comes_first_in_the_batch(tmp_path):
     _creator_home(tmp_path)
     out = lean(tmp_path, ["ok"]).t_creator_batch(theme="rooftop at dusk", platform="instagram")
     assert list(out)[:2] == ["say", "saved_to"]
+
+
+def _two_missions(home):
+    from bau.jarvis import Jarvis
+    from bau.policy import PolicyEngine
+    from bau.regulations import Registry
+    j = Jarvis(PolicyEngine.load(Registry.load()), home=home)
+    return j, [j.plan(o, "research", {}).mission_id for o in ("video tools", "qwen errors")]
+
+
+def test_asked_about_missions_the_small_model_sees_them(tmp_path):
+    # Owner's desktop, 2026-11-10: "my tools do not include a mission status query".
+    _two_missions(tmp_path)
+    r = lean(tmp_path, ["Two missions are ready."]).ask("what missions do I have?")
+    assert any(c["tool"] == "missions" for c in r.cards)
+
+
+def test_run_the_missions_puts_one_card_each_and_runs_nothing(tmp_path):
+    j, ids = _two_missions(tmp_path)
+    r = lean(tmp_path, ["They are on your screen."]).ask("run the missions")
+    assert len(r.pending) == 2 and all(j.get(i).status == "READY" for i in ids)
+
+
+def test_yes_after_jarvis_offered_to_run_them_stages_them_too(tmp_path):
+    _two_missions(tmp_path)
+    a = lean(tmp_path, ["Shall I run those missions for you?", "On your screen."])
+    a.ask("anything new?")
+    assert len(a.ask("yes").pending) == 2
+    b = lean(tmp_path, ["Fine.", "ok"])
+    b.ask("how are you?")
+    assert b.ask("yes").pending == []                 # a yes to something else stages nothing

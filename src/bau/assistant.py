@@ -174,6 +174,11 @@ NUDGE = ("(Go ahead: call the tool now instead of saying you will. If none of yo
 # asked to remember searched instead and said it had saved it (real-model check 2026-11-01).
 REMEMBER_CMD = re.compile(r"^\W*(?:please\W+|jarvis\W+|hey jarvis\W+)*remember\W+(?:that\W+)?"
                           r"(.{3,})", re.I | re.S)
+# "Run the missions", or "yes" right after Jarvis offered to: every READY mission an agent can
+# do goes on the owner's screen as a card; nothing runs before Accept (2026-11-10: the owner
+# said yes to "shall I run those missions?" and nothing happened).
+RUN_MISSIONS = re.compile(r"\b(run|start|launch|do)\b.{0,40}\bmissions?\b", re.I)
+YES = re.compile(r"^\W*(yes|yeah|yep|sure|ok(ay)?|go ahead|do it|please do)\b", re.I)
 WEEK_CMD = re.compile(r"\b(?:schedule|post|publish)\b.{0,20}\bweek\W+([a-z0-9][a-z0-9._-]{0,60}"
                       r"[a-z0-9])", re.I)
 # Talking to the autopilot (docs/AUTOPILOT.md): handled here, never by a model.
@@ -208,6 +213,9 @@ GROUND = (
                 r"\b(remember|last time|we decided|earlier|my notes)\b", re.I | re.S),
      "recall", lambda q: {"query": q}),
     (re.compile(r"\bworkspaces?\b", re.I), "workspaces", lambda q: {}),
+    # The small model's menu has no missions tool, so asked about missions it said it had no
+    # way to see them (owner's desktop, 2026-11-10): look them up first.
+    (re.compile(r"\bmissions?\b", re.I), "missions", lambda q: {}),
     # "Plan seven Instagram posts for my creator ...": the real model on the owner's home
     # (2026-11-10) drafted them only 2 times in 6, asking which creator (there is one) or
     # saying "I'm using the tool" without using it. Drafting only returns prompts and caption
@@ -649,6 +657,20 @@ class Assistant:
         return {"summary": f"Run mission {m.mission_id} ({m.mission_type})?\n{m.objective}\n\n"
                            f"The {AGENT_FOR[m.mission_type]} agent does it; it counts as done "
                            "only if every fact in its answer is backed by what its tools found."}
+
+    def _stage_ready_missions(self, staged: list[str]) -> str:
+        from .jarvis import AGENT_FOR
+        ready = [m for m in self._missions().list()
+                 if m.status == "READY" and m.mission_type in AGENT_FOR]
+        for m in ready:
+            out, err = self._run_tool("run_mission", {"mission_id": m.mission_id})
+            if not err and isinstance(out, dict) and out.get("pending_id"):
+                staged.append(out["pending_id"])
+        if not ready:
+            return ("\n\n(No mission is READY for an agent to run. Say so plainly, from the "
+                    "missions listed above.)")
+        return (f"\n\n({len(ready)} mission(s) are on the owner's screen as cards, one each: "
+                "Accept runs it. Nothing has run yet. Say so in one or two sentences.)")
 
     def t_run_mission(self, mission_id: str) -> dict[str, Any]:
         from .jarvis import agent_executor
@@ -1486,7 +1508,12 @@ class Assistant:
                           "it in one short sentence; do not save it again.)" if not err else
                           f"\n\n(Saving it failed: {str(out)[:200]}. Say so plainly.)")
         elif self.lean:
+            said = [r["text"] for r in self.history if r["role"] == "jarvis"][-1:]
+            asked_run = RUN_MISSIONS.search(user_text) or (
+                YES.match(user_text) and any(RUN_MISSIONS.search(t) for t in said))
             user_text = self._ground(user_text, cards)
+            if asked_run:
+                user_text += self._stage_ready_missions(staged)
             # Naming a week plan that exists puts its card up at once: the small model did not
             # find schedule_week in its menu (real run, 2026-11-01). Staging changes nothing.
             m = WEEK_CMD.search(user_text)
