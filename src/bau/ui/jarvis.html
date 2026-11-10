@@ -24,6 +24,7 @@ body{background:var(--sky)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 canvas#core{position:fixed;inset:0;width:100%;height:100%;display:block}
 /* The tapestry: sacred geometry under the core; it never takes a click. */
+canvas#fifth{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
 canvas#sacred{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
 /* The owner's art (bau look): a still image, gently alive - a slow breathing glow, a pulse
    rising along the centre line, embers drifting up; quicker while Jarvis thinks. */
@@ -247,6 +248,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 <a class="skip" href="#text">Skip to talking to Jarvis</a>
 <canvas id="liquid" aria-hidden="true"></canvas>
 <div id="art" aria-hidden="true"><div class="spine"></div><div class="embers"></div></div>
+<canvas id="fifth" aria-hidden="true"></canvas>
 <canvas id="sacred" aria-hidden="true"></canvas>
 <canvas id="core" aria-hidden="true"></canvas>
 <div class="grid"></div>
@@ -601,141 +603,415 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
+// ---------------------------------------------------------------- the fifth dimension (WebGL)
+// The owner's ask (2026-11-09, after BassForge and pvrellis): cymatics as a 5-dimensional
+// form seen in cross-section. A standing wave in N dimensions, cos x₁ + … + cos x_N (N = 5 at
+// rest), cut by a plane whose N axes fan out at 360°/N (the cut that makes quasicrystals). The
+// plane drifts through the other dimensions, faster with the voice, so the mandala keeps
+// re-forming; a second wave at the golden ratio weaves over and under it. Each contour is drawn
+// as a lit, iridescent tube. On the graphics card; it lowers its own resolution if the frame
+// rate drops, and the 2D tapestry carries on alone if WebGL is missing.
+const FIFTH = (() => {
+  const cv = $("fifth"); let gl = null;
+  try { gl = cv.getContext("webgl", { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: false }); } catch (e) {}
+  if (!gl) { cv.style.display = "none"; return null; }
+  const VS = "attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}";
+  const FS = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 uC; uniform float uR, uT, uLevel, uKick, uNa, uNb, uMix, uLight, uFreq, uPx;
+const float TAU = 6.2831853;
+float wave(vec2 p, float N, float t, float k, float rot, out vec2 g) {
+  float f = 0.0; g = vec2(0.0);
+  for (int j = 0; j < 12; j++) {
+    float fj = float(j); if (fj >= N) break;
+    float a = TAU * fj / N + rot;
+    vec2 d = vec2(cos(a), sin(a)) * k;
+    float ph = t + 0.14 * sin(t * 0.23 * (1.0 + 0.37 * fj) + fj * 2.1);   // near-common phase: the rosette stays centred
+    float u = dot(d, p) + ph;
+    f += cos(u); g -= sin(u) * d;
+  }
+  g /= N; return f / N;
+}
+vec3 iris(float x) { return 0.5 + 0.5 * cos(TAU * (x + vec3(0.02, 0.26, 0.55))); }
+float tube(float f, vec2 g, float bands, float w, out vec3 n, out float lvl) {
+  float s = f * bands, df = (fract(s + 0.5) - 0.5) / bands;
+  float gl = max(length(g), 1e-5), d = df / gl, x = clamp(abs(d) / w, 0.0, 1.0);
+  float h = sqrt(max(0.0, 1.0 - x * x));
+  n = normalize(vec3(sign(d) * (g / gl) * x, h + 0.02));
+  lvl = floor(s + 0.5);
+  return 1.0 - smoothstep(0.8, 1.0, x);
+}
+vec3 shade(vec3 n, float lvl, float hue, float light) {
+  vec3 L = normalize(vec3(-0.45, 0.55, 0.8));
+  float diff = max(dot(n, L), 0.0), spec = pow(max(dot(reflect(-L, n), vec3(0.0, 0.0, 1.0)), 0.0), 28.0);
+  vec3 c = iris(lvl * 0.17 + hue + 0.45 * (1.0 - n.z) + uT * 0.015);
+  c = c * (0.25 + 1.0 * diff) + spec * (light > 0.5 ? 0.35 : 1.1);
+  return light > 0.5 ? c * 0.78 : c;
+}
+void main() {
+  vec2 q = (gl_FragCoord.xy - uC) / uR; float r = length(q);
+  vec2 p = q * uFreq, gA, gA2, gB, gB2;
+  float tA = uT * 0.5, tB = -uT * 0.37 + 1.7;
+  float fA = mix(wave(p, uNa, tA, 1.0, 0.0, gA), wave(p, uNb, tA, 1.0, 0.0, gA2), uMix);
+  float fB = mix(wave(p, uNa, tB, 1.618034, 0.31, gB), wave(p, uNb, tB, 1.618034, 0.31, gB2), uMix);
+  vec2 dA = mix(gA, gA2, uMix) * uFreq / uR, dB = mix(gB, gB2, uMix) * uFreq / uR;
+  float w = (1.9 + uLevel * 3.0 + uKick * 2.0) * uPx;
+  // the zero surfaces of each wave are endless interlaced ribbons; finer threads run beside them
+  vec3 nA, nB, n2, n3; float lA, lB, l2, l3;
+  float cA = tube(fA, dA, 1.0, w * 1.25, nA, lA), cB = tube(fB, dB, 1.0, w, nB, lB);
+  float c2 = tube(fA - 0.42, dA, 1.0, w * 0.45, n2, l2) + tube(fA + 0.42, dA, 1.0, w * 0.45, n3, l3);
+  lA = floor(fA * 2.0 + 2.0) + 1.0; lB = floor(fB * 2.0 + 2.0) + 3.0;
+  float weave = sin((fA + fB) * 6.2831 + uT * 0.2);
+  float zA = nA.z + 0.8 * weave, zB = nB.z - 0.8 * weave;
+  vec3 bg = uLight > 0.5 ? vec3(0.95, 0.94, 0.98) - 0.05 * iris(fA * 0.5 + uT * 0.01)
+                         : vec3(0.012, 0.004, 0.03) + 0.07 * iris(fA * 0.6 + fB * 0.3 + uT * 0.01) * (0.5 + 0.5 * fA);
+  vec3 c = bg;
+  c = mix(c, shade(n2.z > n3.z ? n2 : n3, 7.0, 0.6, uLight), clamp(c2, 0.0, 1.0) * 0.7);
+  vec3 colA = shade(nA, lA, 0.0, uLight), colB = shade(nB, lB, 0.43, uLight);
+  if (zA > zB) { c = mix(c, colB, cB); c = mix(c, colA, cA); } else { c = mix(c, colA, cA); c = mix(c, colB, cB); }
+  float vig = smoothstep(4.6, 1.2, r);
+  c = uLight > 0.5 ? mix(vec3(0.96), c, 0.35 + 0.65 * vig) : c * (0.25 + 0.75 * vig);
+  gl_FragColor = vec4(c, uLight > 0.5 ? 0.86 : 0.93);
+}`;
+  function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+  let prog;
+  try { prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog); if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog)); }
+  catch (e) { console.warn("fifth dimension off:", e); cv.style.display = "none"; return null; }
+  gl.useProgram(prog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, "a"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = {}; for (const n of ["uC", "uR", "uT", "uLevel", "uKick", "uNa", "uNb", "uMix", "uLight", "uFreq", "uPx"]) U[n] = gl.getUniformLocation(prog, n);
+  let soft = false;                                          // a software renderer starts small
+  try { const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const who = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+    soft = /llvmpipe|swiftshader|software|softpipe/i.test(who); } catch (e) {}
+  return { gl, cv, U, scale: soft ? 0.4 : 0.75, phase: 0, Na: 5, Nb: 5, mix: 1, slow: 0, ema: 33, checkAt: 0, lost: false };
+})();
+function fifthResize() { if (!FIFTH) return;
+  FIFTH.cv.width = Math.max(2, Math.round(W * FIFTH.scale)); FIFTH.cv.height = Math.max(2, Math.round(H * FIFTH.scale));
+  FIFTH.gl.viewport(0, 0, FIFTH.cv.width, FIFTH.cv.height); }
+addEventListener("resize", fifthResize); fifthResize();
+if (FIFTH) FIFTH.cv.addEventListener("webglcontextlost", (e) => { e.preventDefault(); FIFTH.lost = true; FIFTH.cv.style.display = "none"; });
+function fifthPaint(now, dt, N) {
+  const F = FIFTH; if (!F || F.lost || !CORE) return;
+  if (N !== F.Nb) { F.Na = F.mix >= 1 ? F.Nb : F.Na; F.Nb = N; F.mix = 0; }
+  F.mix = Math.min(1, F.mix + dt / 3500);
+  const fast = STATE === "thinking" ? 2.2 : STATE === "speaking" ? 1.5 : 1;
+  F.phase += dt * 0.00045 * SPEED * fast * (1 + level * 3 + KICK * 4);   // the slice moves through the dimensions
+  const [X, Y, R] = CORE, s = F.scale, gl = F.gl, U = F.U;
+  gl.uniform2f(U.uC, X * s, (H - Y) * s); gl.uniform1f(U.uR, R * s); gl.uniform1f(U.uT, F.phase);
+  gl.uniform1f(U.uLevel, level); gl.uniform1f(U.uKick, KICK); gl.uniform1f(U.uNa, F.Na); gl.uniform1f(U.uNb, F.Nb);
+  gl.uniform1f(U.uMix, F.mix * F.mix * (3 - 2 * F.mix)); gl.uniform1f(U.uLight, themeLight() ? 1 : 0);
+  gl.uniform1f(U.uFreq, 8.5 + Math.sin(F.phase * 0.07) * 1.8); gl.uniform1f(U.uPx, s);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // keep the whole page smooth: if frames slow down, draw the field at a lower resolution
+  F.ema += (dt - F.ema) * 0.05;
+  if (now - F.checkAt > 3000) { F.checkAt = now;
+    if (F.ema > 60 && F.scale > 0.3) { F.scale *= 0.75; fifthResize(); }
+    else if (F.ema > 60) { F.lost = true; F.cv.style.display = "none"; } }    // too slow here: 2D only
+}
 // ---------------------------------------------------------------- the tapestry (sacred geometry)
-// The owner's ask (2026-11-09): the screen as a psychedelic, esoteric tapestry - sacred
-// geometry, sound and frequency, magnetic fields - alive with Jarvis. Its own canvas under
-// the core, never takes a click, ~30 frames a second, off with the TAPESTRY chip.
-//   Flower of Life   circles of radius u on a hexagonal lattice (centres 'u' apart)
-//   Metatron's Cube  13 centres (core, 6 at d, 6 at 2d), all 78 joining lines
-//   Cymatics         Chladni plate nodal lines cos(nπx)cos(mπy) − cos(mπx)cos(nπy) = 0,
-//                    mirrored six ways into a mandala; the mode (n,m) moves on each beat
-//   Phyllotaxis      seed k at angle k·137.508° and radius c·√k (the golden angle)
-//   Magnetic torus   dipole field lines r = L·sin²θ, energy flowing along them
-//   Resonance ring   standing wave with lobes from the Solfeggio tones (174 … 963 Hz)
-//   Seed of Life     seven circles rippling out on each bass hit
-const SAC = { cv: $("sacred"), on: true, last: 0, key: "", flower: null, metatron: null,
-  chl: null, chlOld: null, chlFade: 1, mode: 0, modeAt: 0, kickWas: 0, seeds: [], toneAt: 0, tone: 4 };
+// The owner's ask (2026-11-09): the screen as a psychedelic, esoteric tapestry - geometry as
+// stances that interlock into dimensions, up to the quantum. Real mathematics, each stance the
+// shadow of the one above it, all of them present at once and one stepping forward at a time:
+//   2D  Flower of Life → Metatron's Cube   circles on a hexagonal lattice; 13 centres, 78 lines
+//   3D  the five Platonic solids, nested   (they are all hidden inside Metatron's Cube)
+//   4D  the tesseract                      16 vertices (±1)^4, turned in the XW, YW, ZW planes
+//   4D  the 600-cell                       120 vertices built on the golden ratio φ, 720 edges
+//   8D  E8                                 240 roots, Coxeter-plane projection: 8 rings of 30
+//   ∿   cymatics                           Chladni plate cos(nπx)cos(mπy) − cos(mπx)cos(nπy) = 0
+//   ψ   hydrogen orbitals                  |ψ_nlm|² from Laguerre and Legendre; colour is phase
+//   S³  the Hopf fibration                 every point of a sphere is a circle in 4D, all linked
+// Always under them: the Flower of Life lattice, magnetic dipole lines r = L·sin²θ, the
+// golden-angle seed head, the Solfeggio resonance ring, Seed of Life ripples on the beat.
+// Its own canvas under the core: never takes a click, ~30 frames a second, TAPESTRY chip.
+const SAC = { cv: $("sacred"), on: true, last: 0, key: "", flower: null, metatron: null, e8: null,
+  chl: null, chlOld: null, chlFade: 1, mode: 0, modeAt: 0, kickWas: 0, seeds: [], toneAt: 0, tone: 4,
+  stance: 0, stanceAt: 0, w: null, orb: null, orbOld: null, orbFade: 1, orbI: 0, a4: 0, labelA: 0 };
 SAC.cx = SAC.cv.getContext("2d");
 try { SAC.on = localStorage.getItem("jarvis-tapestry") !== "0"; } catch (e) {}
+const PHI = (1 + Math.sqrt(5)) / 2, PHI_ANGLE = Math.PI * (3 - Math.sqrt(5));   // φ; 137.508°
 const CHLADNI = [[1, 4], [2, 5], [3, 7], [1, 6], [4, 9], [2, 7], [3, 8], [5, 8], [1, 8], [6, 9], [2, 9], [4, 7]];
 const SOLFEGGIO = [174, 285, 396, 417, 528, 639, 741, 852, 963];
-const PHI_ANGLE = Math.PI * (3 - Math.sqrt(5));            // 137.508°, the golden angle
-function sacLight() { return themeLight(); }
-function sacSprite(size) { const c = document.createElement("canvas"); c.width = c.height = Math.ceil(size); return c; }
-function rainbow(g, cxp, cyp, a, light) {                 // a conic rainbow stroke for a sprite
+const ORBITALS = [[3, 2, 0], [4, 3, 0], [4, 2, 1], [5, 3, 1], [5, 4, 2], [6, 4, 0], [4, 3, 2], [6, 5, 1], [5, 2, 0]];
+const STANCES = [
+  ["II", "FLOWER OF LIFE · METATRON'S CUBE", "one circle unfolds into all of them"],
+  ["III", "THE FIVE PLATONIC SOLIDS", "nested, each hidden inside Metatron's Cube"],
+  ["IV", "TESSERACT", "the shadow a cube casts from the fourth dimension"],
+  ["IV", "600-CELL", "120 vertices, every one placed by the golden ratio"],
+  ["VIII", "E8", "240 roots in eight dimensions, folded into 8 rings of 30"],
+  ["∿", "CYMATICS", "the voice drawn as sand on a vibrating plate"],
+  ["ψ", "HYDROGEN ORBITAL", "where the electron may be; the colour is its phase"],
+  ["S³", "HOPF FIBRATION", "every point of a sphere is a circle in 4D; none touch, all are linked"],
+  ["V", "THE FIFTH DIMENSION", "sound as a 5-dimensional form, seen in cross-section as the slice moves"],
+];
+const FIELD_N = [6, 5, 4, 5, 8, 7, 5, 3, 5];               // the dimensions of the wave behind each stance
+const E8_U = [0, 0.119117702, 0.192736491, 0.217638872, 0.192736491, 0.119117702, 0, 0.921933055];
+const E8_W = [0.096899069, 0.46350566, 0.236930326, 0, -0.236930326, -0.46350566, -0.669823572, 0];
+SAC.stance = STANCES.length - 1; SAC.w = STANCES.map((_, i) => i === SAC.stance ? 1 : 0.1);
+function sacSprite(size) { const c = document.createElement("canvas"); c.width = c.height = Math.max(2, Math.ceil(size)); return c; }
+function hsl2rgb(h, s, l) {
+  const k = (n) => (n + h * 12) % 12, a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+}
+function rainbow(g, cxp, cyp, a, light) {
   const grad = g.createConicGradient ? g.createConicGradient(0, cxp, cyp) : null;
   if (!grad) return light ? "rgba(60,30,120," + a + ")" : "rgba(180,140,255," + a + ")";
   for (let i = 0; i <= 6; i++) grad.addColorStop(i / 6, "hsla(" + (i * 60 + 200) + "," + (light ? "95%,38%," : "100%,66%,") + a + ")");
   return grad;
 }
-function buildFlower(u, ext, light) {                       // the Flower of Life, to the screen edge
+// ---- the solids, built once
+function edgesAt(V, len, tol) { const E = [];
+  for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
+    let d = 0; for (let k = 0; k < V[i].length; k++) d += (V[i][k] - V[j][k]) ** 2;
+    if (Math.abs(Math.sqrt(d) - len) < tol) E.push([i, j]); }
+  return E; }
+function minEdge(V) { let m = Infinity;
+  for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
+    let d = 0; for (let k = 0; k < V[i].length; k++) d += (V[i][k] - V[j][k]) ** 2; m = Math.min(m, Math.sqrt(d)); }
+  return m; }
+function solid(V, scale, hue) { const r = Math.max(...V.map(v => Math.hypot(...v)));
+  const U = V.map(v => v.map(x => x / r * scale)); return { V: U, E: edgesAt(U, minEdge(U), 1e-6), hue }; }
+function cyc(list) { const out = []; for (const [a, b, c] of list) out.push([a, b, c], [b, c, a], [c, a, b]); return out; }
+function signs(v) { let out = [[]]; for (const x of v) out = out.flatMap(p => x ? [[...p, x], [...p, -x]] : [[...p, 0]]); return out; }
+const PLATONIC = (() => {
+  const tet = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]];
+  const cube = signs([1, 1, 1]), octa = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  const ico = cyc(signs([0, 1, PHI])), dod = cube.concat(cyc(signs([0, 1 / PHI, PHI])));
+  return [solid(ico, 1, 190), solid(dod, 0.86, 280), solid(cube, 0.7, 45), solid(octa, 0.55, 330), solid(tet, 0.42, 140)];
+})();
+const TESSERACT = (() => { const V = []; for (let i = 0; i < 16; i++) V.push([0, 1, 2, 3].map(b => (i >> b & 1) ? 1 : -1));
+  return { V, E: edgesAt(V, 2, 1e-6) }; })();
+const CELL600 = (() => {                                   // the 600-cell (all 120 vertices, edge 1/φ)
+  const V = signs([0.5, 0.5, 0.5, 0.5]);
+  for (let i = 0; i < 4; i++) for (const s of [1, -1]) { const v = [0, 0, 0, 0]; v[i] = s; V.push(v); }
+  const even = [[0, 1, 2, 3], [0, 2, 3, 1], [0, 3, 1, 2], [1, 0, 3, 2], [1, 2, 0, 3], [1, 3, 2, 0],
+    [2, 0, 1, 3], [2, 1, 3, 0], [2, 3, 0, 1], [3, 0, 2, 1], [3, 1, 0, 2], [3, 2, 1, 0]];
+  for (const b of signs([PHI / 2, 0.5, 1 / (2 * PHI)])) for (const p of even) {
+    const src = [b[0], b[1], b[2], 0], v = [0, 0, 0, 0]; for (let k = 0; k < 4; k++) v[p[k]] = src[k]; V.push(v); }
+  return { V, E: edgesAt(V, 1 / PHI, 1e-6) };
+})();
+const E8 = (() => { const V = [];
+  for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) for (const a of [1, -1]) for (const b of [1, -1]) {
+    const v = new Array(8).fill(0); v[i] = a; v[j] = b; V.push(v); }
+  for (let m = 0; m < 256; m++) { const v = []; let neg = 0;
+    for (let k = 0; k < 8; k++) { const s = (m >> k & 1) ? -0.5 : 0.5; if (s < 0) neg++; v.push(s); }
+    if (neg % 2 === 0) V.push(v); }
+  const E = []; for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
+    let d = 0; for (let k = 0; k < 8; k++) d += V[i][k] * V[j][k]; if (Math.abs(d - 1) < 1e-9) E.push([i, j]); }
+  return { P: V.map(v => [v.reduce((s, x, k) => s + x * E8_U[k], 0), v.reduce((s, x, k) => s + x * E8_W[k], 0)]),
+    R: V.map(v => Math.hypot(v.reduce((s, x, k) => s + x * E8_U[k], 0), v.reduce((s, x, k) => s + x * E8_W[k], 0))), E };
+})();
+// ---- projections: 4D → 3D → screen
+function rot(a, b, t) { const c = Math.cos(t), s = Math.sin(t); return [a * c - b * s, a * s + b * c]; }
+function turn3(v, ay, ax) { let [x, y, z] = v; [x, z] = rot(x, z, ay); [y, z] = rot(y, z, ax); return [x, y, z]; }
+function from4(v, t) { let [x, y, z, w] = v;                // turn in three 4D planes, then fall to 3D
+  [x, w] = rot(x, w, t * 0.7); [y, w] = rot(y, w, t * 0.43); [z, w] = rot(z, w, t * 0.29); [x, y] = rot(x, y, t * 0.17);
+  const k = 2.4 / (2.4 - w * 0.9); return [x * k, y * k, z * k, w]; }
+function toScreen(p, X, Y, S) { const k = 3.2 / (3.2 - p[2]); return [X + p[0] * k * S, Y + p[1] * k * S, p[2]]; }
+function strokeEdges(g, P, E, light, hueOf, alpha, width) {   // edges in depth-coloured batches
+  const B = 7, paths = Array.from({ length: B }, () => new Path2D());
+  for (const [i, j] of E) { const a = P[i], b = P[j]; if (!a || !b) continue;
+    const z = Math.max(0, Math.min(B - 1, Math.floor(((a[2] + b[2]) / 2 + 1.2) / 2.4 * B)));
+    paths[z].moveTo(a[0], a[1]); paths[z].lineTo(b[0], b[1]); }
+  g.lineWidth = width;
+  for (let z = 0; z < B; z++) { const near = z / (B - 1);
+    g.strokeStyle = light ? "hsla(" + hueOf(near) + ",90%," + (28 + near * 14) + "%," + alpha * (0.45 + near * 0.55) + ")"
+      : "hsla(" + hueOf(near) + ",100%," + (55 + near * 20) + "%," + alpha * (0.35 + near * 0.65) + ")";
+    g.stroke(paths[z]); }
+}
+// ---- sprites, rebuilt when the size or theme changes
+function buildFlower(u, ext, light) {
   const s = sacSprite(ext * 2), g = s.getContext("2d"), c = ext, rings = Math.ceil(ext / u) + 1;
   g.lineWidth = light ? 1.5 : 1.3; g.strokeStyle = rainbow(g, c, c, light ? 0.75 : 0.9, light);
   for (let q = -rings; q <= rings; q++) for (let r = -rings; r <= rings; r++) {
     const x = c + u * (q + r / 2), y = c + u * r * Math.sqrt(3) / 2;
     if (Math.hypot(x - c, y - c) > ext - u) continue;
-    g.beginPath(); g.arc(x, y, u, 0, 6.283); g.stroke();
-  }
+    g.beginPath(); g.arc(x, y, u, 0, 6.283); g.stroke(); }
   g.lineWidth = 2; for (const f of [3, 3.08]) { g.beginPath(); g.arc(c, c, u * f, 0, 6.283); g.stroke(); }
-  g.globalCompositeOperation = "destination-in";            // fade out towards the edges
+  g.globalCompositeOperation = "destination-in";
   const m = g.createRadialGradient(c, c, u * 1.2, c, c, ext);
   m.addColorStop(0, "rgba(0,0,0,1)"); m.addColorStop(0.55, "rgba(0,0,0,.55)"); m.addColorStop(1, "rgba(0,0,0,0)");
   g.fillStyle = m; g.fillRect(0, 0, s.width, s.height);
   return s;
 }
-function buildMetatron(d, light) {                          // Metatron's Cube round the core
+function buildMetatron(d, light) {
   const ext = d * 2.6, s = sacSprite(ext * 2), g = s.getContext("2d"), c = ext, P = [[c, c]];
   for (let k = 1; k <= 2; k++) for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + i * Math.PI / 3;
     P.push([c + Math.cos(a) * d * k, c + Math.sin(a) * d * k]); }
-  g.strokeStyle = light ? "rgba(140,90,0,.55)" : "rgba(255,214,120,.62)"; g.lineWidth = 1;
+  g.strokeStyle = light ? "rgba(140,90,0,.6)" : "rgba(255,214,120,.7)"; g.lineWidth = 1;
   for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
     g.beginPath(); g.moveTo(P[i][0], P[i][1]); g.lineTo(P[j][0], P[j][1]); g.stroke(); }
-  g.strokeStyle = light ? "rgba(90,40,160,.55)" : "rgba(200,170,255,.7)"; g.lineWidth = 1.3;
+  g.strokeStyle = light ? "rgba(90,40,160,.6)" : "rgba(200,170,255,.75)"; g.lineWidth = 1.3;
   for (const [x, y] of P) { g.beginPath(); g.arc(x, y, d / 2, 0, 6.283); g.stroke(); }
-  g.strokeStyle = light ? "rgba(140,90,0,.5)" : "rgba(255,214,120,.55)";
-  for (const k of [1, 2]) { g.beginPath();                  // the two hexagons (Star of David inside)
-    for (let i = 0; i <= 6; i++) { const a = -Math.PI / 2 + i * Math.PI / 3; g.lineTo(c + Math.cos(a) * d * k, c + Math.sin(a) * d * k); }
-    g.stroke(); }
   g.beginPath(); g.arc(c, c, d * 2.5, 0, 6.283); g.stroke();
   return s;
 }
-function buildChladni(n, m, light) {                        // a Chladni plate's nodal lines, glowing
+function buildE8(size, light) {                             // the E8 mandala: 6720 edges, drawn once
+  const s = sacSprite(size), g = s.getContext("2d"), c = size / 2, k = c / 1.2;
+  const P = E8.P.map(([x, y]) => [c + x * k, c + y * k]), ring = [0.2382, 0.3855, 0.4739, 0.5729, 0.7043, 0.7667, 0.927, 1.1396];
+  const ri = (i) => ring.findIndex(r => Math.abs(r - E8.R[i]) < 1e-3);
+  g.globalCompositeOperation = light ? "source-over" : "lighter"; g.lineWidth = light ? 0.5 : 0.45;
+  const B = 8, paths = Array.from({ length: B }, () => new Path2D());
+  for (const [i, j] of E8.E) { const b = Math.max(0, Math.min(B - 1, Math.round((ri(i) + ri(j)) / 2)));
+    paths[b].moveTo(P[i][0], P[i][1]); paths[b].lineTo(P[j][0], P[j][1]); }
+  for (let b = 0; b < B; b++) { g.strokeStyle = light ? "hsla(" + (260 + b * 22) + ",85%,35%,.22)" : "hsla(" + (180 + b * 26) + ",100%,65%,.16)"; g.stroke(paths[b]); }
+  for (let i = 0; i < P.length; i++) { const b = ri(i);
+    g.fillStyle = light ? "hsla(" + (260 + b * 22) + ",90%,30%,.95)" : "hsla(" + (180 + b * 26) + ",100%,75%,1)";
+    g.beginPath(); g.arc(P[i][0], P[i][1], 2.2 + b * 0.25, 0, 6.283); g.fill(); }
+  return s;
+}
+function buildChladni(n, m, light) {
   const N = 150, s = sacSprite(N), g = s.getContext("2d"), img = g.createImageData(N, N), D = img.data;
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const x = i / (N - 1), y = j / (N - 1), rr = Math.hypot(x - 0.5, y - 0.5);
     const f = Math.cos(n * Math.PI * x) * Math.cos(m * Math.PI * y) - Math.cos(m * Math.PI * x) * Math.cos(n * Math.PI * y);
     const v = Math.exp(-Math.abs(f) * 9) * Math.max(0, 1 - rr * 2) ** 0.6, hue = (rr * 720 + 260) % 360;
     const [r, gg, b] = hsl2rgb(hue / 360, 1, light ? 0.35 : 0.62), o = (j * N + i) * 4;
-    D[o] = r; D[o + 1] = gg; D[o + 2] = b; D[o + 3] = Math.round(v * 255);
-  }
+    D[o] = r; D[o + 1] = gg; D[o + 2] = b; D[o + 3] = Math.round(v * 255); }
   g.putImageData(img, 0, 0); return s;
 }
-function hsl2rgb(h, s, l) {
-  const k = (n) => (n + h * 12) % 12, a = s * Math.min(l, 1 - l);
-  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-  return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+function laguerre(k, a, x) { if (k === 0) return 1; let p0 = 1, p1 = 1 + a - x;
+  for (let i = 1; i < k; i++) { const p2 = ((2 * i + 1 + a - x) * p1 - (i + a) * p0) / (i + 1); p0 = p1; p1 = p2; } return p1; }
+function legendre(l, m, x) { let pmm = 1; const s = Math.sqrt(Math.max(0, 1 - x * x));
+  for (let i = 1; i <= m; i++) pmm *= -(2 * i - 1) * s;
+  if (l === m) return pmm; let p1 = x * (2 * m + 1) * pmm; if (l === m + 1) return p1;
+  for (let ll = m + 2; ll <= l; ll++) { const p2 = ((2 * ll - 1) * x * p1 - (ll + m - 1) * pmm) / (ll - m); pmm = p1; p1 = p2; } return p1; }
+function buildOrbital(n, l, m, light) {                     // a slice through |ψ_nlm|², phase as colour
+  const N = 170, s = sacSprite(N), g = s.getContext("2d"), img = g.createImageData(N, N), D = img.data;
+  const L = n * n * 2.1, psi = new Float32Array(N * N); let max = 0;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = (i / (N - 1) * 2 - 1) * L, z = (j / (N - 1) * 2 - 1) * L, r = Math.hypot(x, z) + 1e-9, rho = 2 * r / n;
+    const ang = legendre(l, m, z / r) * (x < 0 && m % 2 ? -1 : 1);
+    const v = Math.pow(rho, l) * Math.exp(-rho / 2) * laguerre(n - l - 1, 2 * l + 1, rho) * ang;
+    psi[j * N + i] = v; max = Math.max(max, v * v); }
+  for (let p = 0; p < N * N; p++) { const v = psi[p], d = Math.pow(v * v / max, 0.42);
+    const [r, gg, b] = v >= 0 ? hsl2rgb((190 + d * 80) / 360, 1, light ? 0.32 : 0.55 + d * 0.2)
+      : hsl2rgb((330 - d * 290 + 360) % 360 / 360, 1, light ? 0.36 : 0.58 + d * 0.15);
+    const o = p * 4; D[o] = r; D[o + 1] = gg; D[o + 2] = b; D[o + 3] = Math.round(Math.min(1, d * 1.15) * 255); }
+  g.putImageData(img, 0, 0); return s;
+}
+function sacImage(g, img, X, Y, rot, scale, alpha) {
+  if (!img || alpha <= 0.004) return;
+  g.save(); g.globalAlpha = Math.min(1, alpha); g.translate(X, Y); g.rotate(rot); g.scale(scale, scale);
+  g.drawImage(img, -img.width / 2, -img.height / 2); g.restore();
 }
 function sacResize() { const d = Math.min(window.devicePixelRatio || 1, 2);
   SAC.cv.width = W * d; SAC.cv.height = H * d; SAC.cx.setTransform(d, 0, 0, d, 0, 0); SAC.key = ""; }
 addEventListener("resize", sacResize); sacResize();
+// ---- the stances, drawn at weight w (0..1), centred on the core
+function drawPlatonic(g, X, Y, S, t, w, light) {
+  PLATONIC.forEach((s, n) => { const ay = t * (0.21 + n * 0.05) * (n % 2 ? -1 : 1), ax = t * (0.13 + n * 0.03) + n;
+    const P = s.V.map(v => toScreen(turn3(v, ay, ax), X, Y, S));
+    strokeEdges(g, P, s.E, light, (near) => (s.hue + near * 40 + t * 6) % 360, w, 1.2 + w * 1.2); });
+}
+function draw4(g, poly, X, Y, S, t, w, light, hue0, width) {
+  const P = poly.V.map(v => { const p = from4(v, t); return toScreen(turn3(p, t * 0.11, 0.5), X, Y, S); });
+  strokeEdges(g, P, poly.E, light, (near) => (hue0 + near * 120 + t * 10) % 360, w, width);
+  if (w > 0.3) { g.fillStyle = light ? "rgba(40,20,90," + w + ")" : "rgba(255,240,200," + w * 0.9 + ")";
+    for (const p of P) { g.beginPath(); g.arc(p[0], p[1], 1.2 + Math.max(0, p[2]) * 1.6, 0, 6.283); g.fill(); } }
+}
+function drawHopf(g, X, Y, S, t, w, light) {
+  const lats = [[-0.55, 7], [-0.15, 9], [0.25, 10], [0.6, 8], [0.82, 6]];
+  g.lineWidth = 1 + w * 0.9;
+  lats.forEach(([c, n], li) => { const rr = Math.sqrt(1 - c * c);
+    for (let k = 0; k < n; k++) { const ph = k / n * 6.283 + t * 0.25 * (li % 2 ? 1 : -1), a = rr * Math.cos(ph), b = rr * Math.sin(ph);
+      const f = 1 / Math.sqrt(2 * (1 + c)); g.beginPath(); let pen = false;
+      for (let i = 0; i <= 72; i++) { const th = i / 72 * 6.283;
+        const x0 = f * (1 + c) * Math.cos(th), x1 = f * (a * Math.sin(th) - b * Math.cos(th)),
+          x2 = f * (a * Math.cos(th) + b * Math.sin(th)), x3 = f * (1 + c) * Math.sin(th), d = 1 - x0;
+        const p = [x1 / d, x2 / d, x3 / d];
+        if (Math.hypot(...p) > 5) { pen = false; continue; }
+        const q = toScreen(turn3([p[0] * 0.38, p[1] * 0.38, p[2] * 0.38], t * 0.17, 0.6 + Math.sin(t * 0.1) * 0.3), X, Y, S);
+        pen ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); pen = true; }
+      g.strokeStyle = light ? "hsla(" + ((li * 60 + k * 9) % 360) + ",90%,35%," + w * 0.8 + ")"
+        : "hsla(" + ((li * 60 + k * 9 + t * 12) % 360) + ",100%,68%," + w * 0.85 + ")";
+      g.stroke(); } });
+}
 function sacPaint(now) {
-  const g = SAC.cx, light = sacLight(), t = now * 0.001 * SPEED;
+  const g = SAC.cx, light = themeLight(), t = now * 0.001 * SPEED;
   g.clearRect(0, 0, W, H);
   if (!CORE) return;
   const [X, Y, R] = CORE, lv = level, kick = KICK, spec = SPEC || [];
   const key = Math.round(R) + "|" + W + "|" + H + "|" + light;
   if (key !== SAC.key) { SAC.key = key; const ext = Math.hypot(W, H) * 0.62;
     SAC.flower = buildFlower(R * 0.62, ext, light); SAC.metatron = buildMetatron(R * 0.95, light);
-    SAC.chl = buildChladni(...CHLADNI[SAC.mode], light); SAC.chlOld = null; }
+    SAC.e8 = buildE8(Math.round(R * 5.4), light);
+    SAC.chl = buildChladni(...CHLADNI[SAC.mode], light); SAC.chlOld = null;
+    SAC.orb = buildOrbital(...ORBITALS[SAC.orbI], light); SAC.orbOld = null; }
   const add = light ? "source-over" : "lighter", fast = STATE === "thinking" ? 2.4 : STATE === "speaking" ? 1.6 : 1;
-  if (!light) {                                            // the night sky the light glows in
+  // the stance steps forward in turn; thinking climbs the dimensions quickly
+  const hold = STATE === "thinking" ? 6000 : STATE === "speaking" ? 11000 : 16000;
+  if (now - SAC.stanceAt > hold) { SAC.stanceAt = now; SAC.stance = (SAC.stance + 1) % STANCES.length; SAC.labelA = 0; }
+  for (let i = 0; i < SAC.w.length; i++) { const want = i === SAC.stance ? 1 : 0.1; SAC.w[i] += (want - SAC.w[i]) * 0.04; }
+  const Wt = SAC.w;
+  SAC.a4 += 0.016 * fast * SPEED * (1 + lv * 2 + kick * 3);       // the 4D turn, pushed by the voice
+  const glOn = FIFTH && !FIFTH.lost;                     // the 5D field paints the sky itself
+  if (!light && !glOn) {
     const veil = g.createRadialGradient(X, Y, R * 0.8, X, Y, Math.hypot(W, H) * 0.6);
-    veil.addColorStop(0, "rgba(10,2,30,.42)"); veil.addColorStop(1, "rgba(2,0,10,.82)");
+    veil.addColorStop(0, "rgba(10,2,30,.42)"); veil.addColorStop(1, "rgba(2,0,10,.84)");
     g.fillStyle = veil; g.fillRect(0, 0, W, H);
   }
   g.save(); g.globalCompositeOperation = add;
-  // 1. a slow rainbow aura (the psychedelic wash; quiet in light mode)
-  if (!light && g.createConicGradient) {
+  if (!light && !glOn && g.createConicGradient) {
     const aura = g.createConicGradient(t * 0.07, X, Y);
     for (let i = 0; i <= 6; i++) aura.addColorStop(i / 6, "hsla(" + ((i * 60 + t * 12) % 360) + ",100%,50%," + (0.1 + lv * 0.08) + ")");
     g.fillStyle = aura; g.fillRect(0, 0, W, H);
   }
-  // 2. the Flower of Life, turning
-  sacImage(g, SAC.flower, X, Y, t * 0.012 * fast, 1, (light ? 0.7 : 0.75) + lv * 0.25);
-  // 3. magnetic torus: dipole field lines r = L sin²θ, energy flowing outward
+  // ground: the Flower of Life to the edges, and the magnetic field it sits in
+  sacImage(g, SAC.flower, X, Y, t * 0.012 * fast, 1, glOn ? Wt[0] * 0.85 : (light ? 0.6 : 0.62) + lv * 0.2 + Wt[0] * 0.25);
+  if (!glOn) {
   g.lineWidth = 1.6; g.setLineDash([4, 14]); g.lineDashOffset = -now * 0.04 * (1 + lv * 5) * SPEED;
   for (let k = 0; k < 7; k++) { const L = R * (1.5 + k * 0.62);
-    g.strokeStyle = light ? "hsla(" + (250 + k * 14) + ",90%,40%,.6)" : "hsla(" + ((190 + k * 22 + t * 8) % 360) + ",100%,70%," + (0.35 + lv * 0.4) + ")";
+    g.strokeStyle = light ? "hsla(" + (250 + k * 14) + ",90%,40%,.55)" : "hsla(" + ((190 + k * 22 + t * 8) % 360) + ",100%,70%," + (0.3 + lv * 0.4) + ")";
     for (const side of [1, -1]) { g.beginPath();
       for (let i = 4; i <= 176; i += 2) { const th = i * Math.PI / 180, r = L * Math.sin(th) ** 2;
-        const x = X + side * r * Math.sin(th), y = Y - r * Math.cos(th);
-        i === 4 ? g.moveTo(x, y) : g.lineTo(x, y); }
-      g.stroke(); }
-  }
+        const x = X + side * r * Math.sin(th), y = Y - r * Math.cos(th); i === 4 ? g.moveTo(x, y) : g.lineTo(x, y); }
+      g.stroke(); } }
   g.setLineDash([]);
-  // 4. cymatics: the Chladni mode, mirrored six ways; a new mode on a beat (or every 7 s)
-  if ((kick > 0.9 && SAC.kickWas <= 0.9 && now - SAC.modeAt > 1200) || now - SAC.modeAt > (STATE === "idle" ? 7000 : 3500)) {
+  }
+  // the stances (each the shadow of the next), interlocked
+  sacImage(g, SAC.metatron, X, Y, -t * 0.03 * fast, (0.9 + Wt[0] * 0.2) * (1 + kick * 0.04), (light ? 0.35 : 0.4) + Wt[0] * 0.55);
+  const big = R * 2.35;
+  if (Wt[4] > 0.02) sacImage(g, SAC.e8, X, Y, t * 0.02 * fast, (0.7 + Wt[4] * 0.45) * (1 + kick * 0.05), Wt[4] * (light ? 0.95 : 1));
+  if (Wt[6] > 0.02) { SAC.orbFade = Math.min(1, SAC.orbFade + 0.02);
+    const os = big * 2.2 / SAC.orb.width;
+    if (SAC.orbOld && SAC.orbFade < 1) sacImage(g, SAC.orbOld, X, Y, t * 0.01, os, Wt[6] * (1 - SAC.orbFade));
+    sacImage(g, SAC.orb, X, Y, t * 0.01, os, Wt[6] * SAC.orbFade); }
+  if (kick > 0.9 && SAC.kickWas <= 0.9 && Wt[6] > 0.5) {         // a beat shifts the electron to a new orbital
+    SAC.orbI = (SAC.orbI + 1) % ORBITALS.length; SAC.orbOld = SAC.orb; SAC.orb = buildOrbital(...ORBITALS[SAC.orbI], light); SAC.orbFade = 0; }
+  if (now - SAC.modeAt > (STATE === "idle" ? 7000 : 3500) || (kick > 0.9 && SAC.kickWas <= 0.9 && now - SAC.modeAt > 1200)) {
     SAC.modeAt = now; SAC.mode = (SAC.mode + 1 + Math.floor(Math.random() * 3)) % CHLADNI.length;
     SAC.chlOld = SAC.chl; SAC.chl = buildChladni(...CHLADNI[SAC.mode], light); SAC.chlFade = 0;
-  }
+    if (Wt[6] > 0.5 && STATE === "idle") { SAC.orbI = (SAC.orbI + 1) % ORBITALS.length; SAC.orbOld = SAC.orb; SAC.orb = buildOrbital(...ORBITALS[SAC.orbI], light); SAC.orbFade = 0; } }
   SAC.chlFade = Math.min(1, SAC.chlFade + 0.03);
-  const cs = R * (2.6 + lv * 0.4 + kick * 0.15), ca = (light ? 0.7 : 0.85) + lv * 0.4;
+  const cs = R * (2.2 + Wt[5] * 0.9 + lv * 0.4 + kick * 0.15), ca = ((light ? 0.5 : 0.6) + lv * 0.4) * (0.35 + Wt[5] * 0.65);
   for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + t * 0.05 * fast;
     if (SAC.chlOld && SAC.chlFade < 1) sacImage(g, SAC.chlOld, X, Y, a, cs / SAC.chlOld.width, ca * (1 - SAC.chlFade) / 1.5);
     sacImage(g, SAC.chl, X, Y, a, cs / SAC.chl.width, ca * SAC.chlFade / 1.5); }
-  // 5. Metatron's Cube, turning the other way, swelling on the beat
-  sacImage(g, SAC.metatron, X, Y, -t * 0.03 * fast, 1 + kick * 0.04, (light ? 0.8 : 0.85) + lv * 0.3);
-  // 6. phyllotaxis: the golden-angle seed head; each seed pulses with its part of the voice
+  if (Wt[1] > 0.02) drawPlatonic(g, X, Y, big * (0.75 + Wt[1] * 0.3) * (1 + kick * 0.04), t * fast, Wt[1], light);
+  if (Wt[2] > 0.02) draw4(g, TESSERACT, X, Y, big * (0.42 + Wt[2] * 0.2), SAC.a4, Wt[2], light, 170, 1.4 + Wt[2] * 1.6);
+  if (Wt[3] > 0.02) draw4(g, CELL600, X, Y, big * (0.62 + Wt[3] * 0.3), SAC.a4 * 0.6, Wt[3] * 0.9, light, 260, 0.8 + Wt[3] * 0.7);
+  if (Wt[7] > 0.02) drawHopf(g, X, Y, big * (0.8 + Wt[7] * 0.3), t * fast, Wt[7], light);
+  // the golden-angle seed head, pulsing with the voice
   const NS = 377, c0 = R * 2.35 / Math.sqrt(NS);
   for (let k = 1; k <= NS; k++) { const a = k * PHI_ANGLE + t * 0.04 * fast, r = c0 * Math.sqrt(k);
-    const v = spec[k % 64] || 0, sz = 1 + v * 3.4 + (k % 21 === 0 ? 1 : 0);
-    g.fillStyle = light ? "hsla(" + ((k * 1.7 + t * 30) % 360) + ",95%,42%," + (0.55 + v * 0.4) + ")"
-      : "hsla(" + ((k * 1.7 + t * 30) % 360) + ",100%,70%," + (0.35 + v * 0.6) + ")";
+    const v = spec[k % 64] || 0, sz = 0.9 + v * 3.4;
+    g.fillStyle = light ? "hsla(" + ((k * 1.7 + t * 30) % 360) + ",95%,42%," + (0.4 + v * 0.4) + ")"
+      : "hsla(" + ((k * 1.7 + t * 30) % 360) + ",100%,70%," + (0.25 + v * 0.6) * (glOn ? 0.55 : 1) + ")";
     g.beginPath(); g.arc(X + Math.cos(a) * r, Y + Math.sin(a) * r, sz, 0, 6.283); g.fill(); }
-  // 7. the resonance ring: a standing wave whose lobes come from a Solfeggio tone
+  // the resonance ring: a standing wave whose lobes come from a Solfeggio tone
   if (now - SAC.toneAt > 9000) { SAC.toneAt = now; SAC.tone = (SAC.tone + 1) % SOLFEGGIO.length; }
   const hz = SOLFEGGIO[SAC.tone], lobes = Math.max(3, Math.round(hz / 44)), rr = R * 3.05;
-  g.lineWidth = 1.6; g.strokeStyle = light ? "rgba(90,40,160,.5)" : "hsla(" + ((hz / 3 + t * 10) % 360) + ",100%,72%,.6)";
+  g.lineWidth = 1.6; g.strokeStyle = light ? "rgba(90,40,160,.55)" : "hsla(" + ((hz / 3 + t * 10) % 360) + ",100%,72%,.6)";
   for (const ph of [0, Math.PI]) { g.beginPath();
     for (let i = 0; i <= 360; i++) { const a = i * Math.PI / 180;
       const r = rr + Math.sin(lobes * a + ph) * Math.sin(t * 2 * fast) * R * (0.06 + lv * 0.12);
@@ -745,7 +1021,7 @@ function sacPaint(now) {
   for (let i = 0; i < SOLFEGGIO.length; i++) { const a = -Math.PI / 2 + i * 6.283 / SOLFEGGIO.length + t * 0.01, on = i === SAC.tone;
     g.fillStyle = light ? (on ? "rgba(90,40,160,.9)" : "rgba(60,80,100,.45)") : (on ? "rgba(255,225,150,.95)" : "rgba(190,210,255,.4)");
     g.fillText(SOLFEGGIO[i] + " Hz", X + Math.cos(a) * (rr + R * 0.28), Y + Math.sin(a) * (rr + R * 0.28)); }
-  // 8. Seed of Life ripples on each bass hit
+  // Seed of Life ripples on each bass hit
   if (kick > 0.9 && SAC.kickWas <= 0.9) { SAC.seeds.push({ r: R * 0.5, a: 0.8, h: t * 40 }); if (SAC.seeds.length > 6) SAC.seeds.shift(); }
   SAC.kickWas = kick;
   for (let i = SAC.seeds.length - 1; i >= 0; i--) { const s = SAC.seeds[i]; s.r += R * 0.045; s.a *= 0.95;
@@ -754,20 +1030,33 @@ function sacPaint(now) {
       g.beginPath(); g.arc(X + Math.cos(a) * o, Y + Math.sin(a) * o, s.r, 0, 6.283); g.stroke(); }
     if (s.a < 0.03) SAC.seeds.splice(i, 1); }
   g.restore();
-}
-function sacImage(g, img, X, Y, rot, scale, alpha) {
-  if (!img || alpha <= 0) return;
-  g.save(); g.globalAlpha = Math.min(1, alpha); g.translate(X, Y); g.rotate(rot); g.scale(scale, scale);
-  g.drawImage(img, -img.width / 2, -img.height / 2); g.restore();
+  // the name of the stance standing forward, under the header
+  SAC.labelA = Math.min(1, SAC.labelA + 0.03);
+  const [num, name, line] = STANCES[SAC.stance], ly = W < 760 ? 92 : 100;
+  g.save(); g.textAlign = "center"; g.globalAlpha = SAC.labelA;
+  g.font = "600 13px Rajdhani, system-ui, sans-serif"; g.fillStyle = light ? "rgba(70,30,140,.9)" : "rgba(255,226,160,.95)";
+  const spaced = (num + "  ·  " + name).split("").join(" ");
+  g.fillText(spaced, X, ly);
+  g.font = "12px Rajdhani, system-ui, sans-serif"; g.fillStyle = light ? "rgba(40,60,80,.8)" : "rgba(200,220,255,.75)";
+  g.fillText(line, X, ly + 17);
+  if (glOn) { g.font = "11px Rajdhani, system-ui, sans-serif"; g.fillStyle = light ? "rgba(40,60,80,.6)" : "rgba(200,220,255,.55)";
+    g.fillText("field: a " + FIELD_N[SAC.stance] + "-dimensional standing wave · slice " + FIFTH.phase.toFixed(2), X, ly + 31); }
+  const dots = STANCES.length, dx = 12;                     // where in the ladder we stand
+  for (let i = 0; i < dots; i++) { g.beginPath(); g.arc(X + (i - (dots - 1) / 2) * dx, ly + (glOn ? 44 : 32), i === SAC.stance ? 3 : 1.6, 0, 6.283);
+    g.fillStyle = light ? "rgba(70,30,140," + (i === SAC.stance ? 0.9 : 0.35) + ")" : "rgba(255,226,160," + (i === SAC.stance ? 0.95 : 0.35) + ")"; g.fill(); }
+  g.restore();
 }
 function sacFrame(now) {
   if (SAC.on && !document.hidden && now - SAC.last > (REDUCED ? 100 : 33)) {
-    SAC.last = now; try { sacPaint(now); } catch (e) { /* one bad frame never stops it */ } }
+    const dt = Math.min(250, now - (SAC.last || now)); SAC.last = now;
+    try { fifthPaint(now, dt, FIELD_N[SAC.stance]); } catch (e) {}
+    try { sacPaint(now); } catch (e) { /* one bad frame never stops it */ } }
   requestAnimationFrame(sacFrame);
 }
 requestAnimationFrame(sacFrame);
 function paintTapestry() { const b = $("c-geo"); b.textContent = SAC.on ? "TAPESTRY ON" : "TAPESTRY OFF";
-  b.classList.toggle("on", SAC.on); SAC.cv.style.display = SAC.on ? "block" : "none"; }
+  b.classList.toggle("on", SAC.on); SAC.cv.style.display = SAC.on ? "block" : "none";
+  if (FIFTH && !FIFTH.lost) FIFTH.cv.style.display = SAC.on ? "block" : "none"; }
 $("c-geo").onclick = () => { SAC.on = !SAC.on; try { localStorage.setItem("jarvis-tapestry", SAC.on ? "1" : "0"); } catch (e) {}
   SAC.key = ""; paintTapestry(); };
 paintTapestry();

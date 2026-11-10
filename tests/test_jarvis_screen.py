@@ -274,6 +274,42 @@ def test_the_tapestry_is_sacred_geometry_that_never_takes_a_click():
     assert "REDUCED ? 100 : 33" in page                                        # ~30 fps, calmer if asked
 
 
+def test_the_fifth_dimension_is_a_real_slice_with_a_safe_fallback():
+    # The owner, 2026-11-09 (BassForge, pvrellis): cymatics as a 5-dimensional form seen in
+    # cross-section; the stances climb to 4D (tesseract, 600-cell), 8D (E8) and the quantum.
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert '<canvas id="fifth" aria-hidden="true"></canvas>' in page
+    assert "canvas#fifth{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}" in page
+    assert page.index('id="fifth"') < page.index('id="sacred"') < page.index('<canvas id="core"')
+    assert "float a = TAU * fj / N + rot;" in page                   # N axes fanned at 360°/N
+    assert "const FIELD_N = [6, 5, 4, 5, 8, 7, 5, 3, 5];" in page
+    assert 'cv.style.display = "none"; return null;' in page         # no WebGL: the 2D tapestry alone
+    assert "F.scale *= 0.75; fifthResize();" in page                 # slow frames: lower resolution
+    for part in ("TESSERACT", "CELL600", "E8_U", "buildOrbital(", "drawHopf(", "laguerre(", "legendre("):
+        assert part in page
+
+
+def test_the_e8_projection_is_eight_rings_of_thirty():
+    import math, re
+    from itertools import product
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    u = [float(x) for x in re.search(r"const E8_U = \[([^\]]+)\]", page).group(1).split(",")]
+    w = [float(x) for x in re.search(r"const E8_W = \[([^\]]+)\]", page).group(1).split(",")]
+    roots = []
+    for i in range(8):
+        for j in range(i + 1, 8):
+            for a, b in product((1, -1), repeat=2):
+                r = [0] * 8; r[i], r[j] = a, b; roots.append(r)
+    roots += [list(s) for s in product((0.5, -0.5), repeat=8) if sum(x < 0 for x in s) % 2 == 0]
+    assert len(roots) == 240
+    radii = [round(math.hypot(sum(x * y for x, y in zip(r, u)), sum(x * y for x, y in zip(r, w))), 4) for r in roots]
+    assert sorted({radii.count(x) for x in set(radii)}) == [30] and len(set(radii)) == 8
+
+
 def test_a_toolbox_card_with_missing_fields_does_not_break():
     from pathlib import Path
     page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
