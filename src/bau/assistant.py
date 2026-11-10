@@ -31,6 +31,7 @@ import json
 import os
 import re
 import secrets
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -69,10 +70,9 @@ How you act:
 - Confirm tools (posting, releasing a hold): calling one only puts it on the owner's
   screen for confirmation. Say it is waiting for their confirmation. Never say it is
   done until a later message tells you the owner confirmed it.
-- Kids videos go only to YouTube, marked made for kids, after the owner has watched
-  them. Never suggest posting child-directed videos to TikTok or other 13+ platforms;
-  if the owner asks to post a kids video there, say plainly that kids videos only go to
-  YouTube. Other videos follow the posting rule above.
+- The creator is a fictional adult. Never make, plan or post anything that involves or
+  refers to minors; if asked, say plainly that BAU never does. Explicit content goes only to
+  Fanvue; Instagram and TikTok get safe-for-work posts only.
 - Approving is never yours, and never offer to do it: money, commercial email sends,
   legal decisions, turning on a model ("bau models bench <id>", then "bau set-status
   model <id> APPROVED"), or anything else that needs the owner's sign-off. Say it is
@@ -93,15 +93,16 @@ CONFIRMATION_NOTE = "PENDING_OWNER_CONFIRMATION"
 # Which node on the Jarvis screen lights up while a tool runs, and what it says.
 TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "strategist",
              "plan_mission": "strategist", "publish_queue": "publisher",
-             "post_video": "publisher", "deadlines": "compliance", "money": "finance",
+             "post_video": "publisher", "fanvue_queue": "publisher",
+             "deadlines": "compliance", "money": "finance",
              "brain_lookup": "memory", "brain_add": "memory", "remember": "memory",
              "brain_gaps": "researcher", "scout_results": "scout", "find_tools": "scout",
              "workspaces": "producer", "draft_stage": "producer",
-             "clip_prompt": "producer", "plan_episode": "producer",
+             "creator_batch": "producer",
              "toolbox": "scout", "capability_map": "scout", "open_source_watch": "scout",
              "world_watch": "godseye", "web_search": "scout", "read_page": "scout",
              "video_clips": "studio", "make_video": "studio",
-             "usage_today": "usage", "results": "results",
+             "usage_today": "usage",
              "agents": "strategist", "ask_agent": "strategist", "ask_thinker": "strategist",
              "hold_everything": "watchdog", "release_hold": "watchdog"}
 TOOL_WORDS = {"draft_stage": "Drafting the next step", "find_tools": "Searching GitHub",
@@ -126,17 +127,59 @@ def load_constitution(home: Path) -> str:
 # A small local model on the laptop reads every tool description before each answer
 # (measured: 34 tools = 3,155 tokens, ~52 s on the laptop's CPU). It gets these in full and
 # a one-line menu of the rest (tool_menu), run through use_tool - the same gateway.
-CORE_TOOLS = ("system_status", "recall", "remember", "toolbox", "missions", "usage_today",
-              "hold_everything", "web_search")
+CORE_TOOLS = ("system_status", "recall", "remember", "toolbox", "usage_today",
+              "hold_everything", "web_search", "creator_batch")
 LEAN_MAX_TOKENS = 400                         # spoken answers; a small model can loop
+# After Accept opens a terminal, that step's card stays down this long (the NVIDIA driver and
+# the pictures download take a while); a step still not done after it comes back.
+SETUP_RUNNING_S = 45 * 60
+# "Not now" on a setup card keeps it down this long; before, it came back on the screen's next
+# check, seconds later (found by the screen audit, 2026-11-08).
+SETUP_SNOOZE_S = 4 * 3600
+# The local model server's window: bau-llm.service runs llama-server with --ctx-size 8192
+# (a test keeps the two equal). Requests are measured in characters, about 3 per token, which
+# errs on the safe side; the owner's desktop got HTTP 400s when Jarvis sent more (2026-11-02).
+LOCAL_SERVER_CTX = 8192
+CHARS_PER_TOKEN = 3
+LEAN_RESULT_CHARS = 3000                      # one tool result, local model
 LEAN_NOTE = ("You see a few tools in full. tool_menu lists the others in one line each "
              "(tool_menu with a name shows one in full); run any of them with use_tool. "
              "Before saying something doesn't exist, look: toolbox, recall, tool_menu.")
 META_TOOLS = ("tool_menu", "use_tool")
+# Harness step 1 (docs/HARNESS-MAP.md): Jarvis's read and act tools run through the Universal
+# Gateway as agent "jarvis". These reach the internet directly, so network trust applies to
+# them (world_watch is not here: offline it still answers from its 5-minute cache).
+# hold_everything only makes BAU safer, so it runs on HOLD.
+NETWORK_TOOLS = {"web_search", "read_page", "find_tools", "video_clips"}
+SAFE_ON_HOLD = {"hold_everything"}
+# What a web page, a search result or a project's README says can try to steer Jarvis. After
+# one of these in a turn, his "act" tools wait for the owner's next message (roadmap step 1).
+OUTSIDE_CONTENT = {"web_search", "read_page", "find_tools"}
+# Where a menu line ends: the first sentence ("e.g. the creator" is not a sentence end).
+SENTENCE_END = re.compile(r"(?<![.\s][a-z])\.\s+(?=[A-Z])")
 # Small models often announce a lookup ("Let me search...") and stop without doing it.
 ANNOUNCED = re.compile(r"\b(let me|i'll|i will|i am going to|i'm going to)\b[^.?!]{0,60}"
                        r"\b(search|look|check|find|ask|use|see)\b", re.I)
 NUDGE = "(Go ahead: call the tool now instead of saying you will.)"
+# "Remember that ..." from the owner: saved first, then the model only confirms. A small model
+# asked to remember searched instead and said it had saved it (real-model check 2026-11-01).
+REMEMBER_CMD = re.compile(r"^\W*(?:please\W+|jarvis\W+|hey jarvis\W+)*remember\W+(?:that\W+)?"
+                          r"(.{3,})", re.I | re.S)
+WEEK_CMD = re.compile(r"\b(?:schedule|post|publish)\b.{0,20}\bweek\W+([a-z0-9][a-z0-9._-]{0,60}"
+                      r"[a-z0-9])", re.I)
+# Talking to the autopilot (docs/AUTOPILOT.md): handled here, never by a model.
+AUTOPILOT_CMD = re.compile(
+    r"^\W*(?:(?:ok(?:ay)?|jarvis|hey jarvis)\W+)*(?:(?P<pause>pause|stop working|hold on)"
+    r"|(?P<resume>resume|carry on|keep working|start working)"
+    r"|focus on\W+(?P<focus>.{2,80}?)"
+    r"|(?:look into|research|find out about)\W+(?P<look>.{2,80}?)"
+    r"|(?P<status>what are you (?:working on|doing)|autopilot status))\W*$", re.I)
+# "Let's do all" and the like: everything waiting on the owner goes on screen at once as cards
+# with Accept, no model needed (the owner's desktop, 2026-11-02: a small model ran out of steps).
+DO_ALL_CMD = re.compile(
+    r"^\W*(?:(?:ok(?:ay)?|yes|yeah|alright|all right|jarvis)\W+)*(?:let'?s\W+)?"
+    r"(?:do\W+(?:it\W+)?all|do\W+everything|continue|keep\W+going|"
+    r"what(?:'s|\W+is)\W+waiting(?:\W+(?:on|for)\W+me)?)\W*$", re.I)
 # Facts first: for the common questions a local model is handed the answer's facts with the
 # question (plain matching, no model), so it only has to say them. Read tools only.
 GROUND = (
@@ -146,12 +189,16 @@ GROUND = (
                 r"governor)", re.I),
      "system_status", lambda q: {}),
     # The real model, asked to post, guessed a kids video (2026-10-27): show it the queue.
-    (re.compile(r"\b(post|publish|upload)\w*\b.{0,40}\b(videos?|clips?|tiktok|youtube)\b",
+    (re.compile(r"\b(post|publish|upload)\w*\b.{0,40}\b(videos?|clips?|tiktok)\b",
                 re.I), "publish_queue", lambda q: {}),
     (re.compile(r"\b(tools?|repos?|open.source|librar(y|ies)|already have)\b", re.I),
      "toolbox", lambda q: {"question": q}),
-    (re.compile(r"\b(remember|last time|we decided|earlier|my notes)\b", re.I),
+    # "Remember that ..." is a command to save (real run 2026-11-01: handed recall's facts,
+    # the model saved nothing and said it had), so only questions about the past match.
+    (re.compile(r"^(?!\W*(?:please\W+|jarvis\W+)*remember\b).*"
+                r"\b(remember|last time|we decided|earlier|my notes)\b", re.I | re.S),
      "recall", lambda q: {"query": q}),
+    (re.compile(r"\bworkspaces?\b", re.I), "workspaces", lambda q: {}),
 )
 
 
@@ -165,6 +212,19 @@ class Tool:
     # confirm tools: builds the card the owner sees - {"summary", "form"?, "preview"?}.
     # Raises ValueError when there is nothing that could be confirmed.
     stage: Callable[..., dict[str, Any]] | None = None
+
+
+def _typed(v: Any, f: dict[str, Any]) -> Any:
+    """The owner's choice for one card field, or None when it is not a valid one."""
+    if "options" in f:
+        return v if v in [o[0] for o in f["options"]] else None
+    if f.get("type") == "number":
+        try:
+            n = float(v)
+        except (TypeError, ValueError):
+            return None
+        return n if f["min"] <= n <= f["max"] else None
+    return v if isinstance(v, str) and v.strip() and len(v) <= 4000 else None
 
 
 @dataclass
@@ -191,6 +251,24 @@ class Reply:
     model: str = ""                           # which model gave this answer
 
 
+def _longest_text(messages: list[Any]) -> tuple[Any, Any, str] | None:
+    """The longest string in these messages, as (holder, key, text), for cutting in place."""
+    best: tuple[Any, Any, str] | None = None
+
+    def walk(node: Any) -> None:
+        nonlocal best
+        items = node.items() if isinstance(node, dict) else enumerate(node) \
+            if isinstance(node, list) else ()
+        for k, v in items:
+            if isinstance(v, str):
+                if len(v) > 400 and (best is None or len(v) > len(best[2])):
+                    best = (node, k, v)
+            else:
+                walk(v)
+    walk(messages)
+    return best
+
+
 def _now() -> str:
     return dt.datetime.now(dt.UTC).isoformat()
 
@@ -207,7 +285,8 @@ def _schema(props: dict[str, Any] | None = None, required: list[str] | None = No
 class Assistant:
     def __init__(self, home: Path | None = None, provider: Provider | None = None,
                  model: dict[str, Any] | None = None, owner: str = "human:owner",
-                 audit: AuditLog | None = None, clients: dict[str, Any] | None = None):
+                 audit: AuditLog | None = None, clients: dict[str, Any] | None = None,
+                 trust: Callable[[], Any] | None = None):
         self.home = home or bau_home()
         self.dir = self.home / "jarvis"
         self.dir.mkdir(parents=True, exist_ok=True)
@@ -221,16 +300,66 @@ class Assistant:
         self.clients = clients or {}         # platform -> API client (tests inject fakes)
         self.messages: list[dict[str, Any]] = []
         self.pending: dict[str, Pending] = {}
+        self.tainted = False                  # this turn read outside content
+        self.setup_started: dict[str, float] = {}     # step -> when its terminal opened
+        self.setup_snoozed: dict[str, float] = {}     # step -> when the owner said Not now
         self.last_model = ""                  # the model that gave the last answer
         self._continuity: str | None = None   # earlier conversation, read once per session
         self.tools = {t.name: t for t in self._tools()}
+        self.gateway, self.caps = self._gateway(trust)
         from .activity import Activity
         self.activity = Activity()            # what the screen shows as live work
         # Started only by the owner from the screen; never offered to a model.
         self.owner_tools = {"check_stage": Tool(
             "check_stage", "The owner checks a stage they have read.",
             _schema({"workspace": {"type": "string"}, "episode": {"type": "string"},
-                     "stage": {"type": "string"}}), self.t_check_stage, kind="confirm")}
+                     "stage": {"type": "string"}}), self.t_check_stage, kind="confirm"),
+            # Setup steps waiting on this computer (src/bau/setup_steps.py); the owner's
+            # Accept runs one. Never offered to a model.
+            "setup_step": Tool("setup_step", "Run one setup step the owner accepted.",
+                               _schema({"step": {"type": "string"}}), self.t_setup_step,
+                               kind="confirm"),
+            # The autopilot's questions (src/bau/autopilot.py): Accept is yes, Not now is no.
+            "autopilot_answer": Tool("autopilot_answer", "The owner answers the autopilot.",
+                                     _schema({"task": {"type": "string"}}),
+                                     self.t_autopilot_yes, kind="confirm"),
+            # A picture the autopilot drafted for Fanvue: Accept lets it post, Not now drops it.
+            "fanvue_review": Tool("fanvue_review", "The owner approves a drafted picture.",
+                                  _schema({"item": {"type": "string"}}),
+                                  self.t_fanvue_approve, kind="confirm")}
+
+    def _gateway(self, trust: Callable[[], Any] | None) -> tuple[Any, dict[str, str]]:
+        """The same gateway the agents use: HOLD, permissions, network trust, budget and the
+        audit chain now apply to every read and act tool of Jarvis's."""
+        from . import network
+        from .economics import Budgets, Ledger
+        from .gateway import Gateway, Handler
+        from .governor import hold_reason
+        home = self.home
+        ask = trust or (lambda: network.TrustPolicy(
+            home / "security" / "networks.yaml").classify(network.detect()))
+        seen: dict[str, Any] = {}
+
+        def trust_now() -> Any:           # the probes take seconds offline: once a minute
+            if time.monotonic() - seen.get("at", -1e9) > 60:
+                seen.update(at=time.monotonic(), trust=ask())
+            return seen["trust"]
+
+        gw = Gateway(audit=self.audit, ledger=Ledger(home),
+                     budgets=Budgets.load(home / "config" / "budgets.yaml"),
+                     trust=trust_now, hold=lambda: hold_reason(home))
+        caps = {}
+        for t in self.tools.values():
+            if t.kind == "confirm" or t.name in META_TOOLS:
+                continue                  # staged for the owner / only dispatch to others
+            cap = f"{'inspect' if t.kind == 'read' else 'change'}.jarvis.{t.name}"
+            level = "READ_ONLY" if t.kind == "read" else "LOW_RISK"
+            net = t.name in NETWORK_TOOLS
+            gw.register(cap, Handler(t.fn, level, needs_network=net, local=not net,
+                                     safe_on_hold=t.name in SAFE_ON_HOLD,
+                                     description=t.description[:200]))
+            caps[t.name] = cap
+        return gw, caps
 
     # -------------------------------------------------------------- tools
     def _tools(self) -> list[Tool]:
@@ -243,8 +372,8 @@ class Assistant:
                          []), self.t_night),
             Tool("missions", "Missions and their status and next action.", _schema(),
                  self.t_missions),
-            Tool("publish_queue", "Videos waiting for review on every platform (YouTube, "
-                 "TikTok...): title, made-for-kids, AI label, checks.",
+            Tool("publish_queue", "Videos waiting for review on every platform (TikTok...): "
+                 "title, AI label, checks.",
                  _schema(), self.t_publish_queue),
             Tool("deadlines", "Open legal review items, regulation reviews coming due, "
                  "and open incidents.",
@@ -259,7 +388,7 @@ class Assistant:
             Tool("brain_gaps", "What is not automatable yet: incomplete workflows, broken "
                  "links, notes holding personal data.", _schema(), self.t_brain_gaps),
             Tool("brain_add", "Add knowledge to the Second Brain from a plain sentence such "
-                 "as 'Content team runs YouTube shorts which consumes scripts and produces "
+                 "as 'Content team runs TikTok shorts which consumes scripts and produces "
                  "videos'.", _schema({"sentence": {"type": "string"}}), self.t_brain_add,
                  kind="act"),
             Tool("remember", "Save a note to long-term memory (a decision, preference or "
@@ -349,31 +478,24 @@ class Assistant:
                  "anything aimed at children.",
                  _schema({"question": {"type": "string"}, "material": {"type": "string"}},
                          ["question"]), self.t_ask_thinker),
-            Tool("results", "How the posted videos are doing: views, watch time, likes, "
-                 "YouTube's estimated earnings, what each video's clips cost and the profit, "
-                 "and which story formats people watch most. refresh=true reads the latest "
-                 "numbers from YouTube and TikTok first (read only, at most once an hour).",
-                 _schema({"refresh": {"type": "boolean"}}), self.t_results),
             Tool("video_clips", "Clips the studio has made or is making: checks the ones in "
                  "progress, saves finished ones, and reports this month's video spending.",
                  _schema(), self.t_video_clips, kind="act"),
-            Tool("workspaces", "Production workspaces (e.g. the kids channel): every "
-                 "episode and where each stage stands - checked, drafted and waiting for the "
+            Tool("workspaces", "Production workspaces (e.g. the creator week): every "
+                 "run and where each stage stands - checked, drafted and waiting for the "
                  "owner's check, ready to draft, or the owner's own step.", _schema(),
                  self.t_workspaces),
-            Tool("clip_prompt", "A video prompt for one scene of a kids series, with each "
-                 "character described exactly as their sheet says and the channel's style, so "
-                 "they look the same in every clip. Give the scene and the character ids.",
-                 _schema({"workspace": {"type": "string"}, "scene": {"type": "string"},
-                          "cast": {"type": "array", "items": {"type": "string"}}}),
-                 self.t_clip_prompt),
-            Tool("plan_episode", "Plan an episode's clips from a story format (e.g. "
-                 "problem-song-solution, count-along, question-reveal, call-and-response): "
-                 "clip-sized scenes with prompts, plus warnings if the channel is starting to "
-                 "repeat itself. Writes series-plan.md in the episode; makes no clip.",
-                 _schema({"workspace": {"type": "string"}, "episode": {"type": "string"},
-                          "format": {"type": "string"}, "seconds": {"type": "integer"}},
-                         ["workspace", "episode", "format"]), self.t_plan_episode, kind="act"),
+            Tool("creator_batch", "Draft a batch of consistent posts for a fictional adult "
+                 "virtual creator profile in BAU_HOME/creators. Requires an owner-created and "
+                 "validated profile. Returns identity-locked sfw visual prompts and caption "
+                 "briefs; does not generate media or publish. Explicit adult batches are the "
+                 "owner's own command (bau creator batch --tier explicit), never this tool. "
+                 "Pass the profile id, theme, platform and optional post count.",
+                 _schema({"creator": {"type": "string"}, "theme": {"type": "string"},
+                          "platform": {"type": "string",
+                                       "enum": ["instagram", "tiktok", "fanvue"]},
+                          "count": {"type": "integer"}},
+                         ["theme", "platform"]), self.t_creator_batch),
             Tool("draft_stage", "Draft the next stage of one episode (only the files that "
                  "stage lists are read; only its output folder is written). The stage folder "
                  "says which brain drafts it: small (free local model), strong (Claude) or "
@@ -388,12 +510,25 @@ class Assistant:
             Tool("release_hold", "Lift a HOLD so BAU runs normally again (owner confirms "
                  "on screen).", _schema(), self.t_release, kind="confirm",
                  stage=lambda: {"summary": "Release the HOLD and let BAU run normally again?"}),
+            Tool("fanvue_queue", "Queue one of the creator's pictures (a file in "
+                 "artifacts/media drawn by bau creator draw) with its caption for Fanvue, "
+                 "level 0 (free teaser) or 1 (subscribers, no nudity). The AI label is added. "
+                 "This only queues it; post it with post_video, which the owner confirms.",
+                 _schema({"picture": {"type": "string"}, "caption": {"type": "string"},
+                          "level": {"type": "integer", "enum": [0, 1]}}),
+                 self.t_fanvue_queue, kind="act"),
             Tool("post_video", "Put one queued video on the owner's screen to post on its "
                  "platform. The owner watches the preview and makes the platform's choices "
                  "(who can see it, audience, promotion) on that card; you cannot make them.",
                  _schema({"platform": {"type": "string", "enum": sorted(ADAPTERS)},
                           "item_id": {"type": "string"}}),
                  self.t_post_video, kind="confirm", stage=self._post_card),
+            Tool("schedule_week", "Put a week of the creator's posts (a plan in "
+                 "BAU_HOME/weeks) on the owner's screen as one card. The owner reads every "
+                 "post, picks TikTok's visibility and confirms once; Ayrshare then posts each "
+                 "on its day with the AI label. You cannot schedule or choose for them.",
+                 _schema({"week": {"type": "string"}}),
+                 self.t_schedule_week, kind="confirm", stage=self._week_card),
             Tool("tool_menu", "Your other tools, one line each. Give a name to see that "
                  "tool in full (what it does and its inputs).",
                  _schema({"name": {"type": "string"}}, []), self.t_tool_menu),
@@ -417,6 +552,8 @@ class Assistant:
 
     def t_tool_menu(self, name: str = "") -> dict[str, Any]:
         how = 'run it with use_tool: {"name": "<tool>", "input": {...}}'
+        if name in ("use_tool", "tool_menu"):
+            return {"name": name, "how": how}
         if name:
             t = self.tools.get(name)
             if t is None or name in META_TOOLS:
@@ -424,10 +561,14 @@ class Assistant:
             return {"name": t.name, "description": t.description,
                     "parameters": t.schema, "how": how}
         rest = [t for n, t in self.tools.items() if n not in CORE_TOOLS and n not in META_TOOLS]
-        return {"tools": [f"{t.name}: {t.description.split('. ')[0][:110]}" for t in rest],
+        return {"tools": [f"{t.name}: {SENTENCE_END.split(t.description)[0][:110]}"
+                          for t in rest],
                 "how": how}
 
     def t_use_tool(self, name: str, input: dict[str, Any] | None = None) -> Any:  # noqa: A002
+        # A small model wrapped use_tool in use_tool (owner's desktop, 2026-11-02): unwrap it.
+        while name == "use_tool" and isinstance(input, dict) and "name" in input:
+            name, input = str(input["name"]), input.get("input") or {}
         if name in META_TOOLS:
             return {"error": f"{name} is not run through use_tool"}
         out, err = self._run_tool(name, input if isinstance(input, dict) else {})
@@ -489,11 +630,18 @@ class Assistant:
 
     def t_money(self, days: int = 30) -> dict[str, Any]:
         from .economics import Ledger, metrics
+        synced = None
+        try:                                   # Fanvue's earnings in first, once an hour
+            from .fanvue import sync_if_due
+            synced = sync_if_due(self.home)
+        except Exception as e:  # noqa: BLE001 - the ledger still answers without Fanvue
+            synced = {"error": f"Fanvue earnings not read: {e}"[:200]}
         since = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
         m = metrics(Ledger(self.home), since=since)
         keep = ("revenue", "profit", "fees", "costs_by_kind", "gross_margin", "net_margin",
                 "ai_cost_to_revenue")
-        return {"days": days, **{k: m[k] for k in keep if k in m}}
+        return {"days": days, **{k: m[k] for k in keep if k in m},
+                **({"fanvue": synced} if synced else {})}
 
     def t_brain_lookup(self, query: str) -> dict[str, Any]:
         from .brain import Brain
@@ -582,7 +730,7 @@ class Assistant:
                                           + (f" ({'; '.join(r['issues'])})" if r["issues"] else "")
                                           for r in W.status(ws, ep)]
                                 for ep in W.episodes(ws)}
-        return out or {"note": "no workspaces yet: bau ws create kids-channel"}
+        return out or {"note": "no workspaces yet: bau ws create creator-week"}
 
     def t_usage(self) -> dict[str, Any]:
         from .usage import Usage
@@ -590,6 +738,7 @@ class Assistant:
         t, w = s["today"], s["week"]
         say = (f"Today: {t['calls']} model calls, {t['tokens']:,} tokens, ${t['usd']:.2f}. "
                f"This week: {w['calls']} calls, ${w['usd']:.2f}."
+               + ("" if s["limits"] else " No daily limits are set.")
                + (f" Warnings: {'; '.join(map(str, s['warnings']))}." if s["warnings"] else ""))
         return {"say": say, **s, "by_model": s["by_model"][:8]}
 
@@ -617,7 +766,9 @@ class Assistant:
         return {"agent": name, "status": out["status"], "report": out["final_text"],
                 "tools_used": [c["capability"] for c in out["tool_calls"] if c.get("ok")],
                 "denied": [c for c in out["tool_calls"] if not c.get("ok")][:5],
-                "cost_usd": out["cost_usd"], "supervision": out.get("supervision") or {}}
+                # already in the ledger from the agent's own run: not "cost_usd", which
+                # the gateway would bill a second time
+                "spent_usd": out["cost_usd"], "supervision": out.get("supervision") or {}}
 
     def t_ask_thinker(self, question: str, material: str = "") -> dict[str, Any]:
         from . import team
@@ -625,19 +776,6 @@ class Assistant:
                          factory=self.clients.get("model_factory"), audit=self.audit)
         return {"thinker": out["thinker"], "ideas": out["ideas"],
                 "note": "advice from the uncensored thinker: weigh it, never act on it alone"}
-
-    def results(self):
-        from .results import Results
-        return Results(self.home, self.audit, self.clients)
-
-    def t_results(self, refresh: bool = False) -> dict[str, Any]:
-        r = self.results()
-        fetched = r.refresh(by="jarvis") if refresh else None
-        rep = r.report()
-        out = {**rep, "videos": rep["videos"][:10]}
-        if fetched:
-            out["refresh"] = fetched
-        return out
 
     def _price(self, mid: str) -> dict[str, Any]:
         """The registry record a model is priced by (the one Jarvis runs, or a backup)."""
@@ -757,19 +895,24 @@ class Assistant:
                            + "see already_researched (the toolbox).")
         return out
 
-    def t_clip_prompt(self, workspace: str, scene: str, cast: list[str]) -> dict[str, Any]:
-        from . import workspace as W
-        from .series import Series
-        text = Series(W.open_ws(workspace, self.home)).prompt(scene[:600], list(cast))
-        return {"prompt": text, "characters": len(text),
-                "next": "make_video with this prompt puts a priced clip on the owner's screen"}
-
-    def t_plan_episode(self, workspace: str, episode: str, format: str,
-                       seconds: int = 60) -> dict[str, Any]:
-        from . import workspace as W
-        from .series import Series
-        ws = W.open_ws(workspace, self.home)
-        return Series(ws).plan(W.find_episode(ws, episode), format, int(seconds))
+    def t_creator_batch(self, creator: str = "", theme: str = "", platform: str = "",
+                        count: int = 7) -> dict[str, Any]:
+        from .virtual_creator import CreatorError, VirtualCreator
+        if not theme or not platform:
+            raise ValueError("give a theme and a platform (instagram, tiktok or fanvue)")
+        have = sorted(p.stem for p in (self.home / "creators").glob("*.yaml"))
+        if not have:
+            raise ValueError("there is no creator profile yet: the owner runs "
+                             "`bau creator init`, edits it, then `bau creator check`")
+        creator = creator.strip().lower() or (have[0] if len(have) == 1 else "")
+        if creator not in have:
+            raise ValueError(f"which creator? The profiles are: {', '.join(have)}")
+        path = self.home / "creators" / f"{creator}.yaml"
+        try:
+            batch = VirtualCreator(path).batch(theme, platform, int(count), tier="sfw")
+        except CreatorError as exc:
+            raise ValueError(str(exc)) from exc
+        return batch
 
     def t_draft_stage(self, workspace: str, episode: str, brain: str = "") -> dict[str, Any]:
         from . import brains
@@ -829,6 +972,70 @@ class Assistant:
         self.pending[pid] = Pending(pid, "check_stage", args, summary, _now())
         return self.pending[pid].public()
 
+    def setup_waiting(self) -> list[dict[str, Any]]:
+        """Every setup step still waiting here, as a card with Accept (the owner's ask,
+        2026-11-02). Each step is staged once; a step done meanwhile is taken down."""
+        from . import setup_steps
+        steps = {s.id: s for s in setup_steps.waiting(self.home)}
+        for pid, p in list(self.pending.items()):
+            if p.tool == "setup_step" and p.args["step"] not in steps:
+                self.pending.pop(pid)
+        staged = {p.args["step"] for p in self.pending.values() if p.tool == "setup_step"}
+        # A step whose terminal is open is being done: no second card while it runs.
+        now = time.monotonic()
+        busy = {k for k, t in self.setup_started.items() if now - t < SETUP_RUNNING_S}
+        busy |= {k for k, t in self.setup_snoozed.items() if now - t < SETUP_SNOOZE_S}
+        for s in steps.values():
+            if s.id not in staged and s.id not in busy:
+                pid = "su_" + secrets.token_hex(4)
+                self.pending[pid] = Pending(pid, "setup_step", {"step": s.id},
+                                            f"Setup: {s.title}\n{s.why}", _now(),
+                                            form=setup_steps.form(s.id))
+        from . import autopilot
+        asked = {p.args["task"] for p in self.pending.values() if p.tool == "autopilot_answer"}
+        for q in autopilot.questions(self.home):
+            if q["id"] not in asked:
+                pid = "ap_" + secrets.token_hex(4)
+                self.pending[pid] = Pending(pid, "autopilot_answer", {"task": q["id"]},
+                                            f"Jarvis asks: {q['question']}\n"
+                                            "Accept = yes, Not now = no.", _now())
+        from .fanvue import LEVELS, Queue
+        q, shown = Queue(self.home), {p.args["item"] for p in self.pending.values()
+                                      if p.tool == "fanvue_review"}
+        for item in q.review():
+            if item["item_id"] not in shown:
+                pid = "fr_" + secrets.token_hex(4)
+                self.pending[pid] = Pending(
+                    pid, "fanvue_review", {"item": item["item_id"]},
+                    f"New picture for Fanvue, level {item['level']} "
+                    f"({LEVELS[item['level']]})"
+                    + (f", unlock price ${item['price_cents'] / 100:.2f}"
+                       if item.get("price_cents") else "")
+                    + f".\n{item['caption']}\n\n"
+                    "Accept: it joins the posting queue. Not now: it is dropped.",
+                    _now(), preview=str(q.picture(item)))
+        return [p.public() for p in self.pending.values()
+                if p.tool in ("setup_step", "autopilot_answer", "fanvue_review")]
+
+    def t_fanvue_approve(self, item: str) -> dict[str, Any]:
+        from .fanvue import Queue
+        Queue(self.home).decide(item, True, self.owner)
+        return {"done": True, "said": "Approved: it joins the posting queue."}
+
+    def t_autopilot_yes(self, task: str) -> dict[str, Any]:
+        from . import autopilot
+        return autopilot.answer(self.home, task, "yes", self.owner)
+
+    def t_setup_step(self, step: str, **typed: Any) -> dict[str, Any]:
+        from . import setup_steps
+        out = setup_steps.run(step, self.home, owner=self.owner, values=typed)
+        if out.get("started"):
+            self.setup_started[step] = time.monotonic()
+        for mid in out.get("switched_on", []):
+            self.audit.append("registry.status", self.owner,
+                              {"kind": "model", "key": mid, "status": "APPROVED"})
+        return out
+
     def t_check_stage(self, workspace: str, episode: str, stage: str) -> dict[str, Any]:
         from . import workspace as W
         ws = W.open_ws(workspace, self.home)
@@ -849,8 +1056,28 @@ class Assistant:
         Governor(self.home, audit=self.audit, systemctl="").release(self.owner)
         return {"hold": None}
 
+    def _week_card(self, week: str) -> dict[str, Any]:
+        from . import week as W
+        try:
+            return W.stage(self.home, week)
+        except W.WeekError as e:
+            raise ValueError(str(e)) from e
+
+    def t_schedule_week(self, week: str, tiktok_visibility: str = "") -> dict[str, Any]:
+        from . import week as W
+        return W.send(self.home, week, tiktok_visibility, W.client(), self.owner)
+
     def _post_card(self, platform: str, item_id: str) -> dict[str, Any]:
         return self.hub().adapter(platform).card(item_id)
+
+    def t_fanvue_queue(self, picture: str, caption: str, level: int) -> dict[str, Any]:
+        from .fanvue import Queue
+        try:
+            item = Queue(self.home, self.audit).add(picture, caption, int(level), "jarvis")
+        except ValueError as e:
+            return {"error": str(e)}
+        return {"queued": item["item_id"], "next": "post_video platform=fanvue item_id="
+                + item["item_id"] + " puts it on the owner's screen"}
 
     def t_post_video(self, platform: str, item_id: str, **choices: Any) -> dict[str, Any]:
         return self.hub().adapter(platform).post(item_id, choices, self.owner)
@@ -877,16 +1104,31 @@ class Assistant:
             return {"status": CONFIRMATION_NOTE, "pending_id": pid,
                     "note": "Shown on the owner's screen. Nothing has happened yet."}, False
         node = TOOL_NODE.get(name, "chief")
+        if self.tainted and tool.kind == "act" and name not in SAFE_ON_HOLD | OUTSIDE_CONTENT:
+            self.audit.append("jarvis.refused", "jarvis", {"tool": name, "why": "untrusted_read"})
+            return {"error": "not run: I read outside content (a web page or search result) "
+                             "in this turn, so I only read now. Ask me again in a new message "
+                             "if you want this done."}, True
         self.activity.emit(node, "start", TOOL_WORDS.get(name, name.replace("_", " ")))
+        from .gateway import CallRequest, GatewayDenied
         try:
-            out = tool.fn(**args)
+            if name in self.caps:
+                out = self.gateway.invoke(CallRequest("jarvis", self.caps[name], args,
+                                                      tainted=self.tainted))
+            else:
+                out = tool.fn(**args)
+        except GatewayDenied as e:
+            self.activity.emit(node, "error", f"{name}: not run ({e.step})")
+            return {"error": f"not run: {e.reason}"[:400]}, True
         except TypeError as e:
             self.activity.emit(node, "error", f"{name}: bad arguments")
             return {"error": f"bad arguments for {name}: {e}"}, True
         except Exception as e:  # report, never hide
             self.activity.emit(node, "error", f"{type(e).__name__}: {e}"[:200])
             return {"error": f"{type(e).__name__}: {e}"[:400]}, True
-        self.audit.append("jarvis.tool", "jarvis", {"tool": name, "kind": tool.kind})
+        if name not in self.caps:         # the gateway already wrote its own row
+            self.audit.append("jarvis.tool", "jarvis", {"tool": name, "kind": tool.kind})
+        self.tainted = self.tainted or name in OUTSIDE_CONTENT
         self.activity.emit(node, "done", TOOL_WORDS.get(name, name.replace("_", " ")) + ": done")
         return out, False
 
@@ -902,12 +1144,20 @@ class Assistant:
         if approve and p.form:
             picked = {}
             for f in p.form["fields"]:
-                v = (choices or {}).get(f["name"])
-                if v not in [o[0] for o in f["options"]]:
+                v = _typed((choices or {}).get(f["name"]), f)
+                if v is None:
                     self.pending[p.id] = p              # still waiting; let them choose
                     return {"error": f"choose: {f['label']}", "retry": True}
                 picked[f["name"]] = v
             p.args = {**p.args, **picked}
+        if not approve and p.tool == "setup_step":           # Not now: not again for a while
+            self.setup_snoozed[p.args["step"]] = time.monotonic()
+        if not approve and p.tool == "fanvue_review":        # Not now on a picture = dropped
+            from .fanvue import Queue
+            Queue(self.home).decide(p.args["item"], False, by)
+        if not approve and p.tool == "autopilot_answer":     # Not now on a question = no
+            from . import autopilot
+            autopilot.answer(self.home, p.args["task"], "no", by)
         if not approve:
             self.audit.append("jarvis.declined", by, {"tool": p.tool, "pending": p.id})
             note = f"[The owner declined: {p.tool}. Nothing was done.]"
@@ -944,6 +1194,11 @@ class Assistant:
                 f[key] = fn()
             except Exception as e:  # one broken source must not silence the briefing
                 f[key] = {"error": f"{type(e).__name__}: {e}"[:200]}
+        from . import update
+        f["update"] = update.last(update.STATE)     # read at call time (tests point it away)
+        from . import autopilot
+        f["autopilot"] = autopilot.digest(self.home) if autopilot._load(self.home)["tasks"] \
+            else None
         return f
 
     def plain_briefing(self, f: dict[str, Any]) -> str:
@@ -977,6 +1232,17 @@ class Assistant:
             parts.append(f"{len(d['regulation_reviews_due'])} regulation review(s) due soon.")
         if d.get("incidents_open"):
             parts.append(f"Heads up: {len(d['incidents_open'])} open incident(s).")
+        if f.get("autopilot"):
+            parts.append(f["autopilot"].split("\n")[0])
+        up = f.get("update") or {}
+        if up.get("result") == "installed":
+            parts.append("Last night BAU installed its newest tested update.")
+        elif up.get("result") == "rolled back":
+            parts.append(f"Last night's update failed ({up.get('why', 'unknown')}), so BAU "
+                         "went back to the previous version by itself.")
+        elif up.get("result") == "broken":
+            parts.append(f"Heads up: last night's update failed and going back failed too. "
+                         f"{up.get('why', '')}")
         review = [m for m in (f.get("missions") or []) if isinstance(m, dict)
                   and m.get("status") == "NEEDS_REVIEW"]
         if review:
@@ -1048,10 +1314,46 @@ class Assistant:
         text = (text or "").strip()[:4000]
         if not text:
             return Reply("I didn't catch that.", mode="plain" if self.provider is None else "model")
+        self.tainted = False                  # the owner's new message: a fresh turn
         self._log("owner", text)
+        if m := AUTOPILOT_CMD.match(text):
+            return self._autopilot_cmd(m)
+        if DO_ALL_CMD.match(text):
+            return self._do_all()
         if self.provider is None:
             return self._plain(text)
         return self._turn(text)
+
+    def _autopilot_cmd(self, m: re.Match[str]) -> Reply:
+        from . import autopilot as A
+        if m.group("pause"):
+            A.pause(self.home, self.owner)
+            text = "Paused. I won't start anything new until you say resume."
+        elif m.group("resume"):
+            A.resume(self.home, self.owner)
+            text = "Back to work."
+        elif m.group("look"):
+            what = m.group("look")
+            A.add(self.home, "research", f"research {what}", {"query": what},
+                  source=self.owner)
+            A.focus(self.home, what, self.owner)
+            text = (f"On it: I'll search GitHub for {what}, read the best projects' blueprints "
+                    "and tell you what I find.")
+        elif m.group("focus"):
+            A.focus(self.home, m.group("focus"), self.owner)
+            text = f"Got it: {m.group('focus')} comes first now."
+        else:
+            text = A.digest(self.home)
+        self._log("jarvis", text)
+        return Reply(text, mode="plain" if self.provider is None else "model")
+    def _do_all(self) -> Reply:
+        self.setup_waiting()
+        waiting = [p.public() for p in self.pending.values()]
+        text = (f"{len(waiting)} thing{'s' * (len(waiting) != 1)} wait for you. They are on "
+                "your screen now: press Accept on each one you want done." if waiting else
+                "Nothing is waiting for you right now.")
+        self._log("jarvis", text)
+        return Reply(text, pending=waiting, mode="plain" if self.provider is None else "model")
 
     def _ground(self, question: str, cards: list[dict[str, Any]]) -> str:
         """Look up the facts for a common question before a small model answers it."""
@@ -1077,16 +1379,36 @@ class Assistant:
         model = self.metered()
         start = len(self.messages)
         cards: list[dict[str, Any]] = []
-        if self.lean:
-            user_text = self._ground(user_text, cards)
-        self.messages.append({"role": "user", "content": user_text})
         staged: list[str] = []
+        if self.lean and (m := REMEMBER_CMD.match(user_text)):
+            note = m.group(1).strip()
+            out, err = self._run_tool("remember", {"title": note[:60], "note": note})
+            cards.append({"tool": "remember", "data": out})
+            user_text += (f"\n\n(Already saved to long-term memory: {note[:200]!r}. Confirm "
+                          "it in one short sentence; do not save it again.)" if not err else
+                          f"\n\n(Saving it failed: {str(out)[:200]}. Say so plainly.)")
+        elif self.lean:
+            user_text = self._ground(user_text, cards)
+            # Naming a week plan that exists puts its card up at once: the small model did not
+            # find schedule_week in its menu (real run, 2026-11-01). Staging changes nothing.
+            m = WEEK_CMD.search(user_text)
+            if m and (self.home / "weeks" / f"{m.group(1)}.yaml").is_file():
+                out, err = self._run_tool("schedule_week", {"week": m.group(1)})
+                if not err and out.get("pending_id"):
+                    staged.append(out["pending_id"])
+                    user_text += (f"\n\n(The week {m.group(1)} is already on the owner's screen "
+                                  "as one card waiting for their confirmation. Say so briefly.)")
+                else:
+                    user_text += f"\n\n(Showing that week failed: {str(out)[:300]}. Say why.)"
+        self.messages.append({"role": "user", "content": user_text})
         final = ""
         nudged = False
         for _ in range(max_steps):
+            limit = LEAN_MAX_TOKENS if self.lean else 2000
+            start -= self._fit(start, limit)
             try:
                 resp = model.complete(self.system_prompt(), self.messages, self.specs(),
-                                      max_tokens=LEAN_MAX_TOKENS if self.lean else 2000)
+                                      max_tokens=limit)
             except UsageLimit as e:
                 del self.messages[start:]
                 final = str(e)
@@ -1126,7 +1448,8 @@ class Assistant:
                 else:
                     shown = (call.input or {}).get("name") if call.name == "use_tool" else None
                     cards.append({"tool": shown or call.name, "data": out})
-                wrapped = untrusted(call.name, json.dumps(out, default=str)[:12000])[0]
+                cap = LEAN_RESULT_CHARS if self.lean else 12000
+                wrapped = untrusted(call.name, json.dumps(out, default=str)[:cap])[0]
                 results.append((call, wrapped, err))
             msg = self.provider.tool_result_message(results)
             if msg.get("role") == "_multi":
@@ -1151,6 +1474,42 @@ class Assistant:
         main = self.model.get("id") or self.model.get("api_model") or "?"
         return main + (f", backup: {', '.join(backups)}" if backups else "")
 
+    def _window_chars(self, max_tokens: int) -> int:
+        ctx = int(self.model.get("context") or LOCAL_SERVER_CTX)
+        if self.lean:                             # the local server's real window wins
+            ctx = min(ctx, LOCAL_SERVER_CTX)
+        return (ctx - max_tokens - 256) * CHARS_PER_TOKEN
+
+    def _fit(self, start: int, max_tokens: int) -> int:
+        """Make the next request fit the model's window: drop the oldest turns first, then cut
+        the longest texts of this turn. Returns how many messages were dropped in front."""
+        budget = self._window_chars(max_tokens)
+        fixed = len(self.system_prompt()) + len(json.dumps(
+            [t.__dict__ for t in self.specs()], default=str))
+
+        def size() -> int:
+            return fixed + len(json.dumps(self.messages, default=str))
+        dropped = 0
+        def plain_user(i: int) -> bool:          # a turn starts here: tool pairs stay whole
+            m = self.messages[i]
+            return m.get("role") == "user" and isinstance(m.get("content"), str)
+        while size() > budget and start - dropped > 0:
+            here = start - dropped
+            cut = next((i for i in range(1, here + 1) if i == here or plain_user(i)), here)
+            del self.messages[:cut]
+            dropped += cut
+        for _ in range(40):                       # this turn alone is still too big
+            over = size() - budget
+            if over <= 0:
+                break
+            spot = _longest_text(self.messages[start - dropped + 1:])
+            if spot is None:
+                break
+            holder, key, text = spot
+            keep = max(200, len(text) - over - 64)
+            holder[key] = text[:keep] + " [cut to fit]"
+        return dropped
+
     def _trim(self, keep: int = 40) -> None:
         """Bound the live context. Cut only before a plain user utterance so tool calls
         and their results always stay paired."""
@@ -1168,7 +1527,7 @@ class Assistant:
         routes = [   # leading word boundary only, so plurals match ("gaps", "missions")
             (r"\b(brief|morning|catch me up|what('?s| is) up|update)", None),
             (r"\b(night|overnight|governor|while i was away)", "night_report"),
-            (r"\b(tiktok|youtube|video|queue|post|upload)", "publish_queue"),
+            (r"\b(tiktok|video|queue|post|upload)", "publish_queue"),
             (r"\b(deadline|legal|regulation|law|incident)", "deadlines"),
             (r"\b(mission)", "missions"),
             (r"\b(money|revenue|cost|spend|profit|sales)", "money"),
@@ -1189,8 +1548,10 @@ class Assistant:
             self._log("jarvis", msg)
             return Reply(msg, pending=[p.public()], mode="plain")
         if re.search(r"\b(hold|freeze|stop everything|pause everything)\b", t):
-            out, _ = self._run_tool("hold_everything", {"reason": text[:120]})
-            msg = "Done. Everything's on hold; only read-only work runs until you release it."
+            out, err = self._run_tool("hold_everything", {"reason": text[:120]})
+            msg = ("Done. Everything's on hold; only read-only work runs until you release it."
+                   if not err else f"I couldn't put BAU on hold: {out.get('error')}. "
+                   "Run `bau governor hold` in a terminal.")
             self._log("jarvis", msg)
             return Reply(msg, [{"tool": "hold_everything", "data": out}], mode="plain")
         # Before the routes: "what did the video transcripts say" is not the publish queue.
@@ -1225,9 +1586,7 @@ class Assistant:
                 f"{len(out['fixed'])} fixed, {len(out['needs_you'])} waiting for you.")
         if tool == "publish_queue":
             out = [i for i in out if "item_id" in i]
-            kids = sum(1 for i in out if i.get("made_for_kids"))
-            return ((f"{len(out)} video{'s' * (len(out) != 1)} waiting to post"
-                     + (f", {kids} made for kids." if kids else ".")) if out
+            return (f"{len(out)} video{'s' * (len(out) != 1)} waiting to post." if out
                     else "Nothing is waiting to post.")
         if tool == "deadlines":
             return (f"{len(out['legal_review_open'])} legal review items, "
@@ -1361,17 +1720,29 @@ def build_assistant(home: Path | None = None, owner: str = "human:owner") -> Ass
 
 
 def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any] | None]:
-    """The model Jarvis (and the workspaces he walks) uses: the first APPROVED, reachable
-    one in the owner's order. When that is a hosted model, the other approved hosted models
-    after it become its backups (FallbackProvider). (None, None) when nothing is approved."""
+    """The model Jarvis (and the workspaces he walks) uses, from the APPROVED models in the
+    owner's order. The owner's rule (2026-11-02): online, the hosted models his API keys pay
+    for answer first and the local model is their backup (FallbackProvider); offline, only
+    the local model is asked, so nothing waits on a model that cannot answer. Claude, when it
+    comes first, answers alone (its tool format is not chained). Local-only mode keeps hosted
+    models out (provider_for refuses them). (None, None) when nothing is approved."""
+    import os
+
+    from . import network
     from .models.providers import FallbackProvider
     from .runtime import provider_for
     home = home or bau_home()
     cfg = YamlStore(home / "config" / "jarvis.yaml").load() or {}
-    chosen: list[tuple[Provider, dict[str, Any], str]] = []
     order = [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "glm-4.7-flash-zai",
              "nemotron-3-super-nim", "qwen3.5-9b", "qwen3.5-4b", "lfm2.5-2.6b",
              "qwen2.5-1.5b-instruct", "local-llm"]
+    try:
+        online = bool(network.detect().online)
+    except Exception:
+        online = True                        # unknown: try the keys, the local model backs up
+    hosted: list[tuple[Provider, dict[str, Any], str]] = []
+    local: tuple[Provider, dict[str, Any], str] | None = None
+    first: tuple[Provider, dict[str, Any], str] | None = None
     for mid in dict.fromkeys(m for m in order if m):
         try:
             provider, rec = provider_for(mid, home)
@@ -1379,8 +1750,11 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             continue
         if rec.get("lane") == "content_only":
             continue                         # content-lane models never run Jarvis
-        hosted = hasattr(provider, "waits")
-        if hosted:
+        key = rec.get("api_key_env")
+        if key and not os.environ.get(key):
+            continue                         # no key on this computer: it cannot answer
+        first = first or (provider, rec, mid)
+        if hasattr(provider, "waits"):       # a hosted OpenAI-compatible model
             # The owner is watching the screen: give a busy hosted model about 20 s, not
             # the bench's 75 s, then say so plainly. A page kept waiting over a minute can
             # be dropped by the browser or the Codespaces proxy (seen as BrokenPipe).
@@ -1388,18 +1762,21 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
             # Z.ai sometimes accepts a request and never answers (rehearsal 2026-10-08:
             # "The read operation timed out" after the bench's 120 s). Give up sooner.
             provider.timeout = CONVERSATION_TIMEOUT
-        if not chosen:
-            chosen.append((provider, rec, mid))
-            if not hosted:
-                break                        # Claude or a local model: no backup chain
-        elif hosted:
-            chosen.append((provider, rec, mid))
-    if not chosen:
+            hosted.append((provider, rec, mid))
+        elif rec.get("deployment") == "local":
+            local = local or (provider, rec, mid)
+    if first is None:
         return None, None
-    provider, rec, mid = chosen[0]
-    if len(chosen) > 1:
-        provider = FallbackProvider([p for p, _, _ in chosen], [m for _, _, m in chosen])
-        rec = {**rec, "fallbacks": [m for _, _, m in chosen[1:]]}
+    if not hasattr(first[0], "waits") and first[1].get("deployment") != "local":
+        if online or local is None:
+            return first[0], {**first[1], "id": first[2]}     # Claude answers alone
+    chain = (hosted + ([local] if local else [])) if online or local is None else [local]
+    if not chain:
+        chain = [first]
+    provider, rec, mid = chain[0]
+    if len(chain) > 1:
+        provider = FallbackProvider([p for p, _, _ in chain], [m for _, _, m in chain])
+        rec = {**rec, "fallbacks": [m for _, _, m in chain[1:]]}
     return provider, {**rec, "id": mid}
 
 

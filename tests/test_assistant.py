@@ -70,7 +70,8 @@ def test_jarvis_is_told_approving_is_never_his_and_has_no_tool_for_it(tmp_path):
     rules = " ".join(PERSONA.split())
     assert "Approving is never yours, and never offer to do it" in rules
     assert "bau set-status model <id> APPROVED" in rules and "never make them up" in rules
-    assert "kids videos only go to YouTube" in rules
+    assert "Never make, plan or post anything that involves or" in rules
+    assert "Explicit content goes only to" in rules
     a = make(tmp_path, [])
     assert not [n for n in a.tools if "approv" in n or "set_status" in n]
 
@@ -105,7 +106,8 @@ def test_tools_run_and_results_are_wrapped(tmp_path):
     results = [m for m in a.messages if m["role"] == "user" and isinstance(m["content"], list)]
     assert "<untrusted_data" in results[0]["content"][0]["content"]
     assert results[1]["content"][0]["is_error"]               # unknown tool reported, not run
-    assert events(tmp_path, "jarvis.tool")[0]["data"]["tool"] == "brain_lookup"
+    assert events(tmp_path, "gateway.invoked")[0]["data"]["capability"] == \
+        "inspect.jarvis.brain_lookup"
 
 
 def test_refusal_keeps_history_valid(tmp_path):

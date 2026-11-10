@@ -363,7 +363,7 @@ def install(path: Path | str, home: Path, etc: Path, ask: Ask, run: Run, by: str
                 team.set_team(home, by, audit, boss=boss)
                 out["boss"] = boss
     if THINKER in have:
-        say(f"The thinker ({THINKER}) is copied. It stays sealed (no tools, never kids); "
+        say(f"The thinker ({THINKER}) is copied. It stays sealed (no tools, never minors); "
             "docs/PACK.md says how to start and approve it.")
 
     enc = pack / "BAU-KEYS.enc"

@@ -8,8 +8,8 @@ kind of brain it needs (its `## Brain` section):
 - ``strong``: Claude, or whatever model Jarvis thinks with, for steps that need
   judgement. The owner may name a different approved model.
 - ``content``: a local uncensored (abliterated) model in the sealed content lane. It drafts
-  text only: no tools, local only, only the content jobs its registry record lists, never
-  in a kids workspace, and never chosen for the owner.
+  text only: no tools, local only, only the content jobs its registry record lists, and
+  never chosen for the owner.
 
 The owner picks once which model each brain means (``bau ws brains``); only a person can.
 """
@@ -24,7 +24,7 @@ from typing import Any
 from .home import bau_home
 from .registry import CONTENT_LANE, ROUTABLE, CapabilityRegistry
 from .store import YamlStore
-from .workspace import BRAINS, for_kids
+from .workspace import BRAINS
 
 WHAT = {"small": "free local model for routine steps",
         "strong": "Claude or Jarvis's best model, for steps that need judgement",
@@ -116,8 +116,6 @@ def resolve(brain: str, home: Path | None, ws: Path, jarvis: tuple[Any, dict[str
                 return strong(f"small brain {cfg['small']} not usable ({e}); the strong "
                               "brain drafted it")
         return strong("no small local model approved yet; the strong brain drafted it")
-    if for_kids(ws):
-        raise ValueError("the content brain is never used in a kids workspace")
     if not cfg["content"]:
         raise ValueError("no content brain chosen: the owner picks one with "
                          "`bau ws brains --content MODEL`")

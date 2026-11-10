@@ -110,22 +110,6 @@ def test_the_1099_report_flags_a_payee_with_no_form_instead_of_crashing(tmp_path
     assert rows and rows[0]["missing_tax_form"] is True
 
 
-def test_one_clip_posted_to_two_platforms_is_paid_for_once(tmp_path):
-    from bau.audit import AuditLog
-    from bau.economics import Ledger
-    from bau.results import Results
-    Ledger(tmp_path).cost("api", 3.0, agent="studio", job_id="clip_aaa")
-    r = Results(tmp_path, AuditLog(tmp_path / "a.jsonl", key=b""))
-    r.videos = lambda: [
-        {"platform": "youtube", "item_id": "y1", "video_id": "V1", "title": "t",
-         "posted_at": "", "made_for_kids": False},
-        {"platform": "tiktok", "item_id": "t1", "video_id": "T1", "title": "t",
-         "posted_at": "", "made_for_kids": False}]
-    for p, i in (("youtube", "y1"), ("tiktok", "t1")):
-        r.links.append({"platform": p, "item_id": i, "clips": ["clip_aaa"], "episode": ""})
-    assert r.report()["totals"]["cost_usd"] == 3.0
-
-
 def test_a_download_killed_just_before_the_rename_finishes_next_time(tmp_path):
     import hashlib
     import urllib.error

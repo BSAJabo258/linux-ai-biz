@@ -31,7 +31,7 @@ def test_the_loop_questions_itself_before_it_searches_and_tests_before_it_adds()
 def test_it_keeps_the_safety_rules():
     t = text().lower()
     for rule in ("never install", "--network none", "licence", "owner says yes",
-                 "never mark", "approve", "kids", "abliterated", "secrets",
+                 "never mark", "approve", "minors", "abliterated", "secrets",
                  "compliant", "one commit"):
         assert rule in t, rule
     assert "claude.md" in t                                 # the rules it must not break

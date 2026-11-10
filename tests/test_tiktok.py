@@ -236,17 +236,8 @@ def test_login_rejects_forged_state(tmp_path):
 
 
 # ------------------------------------------------------------------ audit 2026-10-25
-# Kids content goes only to YouTube made for kids (CLAUDE.md); a HOLD stops every post.
-
-def test_a_video_queued_for_youtube_kids_cannot_go_to_tiktok(tmp_path, engine):
-    from bau import youtube
-    video, client, q = setup(tmp_path)
-    yt = youtube.YouTubeQueue(tmp_path, q.audit)
-    yt.add(video, "Benny the Bear Learns to Count to Ten", "human:owner", kids=True)
-    item = q.add(video, "Counting fun #learning", "human:owner", engine=engine)
-    assert not item.checks["ok"]
-    assert any("made for kids" in p for p in item.checks["problems"])
-
+# The creator is a fictional adult (CLAUDE.md): nothing aimed at or about children; a HOLD
+# stops every post.
 
 def test_a_child_directed_caption_cannot_go_to_tiktok(tmp_path, engine):
     video, client, q = setup(tmp_path)

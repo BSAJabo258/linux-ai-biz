@@ -23,6 +23,9 @@ body{background:var(--sky)}
 :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 canvas#core{position:fixed;inset:0;width:100%;height:100%;display:block}
+/* The tapestry: sacred geometry under the core; it never takes a click. */
+canvas#fifth{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+canvas#sacred{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
 /* The owner's art (bau look): a still image, gently alive - a slow breathing glow, a pulse
    rising along the centre line, embers drifting up; quicker while Jarvis thinks. */
 #art{position:fixed;inset:0;pointer-events:none;background:center/contain no-repeat;opacity:0;
@@ -84,8 +87,9 @@ button.chip{background:none;color:inherit;font:inherit;cursor:pointer;letter-spa
 #caption{pointer-events:none;position:fixed;left:50%;bottom:150px;transform:translateX(-50%);width:min(760px,calc(100% - 32px));
   text-align:center;font-size:20px;line-height:1.4;color:var(--glow);text-shadow:0 0 18px rgba(63,214,255,.35);
   min-height:2.8em}
+#caption:not(:empty){width:fit-content;max-width:min(760px,calc(100% - 32px));padding:8px 16px;border-radius:12px;background:color-mix(in srgb,var(--panel) 78%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 #caption .you{color:var(--dim);font-size:15px;display:block;margin-bottom:6px}
-aside{position:fixed;top:56px;bottom:110px;width:300px;overflow:auto;padding:0 4px;scrollbar-width:thin}
+aside{position:fixed;top:56px;max-height:calc(100vh - 166px);width:300px;overflow:auto;padding:0 4px;scrollbar-width:thin}
 aside.l{left:16px}aside.r{right:16px}
 .panel{background:var(--panel);border:1px solid var(--line);border-left:2px solid var(--cyan);
   padding:10px 12px;margin-bottom:10px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
@@ -117,22 +121,30 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:cente
   text-shadow:0 0 30px rgba(63,214,255,.6)}
 #wake p{color:var(--dim);letter-spacing:.3em;text-transform:uppercase;font-size:12px;animation:blink 1.6s infinite}
 @keyframes blink{50%{opacity:.35}}
-#confirm{position:fixed;inset:0;display:none;place-items:center;background:rgba(1,4,8,.7);z-index:25;padding:16px;overflow:auto}
-#confirm.show{display:grid}
-#confirm .box{width:min(520px,calc(100% - 32px));background:var(--solid);border:1px solid var(--amber);
-  box-shadow:0 0 40px rgba(255,179,64,.25);padding:18px;max-height:calc(100vh - 32px);overflow-y:auto}
+/* A card docked bottom-right, not a screen over everything: the header, the chat box and
+   the mic stay usable while a card waits (the owner, 2026-11-09). */
+#confirm{position:fixed;right:16px;bottom:118px;display:none;z-index:25;pointer-events:none;max-width:calc(100vw - 32px)}
+#confirm.show{display:block}
+#confirm .box{pointer-events:auto;width:min(420px,calc(100vw - 32px));box-sizing:border-box;background:var(--solid);border:1px solid var(--amber);
+  box-shadow:0 0 24px rgba(255,179,64,.2);padding:18px;max-height:calc(100vh - 190px);overflow-y:auto}
 #confirm h2{margin:0 0 10px;font-size:12px;letter-spacing:.3em;color:var(--amber);text-transform:uppercase;font-weight:600}
-#confirm pre{white-space:pre-wrap;font:14px/1.5 inherit;font-family:inherit;margin:0 0 16px;color:var(--ink);max-height:50vh;overflow:auto}
+#confirm pre{white-space:pre-wrap;font:14px/1.5 inherit;font-family:inherit;margin:0 0 16px;color:var(--ink);max-height:30vh;overflow:auto}
 #confirm .btns{position:sticky;bottom:-18px;display:flex;gap:10px;justify-content:flex-end;
   background:var(--solid);padding:12px 0 0;z-index:1}
 #confirm button{font:inherit;letter-spacing:.2em;text-transform:uppercase;font-size:12px;padding:10px 16px;cursor:pointer;background:none}
 #yes{border:1px solid var(--green);color:var(--green)}#yes[disabled]{opacity:.35;cursor:not-allowed}
-#cvid{display:none;width:100%;max-height:34vh;background:#000;margin:0 0 12px}
+#cvid,#cimg{display:none;width:100%;max-height:34vh;background:#000;margin:0 0 12px;object-fit:contain}
 #cform label{display:block;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin:0 0 4px}
 #cform .opts{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
 #confirm #cform .opt{border:1px solid var(--line);color:var(--ink);background:var(--field);padding:12px 14px;
   font-size:14px;letter-spacing:normal;text-transform:none;text-align:left;flex:1 1 180px}
 #confirm #cform .opt.on{border-color:var(--green);color:var(--green);background:rgba(70,242,164,.1)}
+#cform .typed{display:block;width:100%;box-sizing:border-box;border:1px solid var(--line);color:var(--ink);
+  background:var(--field);padding:10px 12px;font:inherit;font-size:15px;margin:0 0 14px}
+#cform textarea.typed{min-height:110px;resize:vertical}
+#cform .why{display:block;color:var(--dim);font-size:11px;margin:4px 0 10px;overflow-wrap:anywhere}
+.about{font-size:12.5px;line-height:1.45;color:var(--dim);margin:6px 0 4px}
+.next{font-size:13px;line-height:1.45;margin:6px 0 8px;padding:6px 9px;border-left:2px solid var(--green);background:rgba(70,242,164,.07)}
 #cneed{font-size:12px;color:var(--amber);margin:0 0 10px}
 #confirm .btns button{padding:12px 20px}
 #confirm .box:focus{outline:none}
@@ -171,7 +183,19 @@ input.q,select.q{width:100%;background:var(--field);color:var(--ink);border:1px 
 .card a{color:var(--cyan);font-weight:600}.badge{float:right;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   border:1px solid currentColor;padding:1px 6px}.badge.rejected{color:var(--red)}.badge.needs{color:var(--amber)}.badge.eligible{color:var(--green)}
 pre.md{white-space:pre-wrap;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;max-height:50vh;overflow:auto}
-#timeline{position:fixed;top:56px;bottom:110px;right:16px;width:340px;overflow:auto;display:none}
+#mindhud{display:none;left:16px;right:auto}body.showmind #mindhud{display:block}
+body.showmind aside.l{display:none}
+#mindhud canvas{width:100%;height:auto;display:block}
+#mindhud h2{margin:0 0 6px;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--cyan);font-weight:600}
+#mindhud .eq{font:12px/1.9 ui-monospace,Consolas,monospace}#mindhud .eq b{color:var(--cyan);font-weight:600}
+#mindhud .eq i{font-style:normal;color:var(--violet);font-variant-numeric:tabular-nums;float:right}
+#mindhud .dim{color:var(--dim);font-size:11.5px}
+#m-queue{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+#m-queue li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px}
+#m-queue .ln{font:10px ui-monospace,monospace;letter-spacing:.1em;text-align:center;border:1px solid;border-radius:5px;padding:1px 0;align-self:start}
+#m-queue .GO{color:var(--green)}#m-queue .VOTE{color:var(--violet)}#m-queue .ASK{color:var(--amber)}
+#m-queue small{display:block;color:var(--dim);overflow-wrap:anywhere}
+#timeline{position:fixed;top:56px;max-height:calc(100vh - 166px);right:16px;width:340px;overflow:auto;display:none}
 #eye{position:fixed;top:60px;left:336px;right:24px;bottom:118px;z-index:5;display:flex;flex-direction:column;gap:8px;
   background:var(--solid);border:1px solid var(--cyan);border-radius:14px;padding:12px 14px;box-shadow:0 0 40px -12px var(--cyan)}
 #eye .eyehead{display:flex;align-items:center;gap:12px;padding:0;font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--cyan)}
@@ -216,6 +240,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   header .r{overflow-x:auto;max-width:72vw;scrollbar-width:none}
   .hint{display:none}header>div:first-child{white-space:nowrap}header .chip{padding:2px 6px;font-size:10px;letter-spacing:.08em}header{padding:12px 16px;letter-spacing:.14em}header .r{gap:8px}#caption{font-size:16px;bottom:138px;background:var(--panel);border-radius:10px;padding:8px 10px}#voicebar{bottom:92px}
   #text::placeholder{font-size:13px}
+  #confirm{left:8px;right:8px;bottom:150px}#confirm .box{width:100%;max-height:calc(100vh - 210px)}
   #modepill{padding:6px 8px;font-size:10px;letter-spacing:.06em}#mic{width:44px;height:44px}#send{padding:8px 10px}#voicebar .rule{width:40px}#wave{width:160px}}
 </style>
 </head>
@@ -223,6 +248,8 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 <a class="skip" href="#text">Skip to talking to Jarvis</a>
 <canvas id="liquid" aria-hidden="true"></canvas>
 <div id="art" aria-hidden="true"><div class="spine"></div><div class="embers"></div></div>
+<canvas id="fifth" aria-hidden="true"></canvas>
+<canvas id="sacred" aria-hidden="true"></canvas>
 <canvas id="core" aria-hidden="true"></canvas>
 <div class="grid"></div>
 <header>
@@ -230,14 +257,16 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <div class="r">
     <span class="chip" id="c-mode">—</span>
     <span class="chip" id="c-hold" hidden>HOLD</span>
-    <button class="chip" id="c-time" data-key="T" title="Timeline: everything that happened (T)">TIMELINE</button>
-    <button class="chip" id="c-mc" data-key="C" title="Mission Control (C)">MISSION CONTROL</button>
-    <button class="chip" id="c-log" data-key="L" title="Show the conversation log (L)">LOG</button>
-    <button class="chip" id="c-mute" data-key="M" title="Mute voice (M)">VOICE ON</button>
-    <button class="chip" id="c-wake" data-key="W" title="Listen for the word 'Jarvis' in this tab only, until you leave the page (W)">WAKE WORD OFF</button>
-    <button class="chip" id="c-alerts" data-key="A" title="Notify me when something needs me and this page is in the background (A)">ALERTS OFF</button>
-    <button class="chip" id="c-theme" data-key="D" title="Light or dark (D)">THEME</button>
-    <button class="chip" id="c-help" data-key="?" title="Keyboard keys (?)" aria-label="Keyboard keys">?</button>
+    <button class="chip" id="c-time" title="Timeline: everything that happened">TIMELINE</button>
+    <button class="chip" id="c-mind" title="The autopilot: his mind, the compass, the vote, his jobs">AUTOPILOT</button>
+    <button class="chip" id="c-mc" title="Mission Control">MISSION CONTROL</button>
+    <button class="chip" id="c-log" title="Show the conversation log">LOG</button>
+    <button class="chip" id="c-mute" title="Mute voice">VOICE ON</button>
+    <button class="chip" id="c-wake" title="Listen for the word 'Jarvis' in this tab only, until you leave the page">WAKE WORD OFF</button>
+    <button class="chip" id="c-alerts" title="Notify me when something needs me and this page is in the background">ALERTS OFF</button>
+    <button class="chip" id="c-geo" title="The sacred-geometry tapestry behind Jarvis: on or off">TAPESTRY ON</button>
+    <button class="chip" id="c-theme" title="Light or dark">THEME</button>
+    <button class="chip" id="c-help" title="Keyboard keys" aria-label="Keyboard keys">?</button>
   </div>
 </header>
 <main id="main">
@@ -246,25 +275,33 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 <aside class="l" id="cards"></aside>
 <aside class="r" id="log" aria-label="Conversation log"></aside>
 <aside id="timeline" aria-label="Timeline"></aside>
+<aside id="mindhud" aria-label="Autopilot">
+  <div class="panel"><h2>Mind · Lorenz field</h2>
+    <div class="eq"><div><b>dx/dt</b> = σ(y − x) <i id="m-x"></i></div><div><b>dy/dt</b> = x(ρ − z) − y <i id="m-y"></i></div>
+    <div><b>dz/dt</b> = xy − βz <i id="m-z"></i></div><div class="dim">σ 10 · β 8/3 · ρ <i id="m-rho"></i></div></div></div>
+  <div class="panel"><h2>Compass · where he points</h2><canvas id="m-compass" width="480" height="480"></canvas><div class="dim" id="m-focus"></div></div>
+  <div class="panel"><h2>The vote · 2 of 3, rules veto</h2><canvas id="m-vote" width="480" height="420"></canvas><div class="dim" id="m-votelegend"></div></div>
+  <div class="panel"><h2>Autopilot · jobs</h2><div class="dim" id="m-status"></div><ul id="m-queue"></ul></div>
+</aside>
 <div id="voicebar" aria-hidden="true"><span class="rule"></span><div><canvas id="wave"></canvas><div id="statelabel">STANDBY</div></div><span class="rule r"></span></div>
-<button id="speakpill" data-key="S" title="Stop speaking (S)" hidden><span class="dot"></span>Speaking · tap to stop</button>
+<button id="speakpill" title="Stop speaking" hidden><span class="dot"></span>Speaking · tap to stop</button>
 <div id="caption" aria-live="polite"></div>
 <div id="ticker" aria-live="polite"></div>
 </main>
 <footer>
   <div class="bar">
-    <button id="modepill" data-key="V" title="Chat (text only) or Voice (Jarvis speaks) (V)"><b>VOICE</b> · chat</button>
-    <button id="mic" data-key="Space" title="Hold to talk (Space)" aria-label="Talk">
+    <button id="modepill" title="Chat (text only) or Voice (Jarvis speaks)"><b>VOICE</b> · chat</button>
+    <button id="mic" title="Hold to talk" aria-label="Talk">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
     </button>
     <input id="text" autocomplete="off" placeholder="Talk to Jarvis…" maxlength="4000" aria-label="Talk to Jarvis">
     <button id="send" data-key="Enter" title="Send (Enter)">SEND</button>
   </div>
 </footer>
-<div class="hint" id="hint">Hold space to talk · Enter to send · Esc to stop speaking</div>
+<div class="hint" id="hint">Type to talk · Hold the mic to speak · Enter to send</div>
 <div id="wake"><div><h1>JARVIS</h1><p>Tap or press any key to wake</p></div></div>
-<div id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"><div class="box" tabindex="-1"><h2 id="confirm-title">Waiting for your confirmation</h2><video id="cvid" controls playsinline></video><pre id="csum"></pre><div id="cform"></div><p id="cneed"></p><p id="cnote"></p>
-  <div class="btns"><button id="no" data-key="Esc" title="Not now (Esc)">Not now</button><button id="yes" data-key="Y" title="Confirm (Y)">Confirm</button></div></div></div>
+<div id="confirm" role="alertdialog" aria-modal="false" aria-labelledby="confirm-title"><div class="box" tabindex="-1"><h2 id="confirm-title">Waiting for your confirmation</h2><video id="cvid" controls playsinline></video><img id="cimg" alt="The picture this post will carry"><pre id="csum"></pre><div id="cform"></div><p id="cneed"></p><p id="cnote"></p>
+  <div class="btns"><button id="no" data-key="Esc" title="Not now (Esc)">Not now</button><button id="yes" title="Confirm">Confirm</button></div></div></div>
 <div id="mcbox" class="overlay" role="dialog" aria-label="Mission Control"><div class="box">
   <button class="act" id="mc-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Mission Control</h2><div class="tabs" id="mc-tabs"></div><div id="mc-body"></div></div></div>
@@ -272,16 +309,10 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <button class="act" id="help-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Keyboard keys</h2>
   <ul>
-    <li><kbd>Space</kbd>Hold to talk</li><li><kbd>Enter</kbd>Send what you typed</li>
-    <li><kbd>/</kbd>Type to Jarvis</li><li><kbd>Esc</kbd>Close a panel or window, stop speaking</li>
+    <li><kbd>Any key</kbd>Type to Jarvis</li><li><kbd>Enter</kbd>Send what you typed</li>
+    <li><kbd>Esc</kbd>Close a panel or window, stop speaking</li>
     <li><kbd>Y</kbd>Confirm what is on screen</li>
-    <li><kbd>1</kbd>…<kbd>9</kbd>Open a part of the business (in order around the core)</li>
-    <li><kbd>G</kbd>Go into the open panel, then Tab and Enter</li>
-    <li><kbd>T</kbd>Timeline</li><li><kbd>C</kbd>Mission Control</li><li><kbd>L</kbd>Conversation log</li>
-    <li><kbd>M</kbd>Voice on or off</li><li><kbd>V</kbd>Chat or Voice mode</li>
-    <li><kbd>S</kbd>Stop Jarvis speaking</li><li><kbd>W</kbd>Wake word on or off</li>
-    <li><kbd>A</kbd>Alerts on or off</li><li><kbd>D</kbd>Light or dark</li>
-    <li><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd>Zoom the map in, out, back</li><li><kbd>?</kbd>This list</li>
+    <li>Hold the microphone button to talk</li>
   </ul>
   <p>On a phone: pinch to zoom, swipe a panel left or right for the next part.</p></div></div>
 <script>
@@ -349,11 +380,15 @@ function resize() { DPR = Math.min(window.devicePixelRatio || 1, 2); W = innerWi
 addEventListener("resize", resize); resize();
 const REDUCED = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
 const SPEED = REDUCED ? 0.15 : 1;            // calm, not frozen, for reduced-motion users
-// The orb: points spread evenly on a sphere (Fibonacci lattice), turned in 3D each frame.
-const ORB_POINTS = 720;
-const orb = Array.from({ length: ORB_POINTS }, (_, i) => {
-  const y = 1 - (i + 0.5) * 2 / ORB_POINTS, r = Math.sqrt(1 - y * y), th = i * 2.39996323;
-  return [Math.cos(th) * r, y, Math.sin(th) * r, Math.random()]; });
+// The mind: a Lorenz strange attractor (the owner's ask, 2026-11-02: "deep formula" visuals).
+// Particles follow dx=σ(y−x), dy=x(ρ−z)−y, dz=xy−βz; ρ rises while he thinks, the voice
+// level shakes it; each keeps a short trail. The live means are shown in the mind panel.
+const MIND_N = REDUCED ? 300 : 760, MIND_TRAIL = 8;
+const mind = Array.from({ length: MIND_N }, () => {
+  const p = [Math.random() * 2 - 1, Math.random() * 2 - 1, 15 + Math.random() * 20];
+  return { p, h: [] }; });
+let RHO = 28;
+const MIND_RHO = { idle: 28, listening: 30, thinking: 36, speaking: 31 };
 const rings = [ // radius factor, width, arc length, speed, dash count
   [1.22, 1, 6.2, -0.002, 60], [1.36, 2, 1.2, 0.004, 3], [1.52, 1, 6.2, 0.001, 120]];
 const STREAMS = Array.from({ length: REDUCED ? 8 : 16 }, (_, i) => ({ y: (i + 0.5) / (REDUCED ? 8 : 16),
@@ -365,7 +400,7 @@ const GOLD = [255, 207, 77];
 function themeLight() { return document.documentElement.dataset.theme === "light"; }
 // Energy streams: soft ribbons flowing across the whole screen, bending through the core.
 function drawStreams(X, Y, R, now) {
-  const t = now * 0.00018 * SPEED, boost = 0.5 + level * 0.9 + (STATE === "thinking" ? 0.3 : 0);
+  const t = now * 0.00018 * SPEED, boost = 0.5 + level * 0.9 + (STATE === "thinking" ? 0.3 : 0) + KICK * 0.6;
   cx.lineCap = "round";
   for (const s of STREAMS) {
     const base = s.y * H, pull = (Y - base) * 0.78;
@@ -403,7 +438,7 @@ function drawTraces(now) {
 }
 // The golden halo round the orb; it brightens with the voice and turns the state's colour.
 function drawHalo(X, Y, R, now) {
-  const hc = STATE === "idle" || STATE === "speaking" ? GOLD : col, rr = R * (1.02 + level * 0.06);
+  const hc = STATE === "idle" || STATE === "speaking" ? GOLD : col, rr = R * (1.02 + level * 0.06 + KICK * 0.04);
   cx.save();
   cx.shadowColor = rgba(hc, 0.9); cx.shadowBlur = 18 + level * 30;
   cx.strokeStyle = rgba(hc, 0.95); cx.lineWidth = 3 + level * 3;
@@ -412,25 +447,35 @@ function drawHalo(X, Y, R, now) {
   cx.beginPath(); cx.arc(X, Y, rr, 0, 6.283); cx.stroke();
   cx.restore();
 }
-// The orb itself: a turning sphere of points with a soft glow behind it.
-function drawOrb(X, Y, R, now) {
-  if (!LIQ) {     // with the liquid art the core is glass (WebGL): only the points float in it
+// The mind itself: the attractor's trails inside a soft glass glow.
+function drawMind(X, Y, R, now) {
+  if (!LIQ) {     // with the liquid art the core is glass (WebGL): only the trails float in it
     const g = cx.createRadialGradient(X, Y, 0, X, Y, R * 1.02);
-    g.addColorStop(0, rgba([180, 235, 255], 0.55 + level * 0.3)); g.addColorStop(0.55, rgba(col, 0.22));
-    g.addColorStop(1, rgba(col, 0.04));
+    g.addColorStop(0, rgba([180, 235, 255], 0.28 + level * 0.25)); g.addColorStop(0.55, rgba(col, 0.14));
+    g.addColorStop(1, rgba(col, 0.03));
     cx.fillStyle = g; cx.beginPath(); cx.arc(X, Y, R, 0, 6.283); cx.fill();
   }
-  const rad = R * 0.9 * (1 + level * 0.12), tilt = 0.42, ct = Math.cos(tilt), st = Math.sin(tilt);
-  const ca = Math.cos(spinA), sa = Math.sin(spinA);
-  for (const [px, py, pz, j] of orb) {
-    const x1 = px * ca + pz * sa, z1 = -px * sa + pz * ca;
-    const y2 = py * ct - z1 * st, z2 = py * st + z1 * ct;
-    const wob = 1 + (STATE === "speaking" || STATE === "listening" ? Math.sin(now / 120 + j * 20) * level * 0.08 : 0);
-    const depth = (z2 + 1) / 2, sx = X + x1 * rad * wob, sy = Y + y2 * rad * wob;
-    cx.fillStyle = rgba(themeLight() ? (depth > 0.5 ? [10, 95, 140] : [10, 120, 168]) : depth > 0.5 ? [225, 248, 255] : col, 0.18 + depth * 0.75);
-    const sz = 0.6 + depth * 1.5; cx.fillRect(sx - sz / 2, sy - sz / 2, sz, sz);
+  RHO += ((MIND_RHO[STATE] || 28) + level * 6 - RHO) * 0.02;
+  const dt = 0.0055 * SPEED * (STATE === "thinking" ? 1.6 : 1), sc = R / 21;
+  const ca = Math.cos(spinA), sa = Math.sin(spinA), light = themeLight();
+  let mx = 0, my = 0, mz = 0;
+  cx.lineWidth = 1;
+  for (const m of mind) {
+    const p = m.p;
+    for (let k = 0; k < 2; k++) {
+      const dx = 10 * (p[1] - p[0]), dy = p[0] * (RHO - p[2]) - p[1], dz = p[0] * p[1] - 8 / 3 * p[2];
+      p[0] += dx * dt; p[1] += dy * dt; p[2] += dz * dt;
+    }
+    mx += p[0]; my += p[1]; mz += p[2];
+    const x = p[0] * ca - p[1] * sa, y = -(p[2] - 25), d = (p[0] * sa + p[1] * ca + 30) / 60;
+    m.h.push([X + x * sc, Y + y * sc]); if (m.h.length > MIND_TRAIL) m.h.shift();
+    const hot = Math.min(1, Math.abs(p[2] - 25) / 20);
+    cx.strokeStyle = rgba(light ? (hot > 0.7 ? [95, 69, 196] : [10, 95, 140]) : hot > 0.7 ? [169, 139, 255] : col, 0.22 + d * 0.6);
+    cx.beginPath(); m.h.forEach(([u, v], i) => i ? cx.lineTo(u, v) : cx.moveTo(u, v)); cx.stroke();
   }
+  MIND_NOW = [mx / MIND_N, my / MIND_N, mz / MIND_N, RHO];
 }
+let MIND_NOW = [0, 0, 0, 28];
 // The voice bar under the orb: bars that follow the real audio when there is some.
 const wv = document.getElementById("wave"), wx = wv ? wv.getContext("2d") : null;
 function drawWave(now) {
@@ -443,11 +488,67 @@ function drawWave(now) {
   const c = STATE === "idle" ? [93, 138, 163] : STATE === "speaking" ? GOLD : col;
   for (let i = 0; i < bars; i++) {
     const k = Math.abs(i - (bars - 1) / 2) / ((bars - 1) / 2), shape = 1 - k * 0.75;
-    const v = realAudio ? Math.abs(buf[(i * 29) % buf.length] - 128) / 128 * 3
+    const v = SPEC ? SPEC[Math.floor(k * (SPEC.length - 1))] * 2.2
       : Math.abs(Math.sin(now / 140 * SPEED + i * 0.7) * Math.sin(now / 330 * SPEED + i));
     const bh = Math.max(2 * DPR, Math.min(1, v) * Math.min(1, level * 1.6 + 0.1) * h * shape);
     wx.fillStyle = rgba(c, 0.9); wx.fillRect(i * w / bars + w / bars * 0.25, mid - bh / 2, w / bars * 0.5, bh);
   }
+}
+
+// The sound layer (the owner's ask, 2026-11-08: "your best visualizations possible"): a
+// mirrored spectrum ring round the core that follows the real voice when there is one (the
+// same analysers as above; a living synthetic spectrum otherwise), a kick on each bass hit
+// that punches the halo and sends a shockwave out, and spark bursts that fly from the core to
+// a team member when it starts work and back when it finishes. Calm for reduced motion.
+let fbuf = null, BASS = 0, bassAvg = 0, KICK = 0, SPEC = null;
+const SHOCKS = [], SPARKS = [];
+function spectrum(now) {
+  const n = 64, out = new Array(n), an = STATE === "listening" ? micAnalyser : analyser;
+  if (realAudio && an) {
+    if (!fbuf || fbuf.length !== an.frequencyBinCount) fbuf = new Uint8Array(an.frequencyBinCount);
+    an.getByteFrequencyData(fbuf);
+    for (let i = 0; i < n; i++) out[i] = fbuf[Math.floor(Math.pow(i / n, 1.6) * fbuf.length * 0.7)] / 255;
+  } else {
+    const e = level * 1.4 + (STATE === "thinking" ? 0.25 : 0.08);
+    for (let i = 0; i < n; i++) out[i] = Math.max(0, Math.min(1, e * (0.55 + 0.45 *
+      Math.sin(now / 170 * SPEED + i * 0.9) * Math.sin(now / 410 * SPEED + i * 0.37)) * (1 - i / n * 0.6)));
+  }
+  return out;
+}
+function mix(a, b, k) { return [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * k)); }
+function shock(X, Y, R, c) { SHOCKS.push({ X, Y, r: R * 1.05, a: 0.7, c: c.slice() }); if (SHOCKS.length > 8) SHOCKS.shift(); }
+function burst(x, y, tx, ty, c) {
+  for (let i = 0; i < (REDUCED ? 4 : 18); i++) SPARKS.push({ x, y, tx, ty, t: -i * 0.04, c, wob: Math.random() * 6.283 });
+  if (SPARKS.length > 240) SPARKS.splice(0, SPARKS.length - 240);
+}
+function drawSpectrum(X, Y, R, now) {
+  const s = spectrum(now), n = s.length, light = themeLight(); SPEC = s;
+  BASS = (s[0] + s[1] + s[2] + s[3]) / 4; bassAvg += (BASS - bassAvg) * 0.05;
+  if (BASS > bassAvg * 1.35 && BASS > 0.25 && KICK < 0.2) { KICK = 1; if (!REDUCED) shock(X, Y, R, STATE === "speaking" ? GOLD : col); }
+  KICK *= 0.9;
+  const r0 = R * (1.08 + KICK * 0.05);
+  cx.save(); cx.lineCap = "round"; cx.globalCompositeOperation = themeLight() ? "source-over" : "lighter";
+  cx.lineWidth = Math.max(1.5, R * 0.018);
+  for (let i = 0; i < n * 2; i++) {               // mirrored: low notes at the top, both sides
+    const v = s[i < n ? i : 2 * n - 1 - i], a = -Math.PI / 2 + i / (n * 2) * 6.283, len = R * (0.04 + v * 0.42);
+    cx.strokeStyle = light ? rgba(mix([10, 95, 140], [176, 112, 0], v), 0.45 + v * 0.5)
+      : rgba(mix(col, GOLD, v), 0.25 + v * 0.65);
+    cx.beginPath(); cx.moveTo(X + Math.cos(a) * r0, Y + Math.sin(a) * r0);
+    cx.lineTo(X + Math.cos(a) * (r0 + len), Y + Math.sin(a) * (r0 + len)); cx.stroke();
+  }
+  cx.restore();
+}
+function drawShocks(dt) {
+  cx.save(); cx.globalCompositeOperation = themeLight() ? "source-over" : "lighter";
+  for (let i = SHOCKS.length - 1; i >= 0; i--) { const s = SHOCKS[i]; s.r += dt * 0.35; s.a *= 0.94;
+    cx.strokeStyle = rgba(s.c, s.a); cx.lineWidth = 2 + s.a * 6; cx.beginPath(); cx.arc(s.X, s.Y, s.r, 0, 6.283); cx.stroke();
+    if (s.a < 0.02) SHOCKS.splice(i, 1); }
+  for (let i = SPARKS.length - 1; i >= 0; i--) { const p = SPARKS[i]; p.t += dt / 900;
+    if (p.t < 0) continue; if (p.t >= 1) { SPARKS.splice(i, 1); continue; }
+    const k = p.t * p.t * (3 - 2 * p.t), bend = Math.sin(p.t * Math.PI) * 60;
+    const x = p.x + (p.tx - p.x) * k + Math.cos(p.wob) * bend, y = p.y + (p.ty - p.y) * k + Math.sin(p.wob) * bend;
+    cx.fillStyle = rgba(p.c, 1 - p.t * 0.6); cx.beginPath(); cx.arc(x, y, 2.4, 0, 6.283); cx.fill(); }
+  cx.restore();
 }
 function frame(now) {
   try {
@@ -492,13 +593,572 @@ function frame(now) {
     for (let i = 0; i < 72; i++) { const a = i * 0.0873, r1 = R * 1.68, r2 = r1 + (i % 6 ? 4 : 10);
       cx.beginPath(); cx.moveTo(X + Math.cos(a) * r1, Y + Math.sin(a) * r1);
       cx.lineTo(X + Math.cos(a) * r2, Y + Math.sin(a) * r2); cx.stroke(); }
-    drawOrb(X, Y, R, now);
+    drawSpectrum(X, Y, R, now);
+    drawMind(X, Y, R, now);
     drawHalo(X, Y, R, now);
+    drawShocks(dt);
     drawWave(now);
   } catch (e) { /* never let one bad frame stop the animation */ }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// ---------------------------------------------------------------- the fifth dimension (WebGL)
+// The owner's ask (2026-11-09, after BassForge and pvrellis): cymatics as a 5-dimensional
+// form seen in cross-section. A standing wave in N dimensions, cos x₁ + … + cos x_N (N = 5 at
+// rest), cut by a plane whose N axes fan out at 360°/N (the cut that makes quasicrystals). The
+// plane drifts through the other dimensions, faster with the voice, so the mandala keeps
+// re-forming; a second wave at the golden ratio weaves over and under it. Each contour is drawn
+// as a lit, iridescent tube. On the graphics card; it lowers its own resolution if the frame
+// rate drops, and the 2D tapestry carries on alone if WebGL is missing.
+const FIFTH = (() => {
+  const cv = $("fifth"); let gl = null;
+  try { gl = cv.getContext("webgl", { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: false }); } catch (e) {}
+  if (!gl) { cv.style.display = "none"; return null; }
+  const VS = "attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}";
+  const FS = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 uC, uJc; uniform float uR, uT, uLevel, uKick, uNa, uNb, uMix, uLight, uFreq, uPx, uFrac;
+const float TAU = 6.2831853;
+float wave(vec2 p, float N, float t, float k, float rot, out vec2 g) {
+  float f = 0.0; g = vec2(0.0);
+  for (int j = 0; j < 12; j++) {
+    float fj = float(j); if (fj >= N) break;
+    float a = TAU * fj / N + rot;
+    vec2 d = vec2(cos(a), sin(a)) * k;
+    float ph = t + 0.14 * sin(t * 0.23 * (1.0 + 0.37 * fj) + fj * 2.1);   // near-common phase: the rosette stays centred
+    float u = dot(d, p) + ph;
+    f += cos(u); g -= sin(u) * d;
+  }
+  g /= N; return f / N;
+}
+vec3 iris(float x) { return 0.5 + 0.5 * cos(TAU * (x + vec3(0.02, 0.26, 0.55))); }
+float tube(float f, vec2 g, float bands, float w, out vec3 n, out float lvl) {
+  float s = f * bands, df = (fract(s + 0.5) - 0.5) / bands;
+  float gl = max(length(g), 1e-5), d = df / gl, x = clamp(abs(d) / w, 0.0, 1.0);
+  float h = sqrt(max(0.0, 1.0 - x * x));
+  n = normalize(vec3(sign(d) * (g / gl) * x, h + 0.02));
+  lvl = floor(s + 0.5);
+  return 1.0 - smoothstep(0.8, 1.0, x);
+}
+vec3 shade(vec3 n, float lvl, float hue, float light) {
+  vec3 L = normalize(vec3(-0.45, 0.55, 0.8));
+  float diff = max(dot(n, L), 0.0), spec = pow(max(dot(reflect(-L, n), vec3(0.0, 0.0, 1.0)), 0.0), 28.0);
+  vec3 c = iris(lvl * 0.17 + hue + 0.45 * (1.0 - n.z) + uT * 0.015);
+  c = c * (0.25 + 1.0 * diff) + spec * (light > 0.5 ? 0.35 : 1.1);
+  return light > 0.5 ? c * 0.78 : c;
+}
+// As above, so below: a Julia set z → z² + c folded into a mirrored 2N-fold mandala; c orbits
+// with the voice. Rings trapped in the orbit give it the woven look of the field around it.
+vec3 julia(vec2 q, float N) {
+  float seg = TAU / (2.0 * N), a = mod(atan(q.y, q.x) + uT * 0.02, 2.0 * seg);
+  a = abs(a - seg);
+  vec2 z = vec2(cos(a), sin(a)) * length(q) * 0.42;
+  float trap = 1e9, esc = -1.0;
+  for (int i = 0; i < 64; i++) {
+    z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + uJc;
+    trap = min(trap, abs(length(z) - 0.62));
+    float d = dot(z, z);
+    if (d > 256.0) { esc = float(i) - log2(log2(d)) + 4.0; break; }
+  }
+  vec3 col = esc < 0.0 ? iris(trap * 2.5 + uT * 0.03) * (1.4 * exp(-trap * 5.0) + 0.1)
+                       : iris(esc * 0.045 + uT * 0.02) * (0.15 + 0.95 * exp(-trap * 3.5)) * smoothstep(0.0, 7.0, esc);
+  return col;
+}
+void main() {
+  vec2 q = (gl_FragCoord.xy - uC) / uR; float r = length(q);
+  vec2 p = q * uFreq, gA, gA2, gB, gB2;
+  float tA = uT * 0.5, tB = -uT * 0.37 + 1.7;
+  float fA = mix(wave(p, uNa, tA, 1.0, 0.0, gA), wave(p, uNb, tA, 1.0, 0.0, gA2), uMix);
+  float fB = mix(wave(p, uNa, tB, 1.618034, 0.31, gB), wave(p, uNb, tB, 1.618034, 0.31, gB2), uMix);
+  vec2 dA = mix(gA, gA2, uMix) * uFreq / uR, dB = mix(gB, gB2, uMix) * uFreq / uR;
+  float w = (1.9 + uLevel * 3.0 + uKick * 2.0) * uPx;
+  // the zero surfaces of each wave are endless interlaced ribbons; finer threads run beside them
+  vec3 nA, nB, n2, n3; float lA, lB, l2, l3;
+  float cA = tube(fA, dA, 1.0, w * 1.25, nA, lA), cB = tube(fB, dB, 1.0, w, nB, lB);
+  float c2 = tube(fA - 0.42, dA, 1.0, w * 0.45, n2, l2) + tube(fA + 0.42, dA, 1.0, w * 0.45, n3, l3);
+  lA = floor(fA * 2.0 + 2.0) + 1.0; lB = floor(fB * 2.0 + 2.0) + 3.0;
+  float weave = sin((fA + fB) * 6.2831 + uT * 0.2);
+  float zA = nA.z + 0.8 * weave, zB = nB.z - 0.8 * weave;
+  vec3 bg = uLight > 0.5 ? vec3(0.95, 0.94, 0.98) - 0.05 * iris(fA * 0.5 + uT * 0.01)
+                         : vec3(0.012, 0.004, 0.03) + 0.07 * iris(fA * 0.6 + fB * 0.3 + uT * 0.01) * (0.5 + 0.5 * fA);
+  vec3 c = bg;
+  c = mix(c, shade(n2.z > n3.z ? n2 : n3, 7.0, 0.6, uLight), clamp(c2, 0.0, 1.0) * 0.7);
+  vec3 colA = shade(nA, lA, 0.0, uLight), colB = shade(nB, lB, 0.43, uLight);
+  if (zA > zB) { c = mix(c, colB, cB); c = mix(c, colA, cA); } else { c = mix(c, colA, cA); c = mix(c, colB, cB); }
+  if (uFrac > 0.004) { vec3 fc = julia(q, mix(uNa, uNb, uMix));
+    fc = uLight > 0.5 ? vec3(0.97) - (vec3(1.0) - clamp(fc, 0.0, 1.0)) * 0.8 : fc;
+    c = mix(c, fc, uFrac * 0.92); }
+  float vig = smoothstep(4.6, 1.2, r);
+  c = uLight > 0.5 ? mix(vec3(0.96), c, 0.35 + 0.65 * vig) : c * (0.25 + 0.75 * vig);
+  gl_FragColor = vec4(c, uLight > 0.5 ? 0.86 : 0.93);
+}`;
+  function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+  let prog;
+  try { prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog); if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog)); }
+  catch (e) { console.warn("fifth dimension off:", e); cv.style.display = "none"; return null; }
+  gl.useProgram(prog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, "a"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = {}; for (const n of ["uJc", "uFrac", "uC", "uR", "uT", "uLevel", "uKick", "uNa", "uNb", "uMix", "uLight", "uFreq", "uPx"]) U[n] = gl.getUniformLocation(prog, n);
+  let soft = false;                                          // a software renderer starts small
+  try { const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const who = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+    soft = /llvmpipe|swiftshader|software|softpipe/i.test(who); } catch (e) {}
+  return { gl, cv, U, scale: soft ? 0.4 : 0.75, phase: 0, frac: 0, Na: 5, Nb: 5, mix: 1, slow: 0, ema: 33, checkAt: 0, lost: false };
+})();
+function fifthResize() { if (!FIFTH) return;
+  FIFTH.cv.width = Math.max(2, Math.round(W * FIFTH.scale)); FIFTH.cv.height = Math.max(2, Math.round(H * FIFTH.scale));
+  FIFTH.gl.viewport(0, 0, FIFTH.cv.width, FIFTH.cv.height); }
+addEventListener("resize", fifthResize); fifthResize();
+if (FIFTH) FIFTH.cv.addEventListener("webglcontextlost", (e) => { e.preventDefault(); FIFTH.lost = true; FIFTH.cv.style.display = "none"; });
+function fifthPaint(now, dt, N) {
+  const F = FIFTH; if (!F || F.lost || !CORE) return;
+  if (N !== F.Nb) { F.Na = F.mix >= 1 ? F.Nb : F.Na; F.Nb = N; F.mix = 0; }
+  F.mix = Math.min(1, F.mix + dt / 3500);
+  const fast = STATE === "thinking" ? 2.2 : STATE === "speaking" ? 1.5 : 1;
+  F.phase += dt * 0.00045 * SPEED * fast * (1 + level * 3 + KICK * 4);   // the slice moves through the dimensions
+  const [X, Y, R] = CORE, s = F.scale, gl = F.gl, U = F.U;
+  gl.uniform2f(U.uC, X * s, (H - Y) * s); gl.uniform1f(U.uR, R * s); gl.uniform1f(U.uT, F.phase);
+  gl.uniform1f(U.uLevel, level); gl.uniform1f(U.uKick, KICK); gl.uniform1f(U.uNa, F.Na); gl.uniform1f(U.uNb, F.Nb);
+  gl.uniform1f(U.uMix, F.mix * F.mix * (3 - 2 * F.mix)); gl.uniform1f(U.uLight, themeLight() ? 1 : 0);
+  gl.uniform1f(U.uFreq, 8.5 + Math.sin(F.phase * 0.07) * 1.8); gl.uniform1f(U.uPx, s);
+  F.frac += ((STANCES[SAC.stance][1].startsWith("FRACTAL") ? 1 : 0) - F.frac) * 0.03;
+  const ja = F.phase * 0.21 + level * 0.6;                  // the seed of the fractal orbits with the voice
+  gl.uniform1f(U.uFrac, F.frac); gl.uniform2f(U.uJc, 0.7885 * Math.cos(ja), 0.7885 * Math.sin(ja));
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // keep the whole page smooth: if frames slow down, draw the field at a lower resolution
+  F.ema += (dt - F.ema) * 0.05;
+  if (now - F.checkAt > 3000) { F.checkAt = now;
+    if (F.ema > 60 && F.scale > 0.3) { F.scale *= 0.75; fifthResize(); }
+    else if (F.ema > 140) { F.lost = true; F.cv.style.display = "none"; } }   // only if truly too slow: 2D only
+}
+// ---------------------------------------------------------------- the tapestry (sacred geometry)
+// The owner's ask (2026-11-09): the screen as a psychedelic, esoteric tapestry - geometry as
+// stances that interlock into dimensions, up to the quantum. Real mathematics, each stance the
+// shadow of the one above it, all of them present at once and one stepping forward at a time:
+//   2D  Flower of Life → Metatron's Cube   circles on a hexagonal lattice; 13 centres, 78 lines
+//   3D  the five Platonic solids, nested   (they are all hidden inside Metatron's Cube)
+//   4D  the tesseract                      16 vertices (±1)^4, turned in the XW, YW, ZW planes
+//   4D  the 600-cell                       120 vertices built on the golden ratio φ, 720 edges
+//   8D  E8                                 240 roots, Coxeter-plane projection: 8 rings of 30
+//   ∿   cymatics                           Chladni plate cos(nπx)cos(mπy) − cos(mπx)cos(nπy) = 0
+//   ψ   hydrogen orbitals                  |ψ_nlm|² from Laguerre and Legendre; colour is phase
+//   S³  the Hopf fibration                 every point of a sphere is a circle in 4D, all linked
+// Always under them: the Flower of Life lattice, magnetic dipole lines r = L·sin²θ, the
+// golden-angle seed head, the Solfeggio resonance ring, Seed of Life ripples on the beat.
+// Its own canvas under the core: never takes a click, ~30 frames a second, TAPESTRY chip.
+const SAC = { cv: $("sacred"), on: true, last: 0, key: "", flower: null, metatron: null, e8: null,
+  chl: null, chlOld: null, chlFade: 1, mode: 0, modeAt: 0, kickWas: 0, seeds: [], toneAt: 0, tone: 4,
+  stance: 0, stanceAt: 0, w: null, orb: null, orbOld: null, orbFade: 1, orbI: 0, a4: 0, labelA: 0 };
+SAC.cx = SAC.cv.getContext("2d");
+try { SAC.on = localStorage.getItem("jarvis-tapestry") !== "0"; } catch (e) {}
+const PHI = (1 + Math.sqrt(5)) / 2, PHI_ANGLE = Math.PI * (3 - Math.sqrt(5));   // φ; 137.508°
+const CHLADNI = [[1, 4], [2, 5], [3, 7], [1, 6], [4, 9], [2, 7], [3, 8], [5, 8], [1, 8], [6, 9], [2, 9], [4, 7]];
+const SOLFEGGIO = [174, 285, 396, 417, 528, 639, 741, 852, 963];
+const ORBITALS = [[3, 2, 0], [4, 3, 0], [4, 2, 1], [5, 3, 1], [5, 4, 2], [6, 4, 0], [4, 3, 2], [6, 5, 1], [5, 2, 0]];
+const STANCES = [
+  ["II", "FLOWER OF LIFE · METATRON'S CUBE", "one circle unfolds into all of them"],
+  ["III", "THE FIVE PLATONIC SOLIDS", "nested, each hidden inside Metatron's Cube"],
+  ["IV", "TESSERACT", "the shadow a cube casts from the fourth dimension"],
+  ["IV", "600-CELL", "120 vertices, every one placed by the golden ratio"],
+  ["VIII", "E8", "240 roots in eight dimensions, folded into 8 rings of 30"],
+  ["∿", "CYMATICS", "the voice drawn as sand on a vibrating plate"],
+  ["ψ", "HYDROGEN ORBITAL", "where the electron may be; the colour is its phase"],
+  ["S³", "HOPF FIBRATION", "every point of a sphere is a circle in 4D; none touch, all are linked"],
+  ["V", "THE FIFTH DIMENSION", "sound as a 5-dimensional form, seen in cross-section as the slice moves"],
+  ["∞", "FRACTAL · AS ABOVE, SO BELOW", "z → z² + c, the same shape at every scale; c moves with his voice"],
+  ["VE", "VECTOR EQUILIBRIUM · THE JITTERBUG", "the inner grid breathing: cuboctahedron, icosahedron, octahedron"],
+];
+const FIELD_N = [6, 5, 4, 5, 8, 7, 5, 3, 5, 6, 6];
+const HERMETIC = ["MENTALISM", "CORRESPONDENCE", "VIBRATION", "POLARITY", "RHYTHM", "CAUSE & EFFECT", "GENDER"];
+const STANCE_PRINCIPLE = [0, 1, 3, 4, 1, 2, 3, 4, 2, 1, 5];   // the Hermetic principle each stance shows most
+// One blueprint, each stance turning into the next (checked mathematics, not decoration):
+const CHAIN = [4, 3, 1, 10, 2, 0, 8, 5, 6, 7, 9];
+const BRIDGE = {
+  4: "fold E8 by the golden ratio: two 600-cells, one φ times the other",
+  3: "the 12 neighbours of any vertex form an icosahedron",
+  1: "the icosahedron breathes: Fuller's jitterbug",
+  10: "the octahedron's twin is the cube; its 4D parent is the tesseract",
+  2: "seen down its diagonal, the cube is a hexagon: Metatron's Cube",
+  0: "the hexagonal lattice is a cut through a higher lattice: cut 5D",
+  8: "a standing wave in five dimensions casts its shadow on a plate",
+  5: "the same standing-wave equation holds the electron in the atom",
+  6: "light and magnetism knot along the circles of the Hopf fibration",
+  7: "repeat one rule at every scale: as above, so below",
+  9: "and back to the top: eight dimensions, E8",
+};
+// E8 → H4: the Coxeter eigenplanes for exponents 1 and 11. The first plane alone is the E8
+// mandala (8 rings of 30); all four together fold E8's 240 roots into two 600-cells whose
+// sizes differ by exactly φ.
+const H4 = [[-0, 0.119117702, 0.192736491, 0.217638872, 0.192736491, 0.119117702, 0, 0.921933055], [0.096899069, 0.46350566, 0.236930326, 0, -0.236930326, -0.46350566, -0.669823572, 0], [-0, -0.352147092, -0.569785963, 0.073618789, -0.569785963, -0.352147092, 0, 0.311854193], [0.700435986, -0.383361321, 0.286462252, 0, -0.286462252, 0.383361321, -0.226575334, 0]];
+const E8_U = [0, 0.119117702, 0.192736491, 0.217638872, 0.192736491, 0.119117702, 0, 0.921933055];
+const E8_W = [0.096899069, 0.46350566, 0.236930326, 0, -0.236930326, -0.46350566, -0.669823572, 0];
+SAC.stance = 8; SAC.chainI = CHAIN.indexOf(8); SAC.vf = -1; SAC.w = STANCES.map((_, i) => i === SAC.stance ? 1 : 0.1);
+function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+function easeAngle(a, target, s) { const d = (((target - a) % 6.2832) + 9.4248) % 6.2832 - 3.1416; return a + d * s; }
+function sacSprite(size) { const c = document.createElement("canvas"); c.width = c.height = Math.max(2, Math.ceil(size)); return c; }
+function hsl2rgb(h, s, l) {
+  const k = (n) => (n + h * 12) % 12, a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+}
+function rainbow(g, cxp, cyp, a, light) {
+  const grad = g.createConicGradient ? g.createConicGradient(0, cxp, cyp) : null;
+  if (!grad) return light ? "rgba(60,30,120," + a + ")" : "rgba(180,140,255," + a + ")";
+  for (let i = 0; i <= 6; i++) grad.addColorStop(i / 6, "hsla(" + (i * 60 + 200) + "," + (light ? "95%,38%," : "100%,66%,") + a + ")");
+  return grad;
+}
+// ---- the solids, built once
+function edgesAt(V, len, tol) { const E = [];
+  for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
+    let d = 0; for (let k = 0; k < V[i].length; k++) d += (V[i][k] - V[j][k]) ** 2;
+    if (Math.abs(Math.sqrt(d) - len) < tol) E.push([i, j]); }
+  return E; }
+function minEdge(V) { let m = Infinity;
+  for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
+    let d = 0; for (let k = 0; k < V[i].length; k++) d += (V[i][k] - V[j][k]) ** 2; m = Math.min(m, Math.sqrt(d)); }
+  return m; }
+function solid(V, scale, hue) { const r = Math.max(...V.map(v => Math.hypot(...v)));
+  const U = V.map(v => v.map(x => x / r * scale)); return { V: U, E: edgesAt(U, minEdge(U), 1e-6), hue }; }
+function cyc(list) { const out = []; for (const [a, b, c] of list) out.push([a, b, c], [b, c, a], [c, a, b]); return out; }
+function signs(v) { let out = [[]]; for (const x of v) out = out.flatMap(p => x ? [[...p, x], [...p, -x]] : [[...p, 0]]); return out; }
+const PLATONIC = (() => {
+  const tet = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]];
+  const cube = signs([1, 1, 1]), octa = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  const ico = cyc(signs([0, 1, PHI])), dod = cube.concat(cyc(signs([0, 1 / PHI, PHI])));
+  return [solid(ico, 1, 190), solid(dod, 0.86, 280), solid(cube, 0.7, 45), solid(octa, 0.55, 330), solid(tet, 0.42, 140)];
+})();
+const TESSERACT = (() => { const V = []; for (let i = 0; i < 16; i++) V.push([0, 1, 2, 3].map(b => (i >> b & 1) ? 1 : -1));
+  return { V, E: edgesAt(V, 2, 1e-6) }; })();
+const JITTER = (() => {                                     // Fuller's jitterbug: (0, ±1, ±t) cycled, t breathing
+  const at = (t) => cyc(signs([0, 1, t]).filter(v => v.length === 3)), ico = at(PHI);
+  return { at, E: edgesAt(ico, minEdge(ico), 1e-6) };
+})();
+const E8 = (() => { const V = [];
+  for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) for (const a of [1, -1]) for (const b of [1, -1]) {
+    const v = new Array(8).fill(0); v[i] = a; v[j] = b; V.push(v); }
+  for (let m = 0; m < 256; m++) { const v = []; let neg = 0;
+    for (let k = 0; k < 8; k++) { const s = (m >> k & 1) ? -0.5 : 0.5; if (s < 0) neg++; v.push(s); }
+    if (neg % 2 === 0) V.push(v); }
+  const E = []; for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
+    let d = 0; for (let k = 0; k < 8; k++) d += V[i][k] * V[j][k]; if (Math.abs(d - 1) < 1e-9) E.push([i, j]); }
+  const Q = V.map(v => H4.map(b => v.reduce((s, x, k) => s + x * b[k], 0)));
+  const nq = Q.map(q => Math.hypot(...q)), rin = Math.min(...nq), inner = nq.map(n => n < rin * 1.1);
+  return { P: V.map(v => [v.reduce((s, x, k) => s + x * E8_U[k], 0), v.reduce((s, x, k) => s + x * E8_W[k], 0)]),
+    R: V.map(v => Math.hypot(v.reduce((s, x, k) => s + x * E8_U[k], 0), v.reduce((s, x, k) => s + x * E8_W[k], 0))), E,
+    Q, inner, scale: Math.max(...nq), Ein: E.filter(([i, j]) => inner[i] && inner[j]),
+    Eout: E.filter(([i, j]) => !(inner[i] && inner[j])) };
+})();
+const CELL600 = (() => {                                    // E8's inner shell: the 600-cell, 120 vertices on φ
+  const V = E8.Q.filter((_, i) => E8.inner[i]), E = edgesAt(V, minEdge(V), 1e-4);
+  const nb = V.map(() => []); for (const [i, j] of E) { nb[i].push(j); nb[j].push(i); }
+  return { V, E, nb };
+})();
+function view4(q, th, spin) { let [x, y, z, w] = q;          // turn out of the E8 mandala's plane, orthographic
+  [x, z] = rot(x, z, th); [y, w] = rot(y, w, th * 0.8); [x, y] = rot(x, y, spin); [z, w] = rot(z, w, spin * 1.3);
+  return [x, y, z]; }
+// ---- projections: 4D → 3D → screen
+function rot(a, b, t) { const c = Math.cos(t), s = Math.sin(t); return [a * c - b * s, a * s + b * c]; }
+function turn3(v, ay, ax) { let [x, y, z] = v; [x, z] = rot(x, z, ay); [y, z] = rot(y, z, ax); return [x, y, z]; }
+function from4(v, t) { let [x, y, z, w] = v;                // turn in three 4D planes, then fall to 3D
+  [x, w] = rot(x, w, t * 0.7); [y, w] = rot(y, w, t * 0.43); [z, w] = rot(z, w, t * 0.29); [x, y] = rot(x, y, t * 0.17);
+  const k = 2.4 / (2.4 - w * 0.9); return [x * k, y * k, z * k, w]; }
+function toScreen(p, X, Y, S) { const k = 3.2 / (3.2 - p[2]); return [X + p[0] * k * S, Y + p[1] * k * S, p[2]]; }
+function strokeEdges(g, P, E, light, hueOf, alpha, width) {   // edges in depth-coloured batches
+  const B = 7, paths = Array.from({ length: B }, () => new Path2D());
+  for (const [i, j] of E) { const a = P[i], b = P[j]; if (!a || !b) continue;
+    const z = Math.max(0, Math.min(B - 1, Math.floor(((a[2] + b[2]) / 2 + 1.2) / 2.4 * B)));
+    paths[z].moveTo(a[0], a[1]); paths[z].lineTo(b[0], b[1]); }
+  g.lineWidth = width;
+  for (let z = 0; z < B; z++) { const near = z / (B - 1);
+    g.strokeStyle = light ? "hsla(" + hueOf(near) + ",90%," + (28 + near * 14) + "%," + alpha * (0.45 + near * 0.55) + ")"
+      : "hsla(" + hueOf(near) + ",100%," + (55 + near * 20) + "%," + alpha * (0.35 + near * 0.65) + ")";
+    g.stroke(paths[z]); }
+}
+// ---- sprites, rebuilt when the size or theme changes
+function buildFlower(u, ext, light) {
+  const s = sacSprite(ext * 2), g = s.getContext("2d"), c = ext, rings = Math.ceil(ext / u) + 1;
+  g.lineWidth = light ? 1.5 : 1.3; g.strokeStyle = rainbow(g, c, c, light ? 0.75 : 0.9, light);
+  for (let q = -rings; q <= rings; q++) for (let r = -rings; r <= rings; r++) {
+    const x = c + u * (q + r / 2), y = c + u * r * Math.sqrt(3) / 2;
+    if (Math.hypot(x - c, y - c) > ext - u) continue;
+    g.beginPath(); g.arc(x, y, u, 0, 6.283); g.stroke(); }
+  g.lineWidth = 2; for (const f of [3, 3.08]) { g.beginPath(); g.arc(c, c, u * f, 0, 6.283); g.stroke(); }
+  g.globalCompositeOperation = "destination-in";
+  const m = g.createRadialGradient(c, c, u * 1.2, c, c, ext);
+  m.addColorStop(0, "rgba(0,0,0,1)"); m.addColorStop(0.55, "rgba(0,0,0,.55)"); m.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = m; g.fillRect(0, 0, s.width, s.height);
+  return s;
+}
+function buildMetatron(d, light) {
+  const ext = d * 2.6, s = sacSprite(ext * 2), g = s.getContext("2d"), c = ext, P = [[c, c]];
+  for (let k = 1; k <= 2; k++) for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + i * Math.PI / 3;
+    P.push([c + Math.cos(a) * d * k, c + Math.sin(a) * d * k]); }
+  g.strokeStyle = light ? "rgba(140,90,0,.6)" : "rgba(255,214,120,.7)"; g.lineWidth = 1;
+  for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+    g.beginPath(); g.moveTo(P[i][0], P[i][1]); g.lineTo(P[j][0], P[j][1]); g.stroke(); }
+  g.strokeStyle = light ? "rgba(90,40,160,.6)" : "rgba(200,170,255,.75)"; g.lineWidth = 1.3;
+  for (const [x, y] of P) { g.beginPath(); g.arc(x, y, d / 2, 0, 6.283); g.stroke(); }
+  g.beginPath(); g.arc(c, c, d * 2.5, 0, 6.283); g.stroke();
+  return s;
+}
+function buildE8(size, light) {                             // the E8 mandala: 6720 edges, drawn once
+  const s = sacSprite(size), g = s.getContext("2d"), c = size / 2, k = c / 1.2;
+  const P = E8.P.map(([x, y]) => [c + x * k, c + y * k]), ring = [0.2382, 0.3855, 0.4739, 0.5729, 0.7043, 0.7667, 0.927, 1.1396];
+  const ri = (i) => ring.findIndex(r => Math.abs(r - E8.R[i]) < 1e-3);
+  g.globalCompositeOperation = light ? "source-over" : "lighter"; g.lineWidth = light ? 0.5 : 0.45;
+  const B = 8, paths = Array.from({ length: B }, () => new Path2D());
+  for (const [i, j] of E8.E) { const b = Math.max(0, Math.min(B - 1, Math.round((ri(i) + ri(j)) / 2)));
+    paths[b].moveTo(P[i][0], P[i][1]); paths[b].lineTo(P[j][0], P[j][1]); }
+  for (let b = 0; b < B; b++) { g.strokeStyle = light ? "hsla(" + (260 + b * 22) + ",85%,35%,.22)" : "hsla(" + (180 + b * 26) + ",100%,65%,.16)"; g.stroke(paths[b]); }
+  for (let i = 0; i < P.length; i++) { const b = ri(i);
+    g.fillStyle = light ? "hsla(" + (260 + b * 22) + ",90%,30%,.95)" : "hsla(" + (180 + b * 26) + ",100%,75%,1)";
+    g.beginPath(); g.arc(P[i][0], P[i][1], 2.2 + b * 0.25, 0, 6.283); g.fill(); }
+  return s;
+}
+function buildChladni(n, m, light) {
+  const N = 150, s = sacSprite(N), g = s.getContext("2d"), img = g.createImageData(N, N), D = img.data;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = i / (N - 1), y = j / (N - 1), rr = Math.hypot(x - 0.5, y - 0.5);
+    const f = Math.cos(n * Math.PI * x) * Math.cos(m * Math.PI * y) - Math.cos(m * Math.PI * x) * Math.cos(n * Math.PI * y);
+    const v = Math.exp(-Math.abs(f) * 9) * Math.max(0, 1 - rr * 2) ** 0.6, hue = (rr * 720 + 260) % 360;
+    const [r, gg, b] = hsl2rgb(hue / 360, 1, light ? 0.35 : 0.62), o = (j * N + i) * 4;
+    D[o] = r; D[o + 1] = gg; D[o + 2] = b; D[o + 3] = Math.round(v * 255); }
+  g.putImageData(img, 0, 0); return s;
+}
+function laguerre(k, a, x) { if (k === 0) return 1; let p0 = 1, p1 = 1 + a - x;
+  for (let i = 1; i < k; i++) { const p2 = ((2 * i + 1 + a - x) * p1 - (i + a) * p0) / (i + 1); p0 = p1; p1 = p2; } return p1; }
+function legendre(l, m, x) { let pmm = 1; const s = Math.sqrt(Math.max(0, 1 - x * x));
+  for (let i = 1; i <= m; i++) pmm *= -(2 * i - 1) * s;
+  if (l === m) return pmm; let p1 = x * (2 * m + 1) * pmm; if (l === m + 1) return p1;
+  for (let ll = m + 2; ll <= l; ll++) { const p2 = ((2 * ll - 1) * x * p1 - (ll + m - 1) * pmm) / (ll - m); pmm = p1; p1 = p2; } return p1; }
+function buildOrbital(n, l, m, light) {                     // a slice through |ψ_nlm|², phase as colour
+  const N = 170, s = sacSprite(N), g = s.getContext("2d"), img = g.createImageData(N, N), D = img.data;
+  const L = n * n * 2.1, psi = new Float32Array(N * N); let max = 0;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = (i / (N - 1) * 2 - 1) * L, z = (j / (N - 1) * 2 - 1) * L, r = Math.hypot(x, z) + 1e-9, rho = 2 * r / n;
+    const ang = legendre(l, m, z / r) * (x < 0 && m % 2 ? -1 : 1);
+    const v = Math.pow(rho, l) * Math.exp(-rho / 2) * laguerre(n - l - 1, 2 * l + 1, rho) * ang;
+    psi[j * N + i] = v; max = Math.max(max, v * v); }
+  for (let p = 0; p < N * N; p++) { const v = psi[p], d = Math.pow(v * v / max, 0.42);
+    const [r, gg, b] = v >= 0 ? hsl2rgb((190 + d * 80) / 360, 1, light ? 0.32 : 0.55 + d * 0.2)
+      : hsl2rgb((330 - d * 290 + 360) % 360 / 360, 1, light ? 0.36 : 0.58 + d * 0.15);
+    const o = p * 4; D[o] = r; D[o + 1] = gg; D[o + 2] = b; D[o + 3] = Math.round(Math.min(1, d * 1.15) * 255); }
+  g.putImageData(img, 0, 0); return s;
+}
+function sacImage(g, img, X, Y, rot, scale, alpha) {
+  if (!img || alpha <= 0.004) return;
+  g.save(); g.globalAlpha = Math.min(1, alpha); g.translate(X, Y); g.rotate(rot); g.scale(scale, scale);
+  g.drawImage(img, -img.width / 2, -img.height / 2); g.restore();
+}
+function sacResize() { const d = Math.min(window.devicePixelRatio || 1, 2);
+  SAC.cv.width = W * d; SAC.cv.height = H * d; SAC.cx.setTransform(d, 0, 0, d, 0, 0); SAC.key = ""; }
+addEventListener("resize", sacResize); sacResize();
+// ---- the stances, drawn at weight w (0..1), centred on the core
+function drawPlatonic(g, X, Y, S, t, w, light) {
+  PLATONIC.forEach((s, n) => { const ay = t * (0.21 + n * 0.05) * (n % 2 ? -1 : 1), ax = t * (0.13 + n * 0.03) + n;
+    const P = s.V.map(v => toScreen(turn3(v, ay, ax), X, Y, S));
+    strokeEdges(g, P, s.E, light, (near) => (s.hue + near * 40 + t * 6) % 360, w, 1.2 + w * 1.2); });
+}
+function draw4(g, poly, X, Y, S, t, w, light, hue0, width, settle = 0) {
+  const P = poly.V.map(v => { let [x, y, z, q] = v;            // settle: the 4D turn returns home, the cube shows its diagonal
+    [x, q] = rot(x, q, easeAngle(t * 0.7, 0, settle)); [y, q] = rot(y, q, easeAngle(t * 0.43, 0, settle));
+    [z, q] = rot(z, q, easeAngle(t * 0.29, 0, settle)); [x, y] = rot(x, y, easeAngle(t * 0.17, 0, settle));
+    const k = 2.4 / (2.4 - q * 0.9) * 0.5, p = [x * k, y * k, z * k, q];   // half size: never near the eye
+    return toScreen(turn3(p, easeAngle(t * 0.11, Math.PI / 4, settle), 0.5 + (0.6155 - 0.5) * settle), X, Y, S); });
+  strokeEdges(g, P, poly.E, light, (near) => (hue0 + near * 120 + t * 10) % 360, w, width);
+  if (w > 0.3) { g.fillStyle = light ? "rgba(40,20,90," + w + ")" : "rgba(255,240,200," + w * 0.9 + ")";
+    for (const p of P) { g.beginPath(); g.arc(p[0], p[1], 1.2 + Math.max(0, p[2]) * 1.6, 0, 6.283); g.fill(); } }
+}
+function drawHopf(g, X, Y, S, t, w, light) {
+  const lats = [[-0.55, 7], [-0.15, 9], [0.25, 10], [0.6, 8], [0.82, 6]];
+  g.lineWidth = 1 + w * 0.9;
+  lats.forEach(([c, n], li) => { const rr = Math.sqrt(1 - c * c);
+    for (let k = 0; k < n; k++) { const ph = k / n * 6.283 + t * 0.25 * (li % 2 ? 1 : -1), a = rr * Math.cos(ph), b = rr * Math.sin(ph);
+      const f = 1 / Math.sqrt(2 * (1 + c)); g.beginPath(); let pen = false;
+      for (let i = 0; i <= 72; i++) { const th = i / 72 * 6.283;
+        const x0 = f * (1 + c) * Math.cos(th), x1 = f * (a * Math.sin(th) - b * Math.cos(th)),
+          x2 = f * (a * Math.cos(th) + b * Math.sin(th)), x3 = f * (1 + c) * Math.sin(th), d = 1 - x0;
+        const p = [x1 / d, x2 / d, x3 / d];
+        if (Math.hypot(...p) > 2.6) { pen = false; continue; }   // the fibre through the pole is a line to infinity
+        const q = toScreen(turn3([p[0] * 0.38, p[1] * 0.38, p[2] * 0.38], t * 0.17, 0.6 + Math.sin(t * 0.1) * 0.3), X, Y, S);
+        pen ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); pen = true; }
+      g.strokeStyle = light ? "hsla(" + ((li * 60 + k * 9) % 360) + ",90%,35%," + w * 0.8 + ")"
+        : "hsla(" + ((li * 60 + k * 9 + t * 12) % 360) + ",100%,68%," + w * 0.85 + ")";
+      g.stroke(); } });
+}
+function sacPaint(now) {
+  const g = SAC.cx, light = themeLight(), t = now * 0.001 * SPEED;
+  g.clearRect(0, 0, W, H);
+  if (!CORE) return;
+  const [X, Y, R] = CORE, lv = level, kick = KICK, spec = SPEC || [];
+  const key = Math.round(R) + "|" + W + "|" + H + "|" + light;
+  if (key !== SAC.key) { SAC.key = key; const ext = Math.hypot(W, H) * 0.62;
+    SAC.flower = buildFlower(R * 0.62, ext, light); SAC.metatron = buildMetatron(R * 0.95, light);
+    SAC.e8 = buildE8(Math.round(R * 5.4), light);
+    SAC.chl = buildChladni(...CHLADNI[SAC.mode], light); SAC.chlOld = null;
+    SAC.orb = buildOrbital(...ORBITALS[SAC.orbI], light); SAC.orbOld = null; }
+  const add = light ? "source-over" : "lighter", fast = STATE === "thinking" ? 2.4 : STATE === "speaking" ? 1.6 : 1;
+  // the stance steps forward in turn; thinking climbs the dimensions quickly
+  const hold = STATE === "thinking" ? 6000 : STATE === "speaking" ? 11000 : 16000;
+  if (now - SAC.stanceAt > hold) { SAC.stanceAt = now; SAC.chainI = (SAC.chainI + 1) % CHAIN.length;
+    SAC.stance = CHAIN[SAC.chainI]; SAC.labelA = 0; SAC.vf = -1; }
+  for (let i = 0; i < SAC.w.length; i++) { const want = i === SAC.stance ? 1 : 0.1; SAC.w[i] += (want - SAC.w[i]) * 0.04; }
+  const Wt = SAC.w;
+  SAC.a4 += 0.016 * fast * SPEED * (1 + lv * 2 + kick * 3);       // the 4D turn, pushed by the voice
+  const glOn = FIFTH && !FIFTH.lost;                     // the 5D field paints the sky itself
+  if (!light && !glOn) {
+    const veil = g.createRadialGradient(X, Y, R * 0.8, X, Y, Math.hypot(W, H) * 0.6);
+    veil.addColorStop(0, "rgba(10,2,30,.42)"); veil.addColorStop(1, "rgba(2,0,10,.84)");
+    g.fillStyle = veil; g.fillRect(0, 0, W, H);
+  }
+  g.save(); g.globalCompositeOperation = add;
+  if (!light && !glOn && g.createConicGradient) {
+    const aura = g.createConicGradient(t * 0.07, X, Y);
+    for (let i = 0; i <= 6; i++) aura.addColorStop(i / 6, "hsla(" + ((i * 60 + t * 12) % 360) + ",100%,50%," + (0.1 + lv * 0.08) + ")");
+    g.fillStyle = aura; g.fillRect(0, 0, W, H);
+  }
+  // ground: the Flower of Life to the edges, and the magnetic field it sits in
+  sacImage(g, SAC.flower, X, Y, t * 0.012 * fast, 1, glOn ? Wt[0] * 0.85 : (light ? 0.6 : 0.62) + lv * 0.2 + Wt[0] * 0.25);
+  if (!glOn) {
+  g.lineWidth = 1.6; g.setLineDash([4, 14]); g.lineDashOffset = -now * 0.04 * (1 + lv * 5) * SPEED;
+  for (let k = 0; k < 7; k++) { const L = R * (1.5 + k * 0.62);
+    g.strokeStyle = light ? "hsla(" + (250 + k * 14) + ",90%,40%,.55)" : "hsla(" + ((190 + k * 22 + t * 8) % 360) + ",100%,70%," + (0.3 + lv * 0.4) + ")";
+    for (const side of [1, -1]) { g.beginPath();
+      for (let i = 4; i <= 176; i += 2) { const th = i * Math.PI / 180, r = L * Math.sin(th) ** 2;
+        const x = X + side * r * Math.sin(th), y = Y - r * Math.cos(th); i === 4 ? g.moveTo(x, y) : g.lineTo(x, y); }
+      g.stroke(); } }
+  g.setLineDash([]);
+  }
+  // the stances (each the shadow of the next), interlocked
+  sacImage(g, SAC.metatron, X, Y, -t * 0.03 * fast, (0.9 + Wt[0] * 0.2) * (1 + kick * 0.04), (light ? 0.35 : 0.4) + Wt[0] * 0.55);
+  const big = R * 2.35;
+  const tau = Math.min(1, (now - SAC.stanceAt) / hold), settle = smooth((tau - 0.62) / 0.33);
+  const spin = t * 0.02 * fast, S8 = big * 1.22 / E8.scale * (1 + kick * 0.04);
+  if (Wt[4] > 0.25) {                                       // E8 live: the mandala turns out of its plane into 4D
+    const here = SAC.stance === 4, th = here ? 1.15 * smooth(tau / 0.75) : 1.15;
+    const P = E8.Q.map(q => { const v = view4(q, th, spin); return [X + v[0] * S8, Y + v[1] * S8, v[2] / E8.scale]; });
+    strokeEdges(g, P, E8.Eout, light, (near) => (180 + near * 140 + t * 8) % 360, Wt[4] * 0.2 * (here ? 1 - settle : 1), 0.45);
+    strokeEdges(g, P, E8.Ein, light, (near) => (260 + near * 90 + t * 8) % 360, Wt[4] * 0.45, 0.7);
+    for (let i = 0; i < P.length; i++) { const a = Wt[4] * (E8.inner[i] ? 1 : (here ? 1 - settle : 1));
+      g.fillStyle = light ? "rgba(60,20,120," + a + ")" : (E8.inner[i] ? "rgba(220,200,255," : "rgba(120,230,255,") + a + ")";
+      g.beginPath(); g.arc(P[i][0], P[i][1], E8.inner[i] ? 2.2 : 1.7, 0, 6.283); g.fill(); }
+  } else if (Wt[4] > 0.02) sacImage(g, SAC.e8, X, Y, spin, 0.7 + Wt[4] * 0.45, Wt[4] * (light ? 0.95 : 1));
+  if (Wt[6] > 0.02) { SAC.orbFade = Math.min(1, SAC.orbFade + 0.02);
+    const os = big * 2.2 / SAC.orb.width;
+    if (SAC.orbOld && SAC.orbFade < 1) sacImage(g, SAC.orbOld, X, Y, t * 0.01, os, Wt[6] * (1 - SAC.orbFade));
+    sacImage(g, SAC.orb, X, Y, t * 0.01, os, Wt[6] * SAC.orbFade); }
+  if (kick > 0.9 && SAC.kickWas <= 0.9 && Wt[6] > 0.5) {         // a beat shifts the electron to a new orbital
+    SAC.orbI = (SAC.orbI + 1) % ORBITALS.length; SAC.orbOld = SAC.orb; SAC.orb = buildOrbital(...ORBITALS[SAC.orbI], light); SAC.orbFade = 0; }
+  if (now - SAC.modeAt > (STATE === "idle" ? 7000 : 3500) || (kick > 0.9 && SAC.kickWas <= 0.9 && now - SAC.modeAt > 1200)) {
+    SAC.modeAt = now; SAC.mode = (SAC.mode + 1 + Math.floor(Math.random() * 3)) % CHLADNI.length;
+    SAC.chlOld = SAC.chl; SAC.chl = buildChladni(...CHLADNI[SAC.mode], light); SAC.chlFade = 0;
+    if (Wt[6] > 0.5 && STATE === "idle") { SAC.orbI = (SAC.orbI + 1) % ORBITALS.length; SAC.orbOld = SAC.orb; SAC.orb = buildOrbital(...ORBITALS[SAC.orbI], light); SAC.orbFade = 0; } }
+  SAC.chlFade = Math.min(1, SAC.chlFade + 0.03);
+  const cs = R * (2.2 + Wt[5] * 0.9 + lv * 0.4 + kick * 0.15), ca = ((light ? 0.5 : 0.6) + lv * 0.4) * (0.35 + Wt[5] * 0.65);
+  for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + t * 0.05 * fast;
+    if (SAC.chlOld && SAC.chlFade < 1) sacImage(g, SAC.chlOld, X, Y, a, cs / SAC.chlOld.width, ca * (1 - SAC.chlFade) / 1.5);
+    sacImage(g, SAC.chl, X, Y, a, cs / SAC.chl.width, ca * SAC.chlFade / 1.5); }
+  if (Wt[1] > 0.02) drawPlatonic(g, X, Y, big * (0.75 + Wt[1] * 0.3) * (1 + kick * 0.04), t * fast, Wt[1], light);
+  if (Wt[2] > 0.02) draw4(g, TESSERACT, X, Y, big * (0.5 + Wt[2] * 0.22), SAC.a4, Wt[2], light, 170, 1.4 + Wt[2] * 1.6,
+    SAC.stance === 2 ? settle : 0);
+  if (Wt[3] > 0.02) {                                       // the 600-cell, same turn as E8; then one vertex's 12 neighbours
+    const here = SAC.stance === 3, th = 1.15 + (here ? tau * 0.9 : 0), vfs = here ? settle : 0;
+    const P = CELL600.V.map(q => { const v = view4(q, th, spin); return [X + v[0] * S8, Y + v[1] * S8, v[2] / E8.scale]; });
+    strokeEdges(g, P, CELL600.E, light, (near) => (260 + near * 120 + t * 10) % 360, Wt[3] * (1 - 0.85 * vfs), 0.8 + Wt[3] * 0.7);
+    if (vfs > 0.01) {
+      if (SAC.vf < 0) SAC.vf = P.reduce((b, p, i) => p[2] > P[b][2] ? i : b, 0);
+      const nb = CELL600.nb[SAC.vf], ring = nb.flatMap((i, a) => nb.slice(a + 1).filter(j => CELL600.nb[i].includes(j)).map(j => [i, j]));
+      g.strokeStyle = light ? "rgba(140,90,0," + vfs + ")" : "rgba(255,214,120," + vfs + ")"; g.lineWidth = 2.2;
+      for (const [i, j] of ring) { g.beginPath(); g.moveTo(P[i][0], P[i][1]); g.lineTo(P[j][0], P[j][1]); g.stroke(); }
+      g.lineWidth = 1; for (const i of nb) { g.beginPath(); g.moveTo(P[SAC.vf][0], P[SAC.vf][1]); g.lineTo(P[i][0], P[i][1]); g.stroke(); }
+    } }
+  if (Wt[7] > 0.02) drawHopf(g, X, Y, big * (0.8 + Wt[7] * 0.3), t * fast, Wt[7], light);
+  if (Wt[10] > 0.02) {                                     // the jitterbug, with the 12 vectors from the centre
+    const k = 0.5 + 0.5 * Math.cos((now - SAC.stanceAt) * 0.0005 * fast + kick), tt = 0.06 + (PHI - 0.06) * k, V = JITTER.at(tt);
+    const rmax = Math.max(...V.map(v => Math.hypot(...v))), S2 = big * (0.75 + Wt[10] * 0.25);
+    const P = V.map(v => toScreen(turn3(v.map(x => x / rmax), t * 0.2, 0.55), X, Y, S2));
+    strokeEdges(g, P, JITTER.E, light, (near) => (40 + near * 60 + t * 8) % 360, Wt[10], 1.4 + Wt[10] * 1.4);
+    const ve = Math.exp(-Math.pow((tt - 1) * 3, 2)) * Wt[10];   // the vectors shine at equilibrium (t = 1)
+    if (ve > 0.02) { g.strokeStyle = light ? "rgba(120,70,0," + ve + ")" : "rgba(255,230,160," + ve + ")"; g.lineWidth = 1;
+      for (const q of P) { g.beginPath(); g.moveTo(X, Y); g.lineTo(q[0], q[1]); g.stroke(); } } }
+  // the golden-angle seed head, pulsing with the voice
+  const NS = 377, c0 = R * 2.35 / Math.sqrt(NS);
+  for (let k = 1; k <= NS; k++) { const a = k * PHI_ANGLE + t * 0.04 * fast, r = c0 * Math.sqrt(k);
+    const v = spec[k % 64] || 0, sz = 0.9 + v * 3.4;
+    g.fillStyle = light ? "hsla(" + ((k * 1.7 + t * 30) % 360) + ",95%,42%," + (0.4 + v * 0.4) + ")"
+      : "hsla(" + ((k * 1.7 + t * 30) % 360) + ",100%,70%," + (0.25 + v * 0.6) * (glOn ? 0.55 : 1) + ")";
+    g.beginPath(); g.arc(X + Math.cos(a) * r, Y + Math.sin(a) * r, sz, 0, 6.283); g.fill(); }
+  // the resonance ring: a standing wave whose lobes come from a Solfeggio tone
+  if (now - SAC.toneAt > 9000) { SAC.toneAt = now; SAC.tone = (SAC.tone + 1) % SOLFEGGIO.length; }
+  const hz = SOLFEGGIO[SAC.tone], lobes = Math.max(3, Math.round(hz / 44)), rr = R * 3.05;
+  g.lineWidth = 1.6; g.strokeStyle = light ? "rgba(90,40,160,.55)" : "hsla(" + ((hz / 3 + t * 10) % 360) + ",100%,72%,.6)";
+  for (const ph of [0, Math.PI]) { g.beginPath();
+    for (let i = 0; i <= 360; i++) { const a = i * Math.PI / 180;
+      const r = rr + Math.sin(lobes * a + ph) * Math.sin(t * 2 * fast) * R * (0.06 + lv * 0.12);
+      i ? g.lineTo(X + Math.cos(a) * r, Y + Math.sin(a) * r) : g.moveTo(X + Math.cos(a) * r, Y + Math.sin(a) * r); }
+    g.stroke(); }
+  g.font = "11px Rajdhani, system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+  for (let i = 0; i < SOLFEGGIO.length; i++) { const a = -Math.PI / 2 + i * 6.283 / SOLFEGGIO.length + t * 0.01, on = i === SAC.tone;
+    g.fillStyle = light ? (on ? "rgba(90,40,160,.9)" : "rgba(60,80,100,.45)") : (on ? "rgba(255,225,150,.95)" : "rgba(190,210,255,.4)");
+    g.fillText(SOLFEGGIO[i] + " Hz", X + Math.cos(a) * (rr + R * 0.28), Y + Math.sin(a) * (rr + R * 0.28)); }
+  // the seven Hermetic principles, slowly turning; the one this stance shows most is lit
+  g.font = "600 10px Rajdhani, system-ui, sans-serif";
+  for (let i = 0; i < HERMETIC.length; i++) { const a = Math.PI / 2 + i * 6.283 / HERMETIC.length - t * 0.006, on = i === STANCE_PRINCIPLE[SAC.stance];
+    const rh = R * 3.62, word = HERMETIC[i].split("").join("\u200A\u200A");
+    g.save(); g.translate(X + Math.cos(a) * rh, Y + Math.sin(a) * rh); g.rotate(a + Math.PI / 2 + (Math.sin(a) < 0 ? 0 : Math.PI));
+    g.fillStyle = light ? (on ? "rgba(90,40,160,.95)" : "rgba(60,80,100,.4)") : (on ? "rgba(255,226,160,.95)" : "rgba(190,210,255,.32)");
+    g.fillText(word, 0, 0); g.restore(); }
+  // Seed of Life ripples on each bass hit
+  if (kick > 0.9 && SAC.kickWas <= 0.9) { SAC.seeds.push({ r: R * 0.5, a: 0.8, h: t * 40 }); if (SAC.seeds.length > 6) SAC.seeds.shift(); }
+  SAC.kickWas = kick;
+  for (let i = SAC.seeds.length - 1; i >= 0; i--) { const s = SAC.seeds[i]; s.r += R * 0.045; s.a *= 0.95;
+    g.strokeStyle = light ? "rgba(90,40,160," + s.a + ")" : "hsla(" + (s.h % 360) + ",100%,75%," + s.a + ")"; g.lineWidth = 1.5;
+    for (let k = 0; k < 7; k++) { const a = k * Math.PI / 3, o = k ? s.r : 0;
+      g.beginPath(); g.arc(X + Math.cos(a) * o, Y + Math.sin(a) * o, s.r, 0, 6.283); g.stroke(); }
+    if (s.a < 0.03) SAC.seeds.splice(i, 1); }
+  g.restore();
+  // the name of the stance standing forward, under the header
+  SAC.labelA = Math.min(1, SAC.labelA + 0.03);
+  const [num, name, line] = STANCES[SAC.stance], ly = W < 760 ? 92 : 100;
+  g.save(); g.textAlign = "center"; g.globalAlpha = SAC.labelA;
+  g.font = "600 13px Rajdhani, system-ui, sans-serif"; g.fillStyle = light ? "rgba(70,30,140,.9)" : "rgba(255,226,160,.95)";
+  const spaced = (num + "  ·  " + name).split("").join(" ");
+  g.fillText(spaced, X, ly);
+  g.font = "12px Rajdhani, system-ui, sans-serif"; g.fillStyle = light ? "rgba(40,60,80,.8)" : "rgba(200,220,255,.75)";
+  g.fillText(line, X, ly + 17);
+  if (glOn) { g.font = "11px Rajdhani, system-ui, sans-serif"; g.fillStyle = light ? "rgba(40,60,80,.6)" : "rgba(200,220,255,.55)";
+    g.fillText("field: a " + FIELD_N[SAC.stance] + "-dimensional standing wave · slice " + FIFTH.phase.toFixed(2), X, ly + 31); }
+  const by = ly + (glOn ? 45 : 31), ba = smooth((tau - 0.55) / 0.2);   // the bridge: how this becomes the next
+  if (ba > 0.01) { g.globalAlpha = SAC.labelA * ba; g.font = "italic 12px Rajdhani, system-ui, sans-serif";
+    g.fillStyle = light ? "rgba(120,70,0,.95)" : "rgba(255,214,120,.95)"; g.fillText("↳ " + BRIDGE[SAC.stance], X, by); g.globalAlpha = SAC.labelA; }
+  const dots = CHAIN.length, dx = 12;                        // where on the chain we stand
+  for (let i = 0; i < dots; i++) { const on = i === SAC.chainI; g.beginPath(); g.arc(X + (i - (dots - 1) / 2) * dx, by + 14, on ? 3 : 1.6, 0, 6.283);
+    g.fillStyle = light ? "rgba(70,30,140," + (on ? 0.9 : 0.35) + ")" : "rgba(255,226,160," + (on ? 0.95 : 0.35) + ")"; g.fill(); }
+  g.restore();
+}
+function sacFrame(now) {
+  if (SAC.on && !document.hidden && now - SAC.last > (REDUCED ? 100 : 33)) {
+    const dt = Math.min(250, now - (SAC.last || now)); SAC.last = now;
+    try { fifthPaint(now, dt, FIELD_N[SAC.stance]); } catch (e) {}
+    try { sacPaint(now); } catch (e) { /* one bad frame never stops it */ } }
+  requestAnimationFrame(sacFrame);
+}
+requestAnimationFrame(sacFrame);
+function paintTapestry() { const b = $("c-geo"); b.textContent = SAC.on ? "TAPESTRY ON" : "TAPESTRY OFF";
+  b.classList.toggle("on", SAC.on); SAC.cv.style.display = SAC.on ? "block" : "none";
+  if (FIFTH && !FIFTH.lost) FIFTH.cv.style.display = SAC.on ? "block" : "none"; }
+$("c-geo").onclick = () => { SAC.on = !SAC.on; try { localStorage.setItem("jarvis-tapestry", SAC.on ? "1" : "0"); } catch (e) {}
+  SAC.key = ""; paintTapestry(); };
+paintTapestry();
 
 // ---------------------------------------------------------------- audio out
 let muted = false, current = null, speakToken = 0;
@@ -565,8 +1225,7 @@ function logLine(role, text) {
 const TITLES = { briefing: "System", system_status: "Status", night_report: "While you were away",
   publish_queue: "Publishing queue", post_video: "Posted", deadlines: "Deadlines", money: "Money", missions: "Missions",
   brain_lookup: "Second Brain", brain_gaps: "Brain gaps", brain_add: "Added to brain",
-  remember: "Remembered", recall: "Memory", plan_mission: "Mission plan", hold_everything: "Hold", release_hold: "Hold",
-  results: "Results" };
+  remember: "Remembered", recall: "Memory", plan_mission: "Mission plan", hold_everything: "Hold", release_hold: "Hold" };
 function fmt(v) { if (v == null) return "—"; if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(2);
   if (typeof v === "boolean") return v ? "yes" : "no"; if (Array.isArray(v)) return v.map(fmt).join(", ");
   if (typeof v === "object") return Object.entries(v).filter(([, x]) => x).map(([k, x]) => k.toLowerCase() + " " + fmt(x)).join(" · ") || "none";
@@ -595,8 +1254,6 @@ function renderCard(c) {
     p = panel(t, "bad"); p.appendChild(el("div", null, d.error));
   } else if (c.tool === "usage_today" && d && d.today) {
     p = panel("Usage", d.warnings && d.warnings.length ? "warn" : ""); usageView(p, d);
-  } else if (c.tool === "results" && d && d.totals) {
-    p = panel("Results · " + d.totals.videos + " video(s)"); resultsView(p, d);
   } else if (c.tool === "toolbox" && d && Array.isArray(d.answers)) {
     p = panel("Toolbox · " + d.answers.length);
     for (const h of d.answers.slice(0, 4)) p.appendChild(toolCard(h));
@@ -610,7 +1267,7 @@ function renderCard(c) {
     p = panel("Clip prompt · " + d.characters + " characters");
     const pre = el("div", null, d.prompt); pre.style.whiteSpace = "pre-wrap"; pre.style.fontSize = "13px"; p.appendChild(pre);
   } else if (Array.isArray(d)) {
-    p = panel(t + " · " + d.length); list(p, d.map(x => x.title ? ((x.platform ? x.platform + ": " : "") + x.title + (x.made_for_kids ? " (kids)" : "")) : (x.caption || x.objective || x.detail || x)));
+    p = panel(t + " · " + d.length); list(p, d.map(x => x.title ? ((x.platform ? x.platform + ": " : "") + x.title) : (x.caption || x.objective || x.detail || x)));
     if (!d.length) p.appendChild(el("div", null, "Nothing here."));
   } else if (d && typeof d === "object") {
     p = panel(t, c.tool === "hold_everything" ? "warn" : "");
@@ -1516,6 +2173,7 @@ let previewUrl = null;
 function nextConfirm() {
   if (showing || !confirmQ.length) return;
   showing = confirmQ.shift(); $("csum").textContent = showing.summary;
+  $("yes").textContent = /^(setup_step|autopilot_answer|fanvue_review)$/.test(showing.tool) ? "Accept" : "Confirm";
   const form = $("cform"), note = $("cnote"), need = $("cneed"), vid = $("cvid");
   form.textContent = ""; note.textContent = ""; need.textContent = ""; picked = {};
   const fields = (showing.form && showing.form.fields) || [];
@@ -1525,29 +2183,48 @@ function nextConfirm() {
     $("yes").disabled = missing.length > 0;
     need.textContent = missing.length ? "To confirm, first choose: " + missing.map(f => f.label).join(" · ") : "";
     if (notes) note.textContent = notes[picked.promotes || ""] || notes.default; };
-  for (const f of fields) {               // owner-only choices: no default is ever preselected
+  for (const f of fields) {               // filled in with Fanvue's own advice; Accept is the choice
     form.appendChild(el("label", null, f.label));
+    const why = f.why ? el("small", "why", "Suggested: " + f.why) : null;
+    if (!f.options) {                     // typed boxes (prices, limits), filled in when suggested
+      const box = el(f.type === "number" ? "input" : "textarea", "typed");
+      if (f.type === "number") { box.type = "number"; box.step = "0.01"; box.min = f.min; box.max = f.max; }
+      box.setAttribute("aria-label", f.label);
+      box.oninput = () => { const v = box.value.trim();
+        picked[f.name] = f.type === "number" && (v === "" || +v < f.min || +v > f.max) ? "" : v; check(); };
+      form.appendChild(box);
+      if (f.value !== undefined) { box.value = f.value; box.oninput(); }
+      if (why) form.appendChild(why);
+      continue;
+    }
     const row = el("div", "opts");
     for (const [v, label] of f.options) {
       const b = el("button", "opt", label); b.type = "button";
       b.onclick = () => { picked[f.name] = v;
         row.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === b)); check(); };
       row.appendChild(b);
+      if (f.value === v) b.click();
     }
     form.appendChild(row);
+    if (why) form.appendChild(why);
   }
   check();
   vid.style.display = "none"; vid.removeAttribute("src");
+  const img = $("cimg"); img.style.display = "none"; img.removeAttribute("src");
   if (showing.preview) {
     const id = showing.id;
     api("/api/preview/" + encodeURIComponent(id)).then(r => r.ok ? r.blob() : null).then(b => {
       if (!b || !showing || showing.id !== id) return;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = URL.createObjectURL(b); vid.src = previewUrl; vid.style.display = "block"; }).catch(() => {});
+      previewUrl = URL.createObjectURL(b);
+      const shown = b.type.startsWith("image/") ? img : vid;   // a picture post or a video
+      shown.src = previewUrl; shown.style.display = "block"; }).catch(() => {});
   }
   $("confirm").classList.add("show");
   shownAt = performance.now();
-  setTimeout(() => (form.querySelector(".opt") || $("confirm").querySelector(".box")).focus(), 50);
+  // Take focus only when nothing else has it: a card must not grab the chat box mid-sentence.
+  const free = !document.activeElement || document.activeElement === document.body;
+  if (free) setTimeout(() => (form.querySelector(".opt, .typed") || $("confirm").querySelector(".box")).focus(), 50);
 }
 async function answer(approve) {
   if (!showing) return;
@@ -1592,8 +2269,8 @@ $("text").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preven
 let canListen = false, rec = null, chunks = [], stream = null, srec = null, live = false;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 function paintMic() { const ok = canListen || !!SR; $("mic").disabled = !ok;
-  $("mic").title = ok ? "Hold to talk (Space)" : "Voice input needs an ElevenLabs key or a browser with speech recognition - type instead";
-  $("hint").textContent = ok ? "Hold space to talk · Enter to send · Esc to stop speaking" : "Type to talk · Enter to send · Esc to stop speaking"; }
+  $("mic").title = ok ? "Hold to talk" : "Voice input needs an ElevenLabs key or a browser with speech recognition - type instead";
+  $("hint").textContent = ok ? "Type to talk · Hold the mic to speak · Enter to send" : "Type to talk · Enter to send · Esc to stop speaking"; }
 async function startListening() {
   if (live || busy || $("mic").disabled) return;
   stopSpeaking(); live = true; $("mic").classList.add("live"); setState("listening"); caption("");
@@ -1637,15 +2314,12 @@ const mic = $("mic");
 mic.addEventListener("pointerdown", (e) => { e.preventDefault(); startListening(); });
 addEventListener("pointerup", () => stopListening());
 addEventListener("keydown", (e) => {
-  if ($("confirm").classList.contains("show")) {
+  if ($("confirm").classList.contains("show") && $("confirm").contains(document.activeElement)) {
     if (e.key === "Escape") answer(false);
     return;
   }
-  if (e.code === "Space" && document.activeElement !== $("text") && !e.repeat) { e.preventDefault(); startListening(); }
   if (e.key === "Escape") stopSpeaking();
-  if ((e.key === "m" || e.key === "M") && document.activeElement !== $("text")) $("c-mute").onclick();
 });
-addEventListener("keyup", (e) => { if (e.code === "Space" && document.activeElement !== $("text")) stopListening(); });
 $("c-mute").onclick = () => { muted = !muted; try { localStorage.setItem("jarvis-muted", muted ? "1" : "0"); } catch (e) {}
   paintMute(); if (muted) stopSpeaking(); };
 // Chat: Jarvis answers in text only. Voice: he speaks too. Same switch as VOICE ON/OFF.
@@ -1751,13 +2425,14 @@ function showDetail(n) {
   const p = panel(n.label, cls); p.id = "detail";
   p.querySelector(".x").onclick = closeDetail;
   p.appendChild(el("div", null, n.summary));
+  if (n.about) p.appendChild(el("div", "about", n.about));       // what this part is for
+  if (n.next) p.appendChild(el("div", "next", "Next: " + n.next));
   const d = n.detail;
   if (n.id === "producer" && d) renderEpisodes(p, d.episodes);
   else if (n.id === "models" && d) renderModels(p, d);
   else if (n.id === "scout") renderScout(p);
   else if (n.id === "studio") renderStudio(p);
   else if (n.id === "usage") renderUsage(p);
-  else if (n.id === "results") renderResults(p);
   else if (n.id === "godseye") renderGodsEye(p);
   else if (d && d.error) p.appendChild(el("div", "issue", d.error));
   else if (Array.isArray(d)) list(p, d.map(i => typeof i === "object" ? (i.title || i.objective || i.detail || Object.values(i).map(fmt).join(" · ")) : i));
@@ -1771,7 +2446,7 @@ function showDetail(n) {
 }
 function renderEpisodes(p, eps) {
   if (!eps || !eps.length) { p.appendChild(el("div", null, "Start one in the terminal:"));
-    cmd(p, "bau ws create kids-channel"); cmd(p, 'bau ws episode kids-channel "your idea"'); return; }
+    cmd(p, "bau ws create creator-week"); cmd(p, 'bau ws episode creator-week "this week\'s theme"'); return; }
   for (const e of eps) {
     const box = el("div", "ep"); box.appendChild(el("b", null, e.workspace + " · " + e.episode));
     for (const s of e.stages) { const r = el("div", "st"); r.appendChild(el("span", null, s.stage));
@@ -1987,38 +2662,6 @@ function usageView(wrap, d) {
   for (const [b, g] of Object.entries(d.github || {}))
     kv(wrap, "GitHub " + b, (g.remaining != null ? g.remaining + " left" : "no reading yet") + (g.waiting_until ? " · waiting until " + g.waiting_until : ""));
 }
-// Results: what each posted video did and whether it paid for its clips. Read only; the
-// numbers come from YouTube and TikTok at most once an hour. Earnings are estimates.
-async function renderResults(p) {
-  const wrap = el("div"); p.appendChild(wrap);
-  let d; try { d = await apiJson("/api/results"); } catch (e) { wrap.appendChild(el("div", "issue", e.message)); return; }
-  button(wrap, "Get the latest numbers", async () => {
-    let r; try { r = await settle(await apiJson("/api/results/refresh", { force: false })); } catch (e) { caption(e.message); return; }
-    const errs = Object.values((r.refresh || {}).errors || {}), skip = Object.values((r.refresh || {}).skipped || {});
-    caption(errs.length ? errs[0] : skip.length ? "Already up to date: " + skip[0] : "Numbers updated.");
-    wrap.remove(); renderResults(p); });
-  resultsView(wrap, d);
-}
-function resultsView(wrap, d) {
-  const money = v => v == null ? "—" : (v < 0 ? "−$" : "$") + Math.abs(v).toFixed(2);
-  const t = d.totals;
-  kv(wrap, "Views", t.views.toLocaleString() + " on " + t.videos + " video(s)");
-  kv(wrap, "Earned (estimate)", money(t.revenue_usd)); kv(wrap, "Clips used", money(t.cost_usd));
-  if (t.unlinked_clip_spend_usd) kv(wrap, "Clips not linked yet", money(t.unlinked_clip_spend_usd));
-  for (const w of d.what_works || []) wrap.appendChild(el("div", null, "▸ " + w));
-  for (const v of d.videos.slice(0, 10)) {
-    const card = el("div", "card"), cls = v.profit_usd == null ? "needs" : v.profit_usd >= 0 ? "eligible" : "rejected";
-    card.appendChild(el("span", "badge " + cls, v.profit_usd == null ? "profit —" : "profit " + money(v.profit_usd)));
-    card.appendChild(el("b", null, v.title));
-    card.appendChild(el("div", "note", (v.platform === "youtube" ? "YouTube" : "TikTok") + (v.made_for_kids ? " · made for kids" : "")));
-    card.appendChild(el("div", null, [v.views == null ? "no numbers yet" : v.views.toLocaleString() + " views",
-      v.avg_view_pct == null ? null : Math.round(v.avg_view_pct) + "% watched", "earned " + money(v.revenue_usd), "clips " + money(v.cost_usd)].filter(Boolean).join(" · ")));
-    if (v.notes.length) card.title = v.notes.join("\n");
-    wrap.appendChild(card);
-  }
-  for (const n of d.notes || []) wrap.appendChild(el("div", "note", n));
-  if (d.videos.some(v => v.cost_usd == null)) cmd(wrap, "bau results link youtube <item> --clips clip_… --episode kids-channel/ep-001");
-}
 // The toolbox: tools others already built for this problem (researched, with sources),
 // shown before Scout searches GitHub. A claim until Scout has inspected it.
 let lastScoutQ = "";
@@ -2030,10 +2673,13 @@ async function showKnown(box, question) {
   for (const h of d.answers.slice(0, 4)) box.appendChild(toolCard(h));
 }
 function toolCard(h) {
+  // A toolbox answer can come with fields missing: never let one break the whole card list.
+  h = Object.assign({ name: "", repo: "", sources: [], evidence: "", problem: "", category: "", licence: "", next: "" }, h);
   {
     const card = el("div", "card"); const a = el("a", null, h.name); a.href = "https://github.com/" + h.repo; a.target = "_blank"; a.rel = "noopener";
     if (h.repo.indexOf(" ") < 0 && h.sources && h.sources[0] && h.sources[0].indexOf("github.com") < 0) a.href = h.sources[0];
-    card.appendChild(el("span", "badge " + (h.evidence.startsWith("inspected") ? "eligible" : "needs"), h.evidence.startsWith("inspected") ? "inspected" : "claimed"));
+    const ev = h.evidence || "";
+    card.appendChild(el("span", "badge " + (ev.startsWith("inspected") ? "eligible" : "needs"), ev.startsWith("inspected") ? "inspected" : "claimed"));
     card.appendChild(a); card.appendChild(el("div", null, h.problem));
     card.appendChild(el("div", null, h.category + " · " + h.licence + (h.caveats ? " · " + h.caveats : "")));
     cmd(card, h.next.startsWith("bau ") ? h.next.split("   ")[0] : h.next);
@@ -2089,6 +2735,11 @@ async function pollActivity() {
     const a = await apiJson("/api/activity?since=" + ASEQ);
     ASEQ = a.seq; BUSY = a.busy || {};
     for (const e of a.events) { (LIVE[e.node] = LIVE[e.node] || []).push(e); if (LIVE[e.node].length > 20) LIVE[e.node].shift();
+      const nd = NODES.find(x => x.id === e.node);
+      if (nd && nd.x != null && CORE) {
+        if (e.kind === "start") burst(CORE[0], CORE[1], nd.x, nd.y, [169, 139, 255]);
+        else if (e.kind === "done") { burst(nd.x, nd.y, CORE[0], CORE[1], [70, 242, 164]); shock(CORE[0], CORE[1], CORE[2], [70, 242, 164]); }
+        else if (e.kind === "error") burst(nd.x, nd.y, CORE[0], CORE[1], [255, 92, 110]); }
       if (e.kind === "done" || e.kind === "error") { logLine("sys", e.node + ": " + e.text); alertOwner(e.node + ": " + e.text);
         clearTimeout(refreshSoon); refreshSoon = setTimeout(loadNodes, 400);
         if (document.body.classList.contains("showtime")) loadTimeline(); } }
@@ -2116,6 +2767,59 @@ async function loadTimeline(older) {
 }
 $("c-time").onclick = () => { document.body.classList.remove("showlog"); document.body.classList.toggle("showtime");
   if (document.body.classList.contains("showtime")) loadTimeline(); };
+
+// ---------------------------------------------------------------- the mind panel (autopilot)
+let MIND_DATA = null, mindTimer = null;
+function drawCompassRadar(goals) {
+  const c = $("m-compass"), x = c.getContext("2d"), w = c.width, m = w / 2, r = w * 0.32;
+  const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#cfefff";
+  x.clearRect(0, 0, w, w); if (!goals.length) return;
+  const max = Math.max(...goals.map(g => g.weight)), ang = i => -Math.PI / 2 + i / goals.length * 6.283;
+  x.strokeStyle = rgba([80, 200, 255], 0.2); x.lineWidth = 1.5;
+  for (let k = 1; k <= 4; k++) { x.beginPath(); goals.forEach((g, i) => x[i ? "lineTo" : "moveTo"](m + Math.cos(ang(i)) * r * k / 4, m + Math.sin(ang(i)) * r * k / 4)); x.closePath(); x.stroke(); }
+  x.beginPath(); goals.forEach((g, i) => { const v = g.focus ? 1 : 0.35 + 0.55 * g.weight / max;
+    x[i ? "lineTo" : "moveTo"](m + Math.cos(ang(i)) * r * v, m + Math.sin(ang(i)) * r * v); }); x.closePath();
+  x.fillStyle = rgba(col, 0.2); x.fill(); x.strokeStyle = rgba(col, 0.95); x.lineWidth = 2.5; x.stroke();
+  x.font = "21px ui-monospace,Consolas,monospace"; x.textAlign = "center"; x.textBaseline = "middle";
+  goals.forEach((g, i) => { x.fillStyle = g.focus ? "#ffb340" : ink;
+    x.fillText(g.short, m + Math.cos(ang(i)) * (r + 50), m + Math.sin(ang(i)) * (r + 30)); });
+}
+function drawVoteSimplex(tasks) {
+  const c = $("m-vote"), x = c.getContext("2d"), w = c.width, h = c.height;
+  const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#cfefff";
+  x.clearRect(0, 0, w, h);
+  const A = [w / 2, 40], B = [50, h - 50], D = [w - 50, h - 50];
+  x.strokeStyle = rgba([80, 200, 255], 0.45); x.lineWidth = 1.5; x.beginPath(); x.moveTo(...A); x.lineTo(...B); x.lineTo(...D); x.closePath(); x.stroke();
+  x.font = "18px ui-monospace,Consolas,monospace"; x.fillStyle = ink; x.textAlign = "center";
+  x.fillText("RULES", A[0], A[1] - 14); x.fillText("EVIDENCE", B[0] + 30, B[1] + 32); x.fillText("JUDGE", D[0] - 20, D[1] + 32);
+  const voted = tasks.filter(t => t.vote);
+  voted.forEach((t, i) => { const v = t.vote.votes, s = (v.rules + v.evidence + v.judge) || 1;
+    const px = (A[0] * v.rules + B[0] * v.evidence + D[0] * v.judge) / s, py = (A[1] * v.rules + B[1] * v.evidence + D[1] * v.judge) / s;
+    x.fillStyle = t.vote.veto ? "#ff4d5e" : t.vote.passed ? "#46f2a4" : "#ffb340";
+    x.beginPath(); x.arc(px + (i % 3 - 1) * 12, py + (i % 2 ? 8 : -8), i ? 8 : 13, 0, 6.283); x.fill(); });
+  const t = voted[0];
+  $("m-votelegend").textContent = t ? `${t.title}: ` + (t.vote.veto ? `stopped by the rules (${t.vote.veto})` :
+    `${t.vote.yes} of 3, ${t.vote.passed ? "passed" : "not passed"}`) : "No votes yet.";
+}
+async function loadMind() {
+  try {
+    MIND_DATA = await apiJson("/api/autopilot"); const s = MIND_DATA.status;
+    $("m-status").textContent = `${s.done} done · ${s.queued} queued · ${s.questions} for you` + (s.paused ? " · paused" : "");
+    $("m-focus").textContent = MIND_DATA.focus ? "Focus: " + MIND_DATA.focus : "No focus set. Say “focus on …”.";
+    const q = $("m-queue"); q.textContent = "";
+    for (const t of MIND_DATA.tasks) { const li = el("li"); li.appendChild(el("span", "ln " + t.lane, t.lane));
+      const d = el("span", null, t.title); d.appendChild(el("small", null, t.state.replace("_", " ") + (t.note ? " · " + t.note : ""))); li.appendChild(d); q.appendChild(li); }
+    if (!MIND_DATA.tasks.length) q.appendChild(el("li", null, "Nothing yet. He starts on his next round."));
+    drawCompassRadar(MIND_DATA.goals); drawVoteSimplex(MIND_DATA.tasks);
+  } catch (e) {}
+}
+function tickMind() { if (!document.body.classList.contains("showmind")) return;
+  const [a, b, c2, r] = MIND_NOW; $("m-x").textContent = a.toFixed(2); $("m-y").textContent = b.toFixed(2);
+  $("m-z").textContent = c2.toFixed(2); $("m-rho").textContent = r.toFixed(1); }
+setInterval(tickMind, 250);
+$("c-mind").onclick = () => { document.body.classList.toggle("showmind");
+  const on = document.body.classList.contains("showmind"); clearInterval(mindTimer);
+  if (on) { loadMind(); mindTimer = setInterval(loadMind, 15000); } };
 
 // ---------------------------------------------------------------- Mission Control, inside
 const MC = [["status", "Status"], ["missions", "Missions"], ["jobs", "Jobs"], ["regulations", "Regulations"],
@@ -2220,7 +2924,7 @@ addEventListener("touchend", (e) => {
 addEventListener("keydown", (e) => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "");
   if (e.ctrlKey || e.metaKey || e.altKey || !woke || performance.now() - wokeAt < 400) return;
-  if ($("confirm").classList.contains("show")) { if ((e.key === "y" || e.key === "Y") && !typing && !$("yes").disabled) answer(true); return; }
+  if ($("confirm").classList.contains("show") && $("confirm").contains(document.activeElement)) { if ((e.key === "y" || e.key === "Y") && !typing && !$("yes").disabled) answer(true); return; }
   if (e.key === "Escape") {
     if ($("help").classList.contains("show")) overlay("help", false);
     else if ($("mcbox").classList.contains("show")) overlay("mcbox", false);
@@ -2228,15 +2932,9 @@ addEventListener("keydown", (e) => {
     else if (SEL) closeDetail();
     return; }
   if (typing) return;
-  const k = e.key.toLowerCase(), act = { t: "c-time", c: "c-mc", l: "c-log", w: "c-wake", a: "c-alerts", d: "c-theme", "?": "c-help", v: "modepill" }[k];
-  if (k === "s" && !$("speakpill").hidden) { stopSpeaking(); return; }
-  if (act) { e.preventDefault(); $(act).onclick(); return; }
-  if (k === "/") { e.preventDefault(); $("text").focus(); return; }
-  if (k === "+" || k === "=") { setZoom(ZOOM * 1.1); return; }
-  if (k === "-") { setZoom(ZOOM / 1.1); return; }
-  if (k === "0") { setZoom(1); return; }
-  if (k === "g") { const b = document.querySelector("#detail button:not(.x), #detail input, #detail textarea"); if (b) { e.preventDefault(); b.focus(); } return; }
-  if (/^[1-9]$/.test(k)) { const n = NODES[parseInt(k, 10) - 1]; if (n) openNode(n.id); }
+  // Every key types to Jarvis (the owner, 2026-11-09: letters fired the controls instead of
+  // the chat). No single-letter shortcuts: the buttons and the mouse do those.
+  if (e.key.length === 1) $("text").focus();
 });
 
 // ---------------------------------------------------------------- wake + briefing
@@ -2248,9 +2946,10 @@ async function wake() {
   setState("thinking"); caption("");
   try { handle(await settle(await apiJson("/api/briefing"))); }
   catch (e) { caption(e.message); setState("idle"); }
-  $("text").focus();
+  if (!$("confirm").classList.contains("show")) $("text").focus();   // never steal a card's box
 }
 $("wake").addEventListener("click", wake);
+$("confirm").addEventListener("click", () => { if (!woke) wake(); }, { capture: true });   // a card answered before waking must not leave the wake screen over everything
 addEventListener("keydown", () => { if (!woke) wake(); }, { capture: true });
 pollActivity();
 apiJson("/api/state").then(paintState).catch(e => caption(e.message));

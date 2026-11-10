@@ -3,7 +3,7 @@
 BAU reads your keys from two files on the laptop:
 - `/etc/bau/models.env`: Claude, Z.ai, NVIDIA, ElevenLabs, Higgsfield and other model or
   service keys;
-- `/etc/bau/platforms.env`: YouTube, TikTok and other platform app keys.
+- `/etc/bau/platforms.env`: TikTok, Ayrshare (`AYRSHARE_API_KEY`, see WEEK.md) and other platform keys.
 
 Instead of typing each key, you can carry them all over from the computer that has them,
 in one locked file. Your keys are **never** pasted into a chat, never put on GitHub, and
@@ -60,7 +60,7 @@ the files stays as it is.
 - A wrong passphrase changes nothing; just run it again.
 - New keys still need your approval where BAU asks for it. For example a model is only
   used after `bau set-status model ... APPROVED`, and YouTube or TikTok still need
-  `bau youtube login` / `bau tiktok login`.
+  `bau tiktok login`.
 - The file is locked with AES-256 in openssl's standard format (PBKDF2-SHA256, 600,000
   rounds). If your Mac says its openssl is too old, install a new one with
   `brew install openssl` and run the script again.

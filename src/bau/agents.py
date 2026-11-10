@@ -117,6 +117,7 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
     final = ""
     evidence: list[str] = []
     seen: Counter[str] = Counter()
+    tainted = False                  # set once a tool brings outside content into this run
     for step in range(1, spec.max_steps + 1):
         est = estimate_usd(spec.model, 4000, 1000)
         ok, why = gateway.budgets.check(gateway.ledger, spec.agent_id, est, job.job_id,
@@ -167,7 +168,8 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
             try:
                 out = gateway.invoke(CallRequest(agent=spec.agent_id, capability=cap,
                                                  args=call.input, job_id=job.job_id,
-                                                 mission_id=mission_id))
+                                                 mission_id=mission_id, tainted=tainted))
+                tainted = tainted or gateway.brings_outside_content(cap)
                 text = out if isinstance(out, str) else json.dumps(out, default=str)[:20000]
                 wrapped, flagged = untrusted(cap, text)
                 flags += flagged

@@ -1,0 +1,66 @@
+name: wifi-kit
+
+# The Wi-Fi rescue kit (docs/WIFI-RESCUE.md): one zip the owner downloads on any computer,
+# copies to a USB stick, and runs on the desktop with no internet. It holds the rescue
+# script and Debian 13's firmware-mediatek package, checked against the SHA-256 Debian
+# publishes (packages.debian.org/trixie/all/firmware-mediatek/download, read 2026-11-02).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [installer/bau-wifi-rescue.sh, .github/workflows/wifi-kit.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wifi-kit
+  cancel-in-progress: false
+
+jobs:
+  kit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: fetch both firmware packages and check them
+        run: |
+          mkdir -p kit
+          pool=https://deb.debian.org/debian/pool/non-free-firmware/f/firmware-nonfree
+          curl -fsSL --retry 3 -o kit/firmware-mediatek_20250410-2_all.deb \
+            "$pool/firmware-mediatek_20250410-2_all.deb"
+          curl -fsSL --retry 3 -o kit/firmware-atheros_20250410-2_all.deb \
+            "$pool/firmware-atheros_20250410-2_all.deb"
+          sha256sum -c <<'SUMS'
+          957f82d72d413f4577f45bfad03237b1dd6f8693eddc226ac452f9c5d4187012  kit/firmware-mediatek_20250410-2_all.deb
+          8387a45e9307052858185620ab30efebbf9660b072d6c8309673bf112e291f35  kit/firmware-atheros_20250410-2_all.deb
+          SUMS
+      - name: make the kit
+        run: |
+          install -m 0755 installer/bau-wifi-rescue.sh kit/bau-wifi-rescue.sh
+          cat > kit/README.txt <<'TXT'
+          BAU Wi-Fi rescue kit (the desktop's MediaTek MT7921 and the laptop's Killer 1435). No internet needed.
+
+          1. Copy this folder to a USB stick, plug it into the desktop or the laptop.
+          2. Open a terminal in the folder and run:
+               sudo bash bau-wifi-rescue.sh
+             It tries one fix after another and stops at the first that works.
+          3. To keep it watching and fixing the Wi-Fi by itself from now on:
+               sudo bash bau-wifi-rescue.sh --install
+
+          What it did is written to /var/log/bau-wifi-rescue.log.
+          TXT
+          (cd kit && sha256sum ./* > SHA256SUMS)
+          zip -qr bau-wifi-kit.zip kit
+      - name: put it on the bau-wifi-kit release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Download bau-wifi-kit.zip, unzip it onto a USB stick, then on the desktop: sudo bash bau-wifi-rescue.sh (docs/WIFI-RESCUE.md)."
+          if gh release view bau-wifi-kit >/dev/null 2>&1; then
+            gh release upload bau-wifi-kit bau-wifi-kit.zip --clobber
+            gh release edit bau-wifi-kit --notes "$notes"
+          else
+            gh release create bau-wifi-kit bau-wifi-kit.zip --title "Wi-Fi rescue kit" \
+              --notes "$notes" --target "${GITHUB_SHA}"
+          fi

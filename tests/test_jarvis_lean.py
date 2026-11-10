@@ -68,7 +68,9 @@ def test_use_tool_cannot_skip_the_owners_confirmation(tmp_path):
 def test_use_tool_refuses_unknown_and_itself(tmp_path):
     a = lean(tmp_path, ["ok"])
     assert "unknown tool" in a.t_use_tool("nope")["error"]
-    assert "error" in a.t_use_tool("use_tool", {"name": "money"})
+    # nested use_tool is unwrapped since 2026-11-02 (see test_a_nested_use_tool_is_unwrapped);
+    # use_tool with nothing to run inside is still refused
+    assert "error" in a.t_use_tool("use_tool", {})
     assert "error" in a.t_use_tool("tool_menu")
 
 
@@ -169,3 +171,129 @@ def test_earlier_answers_are_not_carried_into_a_local_models_instructions(tmp_pa
     b.ask("hi")
     assert "status?" in b.provider.calls[0]["system"]
     assert "The system is fine." not in b.provider.calls[0]["system"]
+
+
+# Real run, 2026-11-01 (Qwen3.5-4B, llama.cpp b11747, fresh home): told "Remember that the
+# creator posts at 7pm", it was handed recall's facts, searched twice, saved nothing and said
+# "I've saved that". A command to remember is not a question about the past.
+def test_a_remember_command_is_not_answered_with_recall(tmp_path):
+    a = lean(tmp_path, ["Saved."])
+    r = a.ask("Remember that the creator posts on Instagram every day at 7pm.")
+    assert "Facts already looked up" not in str(a.provider.calls[0]["messages"][-1]["content"])
+    assert r.cards[0]["tool"] == "remember"
+
+
+# Real-model check, 2026-11-01 (second run): asked to remember, the model searched instead and
+# said "I'm adding that". A small model is not trusted with it: the note is saved first.
+def test_a_remember_command_is_saved_before_the_model_answers(tmp_path):
+    a = lean(tmp_path, ["Got it."])
+    r = a.ask("Jarvis, remember that the creator posts on Instagram every day at 7pm.")
+    notes = list((tmp_path / "memory" / "records").glob("*.md"))
+    assert len(notes) == 1 and "every day at 7pm" in notes[0].read_text()
+    assert "Already saved" in str(a.provider.calls[0]["messages"][-1]["content"])
+    assert r.cards[0]["tool"] == "remember" and r.text == "Got it."
+    b = lean(tmp_path, ["We said 7pm."])
+    b.ask("Do you remember when the creator posts?")
+    # a question saves nothing
+    assert len(list((tmp_path / "memory" / "records").glob("*.md"))) == 1
+    b = lean(tmp_path, ["We said 7pm."])
+    b.ask("Do you remember what we decided about posting?")
+    assert "Facts already looked up" in str(b.provider.calls[0]["messages"][-1]["content"])
+
+
+# Same run: "What workspaces do I have?" - the menu line for workspaces was cut at "e.g" and
+# the model never found it.
+def test_menu_lines_are_not_cut_at_an_abbreviation(tmp_path):
+    lines = lean(tmp_path, ["ok"]).t_tool_menu()["tools"]
+    ws = next(x for x in lines if x.startswith("workspaces:"))
+    assert "creator week" in ws
+    a = lean(tmp_path, ["You have none yet."])
+    r = a.ask("What workspaces do I have?")
+    assert r.cards and r.cards[0]["tool"] == "workspaces"
+
+
+# Same run: with no limits set, the model said "4 calls remaining before today's limit".
+def test_usage_says_plainly_when_no_limit_is_set(tmp_path):
+    assert "No daily limits are set." in lean(tmp_path, ["ok"]).t_usage()["say"]
+
+
+# Same run: asked to plan the creator's posts, it never saw creator_batch (menu only).
+def test_the_creator_batch_is_in_a_small_models_core_tools(tmp_path):
+    assert "creator_batch" in CORE_TOOLS
+
+
+# The owner's desktop, 2026-11-02: HTTP 400s from the local qwen3.5-4b. The model server
+# runs with --ctx-size 8192 (bau-llm.service) but Jarvis kept 40 messages whatever their size
+# and believed the model had 16,384 tokens, so a longer conversation no longer fitted and
+# llama.cpp refused it. Now every request is measured and trimmed to the real window.
+def _size(call):
+    import json
+    return (len(call["system"]) + len(json.dumps(call["messages"], default=str))
+            + len(json.dumps([getattr(t, "__dict__", t) for t in call["tools"] or []],
+                             default=str)))
+
+
+def test_every_request_fits_the_local_servers_window(tmp_path, monkeypatch):
+    from bau import assistant as AS
+    big = "x" * 9000                                   # a long tool result, about 3,000 tokens
+    script = []
+    for _ in range(12):
+        script += [{"tool": "system_status", "input": {}}, "ok"]
+    monkeypatch.setattr(AS.Assistant, "t_status", lambda self: {"detail": big})
+    a = lean(tmp_path, script)
+    a.model = {**LOCAL, "context": 16384}              # what the record claimed
+    for i in range(12):
+        a.ask(f"question {i}")
+    window = AS.LOCAL_SERVER_CTX * AS.CHARS_PER_TOKEN
+    sizes = [_size(c) for c in a.provider.calls]
+    assert all(n <= window for n in sizes), max(sizes)
+    assert a.provider.calls[-1]["messages"][-1]["role"] in ("user", "assistant")
+
+
+def test_one_huge_tool_result_is_cut_not_sent_whole(tmp_path, monkeypatch):
+    from bau import assistant as AS
+    monkeypatch.setattr(AS.Assistant, "t_status", lambda self: {"detail": "y" * 100000})
+    a = lean(tmp_path, [{"tool": "system_status", "input": {}}, "ok"])
+    a.ask("status?")
+    assert _size(a.provider.calls[-1]) <= AS.LOCAL_SERVER_CTX * AS.CHARS_PER_TOKEN
+
+
+def test_the_window_matches_the_model_servers_own_setting():
+    import re
+    from pathlib import Path
+
+    from bau import assistant as AS
+    unit = (Path(__file__).resolve().parents[1] / "image/live-build/config/includes.chroot"
+            "/etc/systemd/system/bau-llm.service").read_text()
+    assert int(re.search(r"--ctx-size (\d+)", unit).group(1)) == AS.LOCAL_SERVER_CTX
+# The owner's desktop, 2026-11-02: the small model put use_tool inside use_tool, then asked
+# the menu about "use_tool", and "lets do all" ran out of steps. Now "do all" puts every
+# setup step waiting for the owner on screen at once (no model needed), and a nested
+# use_tool is unwrapped instead of refused.
+def test_do_all_puts_everything_waiting_on_screen_without_the_model(tmp_path, monkeypatch):
+    from bau import setup_steps
+    monkeypatch.setattr(setup_steps, "_probe", {"nvidia": True, "driver": False,
+                                                "pictures": False, "search": False,
+                                                "update": "off", "autopilot": True,
+                                                "room": False}.__getitem__)
+    for said in ("lets do all", "Let's do it all", "do everything", "ok continue",
+                 "what's waiting on me?"):
+        a = lean(tmp_path, [])                       # the model is never asked
+        r = a.ask(said)
+        assert len(r.pending) == 3 and all(p["tool"] == "setup_step" for p in r.pending), said
+        assert "Accept" in r.text
+    a = lean(tmp_path, ["Sure."])
+    assert not a.ask("can we continue the story about the cafe later").pending
+
+
+def test_nothing_waiting_is_said_plainly(tmp_path):
+    r = lean(tmp_path, []).ask("lets do all")
+    assert r.pending == [] and "nothing" in r.text.lower()
+
+
+def test_a_nested_use_tool_is_unwrapped(tmp_path):
+    a = lean(tmp_path, [])
+    out = a.t_use_tool("use_tool", {"name": "missions", "input": {}})
+    assert not (isinstance(out, dict) and out.get("error"))
+    menu = a.t_tool_menu("use_tool")
+    assert "error" not in menu and "use_tool" in menu["how"]

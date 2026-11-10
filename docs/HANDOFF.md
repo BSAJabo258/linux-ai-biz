@@ -234,14 +234,8 @@ the repo (a test fails if they go stale: rerun `python3 assets/make_art.py`), Gi
 [!IMPORTANT]/[!TIP] notices. Jarvis answer cards for usage_today, toolbox, plan_episode
 and clip_prompt now use readable layouts instead of raw fields.
 
-The kids series engine (2026-10-10, tests first in `tests/test_series.py`): `series.py`
-reads `_shared/characters/*.yaml` + `_shared/style.yaml` (templates with placeholders in
-the kids-channel workspace); `lock(id)` is the fixed character sentence every prompt
-carries; `prompt()` = style + locks + scene + avoid (kids scan, 2500-char cap); `drift()`
-flags off-sheet colours/"never" traits and names without their lock (stage 04 check
-`series_lock`, active once sheets are filled); `plan()` scales `data/series_formats.yaml`
-beats to 3-15 s clips, writes `series.yaml` + `series-plan.md`, warns on four same formats
-in a row or a near-duplicate idea. Jarvis tools `clip_prompt`, `plan_episode`; `bau series`.
+The kids series engine (2026-10-10): removed on 2026-10-31 with the kids channel; the
+owner's business is now one fictional adult virtual creator (docs/VIRTUAL-CREATOR.md).
 
 The repo's look (2026-10-10, tests in `tests/test_repo_look.py`): README opens with an
 animated banner and feature cards (`assets/*.svg`, dark and light via `<picture>`, drawn by
@@ -426,19 +420,8 @@ Owner decisions (2026-10-12):
 
 Next build: the browser lane (map layer 1), then the one-stick installer.
 
-The results tracker (2026-10-10, tests first in `tests/test_results.py`): `results.py`
-reads numbers back for every POSTED queue item, read only. YouTube uses Analytics
-`reports.query`, `dimensions=video`, batches of 200, with `estimatedRevenue` asked
-separately; a refusal means "no earnings" and views still count. TikTok uses
-`/v2/video/query/`, 20 per request. Both clients gained the read scopes, so owners log in
-once more. Other behaviour:
-- snapshots go to `results/snapshots.jsonl`, one refresh per platform an hour;
-- `bau results link` ties a video to its studio clips and episode; cost comes from the
-  ledger's `job_id`, and the format from the episode's `series.yaml`;
-- the report shows profit per video, unlinked clip spend, `by_format` and `what_works`;
-- it is reachable through the `results` tool, a Results node and panel, `/api/results`
-  and `/api/results/refresh`.
-Owner guide: `docs/RESULTS.md`.
+The results tracker (2026-10-10): removed on 2026-10-31 (it read YouTube's numbers);
+results for Fanvue, Instagram and TikTok are planned.
 
 The usage meter (2026-10-10, tests first in `tests/test_usage.py`):
 - `usage.py`: `Metered` wraps the provider for Jarvis's turns, workspace drafts and Scout;
@@ -525,6 +508,8 @@ reads back what `remember` saved (memory used to be write-only for him).
 
 ## Next steps (in order)
 
+**2026-11-01:** the universal-harness plan is in [HARNESS-MAP.md](HARNESS-MAP.md). Build its steps 1 to 3 first (one tool list through the gateway, tool search, tool-call fitness on the model record), each on its own branch, merged only after the owner reviews it.
+
 ### Laptop "best setup" (owner's go, 2026-10-21): what was searched, tested and built
 
 Two research rounds (8 researchers, primary sources only) plus real tests on the stick's
@@ -605,11 +590,27 @@ It needs about 24 GB RAM. Check `reply_ok` and `tool_calls` are true before appr
 
 ### 3. Owner setup still to do
 - **Claude:** `ANTHROPIC_API_KEY` in `/etc/bau/models.env` (laptop) or `.env` (Docker), then `bau set-status model claude-opus-5-5 APPROVED`.
-- **YouTube:** Google Cloud "Desktop app" OAuth client, then `YOUTUBE_CLIENT_ID`/`_SECRET` in `/etc/bau/platforms.env`, then `bau youtube login`. Apply for Google's API audit; until it passes, uploads stay private. See INSTALL Phase 8b.
 - **TikTok:** app keys plus TikTok's app audit (INSTALL Phase 8).
+- **Automatic updates on the desktop** (owner's choice 2026-11-01, `docs/UPDATES.md`): once, `sudo bash bau-update-first.sh` (from `installer/`); not run on the desktop yet.
 - **ElevenLabs:** the owner's account was blocked ("unusual activity", free tier disabled). Voice falls back to the browser's, and nothing in code is needed.
 
 ## Known gaps / ideas (not started)
+
+- **Grow-BAU review, 2026-11-03: the creator's feed.** The job: "fill the Fanvue queue by
+  itself so the loop makes money without me". The answer was mostly glue between parts BAU
+  already has (ComfyUI, the local model, the autopilot timer, the Fanvue queue), so
+  `src/bau/creator_feed.py` was built (PR #135). Candidates looked at for keeping Aria's
+  face the same across pictures:
+  - AHEKOT/ComfyUI_VNCCS (MIT): not a fit. It makes anime and visual-novel sprites on
+    Illustrious/Qwen models, and its "Character Cloner" copies characters from pictures
+    taken from the internet (real-likeness risk).
+  - cubiq/ComfyUI_IPAdapter_plus (GPL-3.0): works with SDXL from a reference picture, and
+    the non-FaceID adapter needs no insightface. But it has been in maintenance-only mode
+    since 2025-04-14, and its page states no licence for the h94/IP-Adapter weights. Next
+    step, only if the owner says yes: read the weights' licence on Hugging Face, then test
+    it in a sandbox on the desktop.
+  - Workflow tools (Activepieces, from the toolbox) were not needed, because the autopilot
+    timer already schedules the work.
 
 - Instagram, Facebook and Snapchat adapters for the publishing hub. Each needs one adapter class in `publishing.py`, a client module, an `examples/platform-*.yaml`, and tests. Verify each platform's current API and posting rules first (consent screens, AI labels, age limits).
 - The `ghcr.io/bsajabo258/bau` image is private by default. Make it public in the package settings if the owner wants `docker pull` to work without logging in.
