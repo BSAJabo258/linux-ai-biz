@@ -257,3 +257,25 @@ def test_accepting_the_filled_in_prices_and_limits_saves_them(tmp_path):
     assert S.run("boundaries", home, values=lim)["done"]
     text = (home / "creators/aria.yaml").read_text()
     assert "subscription: 9.99" in text and "No real person's likeness" in text
+
+
+def test_installed_pictures_never_ask_to_be_downloaded_again(tmp_path):
+    # The owner's desktop, 2026-11-10: after a reboot ComfyUI could not start (CUDA was not
+    # ready yet), so "is it answering?" said no and the card asked to download it all again.
+    from bau.setup_steps import pictures_installed
+    assert not pictures_installed(tmp_path)
+    unit = tmp_path / "etc/systemd/system/bau-pictures.service"
+    model = tmp_path / "usr/local/comfyui/ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors"
+    unit.parent.mkdir(parents=True)
+    unit.write_text("[Unit]\n")
+    assert not pictures_installed(tmp_path)                 # the service without its model
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"x")
+    assert pictures_installed(tmp_path)
+
+
+def test_the_picture_service_loads_cuda_before_it_starts():
+    from pathlib import Path
+    text = (Path(__file__).resolve().parents[1] / "installer" / "bau-pictures-setup.sh").read_text()
+    assert 'PRE="ExecStartPre=+$(command -v nvidia-modprobe) -u -c=0"' in text
+    assert "WorkingDirectory=${SRC}\n${PRE}\nExecStart=" in text

@@ -104,6 +104,14 @@ def _answers(url: str) -> bool:
         return False
 
 
+def pictures_installed(root: Path = Path("/")) -> bool:
+    """Installed counts, not running: the owner's desktop, 2026-11-10, rebooted, ComfyUI could
+    not start before CUDA was ready, and the card kept asking to download it all again."""
+    return ((root / "etc/systemd/system/bau-pictures.service").is_file() and
+            (root / "usr/local/comfyui/ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors")
+            .is_file())
+
+
 def _probe(what: str) -> object:
     """Facts about this computer, read-only."""
     if what == "nvidia":
@@ -113,7 +121,7 @@ def _probe(what: str) -> object:
         return shutil.which("nvidia-smi") is not None and subprocess.run(
             ["nvidia-smi"], capture_output=True, check=False).returncode == 0
     if what == "pictures":
-        return _answers("http://127.0.0.1:8188/system_stats")
+        return _answers("http://127.0.0.1:8188/system_stats") or pictures_installed()
     if what == "search":
         return _answers("http://127.0.0.1:8888/")
     if what == "autopilot":

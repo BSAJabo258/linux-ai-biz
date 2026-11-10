@@ -122,6 +122,14 @@ if [[ -n ${RUNNER} && -f ${RUNNER} ]]; then
     || say "   (the age check loads; it is used on the first picture)"
 fi
 
+# CUDA's device (/dev/nvidia-uvm) appears only when something first asks for it: at boot
+# ComfyUI asked too early, got "CUDA unknown error" five times and gave up (the owner's
+# desktop, 2026-11-10). Root loads it first ("+"), then the service starts as comfyui.
+PRE=""
+if [[ ${BAU_PICTURES_CPU:-} != 1 ]] && command -v nvidia-modprobe >/dev/null; then
+  PRE="ExecStartPre=+$(command -v nvidia-modprobe) -u -c=0"
+fi
+
 cat > "${UNIT}" <<EOF
 [Unit]
 Description=Local pictures for BAU (ComfyUI on 127.0.0.1:8188)
@@ -135,6 +143,7 @@ User=comfyui
 Group=comfyui
 SupplementaryGroups=video render
 WorkingDirectory=${SRC}
+${PRE}
 ExecStart=${VENV}/bin/python ${SRC}/main.py --listen 127.0.0.1 --port 8188 --disable-auto-launch ${EXTRA[*]}
 Restart=on-failure
 RestartSec=30
