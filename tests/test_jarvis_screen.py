@@ -257,3 +257,104 @@ def test_nothing_invisible_covers_the_buttons():
     assert "#timeline{position:fixed;top:56px;max-height:calc(100vh - 166px);" in page
     # a card answered before waking also takes the wake screen away
     assert '$("confirm").addEventListener("click", () => { if (!woke) wake(); }' in page
+
+
+def _page():
+    from pathlib import Path
+    return (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+
+
+def _full_screen_layer(name):
+    return (f"canvas#{name}{{position:fixed;inset:0;width:100%;height:100%;"
+            "display:block;pointer-events:none}")
+
+
+def test_the_tapestry_is_sacred_geometry_that_never_takes_a_click():
+    # The owner, 2026-11-09: the screen as a psychedelic, esoteric tapestry (sacred geometry,
+    # sound and frequency, magnetic fields), alive with Jarvis, with an off switch.
+    page = _page()
+    assert '<canvas id="sacred" aria-hidden="true"></canvas>' in page
+    assert _full_screen_layer("sacred") in page
+    assert page.index('id="sacred"') < page.index('<canvas id="core"')      # under the core
+    for part in ("buildFlower(", "buildMetatron(", "buildChladni(", "PHI_ANGLE", "SOLFEGGIO",
+                 "L * Math.sin(th) ** 2", "HERMETIC", "JITTER"):
+        assert part in page
+    assert 'id="c-geo"' in page and 'localStorage.setItem("jarvis-tapestry"' in page
+    assert "REDUCED ? 100 : 33" in page                                      # ~30 fps
+
+
+def test_the_fifth_dimension_is_a_real_slice_with_a_safe_fallback():
+    # The owner, 2026-11-09 (BassForge, pvrellis): cymatics as a 5-dimensional form seen in
+    # cross-section; the stances climb to 4D, 8D (E8), the quantum and the fractal.
+    page = _page()
+    assert '<canvas id="fifth" aria-hidden="true"></canvas>' in page
+    assert _full_screen_layer("fifth") in page
+    assert page.index('id="fifth"') < page.index('id="sacred"') < page.index('<canvas id="core"')
+    assert "float a = TAU * fj / N + rot;" in page                 # N axes fanned at 360°/N
+    assert "const FIELD_N = [6, 5, 4, 5, 8, 7, 5, 3, 5, 6, 6];" in page
+    assert 'cv.style.display = "none"; return null;' in page       # no WebGL: 2D alone
+    assert "F.scale *= 0.75; fifthResize();" in page               # slow frames: lower res
+    for part in ("TESSERACT", "CELL600", "E8_U", "buildOrbital(", "drawHopf(", "laguerre(",
+                 "legendre(", "vec3 julia(", "uJc"):
+        assert part in page
+
+
+def test_the_e8_projection_is_eight_rings_of_thirty():
+    import math
+    import re
+    from itertools import product
+    page = _page()
+    u = [float(x) for x in re.search(r"const E8_U = \[([^\]]+)\]", page).group(1).split(",")]
+    w = [float(x) for x in re.search(r"const E8_W = \[([^\]]+)\]", page).group(1).split(",")]
+    roots = []
+    for i in range(8):
+        for j in range(i + 1, 8):
+            for a, b in product((1, -1), repeat=2):
+                r = [0] * 8
+                r[i], r[j] = a, b
+                roots.append(r)
+    roots += [list(s) for s in product((0.5, -0.5), repeat=8) if sum(x < 0 for x in s) % 2 == 0]
+    assert len(roots) == 240
+
+    def radius(r):
+        return round(math.hypot(sum(x * y for x, y in zip(r, u, strict=True)),
+                                sum(x * y for x, y in zip(r, w, strict=True))), 4)
+
+    radii = [radius(r) for r in roots]
+    assert sorted({radii.count(x) for x in set(radii)}) == [30] and len(set(radii)) == 8
+
+
+def test_a_toolbox_card_with_missing_fields_does_not_break():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert 'h = Object.assign({ name: "", repo: "", sources: [], evidence: ""' in page
+
+
+def test_e8_folds_into_two_600_cells_by_the_golden_ratio():
+    # The stances are one blueprint: E8's 240 roots, projected by H4, are two 600-cells
+    # (120 vertices each, 12 neighbours per vertex) whose sizes differ by exactly φ.
+    import json
+    import math
+    import re
+    from itertools import combinations, product
+    page = _page()
+    h4 = json.loads(re.search(r"const H4 = (\[\[.*?\]\]);", page).group(1))
+    roots = []
+    for i, j in combinations(range(8), 2):
+        for a, b in product((1, -1), repeat=2):
+            r = [0] * 8
+            r[i], r[j] = a, b
+            roots.append(r)
+    roots += [list(s) for s in product((0.5, -0.5), repeat=8) if sum(x < 0 for x in s) % 2 == 0]
+    pts = [[sum(x * y for x, y in zip(r, b, strict=True)) for b in h4] for r in roots]
+    norms = [math.sqrt(sum(x * x for x in p)) for p in pts]
+    small = min(norms)
+    inner = [p for p, n in zip(pts, norms, strict=True) if n < small * 1.1]
+    assert len(inner) == 120
+    assert abs(max(norms) / small - (1 + math.sqrt(5)) / 2) < 1e-6
+    edge = min(math.dist(a, b) for a, b in combinations(inner, 2))
+    assert {sum(abs(math.dist(a, b) - edge) < 1e-6 for b in inner) for a in inner} == {12}
+    assert "const CHAIN = [4, 3, 1, 10, 2, 0, 8, 5, 6, 7, 9];" in page
+    assert "BRIDGE[SAC.stance]" in page
