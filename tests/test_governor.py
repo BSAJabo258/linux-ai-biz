@@ -175,3 +175,29 @@ def test_mission_control_shows_governor(tmp_path):
     assert api["hold"] == "spend" and api["needs_you"][0]["subject"] == "job_1"
     # The Governor does not re-report its own dashboard rows as new problems.
     assert not [f for f in g._dashboard({}, None, None) if "governor:" in f.detail]
+
+
+def test_an_owner_deferral_turns_a_red_build_item_into_a_dated_note(tmp_path):
+    # The owner, 2026-11-09: compliance items move to next year. Until the date they are a
+    # note, not a red; on the date they are red again by themselves.
+    import datetime as dt
+
+    import yaml
+
+    from bau.status import dashboard
+    (tmp_path / "reports").mkdir()
+    (tmp_path / "reports" / "build_state.yaml").write_text(yaml.safe_dump([
+        {"item": "Tax nexus rules verified by a CPA", "status": "not_started", "critical": True,
+         "deferred_until": dt.date(2027, 1, 1)},
+        {"item": "Backup restores", "status": "implemented", "critical": True}]))
+
+    def rows(on):
+        return {i["item"]: i["color"] for i in dashboard(tmp_path, on)["items"]
+                if i["item"].startswith("build:")}
+
+    before = rows(dt.date(2026, 11, 10))
+    assert before["build: Tax nexus rules verified by a CPA [not_started, deferred by the owner "
+                  "until 2027-01-01]"] == "YELLOW"
+    assert before["build: Backup restores [implemented]"] == "RED"
+    assert rows(dt.date(2027, 1, 1))["build: Tax nexus rules verified by a CPA [not_started]"] \
+        == "RED"
