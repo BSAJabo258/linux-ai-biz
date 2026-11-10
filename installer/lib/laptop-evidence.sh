@@ -14,6 +14,16 @@ _ev_gb() { awk -v mb="$1" 'BEGIN {printf "%.1f", mb / 1024}'; }
 
 # Largest internal disk in whole GB; 0 when lsblk is missing or says nothing useful.
 # Key=value pairs, because a plain column list shifts when a field (MODEL, TRAN) is empty.
+# Internal disks Linux can see: whole disks that are not USB, loop, zram or RAM disks.
+_ev_internal_disks() {
+  lsblk -d -n -P -o NAME,TYPE,TRAN 2>/dev/null | awk '
+    { n = t = tr = ""
+      for (i = 1; i <= NF; i++) { split($i, kv, "="); gsub(/"/, "", kv[2])
+        if (kv[1] == "NAME") n = kv[2]; else if (kv[1] == "TYPE") t = kv[2]; else if (kv[1] == "TRAN") tr = kv[2] }
+      if (t == "disk" && tr != "usb" && n !~ /^(zram|loop|ram)/) c++ }
+    END { print c + 0 }'
+}
+
 _ev_disk_gb() {
   lsblk -d -n -P -o TYPE,TRAN,SIZE 2>/dev/null | awk '
     {
@@ -95,9 +105,12 @@ evidence_verdict() {
   if [[ -n "${blocked}" ]] && (( blocked > 0 )); then
     steps+=("${blocked} radio(s) blocked; Wi-Fi or Bluetooth will not work until unblocked")
   fi
+  # A RAID controller only matters when it hides the internal disk. Intel VMD on 12th-gen and
+  # later boards reports itself as "RAID bus controller" while Linux's vmd driver shows the NVMe
+  # fine (ROG Strix G15CF, 2026-11-09); switching a working machine to AHCI can stop it booting.
   raid="$(lspci -nnk 2>/dev/null | grep -ci 'raid bus controller' || true)"
-  if [[ -n "${raid}" ]] && (( raid > 0 )); then
-    steps+=("disk controller reports RAID (often Intel RST); Linux may not see the disk - switch to AHCI first")
+  if [[ -n "${raid}" ]] && (( raid > 0 )) && (( $(_ev_internal_disks) == 0 )); then
+    steps+=("disk controller reports RAID (often Intel RST) and Linux sees no internal disk - switch to AHCI first")
   fi
   if ! have lsblk; then steps+=("lsblk is missing, so disk and RAID checks were skipped"); fi
 

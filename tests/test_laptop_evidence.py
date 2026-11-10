@@ -89,7 +89,8 @@ def test_process_command_lines_are_never_printed(tmp_path):
         p.kill()
         p.wait(timeout=30)
     assert "BAU-ARGV-CANARY" not in summary and "BAU-ARGV-CANARY" not in full
-    assert re.search(r"^\s+\d+ sleep$", full, re.M)                # names only
+    # names only: "<count> <name>" lines, the 20 most common (a busy machine may not list sleep)
+    assert re.search(r"^\s+\d+ [^\s/]+$", full, re.M)
 
 
 def test_a_dirty_checkout_is_reported_with_branch_commit_and_changes(tmp_path):
@@ -139,7 +140,9 @@ def test_the_evidence_only_reads():
 
 def test_the_evidence_ships_on_the_stick_and_is_linted():
     assert "lib/laptop-evidence.sh" in (ROOT / "installer" / "make-payload.sh").read_text()
-    assert "installer/lib/*.sh" in (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+    # CI runs scripts/check.sh, whose shellcheck step covers every tracked *.sh
+    assert "git ls-files --cached --others --exclude-standard '*.sh'" in (
+        ROOT / "scripts" / "check.sh").read_text()
     if not shutil.which("shellcheck"):
         pytest.skip("needs shellcheck")
     r = subprocess.run(["shellcheck", "-x", str(SH), str(LIB)], capture_output=True, text=True)
@@ -156,3 +159,34 @@ def test_a_script_copied_alone_says_the_verdict_is_unknown(tmp_path):
     assert r.returncode == 0, r.stderr
     summary = (out / "BAU-LAPTOP-SUMMARY-LINUX.txt").read_text()
     assert "VERDICT: unknown" in summary and "laptop-evidence.sh is missing" in summary
+
+
+def _stub(bin_dir, name, text):
+    f = bin_dir / name
+    f.write_text("#!/bin/sh\ncat <<'EOF'\n" + text + "EOF\n")
+    f.chmod(0o755)
+
+
+RAID_LINE = ("0000:00:0e.0 RAID bus controller [0104]: Intel Corporation Volume Management "
+             "Device NVMe RAID Controller [8086:467f]\n\tKernel driver in use: vmd\n")
+
+
+def test_intel_vmd_raid_with_a_visible_disk_is_not_a_step(tmp_path):
+    # Real run on the owner's ROG Strix (2026-11-09): VMD says "RAID bus controller" while the
+    # NVMe works through it. Telling that machine to switch to AHCI could stop it booting.
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _stub(bin_dir, "lspci", RAID_LINE)
+    _stub(bin_dir, "lsblk", 'NAME="nvme0n1" TYPE="disk" TRAN="nvme" SIZE="476.9G"\n')
+    summary, _ = run_check(tmp_path, path_dir=str(bin_dir))
+    assert "switch to AHCI" not in summary
+
+
+def test_raid_that_hides_every_internal_disk_is_a_step(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _stub(bin_dir, "lspci", RAID_LINE)
+    _stub(bin_dir, "lsblk", 'NAME="sdb" TYPE="disk" TRAN="usb" SIZE="57.3G"\n'
+                            'NAME="zram0" TYPE="disk" TRAN="" SIZE="4G"\n')
+    summary, _ = run_check(tmp_path, path_dir=str(bin_dir))
+    assert "Linux sees no internal disk - switch to AHCI first" in summary
