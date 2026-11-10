@@ -11,8 +11,8 @@ set -uo pipefail
 MODEL=qwen2.5-1.5b-instruct
 FILE=qwen2.5-1.5b-instruct-q4_k_m.gguf
 CLAUDE=claude-opus-5-5
-ETC=${BAU_ETC:-/etc/bau}          # BAU_ETC: tests only
-export BAU_HOME=/var/lib/bau BAU_AUDIT_KEY=/etc/bau/audit.key \
+ETC=${BAU_ETC:-/etc/bau}          # BAU_ETC, BAU_SETUP_HOME: tests only
+export BAU_HOME=${BAU_SETUP_HOME:-/var/lib/bau} BAU_AUDIT_KEY=/etc/bau/audit.key \
   BAU_ALLOWED_SIGNERS=/etc/bau/allowed_signers
 umask 007
 

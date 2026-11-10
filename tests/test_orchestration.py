@@ -173,6 +173,12 @@ def test_anthropic_provider_with_fake_sdk_client():
     assert captured["tools"][0]["input_schema"]["additionalProperties"] is False
     assert r.tool_calls[0].name == "memory__search" and r.text == "hi"
 
+    # Jarvis offers more tools than the API's 20 strict ones; the rest go without strict.
+    many = [ToolSpec(f"t{i}", "d", {"type": "object", "properties": {}}) for i in range(36)]
+    p.complete("sys", [{"role": "user", "content": "x"}], many)
+    assert sum(t["strict"] for t in captured["tools"]) == 20
+    assert len(captured["tools"]) == 36
+
     def refuse(**kw):
         return types.SimpleNamespace(stop_reason="refusal", model="claude-opus-5-5", content=[],
                                      stop_details=types.SimpleNamespace(category="cyber"),

@@ -271,6 +271,12 @@ def test_the_sound_server_can_start_and_has_a_volume_control():
     assert 'value="pulseaudio"' in hook and "/etc/xdg/xfce4/panel/default.xml" in hook
 
 
+def test_jarvis_can_speak_without_an_elevenlabs_key():
+    # 2026-10-28, the desktop: no key, so Firefox's own voice; without a Speech Dispatcher
+    # output module it has only the silent "dummy" voice and Jarvis says nothing.
+    assert {"speech-dispatcher", "speech-dispatcher-espeak-ng"} <= LISTED
+
+
 # ------------------------------------------------------------------ memory on the live stick
 # The owner's stick in a VM (2026-10-20): "/" is a 3.7 GB RAM overlay; filling it stopped
 # even a 94 KB install ("not enough free space in /var/cache/apt/archives").

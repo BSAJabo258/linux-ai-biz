@@ -243,7 +243,9 @@ def run_setup(tmp_path, answers, bench_exit=0):
         (bin_dir / name).write_text("#!/bin/bash\n" + body + "\n")
         (bin_dir / name).chmod(0o755)
     (tmp_path / "state").write_text("NOT_EVALUATED")
+    # BAU_SETUP_HOME: an installed machine's /var/lib/bau/models must not change the answers
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "BAU_ETC": str(etc),
+           "BAU_SETUP_HOME": str(tmp_path / "home"),
            "LOG": str(tmp_path / "log"), "STATE": str(tmp_path / "state"),
            "BENCH_EXIT": str(bench_exit)}
     r = subprocess.run(["bash", str(script)], input=answers, env=env, capture_output=True,

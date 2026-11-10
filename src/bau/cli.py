@@ -509,6 +509,9 @@ def cmd_wipe_gate(a: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+SBIN = ("/usr/sbin", "/sbin")     # where Debian puts admin tools such as nft and aa-status
+
+
 def cmd_selftest(a: argparse.Namespace) -> int:
     """On-machine acceptance subset: everything that can be checked without a human."""
     import shutil
@@ -524,8 +527,11 @@ def cmd_selftest(a: argparse.Namespace) -> int:
     results["memory_chain"] = "ok" if MemoryLane().verify()[0] else "FAIL"
     container = os.environ.get("BAU_IN_CONTAINER") == "1"
     host_only = ("podman", "nft", "aa-status", "chronyc")   # the laptop's hardening layer
+    # nft and aa-status live in /usr/sbin, which the owner's own PATH leaves out (desktop,
+    # 2026-10-28: "missing" while nftables and AppArmor were both active)
+    path = os.pathsep.join([os.environ.get("PATH", ""), *SBIN])
     for tool in (*host_only, "ssh-keygen", "ffmpeg"):
-        results[f"tool:{tool}"] = "ok" if shutil.which(tool) else \
+        results[f"tool:{tool}"] = "ok" if shutil.which(tool, path=path) else \
             "laptop only (not in the container)" if container and tool in host_only else "missing"
     for key, env in (("audit.key", "BAU_AUDIT_KEY"), ("unsubscribe.key", "BAU_UNSUB_KEY")):
         p = Path(os.environ.get(env) or Path("/etc/bau") / key)

@@ -75,3 +75,18 @@ def test_scanning_a_path_that_does_not_exist_is_not_called_clean(tmp_path):
     # Audit 2026-10-25: a typo in the path gave {"findings": []} and exit 0.
     r = _bau(tmp_path, "secrets", str(tmp_path / "no-such-folder"))
     assert r.returncode != 0 and "findings" not in r.stdout
+
+
+def test_selftest_finds_admin_tools_outside_the_owners_path(tmp_path, monkeypatch, capsys):
+    # Desktop, 2026-10-28: selftest said nft and aa-status were "missing" while nftables and
+    # AppArmor were active; they live in /usr/sbin, which the owner's PATH leaves out.
+    from bau import cli
+    sbin = tmp_path / "sbin"
+    sbin.mkdir()
+    (sbin / "nft").write_text("#!/bin/sh\n")
+    (sbin / "nft").chmod(0o755)
+    monkeypatch.setattr(cli, "SBIN", (str(sbin),))
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    cli.main(["selftest"])
+    out = json.loads(capsys.readouterr().out)
+    assert out["tool:nft"] == "ok" and out["tool:aa-status"] == "missing"
