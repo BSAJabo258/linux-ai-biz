@@ -162,9 +162,12 @@ SENTENCE_END = re.compile(r"(?<![.\s][a-z])\.\s+(?=[A-Z])")
 # draft seven SFW Instagram posts ... Should I proceed?" with no tool called: the verbs only
 # covered looking things up, not making things. Nudging is safe: posting and money tools only
 # stage a card for the owner.
-ANNOUNCED = re.compile(r"\b(let me|i'll|i will|i am going to|i'm going to|i can)\b[^.?!]{0,60}"
+ANNOUNCED = re.compile(r"\b(let me|i'll|i will|i am going to|i'm going to|i can|i'm|i am)\b"
+                       r"[^.?!]{0,60}"
                        r"\b(search|look|check|find|ask|use|see|draft|plan|write|create|make|"
-                       r"prepare|stage|queue|schedule|save|list|pull|get|run|build)\b", re.I)
+                       r"prepare|stage|queue|schedule|save|list|pull|get|run|build|using|"
+                       r"drafting|creating|writing|making|preparing|checking|searching|looking|"
+                       r"planning|running)\b", re.I)
 NUDGE = ("(Go ahead: call the tool now instead of saying you will. If none of your tools does "
          "this, say plainly that you cannot do it yet.)")
 # "Remember that ..." from the owner: saved first, then the model only confirms. A small model
@@ -205,7 +208,29 @@ GROUND = (
                 r"\b(remember|last time|we decided|earlier|my notes)\b", re.I | re.S),
      "recall", lambda q: {"query": q}),
     (re.compile(r"\bworkspaces?\b", re.I), "workspaces", lambda q: {}),
+    # "Plan seven Instagram posts for my creator ...": the real model on the owner's home
+    # (2026-11-10) drafted them only 2 times in 6, asking which creator (there is one) or
+    # saying "I'm using the tool" without using it. Drafting only returns prompts and caption
+    # briefs, nothing is posted, so the batch is made first and the model presents it.
+    (re.compile(r"\b(plan|draft|write|make|create|prepare)\b.{0,60}\b(posts?|captions?)\b",
+                re.I | re.S), "creator_batch", lambda q: _creator_args(q)),
 )
+NUMBERS = {w: i for i, w in enumerate("one two three four five six seven eight nine ten "
+                                       "eleven twelve thirteen fourteen".split(), 1)}
+
+
+def _creator_args(question: str) -> dict[str, Any] | None:
+    """creator_batch's arguments from the owner's own words; None when no platform is named
+    (the platform is the owner's to say, never guessed)."""
+    q = question.lower()
+    platform = next((p for p in ("instagram", "tiktok", "fanvue") if p in q), None)
+    if platform is None:
+        return None
+    m = re.search(r"\b(\d{1,2}|" + "|".join(NUMBERS) + r")\b\s+(?:\w+\s+){0,2}posts?", q)
+    count = 7 if not m else (int(m.group(1)) if m.group(1).isdigit() else NUMBERS[m.group(1)])
+    t = re.search(r"\b(?:about|on|for a|themed?)\b\s+(.{3,120})", question, re.I | re.S)
+    theme = (t.group(1) if t else question).strip(" .?!")
+    return {"theme": theme[:200], "platform": platform, "count": max(1, min(count, 14))}
 
 
 @dataclass
@@ -919,7 +944,21 @@ class Assistant:
             batch = VirtualCreator(path).batch(theme, platform, int(count), tier="sfw")
         except CreatorError as exc:
             raise ValueError(str(exc)) from exc
-        return batch
+        # Saved where the owner can open it, and one true sentence to say: the real model said
+        # "ready in your folder" and "waiting on your confirmation to publish" for a batch that
+        # was never saved and never staged (2026-11-10).
+        from .virtual_creator import write_markdown
+        out = self.home / "creators" / "drafts"
+        out.mkdir(parents=True, exist_ok=True)
+        slug = re.sub(r"[^a-z0-9]+", "-", theme.lower()).strip("-")[:40] or "batch"
+        saved = out / f"{creator}-{platform}-{dt.datetime.now():%Y%m%d-%H%M%S}-{slug}.md"
+        saved.write_text(write_markdown(batch))
+        n = len(batch.get("posts") or batch.get("items") or []) or int(count)
+        # First, so a model that reads only the start of a long result still sees them.
+        return {"say": f"I drafted {n} {platform} posts about {theme[:80]} and saved them to "
+                       f"{saved}. They are drafts only: nothing was posted or scheduled, and "
+                       "nothing is waiting for your confirmation.",
+                "saved_to": str(saved), **batch}
 
     def t_draft_stage(self, workspace: str, episode: str, brain: str = "") -> dict[str, Any]:
         from . import brains
@@ -1377,7 +1416,10 @@ class Assistant:
         for pattern, name, args in GROUND:
             if len(facts) == 2 or not pattern.search(question):
                 continue
-            out, err = self._run_tool(name, args(question[:300]))
+            a = args(question[:300])
+            if a is None:                     # not enough in the owner's words to do it
+                continue
+            out, err = self._run_tool(name, a)
             if err:
                 continue
             cards.append({"tool": name, "data": out})

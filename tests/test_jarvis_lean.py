@@ -311,3 +311,45 @@ def test_promising_to_draft_without_doing_it_gets_the_nudge(tmp_path):
     nudge = [m for m in a.messages if m.get("role") == "user"
              and "call the tool now" in str(m.get("content"))]
     assert len(nudge) == 1 and "cannot do it yet" in str(nudge[0]["content"])
+
+
+def _creator_home(tmp_path):
+    import shutil
+
+    from bau.home import shipped_data
+    (tmp_path / "creators").mkdir(exist_ok=True)
+    shutil.copy(shipped_data() / "virtual_creator_profile.example.yaml",
+                tmp_path / "creators" / "aria.yaml")
+
+
+def test_asking_for_posts_drafts_them_first_from_the_owners_words(tmp_path):
+    # Owner's home, real model, 2026-11-10: drafted only 2 times in 6 (asked which creator,
+    # or said "I'm using the tool" without using it). Now the batch is made, then presented.
+    _creator_home(tmp_path)
+    a = lean(tmp_path, ["Here they are."])
+    r = a.ask("Plan seven Instagram posts for my creator about a cozy autumn week.")
+    batch = next(c["data"] for c in r.cards if c["tool"] == "creator_batch")
+    assert batch["platform"] == "instagram" and batch["theme"] == "a cozy autumn week"
+    saved = (tmp_path / "creators" / "drafts")
+    assert len(list(saved.glob("aria-instagram-*.md"))) == 1
+    assert "nothing was posted or scheduled" in batch["say"]
+
+
+def test_no_platform_named_means_no_guess(tmp_path):
+    from bau.assistant import _creator_args
+    assert _creator_args("Plan some posts") is None
+    assert _creator_args("Draft 3 TikTok posts on beach days") == {
+        "theme": "beach days", "platform": "tiktok", "count": 3}
+
+
+def test_saying_im_using_a_tool_without_using_it_gets_the_nudge(tmp_path):
+    a = lean(tmp_path, ["I'm using the creatorbatch tool to draft your posts.",
+                        {"tool": "workspaces", "input": {}}, "Done."])
+    assert a.ask("anything?").text == "Done."
+
+
+def test_the_true_sentence_comes_first_in_the_batch(tmp_path):
+    # A small model reads only the start of a long result (_ground keeps 4000 characters).
+    _creator_home(tmp_path)
+    out = lean(tmp_path, ["ok"]).t_creator_batch(theme="rooftop at dusk", platform="instagram")
+    assert list(out)[:2] == ["say", "saved_to"]
