@@ -257,3 +257,25 @@ def test_nothing_invisible_covers_the_buttons():
     assert "#timeline{position:fixed;top:56px;max-height:calc(100vh - 166px);" in page
     # a card answered before waking also takes the wake screen away
     assert '$("confirm").addEventListener("click", () => { if (!woke) wake(); }' in page
+
+
+def test_the_tapestry_is_sacred_geometry_that_never_takes_a_click():
+    # The owner, 2026-11-09: the screen as a psychedelic, esoteric tapestry (sacred geometry,
+    # sound and frequency, magnetic fields), alive with Jarvis, with an off switch.
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert '<canvas id="sacred" aria-hidden="true"></canvas>' in page
+    assert "canvas#sacred{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}" in page
+    assert page.index('id="sacred"') < page.index('<canvas id="core"')        # under the core
+    for part in ("buildFlower(", "buildMetatron(", "buildChladni(", "PHI_ANGLE", "SOLFEGGIO", "L * Math.sin(th) ** 2"):
+        assert part in page
+    assert 'id="c-geo"' in page and 'localStorage.setItem("jarvis-tapestry"' in page
+    assert "REDUCED ? 100 : 33" in page                                        # ~30 fps, calmer if asked
+
+
+def test_a_toolbox_card_with_missing_fields_does_not_break():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert 'h = Object.assign({ name: "", repo: "", sources: [], evidence: ""' in page
