@@ -712,7 +712,9 @@ void main() {
   try { const ext = gl.getExtension("WEBGL_debug_renderer_info");
     const who = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
     soft = /llvmpipe|swiftshader|software|softpipe/i.test(who); } catch (e) {}
-  return { gl, cv, U, scale: soft ? 0.4 : 0.75, phase: 0, frac: 0, Na: 5, Nb: 5, mix: 1, slow: 0, ema: 33, checkAt: 0, lost: false };
+  // Half the screen's pixels at most: the owner's RTX 3060 fell off the bus (Xid 79, 2026-11-10)
+  // while this canvas drew beside the local model and ComfyUI; the field is kept light.
+  return { gl, cv, U, scale: soft ? 0.35 : 0.5, phase: 0, frac: 0, Na: 5, Nb: 5, mix: 1, slow: 0, ema: 33, checkAt: 0, lost: false };
 })();
 function fifthResize() { if (!FIFTH) return;
   FIFTH.cv.width = Math.max(2, Math.round(W * FIFTH.scale)); FIFTH.cv.height = Math.max(2, Math.round(H * FIFTH.scale));
@@ -1146,7 +1148,7 @@ function sacPaint(now) {
   g.restore();
 }
 function sacFrame(now) {
-  if (SAC.on && !document.hidden && now - SAC.last > (REDUCED ? 100 : 33)) {
+  if (SAC.on && !document.hidden && now - SAC.last > (REDUCED ? 100 : 50)) {   // 20 frames a second
     const dt = Math.min(250, now - (SAC.last || now)); SAC.last = now;
     try { fifthPaint(now, dt, FIELD_N[SAC.stance]); } catch (e) {}
     try { sacPaint(now); } catch (e) { /* one bad frame never stops it */ } }

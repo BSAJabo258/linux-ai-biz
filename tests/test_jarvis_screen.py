@@ -281,7 +281,8 @@ def test_the_tapestry_is_sacred_geometry_that_never_takes_a_click():
                  "L * Math.sin(th) ** 2", "HERMETIC", "JITTER"):
         assert part in page
     assert 'id="c-geo"' in page and 'localStorage.setItem("jarvis-tapestry"' in page
-    assert "REDUCED ? 100 : 33" in page                                      # ~30 fps
+    assert "REDUCED ? 100 : 50" in page                                      # 20 fps
+    assert "scale: soft ? 0.35 : 0.5," in page                # light on the GPU (Xid 79)
 
 
 def test_the_fifth_dimension_is_a_real_slice_with_a_safe_fallback():
