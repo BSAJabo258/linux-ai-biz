@@ -211,16 +211,20 @@ def test_the_money_tool_reads_fanvue_first_once_connected(tmp_path, monkeypatch)
 
 
 # ------------------------------------------------------------------ setup card
-def test_connect_card_shows_only_with_the_apps_keys_and_goes_once_connected(tmp_path,
+def test_the_connect_card_is_the_easy_way_and_goes_once_connected_either_way(tmp_path,
                                                                             monkeypatch):
+    # The developer app's own card is retired (2026-11-10: its redirect address was refused
+    # on the owner's desktop); the card uses Fanvue's official connection, and a computer
+    # already signed in through a developer app gets no card.
     from bau import setup_steps as S
-    monkeypatch.setattr(F, "app_credentials", lambda: (_ for _ in ()).throw(F.FanvueError()))
-    assert S._done("fanvue", tmp_path, lambda w: None) is None
+    (tmp_path / "creators").mkdir()
+    (tmp_path / "creators" / "aria.yaml").write_text("id: aria\n")
     monkeypatch.setattr(F, "app_credentials", lambda: ("cid", "secret"))
-    assert S._done("fanvue", tmp_path, lambda w: None) is False
-    assert S._command("fanvue", tmp_path) == "bau fanvue login"
+    assert S._done("fanvue", tmp_path, lambda w: None) is None
+    assert S._done("fanvue_app", tmp_path, lambda w: None) is False
+    assert S._command("fanvue_app", tmp_path) == "bau fanvue connect"
     client(tmp_path, FakeFanvue())
-    assert S._done("fanvue", tmp_path, lambda w: None) is True
+    assert S._done("fanvue_app", tmp_path, lambda w: None) is None
 
 
 def test_the_card_shows_the_picture_as_a_picture(tmp_path):

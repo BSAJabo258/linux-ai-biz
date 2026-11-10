@@ -309,13 +309,16 @@ def test_the_picture_service_loads_cuda_before_it_starts():
 
 
 # ------------------------------------------------------------------ the money loop's cards
-def test_without_fanvue_app_keys_a_card_says_how_and_types_them_in(box):
+def test_fanvue_is_connected_the_easy_way_no_app_no_keys(box):
+    # The developer app's redirect address was refused twice on the owner's desktop
+    # (2026-11-10): the card now uses Fanvue's official connection (sign in, Allow).
     assert "fanvue_app" in ids(box) and "fanvue" not in ids(box)
     S.run("fanvue_app", box.home, probe=box.probe, terminal=box.terminal)
-    cmd = box.opened[-1][1]
-    assert cmd == ("sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET && "
-                   "bau fanvue login")
-    assert "127.0.0.1:3456/callback" in S.BY_ID["fanvue_app"].why
+    assert box.opened[-1][1] == "bau fanvue connect"
+    from bau import fanvue_mcp
+    fanvue_mcp.Store(box.home).save({"client_id": "c", "access_token": "a",
+                                     "refresh_token": "r"})
+    assert "fanvue_app" not in ids(box)
 
 
 def test_once_fanvue_and_autopost_are_on_the_automaton_card_starts_it(box, monkeypatch):
