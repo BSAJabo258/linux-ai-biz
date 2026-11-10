@@ -21,8 +21,8 @@ class FakeResp:
     def __exit__(self, *a):
         return False
 
-    def read(self):
-        return self.body
+    def read(self, n=-1):
+        return self.body if n < 0 else self.body[:n]
 
 
 def test_local_voice_speaks_and_listens_on_this_computer_only(tmp_path, monkeypatch):
@@ -34,10 +34,10 @@ def test_local_voice_speaks_and_listens_on_this_computer_only(tmp_path, monkeypa
     def opener(req, timeout=0):
         sent.append(req)
         return FakeResp(b'{"text": "status please"}' if req.full_url.endswith("/listen")
-                        else b"RIFF-wav")
+                        else b"RIFF-wavWAVE")
     v = Voice(tmp_path, opener=opener)
     assert v.available and v.can_listen
-    assert v.speak("Good morning") == b"RIFF-wav" and v.speak("Good morning") == b"RIFF-wav"
+    assert v.speak("Good morning") == b"RIFF-wavWAVE" and v.speak("Good morning") == b"RIFF-wavWAVE"
     assert len(sent) == 1                                          # second from the cache
     assert sent[0].full_url == "http://127.0.0.1:8767/speak"
     assert json.loads(sent[0].data) == {"text": "Good morning", "voice": "bm_lewis"}
@@ -92,3 +92,24 @@ def test_jarvis_opens_the_browser_without_lending_it_the_terminal(monkeypatch, c
     print("after", flush=True)
     out, err = capfd.readouterr()
     assert "noise" not in out + err and "after" in out
+
+
+def test_local_voice_takes_nothing_on_trust(tmp_path, monkeypatch):
+    # The service has no login, so a reply that is not WAV, or too big, or not a short
+    # transcript is dropped (security review, 2026-11-10).
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    save_config(tmp_path, speak="local", listen="local")
+
+    def answer(body):
+        return lambda req, timeout=0: FakeResp(body)
+    assert Voice(tmp_path, opener=answer(b"<html>not audio</html>")).speak("hi") is None
+    assert not list((tmp_path / "jarvis" / "tts").glob("*")) if (
+        tmp_path / "jarvis" / "tts").exists() else True              # nothing cached
+    wav = b"RIFF\x00\x00\x00\x00WAVEfmt "
+    assert Voice(tmp_path, opener=answer(wav)).speak("hi") == wav
+    assert Voice(tmp_path, opener=answer(b'{"text": 42}')).listen(b"x") is None
+    assert Voice(tmp_path, opener=answer(b'["no"]')).listen(b"x") is None
+    huge = json.dumps({"text": "a" * 70_000}).encode()
+    assert Voice(tmp_path, opener=answer(huge)).listen(b"x") is None
+    long = json.dumps({"text": "b" * 5000}).encode()
+    assert len(Voice(tmp_path, opener=answer(long)).listen(b"x")) == 2000
