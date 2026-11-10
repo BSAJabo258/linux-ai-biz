@@ -59,7 +59,25 @@ Chroma is set up and you have written your explicit limits and prices, the feed 
 your base level, then a level 2 nude unlock, then a level 3 xxx unlock. Your limits are added
 to what those pictures must never show, and each unlock card shows its price.
 
-## Set it up once
+## Set it up once: the easy way
+
+Jarvis shows a **Connect Fanvue** card. Press Accept: Fanvue opens in the browser. Sign in
+and press **Allow**. That's all: no app, no keys, no address to type. Or in a terminal:
+
+```bash
+bau fanvue connect      # sign in and press Allow
+bau fanvue tools        # what the connection lets Jarvis do
+```
+
+This is Fanvue's official connection for AI tools (api.fanvue.com/docs/mcp-server, read
+2026-11-10). BAU registers itself with Fanvue's sign-in by itself; the sign-in is kept in
+`BAU_HOME/secrets/fanvue_mcp.json`, readable only by you. Undo it on Fanvue: Settings >
+Account > Third Party Apps Consent.
+
+Not done yet: posting and earnings still go through the developer-app way below; they move
+to this connection once its real tools have been seen on your account.
+
+## Or: your own developer app
 
 Fanvue gives out no API keys. Every app signs in through Fanvue's own Allow page. So:
 

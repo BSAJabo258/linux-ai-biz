@@ -68,13 +68,10 @@ STEPS = (
          "The autopilot: every 30 minutes Jarvis scans GitHub, inspects what he finds and "
          "votes on what to add, and asks you only about money, posting and legal. A "
          "terminal opens; type your password."),
-    Step("fanvue_app", "Make your Fanvue app (once)",
-         "The money starts on Fanvue, and Jarvis can't reach it yet. On fanvue.com, open the "
-         "Developer Area and create an app; on its Authentication tab add the redirect "
-         "http://127.0.0.1:3456/callback and turn on read:self, read:media, write:media, "
-         "write:creator, write:post and read:insights. Then press Accept: a terminal asks for "
-         "the app's Client ID and Client Secret (not shown as you paste), then Fanvue opens: "
-         "sign in and press Allow."),
+    Step("fanvue_app", "Connect Fanvue",
+         "The money starts on Fanvue, and Jarvis can't reach it yet. Press Accept: Fanvue "
+         "opens in the browser (its official connection for AI tools: no app, no keys). Sign "
+         "in and press Allow."),
     Step("fanvue", "Connect Fanvue",
          "So Jarvis can put Aria's pictures on Fanvue (each one only after your Accept) and "
          "count what she earns. Fanvue opens in the browser: sign in and press Allow."),
@@ -203,14 +200,12 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
     if step == "autopilot":
         return bool(probe("autopilot"))
     if step == "fanvue_app":              # the money loop's first link (found 2026-11-10)
-        from . import fanvue
-        if _profile(home) is None:
+        from . import fanvue, fanvue_mcp
+        if _profile(home) is None or fanvue.TokenStore(home).load() is not None:
             return None
-        try:
-            fanvue.app_credentials()
-        except fanvue.FanvueError:
-            return False
-        return None                       # keys are here: the Connect Fanvue card takes over
+        return fanvue_mcp.Store(home).connected()
+    if step == "fanvue":                  # the developer-app way: a terminal command only
+        return None
     if step in ("automaton", "grow"):     # after Fanvue is connected and autopost is chosen
         from . import automaton, fanvue
         if (fanvue.TokenStore(home).load() is None
@@ -219,13 +214,6 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         if step == "automaton":
             return bool(automaton.load(home).get("started_at"))
         return None if not automaton.status(home).get("grow_ready") else False
-    if step == "fanvue":                  # only once the app's keys are on this computer
-        from . import fanvue
-        try:
-            fanvue.app_credentials()
-        except fanvue.FanvueError:
-            return None
-        return fanvue.TokenStore(home).load() is not None
     if step == "autopost":                # once Fanvue is connected, until he chooses
         from . import fanvue
         if fanvue.TokenStore(home).load() is None:
@@ -281,7 +269,7 @@ def _command(step: str, home: Path) -> str:
     if step == "fanvue":
         return "bau fanvue login"
     if step == "fanvue_app":
-        return "sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET && bau fanvue login"
+        return "bau fanvue connect"
     if step == "nvidia":
         return "sudo bau-gpu-setup"
     if step == "pictures":

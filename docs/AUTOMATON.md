@@ -51,9 +51,8 @@ to people who never signed up.
 
 Jarvis shows these as cards, one after the other; press Accept on each:
 
-1. **Make your Fanvue app (once)**: the card says what to click on Fanvue, then a terminal
-   asks for the app's two keys (`sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET`)
-   and logs in (see `docs/FANVUE.md`).
+1. **Connect Fanvue**: Fanvue opens in the browser; sign in and press **Allow** (Fanvue's
+   official connection: no app, no keys; or `bau fanvue connect`, see `docs/FANVUE.md`).
 2. **Let Jarvis post to Fanvue on his own**: your audience and number a day.
 3. **Start the automaton**: your days, budget, reinvest share, cap and grow-at.
 

@@ -1579,6 +1579,24 @@ def cmd_fanvue(a):
         AuditLog().append("fanvue.connected", who, {})
         _out({"connected": me.get("handle"), "creator": me.get("isCreator"),
               "ai_creator": me.get("isAiCreator")})
+    elif a.fv_cmd == "connect":
+        from . import fanvue_mcp as FM
+        who = _human()
+        FM.connect(port=a.port, open_browser=lambda u: (
+            print(f"Opening Fanvue. Sign in and press Allow. If nothing opens, open this "
+                  f"link:\n{u}"), _open_browser(u)))
+        tools = FM.FanvueMcp()
+        tools.initialize()
+        names = sorted(t["name"] for t in tools.list_tools())
+        AuditLog().append("fanvue.connected", who, {"via": "official connection",
+                                                    "tools": len(names)})
+        _out({"connected": True, "via": "Fanvue's official connection", "tools": len(names)})
+    elif a.fv_cmd == "tools":
+        from . import fanvue_mcp as FM
+        tools = FM.FanvueMcp()
+        tools.initialize()
+        _out([{"name": t["name"], "about": (t.get("description") or "")[:120]}
+              for t in tools.list_tools()])
     elif a.fv_cmd == "logout":
         fanvue.TokenStore().clear()
         _out({"connected": None})
@@ -2271,7 +2289,11 @@ def register(sub: argparse._SubParsersAction) -> None:
     s = sub.add_parser("fanvue", help="Fanvue: queue pictures, your Accept in Jarvis posts "
                        "them; earnings into the ledger (docs/FANVUE.md)")
     fv = s.add_subparsers(dest="fv_cmd", required=True)
-    x = fv.add_parser("login", help="connect your Fanvue account (opens Fanvue)")
+    x = fv.add_parser("connect", help="connect Fanvue the easy way: sign in and press Allow "
+                      "(Fanvue's official connection; no app, no keys)")
+    x.add_argument("--port", type=int, default=3457)
+    fv.add_parser("tools", help="what Fanvue's official connection lets Jarvis do")
+    x = fv.add_parser("login", help="connect through your own Fanvue developer app")
     x.add_argument("--port", type=int, default=3456)
     fv.add_parser("logout")
     x = fv.add_parser("add", help="queue a picture from artifacts/media with its caption")
