@@ -1647,7 +1647,8 @@ class Voice:
 
     URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128"
     STT_URL = "https://api.elevenlabs.io/v1/speech-to-text"
-    LOCAL_URL = "http://127.0.0.1:8767"     # installer/bau-voice-server.py
+    LOCAL_URL = "http://127.0.0.1:8767"     # the bau-voice service (Kokoro + faster-whisper)
+    LOCAL_MAX_AUDIO = 20_000_000            # bytes: a long reply is a few MB of WAV
 
     def __init__(self, home: Path | None = None, opener: Any = None):
         self.home = home or bau_home()
@@ -1703,9 +1704,13 @@ class Voice:
                                      .encode(), headers={"Content-Type": "application/json"})
         try:
             with self.open(req, timeout=60) as r:
-                audio = r.read()
+                audio = r.read(self.LOCAL_MAX_AUDIO + 1)
         except (urllib.error.URLError, OSError):
             return None                 # not installed or stopped: the browser's voice
+        # The service has no login (127.0.0.1 only), so take nothing on trust: a reply that is
+        # not a WAV file, or is oversized, is dropped and never cached.
+        if len(audio) > self.LOCAL_MAX_AUDIO or audio[:4] != b"RIFF" or audio[8:12] != b"WAVE":
+            return None
         self.cache.mkdir(parents=True, exist_ok=True)
         cached.write_bytes(audio)
         return audio
@@ -1725,9 +1730,14 @@ class Voice:
                                          headers={"Content-Type": mime.split(";")[0]})
             try:
                 with self.open(req, timeout=60) as r:
-                    return str(json.loads(r.read()).get("text") or "").strip()
-            except (urllib.error.URLError, OSError, ValueError):
+                    raw = r.read(65_537)
+                if len(raw) > 65_536:
+                    return None
+                text = json.loads(raw).get("text")
+            except (urllib.error.URLError, OSError, ValueError, AttributeError):
                 return None
+            # one push-to-talk clip is a sentence or two, never pages of "what you said"
+            return text.strip()[:2000] if isinstance(text, str) else None
         boundary = "bau" + secrets.token_hex(12)
         ext = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a",
                "audio/wav": "wav", "audio/mpeg": "mp3"}.get(mime.split(";")[0], "webm")
