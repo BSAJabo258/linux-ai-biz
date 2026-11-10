@@ -188,11 +188,30 @@ class Registry:
                 and r.effective_date is not None and r.effective_date <= horizon]
 
 
+_FLAG_TOKEN = r"(?:true|false|null|#|\d{1,3})"
+_FLAG_RUN = re.compile(rf"(?<!\S)(?:{_FLAG_TOKEN}\s+){{3,}}{_FLAG_TOKEN}(?!\S)")
+
+
 def _normalize(html: bytes) -> str:
     text = html.decode("utf-8", "replace")
     text = re.sub(r"(?is)<(script|style|noscript)[^>]*>.*?</\1>", " ", text)
     text = re.sub(r"(?s)<[^>]+>", " ", text)
+    # Per-visit IDs (support.google.com prints a fresh 19-20 digit one in its menu on every
+    # load, 2026-11-09) are not the law changing; no real rule has a 10-digit number.
+    text = re.sub(r"\d{10,}", "#", text)
+    # Its menu also prints per-visit settings flags as plain words ("true false true 17 false").
+    # Runs of 4+ such tokens that include true/false are page machinery, never rule text.
+    text = _FLAG_RUN.sub(
+        lambda m: " " if re.search(r"\b(true|false)\b", m.group(0)) else m.group(0), text)
     return re.sub(r"\s+", " ", text).strip()
+
+
+# How pages are fingerprinted. When it changes, every source gets a new baseline once instead
+# of a wave of false "changed" alarms.
+NORM_VERSION = 2
+# The fingerprint of a page with no text: a block or challenge page, never a new law. EUR-Lex
+# served those to the watcher on 2026-11-09 and every EU source showed as "changed".
+EMPTY_HASH = hashlib.sha256(b"").hexdigest()
 
 
 def fetch_url(url: str, timeout: int = 20, max_bytes: int = 5_000_000) -> bytes | None:
@@ -225,11 +244,18 @@ def watch(registry: Registry, state_path: Path, on: dt.date,
         if body is None:
             unreachable.append(url)
             continue
-        digest = hashlib.sha256(_normalize(body).encode()).hexdigest()
-        if entry.get("hash") and entry["hash"] != digest:
+        text = _normalize(body)
+        before = entry.get("chars")
+        if not text or (before and len(text) < before * 0.25):   # blank or blocked: not a version
+            unreachable.append(url)
+            continue
+        digest = hashlib.sha256(text.encode()).hexdigest()
+        if entry.get("hash") == EMPTY_HASH:          # back after a blank page: that alarm was false
+            entry.pop("changed_at", None)
+        elif entry.get("hash") and entry.get("norm") == NORM_VERSION and entry["hash"] != digest:
             entry["changed_at"] = on.isoformat()
             changed.append({"url": url, "reg_ids": ids})
-        entry["hash"] = digest
+        entry.update(hash=digest, chars=len(text), norm=NORM_VERSION)
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(json.dumps(state, indent=2, sort_keys=True))
     return {"checked": len(urls), "changed": changed, "unreachable": unreachable}

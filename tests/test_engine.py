@@ -153,3 +153,42 @@ def test_regulation_watch_flags_changed_sources(tmp_path, engine):
     assert [c["url"] for c in res["changed"]] == [url]
     off = watch(engine.registry, state, ON, lambda u: None)
     assert len(off["unreachable"]) == first["checked"]
+
+
+def test_regulation_watch_ignores_blank_pages_and_per_visit_ids(tmp_path, engine):
+    # 2026-11-09: EUR-Lex served empty pages and support.google.com prints a fresh 19-20 digit
+    # ID on every visit; all eight sources showed "changed" though no law had.
+    import hashlib
+    import json
+
+    from bau.regulations import watch
+    law = "<html><body>" + "Article 5 lawful processing. " * 40 + "</body></html>"
+    url = engine.registry.get("us-canspam")["source_url"]
+    flags = " true Search true true 17 false</p>"
+    pages = {url: (law + "<p>Main menu 1677417303799587931" + flags).encode()}
+
+    def fetch(u):
+        return pages.get(u, law.encode())
+
+    state = tmp_path / "watch.json"
+    watch(engine.registry, state, ON, fetch)
+    pages[url] = (law + "<p>Main menu 16863927539524162222" + flags).encode()
+    assert watch(engine.registry, state, ON, fetch)["changed"] == []          # a visit ID
+    menu = "<p>Main menu 1677417303799587931 true Search false true 17 true</p>"
+    pages[url] = (law + menu).encode()
+    assert watch(engine.registry, state, ON, fetch)["changed"] == []          # visit flags
+    pages[url] = b"<html><script>challenge()</script></html>"
+    res = watch(engine.registry, state, ON, fetch)
+    assert res["changed"] == [] and url in res["unreachable"]                  # a blank page
+    pages[url] = b"<html><body>Please wait</body></html>"
+    assert url in watch(engine.registry, state, ON, fetch)["unreachable"]     # a stub page
+
+    # an old state that recorded the blank page as a change clears once the page is back
+    data = json.loads(state.read_text())
+    data[url].update(hash=hashlib.sha256(b"").hexdigest(), changed_at="2026-11-09")
+    state.write_text(json.dumps(data))
+    pages.pop(url)
+    assert watch(engine.registry, state, ON, fetch)["changed"] == []
+    assert "changed_at" not in json.loads(state.read_text())[url]
+    pages[url] = (law + "<p>penalty now $60,000</p>").encode()             # a real change
+    assert [c["url"] for c in watch(engine.registry, state, ON, fetch)["changed"]] == [url]
