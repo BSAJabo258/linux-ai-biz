@@ -683,7 +683,13 @@ class Assistant:
                                     factory=self.clients.get("model_factory"),
                                     run_agent=runner))
         ex = m.steps.get("execute") or {}
-        return {"mission_id": m.mission_id, "status": m.status, "verified": m.steps.get("verify"),
+        # The owner's screen said "Done." after both missions came back PAUSED (2026-11-10).
+        say = (f"Mission {m.mission_id} is done and checked: every fact in its report is backed "
+               "by what its tools found." if m.status == "COMPLETED" else
+               f"Mission {m.mission_id} is {m.status.lower()}, not done: "
+               f"{ex.get('why_not_verified') or m.next_action}.")
+        return {"say": say, "mission_id": m.mission_id, "status": m.status,
+                "verified": m.steps.get("verify"),
                 "report": ex.get("report", ""), "why_not_verified": ex.get("why_not_verified"),
                 "evidence": m.evidence[-1:], "next_action": m.next_action}
 
