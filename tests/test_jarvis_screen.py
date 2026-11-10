@@ -259,54 +259,69 @@ def test_nothing_invisible_covers_the_buttons():
     assert '$("confirm").addEventListener("click", () => { if (!woke) wake(); }' in page
 
 
+def _page():
+    from pathlib import Path
+    return (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+
+
+def _full_screen_layer(name):
+    return (f"canvas#{name}{{position:fixed;inset:0;width:100%;height:100%;"
+            "display:block;pointer-events:none}")
+
+
 def test_the_tapestry_is_sacred_geometry_that_never_takes_a_click():
     # The owner, 2026-11-09: the screen as a psychedelic, esoteric tapestry (sacred geometry,
     # sound and frequency, magnetic fields), alive with Jarvis, with an off switch.
-    from pathlib import Path
-    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
-            ).read_text(encoding="utf-8")
+    page = _page()
     assert '<canvas id="sacred" aria-hidden="true"></canvas>' in page
-    assert "canvas#sacred{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}" in page
-    assert page.index('id="sacred"') < page.index('<canvas id="core"')        # under the core
-    for part in ("buildFlower(", "buildMetatron(", "buildChladni(", "PHI_ANGLE", "SOLFEGGIO", "L * Math.sin(th) ** 2"):
+    assert _full_screen_layer("sacred") in page
+    assert page.index('id="sacred"') < page.index('<canvas id="core"')      # under the core
+    for part in ("buildFlower(", "buildMetatron(", "buildChladni(", "PHI_ANGLE", "SOLFEGGIO",
+                 "L * Math.sin(th) ** 2", "HERMETIC", "JITTER"):
         assert part in page
     assert 'id="c-geo"' in page and 'localStorage.setItem("jarvis-tapestry"' in page
-    assert "REDUCED ? 100 : 33" in page                                        # ~30 fps, calmer if asked
+    assert "REDUCED ? 100 : 33" in page                                      # ~30 fps
 
 
 def test_the_fifth_dimension_is_a_real_slice_with_a_safe_fallback():
     # The owner, 2026-11-09 (BassForge, pvrellis): cymatics as a 5-dimensional form seen in
-    # cross-section; the stances climb to 4D (tesseract, 600-cell), 8D (E8) and the quantum.
-    from pathlib import Path
-    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
-            ).read_text(encoding="utf-8")
+    # cross-section; the stances climb to 4D, 8D (E8), the quantum and the fractal.
+    page = _page()
     assert '<canvas id="fifth" aria-hidden="true"></canvas>' in page
-    assert "canvas#fifth{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}" in page
+    assert _full_screen_layer("fifth") in page
     assert page.index('id="fifth"') < page.index('id="sacred"') < page.index('<canvas id="core"')
-    assert "float a = TAU * fj / N + rot;" in page                   # N axes fanned at 360°/N
-    assert "const FIELD_N = [6, 5, 4, 5, 8, 7, 5, 3, 5];" in page
-    assert 'cv.style.display = "none"; return null;' in page         # no WebGL: the 2D tapestry alone
-    assert "F.scale *= 0.75; fifthResize();" in page                 # slow frames: lower resolution
-    for part in ("TESSERACT", "CELL600", "E8_U", "buildOrbital(", "drawHopf(", "laguerre(", "legendre("):
+    assert "float a = TAU * fj / N + rot;" in page                 # N axes fanned at 360°/N
+    assert "const FIELD_N = [6, 5, 4, 5, 8, 7, 5, 3, 5, 6, 6];" in page
+    assert 'cv.style.display = "none"; return null;' in page       # no WebGL: 2D alone
+    assert "F.scale *= 0.75; fifthResize();" in page               # slow frames: lower res
+    for part in ("TESSERACT", "CELL600", "E8_U", "buildOrbital(", "drawHopf(", "laguerre(",
+                 "legendre(", "vec3 julia(", "uJc"):
         assert part in page
 
 
 def test_the_e8_projection_is_eight_rings_of_thirty():
-    import math, re
+    import math
+    import re
     from itertools import product
-    from pathlib import Path
-    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
-            ).read_text(encoding="utf-8")
+    page = _page()
     u = [float(x) for x in re.search(r"const E8_U = \[([^\]]+)\]", page).group(1).split(",")]
     w = [float(x) for x in re.search(r"const E8_W = \[([^\]]+)\]", page).group(1).split(",")]
     roots = []
     for i in range(8):
         for j in range(i + 1, 8):
             for a, b in product((1, -1), repeat=2):
-                r = [0] * 8; r[i], r[j] = a, b; roots.append(r)
+                r = [0] * 8
+                r[i], r[j] = a, b
+                roots.append(r)
     roots += [list(s) for s in product((0.5, -0.5), repeat=8) if sum(x < 0 for x in s) % 2 == 0]
     assert len(roots) == 240
-    radii = [round(math.hypot(sum(x * y for x, y in zip(r, u)), sum(x * y for x, y in zip(r, w))), 4) for r in roots]
+
+    def radius(r):
+        return round(math.hypot(sum(x * y for x, y in zip(r, u, strict=True)),
+                                sum(x * y for x, y in zip(r, w, strict=True))), 4)
+
+    radii = [radius(r) for r in roots]
     assert sorted({radii.count(x) for x in set(radii)}) == [30] and len(set(radii)) == 8
 
 

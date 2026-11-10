@@ -622,7 +622,7 @@ precision highp float;
 #else
 precision mediump float;
 #endif
-uniform vec2 uC; uniform float uR, uT, uLevel, uKick, uNa, uNb, uMix, uLight, uFreq, uPx;
+uniform vec2 uC, uJc; uniform float uR, uT, uLevel, uKick, uNa, uNb, uMix, uLight, uFreq, uPx, uFrac;
 const float TAU = 6.2831853;
 float wave(vec2 p, float N, float t, float k, float rot, out vec2 g) {
   float f = 0.0; g = vec2(0.0);
@@ -652,6 +652,23 @@ vec3 shade(vec3 n, float lvl, float hue, float light) {
   c = c * (0.25 + 1.0 * diff) + spec * (light > 0.5 ? 0.35 : 1.1);
   return light > 0.5 ? c * 0.78 : c;
 }
+// As above, so below: a Julia set z → z² + c folded into a mirrored 2N-fold mandala; c orbits
+// with the voice. Rings trapped in the orbit give it the woven look of the field around it.
+vec3 julia(vec2 q, float N) {
+  float seg = TAU / (2.0 * N), a = mod(atan(q.y, q.x) + uT * 0.02, 2.0 * seg);
+  a = abs(a - seg);
+  vec2 z = vec2(cos(a), sin(a)) * length(q) * 0.42;
+  float trap = 1e9, esc = -1.0;
+  for (int i = 0; i < 64; i++) {
+    z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + uJc;
+    trap = min(trap, abs(length(z) - 0.62));
+    float d = dot(z, z);
+    if (d > 256.0) { esc = float(i) - log2(log2(d)) + 4.0; break; }
+  }
+  vec3 col = esc < 0.0 ? iris(trap * 2.5 + uT * 0.03) * (1.4 * exp(-trap * 5.0) + 0.1)
+                       : iris(esc * 0.045 + uT * 0.02) * (0.15 + 0.95 * exp(-trap * 3.5)) * smoothstep(0.0, 7.0, esc);
+  return col;
+}
 void main() {
   vec2 q = (gl_FragCoord.xy - uC) / uR; float r = length(q);
   vec2 p = q * uFreq, gA, gA2, gB, gB2;
@@ -673,6 +690,9 @@ void main() {
   c = mix(c, shade(n2.z > n3.z ? n2 : n3, 7.0, 0.6, uLight), clamp(c2, 0.0, 1.0) * 0.7);
   vec3 colA = shade(nA, lA, 0.0, uLight), colB = shade(nB, lB, 0.43, uLight);
   if (zA > zB) { c = mix(c, colB, cB); c = mix(c, colA, cA); } else { c = mix(c, colA, cA); c = mix(c, colB, cB); }
+  if (uFrac > 0.004) { vec3 fc = julia(q, mix(uNa, uNb, uMix));
+    fc = uLight > 0.5 ? vec3(0.97) - (vec3(1.0) - clamp(fc, 0.0, 1.0)) * 0.8 : fc;
+    c = mix(c, fc, uFrac * 0.92); }
   float vig = smoothstep(4.6, 1.2, r);
   c = uLight > 0.5 ? mix(vec3(0.96), c, 0.35 + 0.65 * vig) : c * (0.25 + 0.75 * vig);
   gl_FragColor = vec4(c, uLight > 0.5 ? 0.86 : 0.93);
@@ -687,12 +707,12 @@ void main() {
   const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, "a"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = {}; for (const n of ["uC", "uR", "uT", "uLevel", "uKick", "uNa", "uNb", "uMix", "uLight", "uFreq", "uPx"]) U[n] = gl.getUniformLocation(prog, n);
+  const U = {}; for (const n of ["uJc", "uFrac", "uC", "uR", "uT", "uLevel", "uKick", "uNa", "uNb", "uMix", "uLight", "uFreq", "uPx"]) U[n] = gl.getUniformLocation(prog, n);
   let soft = false;                                          // a software renderer starts small
   try { const ext = gl.getExtension("WEBGL_debug_renderer_info");
     const who = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
     soft = /llvmpipe|swiftshader|software|softpipe/i.test(who); } catch (e) {}
-  return { gl, cv, U, scale: soft ? 0.4 : 0.75, phase: 0, Na: 5, Nb: 5, mix: 1, slow: 0, ema: 33, checkAt: 0, lost: false };
+  return { gl, cv, U, scale: soft ? 0.4 : 0.75, phase: 0, frac: 0, Na: 5, Nb: 5, mix: 1, slow: 0, ema: 33, checkAt: 0, lost: false };
 })();
 function fifthResize() { if (!FIFTH) return;
   FIFTH.cv.width = Math.max(2, Math.round(W * FIFTH.scale)); FIFTH.cv.height = Math.max(2, Math.round(H * FIFTH.scale));
@@ -710,6 +730,9 @@ function fifthPaint(now, dt, N) {
   gl.uniform1f(U.uLevel, level); gl.uniform1f(U.uKick, KICK); gl.uniform1f(U.uNa, F.Na); gl.uniform1f(U.uNb, F.Nb);
   gl.uniform1f(U.uMix, F.mix * F.mix * (3 - 2 * F.mix)); gl.uniform1f(U.uLight, themeLight() ? 1 : 0);
   gl.uniform1f(U.uFreq, 8.5 + Math.sin(F.phase * 0.07) * 1.8); gl.uniform1f(U.uPx, s);
+  F.frac += ((STANCES[SAC.stance][1].startsWith("FRACTAL") ? 1 : 0) - F.frac) * 0.03;
+  const ja = F.phase * 0.21 + level * 0.6;                  // the seed of the fractal orbits with the voice
+  gl.uniform1f(U.uFrac, F.frac); gl.uniform2f(U.uJc, 0.7885 * Math.cos(ja), 0.7885 * Math.sin(ja));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   // keep the whole page smooth: if frames slow down, draw the field at a lower resolution
   F.ema += (dt - F.ema) * 0.05;
@@ -751,8 +774,12 @@ const STANCES = [
   ["ψ", "HYDROGEN ORBITAL", "where the electron may be; the colour is its phase"],
   ["S³", "HOPF FIBRATION", "every point of a sphere is a circle in 4D; none touch, all are linked"],
   ["V", "THE FIFTH DIMENSION", "sound as a 5-dimensional form, seen in cross-section as the slice moves"],
+  ["∞", "FRACTAL · AS ABOVE, SO BELOW", "z → z² + c, the same shape at every scale; c moves with his voice"],
+  ["VE", "VECTOR EQUILIBRIUM · THE JITTERBUG", "the inner grid breathing: cuboctahedron, icosahedron, octahedron"],
 ];
-const FIELD_N = [6, 5, 4, 5, 8, 7, 5, 3, 5];               // the dimensions of the wave behind each stance
+const FIELD_N = [6, 5, 4, 5, 8, 7, 5, 3, 5, 6, 6];
+const HERMETIC = ["MENTALISM", "CORRESPONDENCE", "VIBRATION", "POLARITY", "RHYTHM", "CAUSE & EFFECT", "GENDER"];
+const STANCE_PRINCIPLE = [0, 1, 3, 4, 1, 2, 3, 4, 2, 1, 5];   // the Hermetic principle each stance shows most               // the dimensions of the wave behind each stance
 const E8_U = [0, 0.119117702, 0.192736491, 0.217638872, 0.192736491, 0.119117702, 0, 0.921933055];
 const E8_W = [0.096899069, 0.46350566, 0.236930326, 0, -0.236930326, -0.46350566, -0.669823572, 0];
 SAC.stance = STANCES.length - 1; SAC.w = STANCES.map((_, i) => i === SAC.stance ? 1 : 0.1);
@@ -798,6 +825,10 @@ const CELL600 = (() => {                                   // the 600-cell (all 
   for (const b of signs([PHI / 2, 0.5, 1 / (2 * PHI)])) for (const p of even) {
     const src = [b[0], b[1], b[2], 0], v = [0, 0, 0, 0]; for (let k = 0; k < 4; k++) v[p[k]] = src[k]; V.push(v); }
   return { V, E: edgesAt(V, 1 / PHI, 1e-6) };
+})();
+const JITTER = (() => {                                     // Fuller's jitterbug: (0, ±1, ±t) cycled, t breathing
+  const at = (t) => cyc(signs([0, 1, t]).filter(v => v.length === 3)), ico = at(PHI);
+  return { at, E: edgesAt(ico, minEdge(ico), 1e-6) };
 })();
 const E8 = (() => { const V = [];
   for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) for (const a of [1, -1]) for (const b of [1, -1]) {
@@ -1001,6 +1032,14 @@ function sacPaint(now) {
   if (Wt[2] > 0.02) draw4(g, TESSERACT, X, Y, big * (0.42 + Wt[2] * 0.2), SAC.a4, Wt[2], light, 170, 1.4 + Wt[2] * 1.6);
   if (Wt[3] > 0.02) draw4(g, CELL600, X, Y, big * (0.62 + Wt[3] * 0.3), SAC.a4 * 0.6, Wt[3] * 0.9, light, 260, 0.8 + Wt[3] * 0.7);
   if (Wt[7] > 0.02) drawHopf(g, X, Y, big * (0.8 + Wt[7] * 0.3), t * fast, Wt[7], light);
+  if (Wt[10] > 0.02) {                                     // the jitterbug, with the 12 vectors from the centre
+    const k = 0.5 - 0.5 * Math.cos(t * 0.5 * fast + kick), tt = 0.06 + (PHI - 0.06) * k, V = JITTER.at(tt);
+    const rmax = Math.max(...V.map(v => Math.hypot(...v))), S2 = big * (0.75 + Wt[10] * 0.25);
+    const P = V.map(v => toScreen(turn3(v.map(x => x / rmax), t * 0.2, 0.55), X, Y, S2));
+    strokeEdges(g, P, JITTER.E, light, (near) => (40 + near * 60 + t * 8) % 360, Wt[10], 1.4 + Wt[10] * 1.4);
+    const ve = Math.exp(-Math.pow((tt - 1) * 3, 2)) * Wt[10];   // the vectors shine at equilibrium (t = 1)
+    if (ve > 0.02) { g.strokeStyle = light ? "rgba(120,70,0," + ve + ")" : "rgba(255,230,160," + ve + ")"; g.lineWidth = 1;
+      for (const q of P) { g.beginPath(); g.moveTo(X, Y); g.lineTo(q[0], q[1]); g.stroke(); } } }
   // the golden-angle seed head, pulsing with the voice
   const NS = 377, c0 = R * 2.35 / Math.sqrt(NS);
   for (let k = 1; k <= NS; k++) { const a = k * PHI_ANGLE + t * 0.04 * fast, r = c0 * Math.sqrt(k);
@@ -1021,6 +1060,13 @@ function sacPaint(now) {
   for (let i = 0; i < SOLFEGGIO.length; i++) { const a = -Math.PI / 2 + i * 6.283 / SOLFEGGIO.length + t * 0.01, on = i === SAC.tone;
     g.fillStyle = light ? (on ? "rgba(90,40,160,.9)" : "rgba(60,80,100,.45)") : (on ? "rgba(255,225,150,.95)" : "rgba(190,210,255,.4)");
     g.fillText(SOLFEGGIO[i] + " Hz", X + Math.cos(a) * (rr + R * 0.28), Y + Math.sin(a) * (rr + R * 0.28)); }
+  // the seven Hermetic principles, slowly turning; the one this stance shows most is lit
+  g.font = "600 10px Rajdhani, system-ui, sans-serif";
+  for (let i = 0; i < HERMETIC.length; i++) { const a = Math.PI / 2 + i * 6.283 / HERMETIC.length - t * 0.006, on = i === STANCE_PRINCIPLE[SAC.stance];
+    const rh = R * 3.62, word = HERMETIC[i].split("").join("\u200A\u200A");
+    g.save(); g.translate(X + Math.cos(a) * rh, Y + Math.sin(a) * rh); g.rotate(a + Math.PI / 2 + (Math.sin(a) < 0 ? 0 : Math.PI));
+    g.fillStyle = light ? (on ? "rgba(90,40,160,.95)" : "rgba(60,80,100,.4)") : (on ? "rgba(255,226,160,.95)" : "rgba(190,210,255,.32)");
+    g.fillText(word, 0, 0); g.restore(); }
   // Seed of Life ripples on each bass hit
   if (kick > 0.9 && SAC.kickWas <= 0.9) { SAC.seeds.push({ r: R * 0.5, a: 0.8, h: t * 40 }); if (SAC.seeds.length > 6) SAC.seeds.shift(); }
   SAC.kickWas = kick;
