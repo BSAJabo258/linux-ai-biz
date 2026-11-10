@@ -148,6 +148,23 @@ def test_confirm_is_never_focused_and_ignores_the_first_moment():
     assert "if (approve && performance.now() - shownAt < CONFIRM_SETTLE_MS) return;" in page
 
 
+def test_a_waiting_card_never_covers_the_controls():
+    # The owner, 2026-11-09: setup steps, autopilot questions and Fanvue pictures popped a
+    # full-screen box that blocked the header buttons, the chat box and the mic. The card
+    # is docked in a corner; only the card itself takes clicks, and keys reach the chat
+    # unless the owner is inside the card.
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    rule = page.split("#confirm{", 1)[1].split("}", 1)[0]
+    assert "inset:0" not in rule and "background" not in rule
+    assert "pointer-events:none" in rule
+    assert "#confirm .box{pointer-events:auto" in page
+    assert 'aria-modal="false"' in page
+    assert page.count('$("confirm").classList.contains("show") && '
+                      '$("confirm").contains(document.activeElement)') == 2
+
+
 def test_the_screen_keeps_answering_while_jarvis_thinks(tmp_path):
     # /api/overview used to wait for the whole model turn; the page polls it, the waiting
     # requests used up the browser's connections and the live feed stalled.
