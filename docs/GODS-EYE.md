@@ -48,3 +48,14 @@ dates read 2026-11-10 from space.com, rmg.co.uk and amsmeteors.org, one day eith
 there is a moment, the creator feed gives the day's first post that theme, for example "watching
 the Perseid meteor shower under the night sky". Each moment is used once. Earthquakes and other
 disasters are never a theme.
+
+## In the money loop and the briefing (2026-11-10)
+
+- **Best hours:** autopost only posts in the audience's evening, 18:00 to 23:00 local in at
+  least one of New York, Chicago, Los Angeles or London. The creator profile can list its own
+  `posting_zones`.
+- **Brand safety:** before each post God's Eye reads the USGS earthquake feed (public
+  domain). A magnitude 7 or stronger quake in the last 24 hours holds that day's posts; they
+  stay queued and go out once it has passed. If the feed cannot be reached, posting goes on.
+- **Briefing:** Jarvis's morning facts carry tonight's sky, any magnitude 6+ earthquakes of
+  the last 24 hours, and whether posts are held. Every lookup is audited with its purpose.

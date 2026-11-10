@@ -527,6 +527,12 @@ def autopost_tick(home: Path, client: FanvueClient | None = None,
     waiting = q.pending()
     if not waiting:
         return {"autopost": "nothing queued", "posted_today": posted}
+    from . import spatial  # God's Eye: the audience's evening, brand safety
+    if not spatial.posting_time_ok(home, now or dt.datetime.now(dt.UTC)):
+        return {"autopost": "waiting for the audience's evening", "posted_today": posted}
+    pause = spatial.brand_pause_now(home)
+    if pause:
+        return {"autopost": f"held today for brand safety: {pause}", "posted_today": posted}
     item = waiting[0]
     item["auto"], item["tried_at"] = True, (now or dt.datetime.now(dt.UTC)).isoformat()
     q.save(item)
