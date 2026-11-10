@@ -1213,11 +1213,31 @@ def cmd_hands(a):
     return 0 if out["done"] else 1
 
 
+def _open_browser(url: str) -> bool:
+    """Open the browser without handing it this terminal. Firefox prints its own console
+    chatter (the owner's terminal, 2026-11-09: "[fluent.dom] An element named count wasn't
+    found in the source") to whatever terminal started it, mixed into Jarvis's output."""
+    import webbrowser
+    sys.stdout.flush()
+    sys.stderr.flush()
+    saved = os.dup(1), os.dup(2)
+    null = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(null, 1)
+        os.dup2(null, 2)
+        return webbrowser.open(url)
+    finally:
+        os.dup2(saved[0], 1)
+        os.dup2(saved[1], 2)
+        for fd in (null, *saved):
+            os.close(fd)
+
+
 def cmd_jarvis(a):
     from .assistant import Voice, build_assistant, load_env_file, save_config
     if a.jv_cmd == "config":
         values = {"call_me": a.call_me, "model": a.model, "elevenlabs_voice_id": a.voice_id,
-                  "listen": a.listen}
+                  "listen": a.listen, "speak": a.speak, "local_voice": a.local_voice}
         if any(v is not None for v in values.values()):
             save_config(bau_home(), **values)
         _out(yaml.safe_load((bau_home() / "config" / "jarvis.yaml").read_text())
@@ -1276,8 +1296,7 @@ def cmd_jarvis(a):
     else:
         print(f"Jarvis is up ({mode}). Open: {url}\nCtrl+C to stop.", file=sys.stderr)
     if not a.no_browser and not service:
-        import webbrowser
-        webbrowser.open(url)
+        _open_browser(url)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
@@ -1496,10 +1515,9 @@ def cmd_fanvue(a):
     if a.fv_cmd == "login":
         who = _human()
         client = fanvue.FanvueClient()
-        import webbrowser
         fanvue.login(client, port=a.port, open_browser=lambda u: (
             print(f"Opening Fanvue to connect. If nothing opens, open this link:\n{u}"),
-            webbrowser.open(u)))
+            _open_browser(u)))
         me = client.me()
         AuditLog().append("fanvue.connected", who, {})
         _out({"connected": me.get("handle"), "creator": me.get("isCreator"),
@@ -2209,8 +2227,12 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--call-me")
     x.add_argument("--model", help="registered, approved model id (default claude-opus-5-5)")
     x.add_argument("--voice-id", help="ElevenLabs voice id")
-    x.add_argument("--listen", choices=["elevenlabs", "browser"],
-                   help="where push-to-talk audio is transcribed")
+    x.add_argument("--listen", choices=["elevenlabs", "local", "browser"],
+                   help="where push-to-talk audio is transcribed (local: this computer, "
+                   "the bau-voice service on 127.0.0.1:8767)")
+    x.add_argument("--speak", choices=["elevenlabs", "local"],
+                   help="who speaks Jarvis's replies (local: Kokoro on this computer)")
+    x.add_argument("--local-voice", help="Kokoro voice for --speak local (default bm_george)")
     jv.add_parser("constitution", help="where your operating constitution lives and what "
                   "Jarvis loads from it")
     s.set_defaults(fn=cmd_jarvis)
