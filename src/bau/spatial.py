@@ -126,3 +126,49 @@ def create_scene(layers: list[dict[str, Any]], title: str) -> dict[str, Any]:
 def export_scene(scene: dict[str, Any], out: Path) -> Path:
     out.write_text(json.dumps(scene, indent=1))
     return out
+
+
+# ------------------------------------------------------------------ the sky (timely post ideas)
+# The owner's ask (2026-11-10): God's Eye helps the money loop with timely post ideas. The
+# sky layer is worked out on this computer (no network): the Moon's phase, the solstices and
+# equinoxes, and the major meteor-shower peaks. The creator feed turns a moment into the
+# theme of the day's first post. Disasters are deliberately not a theme.
+SYNODIC_DAYS = 29.530588853                                  # mean length of a lunar month
+NEW_MOON = dt.datetime(2000, 1, 6, 18, 14, tzinfo=dt.UTC)     # a known new moon (Meeus)
+# Peaks read 2026-11-10 (space.com "Meteor showers 2026", rmg.co.uk, amsmeteors.org); the
+# sources differ by a day, so each counts one day either side.
+METEOR_PEAKS = {(1, 3): "Quadrantid", (4, 22): "Lyrid", (5, 6): "Eta Aquariid",
+                (8, 12): "Perseid", (10, 21): "Orionid", (11, 17): "Leonid",
+                (12, 13): "Geminid"}
+# Northern-hemisphere names (the audience the owner targets); dates move by a day year to year.
+SEASONS = {(3, 20): ("spring equinox", "the first day of spring, fresh flowers and light layers"),
+           (6, 21): ("summer solstice", "the longest day of the year, a golden hour that "
+                                         "lasts forever"),
+           (9, 22): ("autumn equinox", "the first day of autumn, warm layers and falling leaves"),
+           (12, 21): ("winter solstice", "the longest night of the year, candles and cozy "
+                                         "knitwear")}
+
+
+def moon_age(when: dt.datetime) -> float:
+    """Days since the last new moon (0 = new, about 14.8 = full)."""
+    return ((when - NEW_MOON).total_seconds() / 86400) % SYNODIC_DAYS
+
+
+def sky_moments(day: dt.date) -> list[dict[str, str]]:
+    """Today's sky moments, each with a post theme for a lifestyle creator."""
+    out = []
+    age = moon_age(dt.datetime(day.year, day.month, day.day, 12, tzinfo=dt.UTC))
+    if abs(age - SYNODIC_DAYS / 2) < 1.0:
+        out.append({"kind": "moon", "name": "full moon",
+                    "theme": "a full moon night, wrapped in a blanket on the balcony"})
+    elif age < 1.0 or age > SYNODIC_DAYS - 1.0:
+        out.append({"kind": "moon", "name": "new moon",
+                    "theme": "a dark-sky night, stargazing far from the city lights"})
+    for (m, d), name in METEOR_PEAKS.items():
+        if abs((day - dt.date(day.year, m, d)).days) <= 1:
+            out.append({"kind": "meteors", "name": f"{name} meteor shower",
+                        "theme": f"watching the {name} meteor shower under the night sky"})
+    for (m, d), (name, theme) in SEASONS.items():
+        if abs((day - dt.date(day.year, m, d)).days) <= 1:
+            out.append({"kind": "season", "name": name, "theme": theme})
+    return out

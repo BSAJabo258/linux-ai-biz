@@ -38,3 +38,13 @@ its purpose.
 | OpenSky Network | free for non-commercial use; commercial use needs their licence |
 | CelesTrak | public orbital data |
 | World outline | Made with Natural Earth: public domain |
+
+## The sky: timely post ideas (2026-11-10)
+
+God's Eye also helps the money loop. Each day it works out the sky on this computer (no
+internet needed): full and new moons, the solstices and equinoxes, and the peaks of the major
+meteor showers (Quadrantids, Lyrids, Eta Aquariids, Perseids, Orionids, Leonids, Geminids;
+dates read 2026-11-10 from space.com, rmg.co.uk and amsmeteors.org, one day either side). When
+there is a moment, the creator feed gives the day's first post that theme, for example "watching
+the Perseid meteor shower under the night sky". Each moment is used once. Earthquakes and other
+disasters are never a theme.

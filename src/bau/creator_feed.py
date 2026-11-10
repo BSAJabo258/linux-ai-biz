@@ -66,16 +66,33 @@ def fill(home: Path) -> int:
         levels += [2, 3]                          # the paid unlocks, in turn with the base level
     made = len(q.items()) + len(open_drafts)
     themes = list(prof.get("themes") or THEMES)
+    timely = _timely(home)
     n = 0
     for i in range(max(0, need)):
         level = levels[(made + i) % len(levels)]
-        theme = secrets.choice(themes)
-        if A.add(home, "draft", f"Fanvue post: {theme} ({secrets.token_hex(2)})",
-                 {"job": "fanvue_post", "theme": theme, "level": level,
-                  "shot": secrets.choice(SHOTS), "parts": pick(level)},
+        moment = timely.pop(0) if timely else None   # God's Eye: today's sky, first post
+        theme = moment["theme"] if moment else secrets.choice(themes)
+        detail = {"job": "fanvue_post", "theme": theme, "level": level,
+                  "shot": secrets.choice(SHOTS), "parts": pick(level)}
+        if moment:
+            detail["timely"] = moment["key"]
+        if A.add(home, "draft", f"Fanvue post: {theme} ({secrets.token_hex(2)})", detail,
                  source="autopilot (feed)"):
             n += 1
     return n
+
+
+def _timely(home: Path, day: dt.date | None = None) -> list[dict[str, str]]:
+    """Today's God's Eye sky moments not yet used for a post (one post each)."""
+    from .spatial import sky_moments
+    day = day or dt.datetime.now(dt.UTC).date()
+    used = {t["detail"].get("timely") for t in A._load(home)["tasks"]}
+    out = []
+    for m in sky_moments(day):
+        key = f"{m['name']} {day.isoformat()}"
+        if key not in used:
+            out.append({**m, "key": key})
+    return out[:1]
 
 
 def explicit_ready(prof: dict[str, Any]) -> bool:
