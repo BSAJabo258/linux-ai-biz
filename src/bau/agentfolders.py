@@ -252,9 +252,10 @@ def summary(a: Agent, home: Path | None) -> dict[str, Any]:
 def run(name: str, task: str, home: Path | None, audit: Any = None,
         jarvis: tuple[Any, dict[str, Any]] | None = None, factory: Any = None,
         brains: tuple[Any, dict[str, Any]] | None = None, mission_id: str = "",
-        trust: Any = None, double_check: bool = False) -> Any:
+        trust: Any = None, double_check: bool = False, job: Any = None) -> Any:
     """Run an approved agent folder on one task. ``brains`` forces a (provider, model);
-    otherwise an agent on the small brain runs under the team's supervisor."""
+    otherwise an agent on the small brain runs under the team's supervisor. ``job`` is the
+    executive controller's job for this task: the run (and a takeover) continues it."""
     from .audit import AuditLog
     home = home or bau_home()
     a = load(name, home)
@@ -272,14 +273,14 @@ def run(name: str, task: str, home: Path | None, audit: Any = None,
                     kind="creative_writing" if a.brain == "content" else "")
         if b["brain"] == "small":
             return _supervised(a, task, home, audit, b, jarvis, factory, mission_id, trust,
-                               double_check)
+                               double_check, job)
         brains = (b["provider"], b["model"])
-    return _run_once(a, task, home, audit, brains, mission_id, trust)
+    return _run_once(a, task, home, audit, brains, mission_id, trust, job)
 
 
 def _supervised(a: Agent, task: str, home: Path, audit: Any, boss: dict[str, Any],
                 jarvis: Any, factory: Any, mission_id: str, trust: Any,
-                double_check: bool) -> Any:
+                double_check: bool, job: Any = None) -> Any:
     """The team's boss runs the agent; the supervisor hands a stuck job to the specialist
     (docs/TEAM.md) and the run goes on the score sheet."""
     from . import supervisor, team
@@ -305,7 +306,7 @@ def _supervised(a: Agent, task: str, home: Path, audit: Any, boss: dict[str, Any
                       "task": task[:200]})
         return _run_once(a, t, home, audit,
                          (_metered(s, home, audit, f"folder:{a.name}"), s["model"]),
-                         mission_id, trust)
+                         mission_id, trust, _fresh(job, home))
 
     def verify(answer: str, evidence: list[str]) -> str:
         try:
@@ -329,7 +330,7 @@ def _supervised(a: Agent, task: str, home: Path, audit: Any, boss: dict[str, Any
     res = supervisor.supervise(
         task, lambda t: _run_once(a, t, home, audit,
                                   (_metered(boss, home, audit, f"folder:{a.name}"),
-                                   boss["model"]), mission_id, trust),
+                                   boss["model"]), mission_id, trust, job),
         specialist if chosen["specialist"] else None, mode=mode,
         over_limit=Usage(home, audit).over_limit,
         verify=verify if double_check and chosen["specialist"] else None)
@@ -361,8 +362,17 @@ def _metered(brain: dict[str, Any], home: Path, audit: Any, who: str,
     return Metered(brain["provider"], Usage(home, audit), price, mid, who, ledger=ledger)
 
 
+def _fresh(job: Any, home: Path) -> Any:
+    """The job as last saved (the boss's run changed it), for the specialist to continue."""
+    if job is None:
+        return None
+    from .jobs import JobStore
+    return JobStore(home).load(job.job_id)
+
+
 def _run_once(a: Agent, task: str, home: Path, audit: Any,
-              brains: tuple[Any, dict[str, Any]], mission_id: str, trust: Any) -> Any:
+              brains: tuple[Any, dict[str, Any]], mission_id: str, trust: Any,
+              job: Any = None) -> Any:
     from . import agents
     from .gateway import Handler
     from .jobs import JobStore
@@ -404,7 +414,8 @@ def _run_once(a: Agent, task: str, home: Path, audit: Any,
                                 max_steps=a.max_steps, tool_specs=specs)
         gw.audit.append("agentfolder.run", agent_id, {"task": task[:200],
                                                       "model": spec.model["model_id"]})
-        return agents.run(spec, task, provider, gw, JobStore(home), mission_id=mission_id)
+        return agents.run(spec, task, provider, gw, JobStore(home), mission_id=mission_id,
+                          job=job)
     finally:
         for c in clients:
             c.close()

@@ -265,6 +265,14 @@ def cmd_mission(a):
         _out({"mission_id": m.mission_id, "status": m.status, "verified": m.steps.get("verify"),
               "why_not_verified": ex.get("why_not_verified"), "report": ex.get("report"),
               "evidence": m.evidence[-1:]})
+    elif a.mission_cmd == "cancel":
+        from .jarvis import cancel_mission
+        _human()
+        try:
+            _out(cancel_mission(j, a.mission_id, f"human:{getpass.getuser()}"))
+        except KeyError as e:
+            print(str(e), file=sys.stderr)
+            return EXIT_BLOCKED
     elif a.mission_cmd == "approve":
         from .security.permissions import SshApprovals, load_approval
         m = j.get(a.mission_id)
@@ -1678,6 +1686,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("mission_id")
     x = js.add_parser("run", help="you: run a READY mission (its agent does it; checked "
                                   "against what its tools found)")
+    x.add_argument("mission_id")
+    x = js.add_parser("cancel", help="you: stop a mission; a running agent stops at its next "
+                                     "step")
     x.add_argument("mission_id")
     x = js.add_parser("approve")
     x.add_argument("mission_id")

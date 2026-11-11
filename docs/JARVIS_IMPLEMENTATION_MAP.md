@@ -96,6 +96,9 @@ row does not hold the job id. A supervised run with a takeover makes **two** job
 
 ## Phase 1 work order: Jarvis executes missions through the executive controller
 
+**Built 2026-11-11** (tests: `tests/test_mission_run.py`, `tests/test_orchestration.py`; each
+safety check was removed once and its test failed). Not yet run on the owner's desktop.
+
 Goal: one mission run goes owner -> card -> controller -> adapter -> existing agent loop ->
 gateway -> verification -> back to Jarvis, with one job, linked to the mission, that can be
 cancelled and is offered back after a crash. No new controller, job store, gateway or agent loop.
@@ -106,7 +109,7 @@ cancelled and is offered back after a crash. No new controller, job store, gatew
 | 2 | `src/bau/agents.py` `run` loop | at the top of each step, reload the job; if its status is `CANCELLED`, stop with status `CANCELLED` (today a cancel written by the controller is never seen mid-run) |
 | 3 | planned new module `agent_folder` in `src/bau/adapters/`, class `AgentFolderAdapter(AdapterBase)` | `adapter_id = "agent_folder"`; `run(contract, context)` loads the controller's job and calls `agentfolders.run(contract.agent, contract.objective, ..., job=job)`; returns `ExecutionResult` with `evidence = {final_text, evidence, tool_calls, cost_usd}` and the agent's status mapped to COMPLETED / FAILED / CANCELLED |
 | 4 | `src/bau/jarvis.py` `agent_executor.execute` | replace the direct `AF.run` call with `ExecutiveController(JobStore(home), registry with AgentFolderAdapter, hold=governor.hold_reason)`: `create_task(TaskContract(mission_id, objective, agent=name))`, then `dispatch(task_id, "agent_folder")`. Keep the verification code exactly as it is, fed from `result.evidence`. Return `job_id` in the result so `Jarvis.run` stores it in `m.steps["execute"]`. The `run_agent` test hook keeps working |
-| 5 | `src/bau/assistant.py` new confirm tool `cancel_mission` | owner card; calls `ExecutiveController.cancel(job_id)` for the mission's job and saves the mission as CANCELLED. Confirm-kind, so never offered as an action a model can take alone |
+| 5 | `src/bau/jarvis.py` `cancel_mission`, `bau mission cancel ID` | the owner's cancel, at a terminal: `ExecutiveController.cancel` on every unfinished job of the mission, mission CANCELLED. **Changed from a Jarvis card while building:** the Jarvis screen answers one request at a time (`jarvis_server` holds its lock while a mission runs), so a card could never be pressed during a run; a terminal command is a separate process and the agent sees the cancel at its next step |
 | 6 | `src/bau/governor.py` `_missions` | a mission RUNNING whose linked job is INTERRUPTED (or missing) becomes PAUSED with `next_action = "interrupted: run it again"`, so the existing PAUSED finding and the existing `run_mission` card cover it. No silent resume |
 
 Tests first (all with fakes, in `tests/test_mission_run.py` and `tests/test_executive.py`):

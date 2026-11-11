@@ -376,3 +376,28 @@ def test_a_tool_error_reaches_the_model_only_as_data(tmp_path):
     fed = prov.calls[1]["messages"][-1]["content"][0]["content"]
     assert fed.startswith("<untrusted_data") and 'injection_suspected="true"' in fed
     assert res.injection_flags == 1
+
+
+def test_a_cancel_written_during_a_run_stops_the_agent_and_is_not_overwritten(tmp_path):
+    # Phase 1 (docs/JARVIS_IMPLEMENTATION_MAP.md): the owner's cancel comes from another
+    # process (`bau mission cancel`); the loop used to save RUNNING over it after each step.
+    from bau.jobs import JobStore
+    g = gw(tmp_path, agent_tools={"research": ["memory.search"]})
+    store = JobStore(tmp_path)
+    job = store.create("msn_x", "Find pricing", "research", ["agent_loop"])
+
+    def cancel_then_search(query):
+        other = JobStore(tmp_path).load(job.job_id)     # the owner, from another process
+        other.status = "CANCELLED"
+        JobStore(tmp_path).checkpoint(other)
+        return [{"hit": query}]
+    g.register("memory.search", Handler(cancel_then_search, "READ_ONLY"))
+    prov = ScriptedProvider([{"tool": "memory__search", "input": {"query": "a"}},
+                             {"tool": "memory__search", "input": {"query": "b"}}, "done"])
+    spec = agents.AgentSpec("research", "test", ["memory.search"],
+                            {"model_id": "m", "provider": "local"},
+                            tool_specs={"memory.search": ToolSpec("memory.search", "d",
+                                                                  {"type": "object"})})
+    res = agents.run(spec, "Find pricing", prov, g, store, job=job)
+    assert res.status == "CANCELLED" and len(prov.calls) == 1      # no second model call
+    assert JobStore(tmp_path).load(job.job_id).status == "CANCELLED"

@@ -230,8 +230,10 @@ class Governor:
     def _missions(self, st, since, executor) -> list[Finding]:
         out = []
         latest: dict[str, dict[str, Any]] = {}
-        for r in JsonlStore(self.home / "jobs" / "missions.jsonl"):
+        store = JsonlStore(self.home / "jobs" / "missions.jsonl")
+        for r in store:
             latest[r["mission_id"]] = r
+        out += self._crashed_missions(store, latest)
         for m in latest.values():
             if m["status"] in ("FAILED", "PAUSED"):
                 out.append(Finding("missions", "ACTION", m["mission_id"],
@@ -239,6 +241,34 @@ class Governor:
             elif m["status"] == "BLOCKED":
                 out.append(Finding("missions", "INFO", m["mission_id"],
                                    "blocked by compliance gates (working as intended)"))
+        return out
+
+    def _crashed_missions(self, store: Any, latest: dict[str, dict[str, Any]]
+                          ) -> list[Finding]:
+        """A mission still RUNNING whose job is gone, interrupted or waiting was left by a crash
+        (Phase 1): it becomes PAUSED, so the owner can run it again. Never resumed silently."""
+        from .jobs import JobStore
+        live = {"RUNNING", "PENDING", "WAITING_FOR_APPROVAL"}
+        by_mission: dict[str, list[str]] = {}
+        for job in JobStore(self.home).all():
+            by_mission.setdefault(job.mission_id, []).append(job.status)
+        stale = _now() - dt.timedelta(minutes=int(self.cfg["stale_job_minutes"]))
+        out = []
+        for m in latest.values():
+            if m["status"] != "RUNNING":
+                continue
+            states = by_mission.get(m["mission_id"], [])
+            started = (m.get("steps") or {}).get("run_started")
+            if any(s in live for s in states):
+                continue
+            if not states and started and _ts(started) > stale:
+                continue                 # just started: its job is being created
+            m["status"] = "PAUSED"
+            m["next_action"] = "interrupted before it finished: run it again"
+            store.append(m)
+            latest[m["mission_id"]] = m
+            out.append(Finding("missions", "WARN", m["mission_id"],
+                               "left RUNNING by an interruption", "paused for the owner"))
         return out
 
     def _agents(self, st, since, executor) -> list[Finding]:

@@ -72,6 +72,7 @@ LOOP_LIMIT = 3
 @dataclass
 class RunResult:
     status: str        # COMPLETED | PAUSED | REFUSED | STEP_LIMIT | LOOPING | FAILED | NEEDS_OWNER
+    #                    | CANCELLED (the owner's `bau mission cancel`)
     final_text: str
     steps: int
     tool_calls: list[dict[str, Any]]
@@ -118,7 +119,20 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
     evidence: list[str] = []
     seen: Counter[str] = Counter()
     tainted = False                  # set once a tool brings outside content into this run
+    def cancelled() -> bool:
+        # The owner's cancel is written to the job by another process (`bau mission cancel`):
+        # read it before every step and before every save, so it is seen and never overwritten.
+        try:
+            return jobs.load(job.job_id).status == "CANCELLED"
+        except (KeyError, OSError, ValueError):
+            return False
+
     for step in range(1, spec.max_steps + 1):
+        if cancelled():
+            job.status = "CANCELLED"
+            gateway.audit.append("agent.cancelled", spec.agent_id,
+                                 {"job_id": job.job_id, "step": step})
+            return RunResult("CANCELLED", final, step - 1, log, cost, flags, evidence)
         est = estimate_usd(spec.model, 4000, 1000)
         ok, why = gateway.budgets.check(gateway.ledger, spec.agent_id, est, job.job_id,
                                         mission_id)
@@ -194,7 +208,8 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
             messages.append(msg)
         job.completed_steps.append(f"step-{step}")
         job.cost_usd = cost
-        jobs.checkpoint(job)
+        if not cancelled():
+            jobs.checkpoint(job)
     else:
         job.status = "PAUSED"
         job.next_action = "step limit reached; review the transcript before continuing"
