@@ -86,6 +86,12 @@ Fanvue gives out no API keys. Every app signs in through Fanvue's own Allow page
    bau fanvue login
    ```
 
+   The browser page says **Fanvue connected** only once the login is saved on this computer,
+   and the terminal prints your Fanvue handle and where it was saved. If the page says
+   **NOT connected**, the reason is on the page and in the terminal: most often the redirect
+   address on the app's Authentication tab is not exactly the one above, or a scope is off.
+   Fix it on Fanvue and run `bau fanvue login` again.
+
 ## By hand
 
 ```bash

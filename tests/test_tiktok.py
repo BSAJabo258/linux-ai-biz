@@ -225,14 +225,27 @@ def test_login_rejects_forged_state(tmp_path):
         port = s.getsockname()[1]
     client = tiktok.TikTokClient(tmp_path, http=FakeTikTok(), creds=("ck", "cs"))
 
+    import urllib.error
+    pages = []
+
+    def answer(url):
+        try:
+            urllib.request.urlopen(url).read()
+        except urllib.error.HTTPError as e:          # the page says NOT connected
+            pages.append((e.code, e.read().decode()))
+
     def browser(url):
         q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
-        threading.Timer(0.2, lambda: urllib.request.urlopen(
-            f"{q['redirect_uri']}?code=abc&state=forged").read()).start()
+        threading.Timer(0.2, answer, [f"{q['redirect_uri']}?code=abc&state=forged"]).start()
 
     with pytest.raises(tiktok.TikTokError, match="state"):
         tiktok.login(client, port=port, open_browser=browser, timeout=10)
     assert client.tokens.load() is None
+    for _ in range(100):
+        if pages:
+            break
+        __import__("time").sleep(0.05)
+    assert pages and pages[0][0] == 400 and "NOT connected" in pages[0][1]
 
 
 # ------------------------------------------------------------------ audit 2026-10-25
