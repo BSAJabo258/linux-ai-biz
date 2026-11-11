@@ -92,6 +92,7 @@ CONFIRMATION_NOTE = "PENDING_OWNER_CONFIRMATION"
 
 # Which node on the Jarvis screen lights up while a tool runs, and what it says.
 TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "strategist",
+             "portfolio": "strategist",
              "plan_mission": "strategist", "publish_queue": "publisher",
              "post_video": "publisher", "fanvue_queue": "publisher",
              "deadlines": "compliance", "money": "finance",
@@ -424,6 +425,10 @@ class Assistant:
                          []), self.t_night),
             Tool("missions", "Missions and their status and next action.", _schema(),
                  self.t_missions),
+            Tool("portfolio", "Every business mission at once: the owner's priority, budget "
+                 "left, the money it really made and spent (from the ledger), and whether its "
+                 "goal is met. Finished work is not a met goal.", _schema(),
+                 self.t_portfolio),
             Tool("publish_queue", "Videos waiting for review on every platform (TikTok...): "
                  "title, AI label, checks.",
                  _schema(), self.t_publish_queue),
@@ -728,6 +733,11 @@ class Assistant:
                  "next_action": m.get("next_action", ""),
                  **({"how": "run_mission (the owner confirms on screen)"}
                     if m["status"] == "READY" else {})} for m in latest.values()][-10:]
+
+    def t_portfolio(self) -> dict[str, Any]:
+        from .jarvis import portfolio
+        p = portfolio(self.home)
+        return {**p, "missions": p["missions"][:10]}
 
     def t_publish_queue(self) -> list[dict[str, Any]]:
         return self.hub().pending()

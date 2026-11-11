@@ -145,3 +145,33 @@ in Jarvis, accept its run card, and read back `bau jobs` and the mission's statu
    dedicated session), READ / FILL / DRAFT / SUBMIT as separate gateway levels.
 5. Service adapters on the same contract; Fanvue's real-account test is the owner's step.
 6. Mission Control: missions, jobs and their links from the records above, never sample data.
+
+## Universal Automaton directive (2026-11-11): the mission portfolio
+
+The owner's directive of 2026-11-11 asks for several business missions at once. Order: finish
+the catalog (done, #172), money counted from real ledger rows (#173), then the portfolio below,
+then factory runs through the executive controller, task dependencies, the rich router on the
+live path, new agents and factories, recovery, the screen.
+
+**Unit 1, built 2026-11-11** (tests `tests/test_portfolio.py`; each safeguard removed once and
+its test failed). One mission store (`jobs/missions.jsonl`), no second database:
+
+- `jarvis.Mission` gains `priority`, `budget_usd` (None: no cap of its own), `goal`
+  (`profit_usd` or `revenue_usd`, `at_least`, `by`) and `factory`. Rows load old or new
+  (`jarvis._mission` skips fields it does not know).
+- `jarvis.set_mission`, `bau mission set ID --priority N --budget USD --goal-profit USD
+  --by DATE`: the owner only, audited (`mission.set`).
+- `economics.pnl(ledger, mission_id)`: money received (refunds subtract, fees), costs by
+  kind, profit, margin, hours, customers, cost per customer, acquisition cost only when
+  measured. Invoices and projections never count.
+- `jarvis.portfolio`, `bau mission portfolio`, Jarvis `portfolio`: every mission, active first
+  by priority, budget left, its money, its jobs, goal met or not. A mission whose agent finished
+  is still active until the ledger meets its goal. Rows with no mission (Fanvue's sync today)
+  show as `unattributed`.
+- Budget: `Jarvis.run` refuses a mission already over its budget; the agents' gateway
+  (`runtime.build_gateway`, `Budgets.mission_caps`) pauses a step that would pass it. A $0
+  budget still lets free (local) work run.
+
+Next unit: `FactoryRun.mission_id`, and a factory's agent stages dispatched through
+`ExecutiveController` (today `cli_ext` factory hooks call `agents.run` directly, with the run
+id as the mission id); then `Job.depends_on`, checked by `dispatch`.

@@ -100,9 +100,12 @@ def build_gateway(home: Path | None = None, trust=None) -> Gateway:
         if a.get("status") in ("APPROVED", "ACTIVE"):
             agent_tools[a["agent_id"]] = list(a.get("tools", []))
             table.agent_ceiling[a["agent_id"]] = "LOW_RISK"
-    gw = Gateway(table=table, ledger=Ledger(home), budgets=Budgets.load(
-        home / "config" / "budgets.yaml"), providers=reg.data["provider"],
-        trust=trust, agent_tools=agent_tools, hold=lambda: hold_reason(home))
+    budgets = Budgets.load(home / "config" / "budgets.yaml")
+    from .jarvis import mission_budget  # each mission's own cap, the owner's
+    budgets.mission_caps = lambda mid: mission_budget(home, mid)
+    gw = Gateway(table=table, ledger=Ledger(home), budgets=budgets,
+                 providers=reg.data["provider"], trust=trust, agent_tools=agent_tools,
+                 hold=lambda: hold_reason(home))
     memory = MemoryLane(home)
     drafts = home / "artifacts" / "drafts"
     media_in = home / "artifacts" / "media_inbox"

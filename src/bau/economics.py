@@ -8,6 +8,7 @@ PAUSE). Secret values never appear here - key health tracks names and dates only
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -89,10 +90,13 @@ class Budget:
 
 @dataclass
 class Budgets:
-    """Per-agent budgets (spec §102). Unknown agents get the default budget."""
+    """Per-agent budgets (spec §102). Unknown agents get the default budget. ``mission_caps``
+    (mission id -> the owner's budget for that mission, or None) adds the mission's own cap:
+    all of its spending, whoever spent it."""
     by_agent: dict[str, Budget] = field(default_factory=dict)
     default: Budget = field(default_factory=lambda: Budget(per_job=1.0, per_hour=2.0,
                                                            per_day=10.0, per_mission=5.0))
+    mission_caps: Callable[[str], float | None] | None = None
 
     @classmethod
     def load(cls, path: Path | None = None) -> Budgets:
@@ -122,6 +126,9 @@ class Budgets:
         for name, limit, spent in checks:
             if limit is not None and spent() + add_usd > limit:
                 return False, f"{agent} would exceed {name} budget ${limit:.2f}"
+        cap = self.mission_caps(mission_id) if mission_id and self.mission_caps else None
+        if cap is not None and ledger.spent(mission_id=mission_id) + add_usd > cap:
+            return False, f"mission {mission_id} would exceed its budget ${cap:.2f}"
         return True, ""
 
 
@@ -131,6 +138,38 @@ def received_usd(row: dict[str, Any]) -> float:
     gross = float(row.get("gross_usd") or 0)
     return ((-gross if row.get("refund") else gross)
             - float(row.get("platform_fee") or 0) - float(row.get("payment_fee") or 0))
+
+
+def pnl(ledger: Ledger, mission_id: str, since: dt.datetime | None = None) -> dict[str, Any]:
+    """One mission's profit and loss from the ledger's own rows (``mission_id=""``: the rows no
+    mission claims). Only money received counts: a sale row is written when a payment arrived
+    (Fanvue's sync, ``bau ... sale``); invoices, drafts and projections live elsewhere and never
+    count. A refund lowers it; fees are the platform's and the payment provider's."""
+    def mine(r: dict[str, Any]) -> bool:
+        return r.get("mission_id", "") == mission_id and (since is None or _ts(r) >= since)
+
+    sales = [r for r in ledger.revenue if mine(r)]
+    costs = [r for r in ledger.costs if mine(r)]
+    revenue = sum(r["gross_usd"] for r in sales if not r["refund"])
+    refunds = sum(r["gross_usd"] for r in sales if r["refund"])
+    kept = sum(received_usd(r) for r in sales)
+    by_kind: dict[str, float] = {}
+    for c in costs:
+        by_kind[c["kind"]] = by_kind.get(c["kind"], 0.0) + c["usd"]
+    cost = sum(by_kind.values())
+    customers = {r["customer_ref"] for r in sales if r.get("customer_ref")}
+    new = sum(1 for r in sales if r.get("new_customer") and not r["refund"])
+    profit = kept - cost
+    return {"revenue_usd": round(revenue, 2), "refunds_usd": round(refunds, 2),
+            "fees_usd": round(revenue - refunds - kept, 2), "kept_usd": round(kept, 2),
+            "costs_by_kind": {k: round(v, 4) for k, v in sorted(by_kind.items())},
+            "cost_usd": round(cost, 4), "profit_usd": round(profit, 2),
+            "margin": round(profit / (revenue - refunds), 4) if revenue - refunds > 0 else None,
+            "human_hours": round(sum(r["hours"] for r in ledger.hours if mine(r)), 2),
+            "customers": len(customers),
+            "cost_per_customer_usd": round(cost / len(customers), 2) if customers else None,
+            "customer_acquisition_cost_usd": round(by_kind["marketing"] / new, 2)
+            if new and by_kind.get("marketing") else None}
 
 
 def metrics(ledger: Ledger, since: dt.datetime | None = None,
