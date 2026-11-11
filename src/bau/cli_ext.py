@@ -1659,13 +1659,17 @@ def cmd_fanvue(a):
     if a.fv_cmd == "login":
         who = _human()
         client = fanvue.FanvueClient()
-        fanvue.login(client, port=a.port, open_browser=lambda u: (
-            print(f"Opening Fanvue to connect. If nothing opens, open this link:\n{u}"),
-            _open_browser(u)))
-        me = client.me()
+        try:
+            fanvue.login(client, port=a.port, open_browser=lambda u: (
+                print(f"Opening Fanvue to connect. If nothing opens, open this link:\n{u}"),
+                _open_browser(u)))
+            me = client.me()          # proves the saved login really works
+        except (fanvue.FanvueError, OSError) as e:
+            print(f"Fanvue is NOT connected: {e}", file=sys.stderr)
+            return EXIT_BLOCKED
         AuditLog().append("fanvue.connected", who, {})
         _out({"connected": me.get("handle"), "creator": me.get("isCreator"),
-              "ai_creator": me.get("isAiCreator")})
+              "ai_creator": me.get("isAiCreator"), "saved_in": str(client.tokens.path)})
     elif a.fv_cmd == "logout":
         fanvue.TokenStore().clear()
         _out({"connected": None})

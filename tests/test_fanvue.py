@@ -5,6 +5,7 @@ earnings come into the ledger once each. Fake Fanvue only: no network, no keys."
 import base64
 import hashlib
 import json
+import time
 import urllib.parse
 
 import pytest
@@ -323,3 +324,90 @@ def test_a_level_2_or_3_unlock_posts_with_the_owners_price_in_cents(tmp_path):
     q.post(item, client(tmp_path, fake), "human:owner", "subscribers")
     post = next(json.loads(b) for m, u, _, b in fake.calls if u.endswith("/v1/posts"))
     assert post["price"] == 1499 and post["mediaUuids"] == ["m-1"]
+
+
+# ------------------------------------------------------------------ 2026-11-11: the owner saw
+# "Fanvue connected" in the browser while BAU was not connected. The page now tells the truth.
+def _free_port():
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def _browser(query, pages, also=()):
+    """Plays the browser: optional stray requests first, then Fanvue's redirect back."""
+    import threading
+    import urllib.error
+    import urllib.request
+
+    def go(url):
+        q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
+        base = q["redirect_uri"].rsplit("/", 1)[0]
+
+        def hit():
+            for extra in also:
+                try:
+                    urllib.request.urlopen(base + extra).read()
+                except urllib.error.HTTPError as e:
+                    pages.append((e.code, extra))
+            target = f"{q['redirect_uri']}?{query(q)}"
+            try:
+                with urllib.request.urlopen(target) as r:
+                    pages.append((r.status, r.read().decode()))
+            except urllib.error.HTTPError as e:
+                pages.append((e.code, e.read().decode()))
+        threading.Timer(0.2, hit).start()
+    return go
+
+
+def _wait(pages, n):
+    """The login returns as soon as the answer is in; the page may still be on its way."""
+    for _ in range(100):
+        if len(pages) >= n:
+            return pages
+        time.sleep(0.05)
+    raise AssertionError(f"the browser saw {pages}")
+
+
+def test_the_browser_says_connected_only_once_the_login_is_saved(tmp_path):
+    pages = []
+    c = client(tmp_path, FakeFanvue(), token=False)
+    F.login(c, port=_free_port(), timeout=10, open_browser=_browser(
+        lambda q: f"code=abc&state={q['state']}", pages, also=("/favicon.ico",)))
+    _wait(pages, 2)
+    assert pages[0] == (404, "/favicon.ico")          # a stray request doesn't use up the answer
+    assert pages[-1][0] == 200 and "Fanvue connected" in pages[-1][1]
+    assert c.tokens.load()["access_token"] == "at0"
+
+
+def test_a_failed_token_exchange_is_never_shown_as_connected(tmp_path):
+    class Refusing(FakeFanvue):
+        def request(self, method, url, headers, body=None, timeout=120):
+            if url == F.TOKEN_URL:
+                return 400, b'{"error_description": "redirect_uri does not match"}'
+            return super().request(method, url, headers, body, timeout)
+    pages = []
+    c = client(tmp_path, Refusing(), token=False)
+    with pytest.raises(F.FanvueError, match="redirect_uri does not match"):
+        F.login(c, port=_free_port(), timeout=10, open_browser=_browser(
+            lambda q: f"code=abc&state={q['state']}", pages))
+    _wait(pages, 1)
+    assert pages[-1][0] == 400 and "NOT connected" in pages[-1][1]
+    assert "redirect_uri does not match" in pages[-1][1] and c.tokens.load() is None
+
+
+def test_fanvue_saying_no_is_shown_as_not_connected(tmp_path):
+    pages = []
+    c = client(tmp_path, FakeFanvue(), token=False)
+    with pytest.raises(F.FanvueError, match="access_denied"):
+        F.login(c, port=_free_port(), timeout=10, open_browser=_browser(
+            lambda q: f"error=access_denied&state={q['state']}", pages))
+    _wait(pages, 1)
+    assert "NOT connected" in pages[-1][1] and c.tokens.load() is None
+
+
+def test_login_times_out_as_a_fanvue_error(tmp_path):
+    c = client(tmp_path, FakeFanvue(), token=False)
+    with pytest.raises(F.FanvueError, match="timed out"):
+        F.login(c, port=_free_port(), timeout=1, open_browser=lambda u: None)

@@ -46,7 +46,6 @@ from __future__ import annotations
 import base64
 import datetime as dt
 import hashlib
-import http.server
 import json
 import math
 import os
@@ -59,7 +58,7 @@ from typing import Any
 
 from .audit import AuditLog
 from .home import atomic_write_json, bau_home
-from .tiktok import Http, _env_file
+from .tiktok import Http, TikTokError, _env_file, oauth_callback
 
 API = "https://api.fanvue.com"
 AUTH_URL = "https://auth.fanvue.com/oauth2/auth"
@@ -257,37 +256,36 @@ class FanvueHttp(Http):
 
 def login(client: FanvueClient, port: int = PORT, open_browser: Any = None,
           timeout: int = 300) -> dict[str, Any]:
-    """One-shot callback server on 127.0.0.1. Register http://127.0.0.1:<port>/callback as a
-    redirect URI on the Fanvue app's Authentication tab."""
+    """A callback server on 127.0.0.1. Register http://127.0.0.1:<port>/callback as a
+    redirect URI on the Fanvue app's Authentication tab. The browser says "connected" only
+    once the token is saved on this computer (oauth_callback)."""
     redirect = f"http://127.0.0.1:{port}/callback"
     verifier, challenge = pkce_pair()
     state = secrets.token_hex(32)
-    got: dict[str, str] = {}
 
-    class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
-            got.update(dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query)))
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(b"BAU: Fanvue connected. You can close this tab.")
+    def finish(got: dict[str, str]) -> dict[str, Any]:
+        if not secrets.compare_digest(got.get("state", ""), state):
+            raise FanvueError("state mismatch - login aborted")
+        if "code" not in got:
+            raise FanvueError("Fanvue refused: "
+                              f"{got.get('error_description') or got.get('error')}")
+        try:
+            tok = client.exchange(got["code"], redirect, verifier)
+        except OSError as e:          # the token could not be written in BAU_HOME/secrets
+            raise FanvueError(f"Fanvue answered, but the login could not be saved in "
+                              f"{client.tokens.path}: {e}") from e
+        if client.tokens.load() is None:
+            raise FanvueError(f"the login was not saved in {client.tokens.path}")
+        return tok
 
-        def log_message(self, *a: Any) -> None:
-            pass
-
-    srv = http.server.HTTPServer(("127.0.0.1", port), Handler)
-    srv.timeout = timeout
     url = client.authorize_url(redirect, state, challenge)
-    (open_browser or (lambda u: print(f"Open this link to connect Fanvue:\n{u}")))(url)
-    srv.handle_request()
-    srv.server_close()
-    if not got:
-        raise FanvueError("no answer from Fanvue (timed out)")
-    if not secrets.compare_digest(got.get("state", ""), state):
-        raise FanvueError("state mismatch - login aborted")
-    if "code" not in got:
-        raise FanvueError(f"Fanvue refused: {got.get('error_description') or got.get('error')}")
-    return client.exchange(got["code"], redirect, verifier)
+    try:
+        return oauth_callback("Fanvue", port, "/callback", url,
+                              open_browser or (lambda u: print(f"Open this link to connect "
+                                                               f"Fanvue:\n{u}")),
+                              timeout, finish)
+    except TikTokError as e:          # the shared helper's timeout
+        raise FanvueError(str(e)) from None
 
 
 # ------------------------------------------------------------------ the queue

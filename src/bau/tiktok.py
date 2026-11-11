@@ -38,6 +38,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -257,40 +258,74 @@ class TikTokClient:
                           {"filters": {"video_ids": ids}}).get("videos") or []
 
 
-def login(client: TikTokClient, port: int = 3455, open_browser: Any = None,
-          timeout: int = 300) -> dict[str, Any]:
-    """Desktop OAuth: a one-shot callback server on 127.0.0.1. Register
-    http://127.0.0.1:<port>/callback/ as a redirect URI in the TikTok developer portal."""
-    redirect = f"http://127.0.0.1:{port}/callback/"
-    verifier, challenge = pkce_pair()
-    state = secrets.token_urlsafe(24)
-    got: dict[str, str] = {}
+def oauth_callback(name: str, port: int, path: str, url: str, open_browser: Any,
+                   timeout: int, finish: Callable[[dict[str, str]], Any]) -> Any:
+    """The browser comes back to http://127.0.0.1:<port><path>; `finish` checks the answer
+    and saves the login. Only after it succeeded does the page say connected: before, the
+    page said "connected" the moment any answer arrived, even a refusal or a failed token
+    exchange, so the owner saw it done while nothing was saved (found 2026-11-11). Other
+    requests (a favicon, a prefetch) get a 404 and don't use up the one answer."""
+    result: dict[str, Any] = {}
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
-            q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
-            got.update(q)
-            self.send_response(200)
+            parts = urllib.parse.urlsplit(self.path)
+            if parts.path.rstrip("/") != path.rstrip("/") or result:
+                self.send_response(404)
+                self.end_headers()
+                return
+            try:
+                result["value"] = finish(dict(urllib.parse.parse_qsl(parts.query)))
+                code, text = 200, f"BAU: {name} connected. You can close this tab."
+            except Exception as e:  # noqa: BLE001 - shown here, raised again by the caller
+                result["error"] = e
+                code, text = 400, (f"BAU: {name} is NOT connected.\n\n{e}\n\n"
+                                   "Close this tab and try again from BAU.")
+            self.send_response(code)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
-            self.wfile.write(b"BAU: TikTok connected. You can close this tab.")
+            self.wfile.write(text.encode())
 
         def log_message(self, *a: Any) -> None:
             pass
 
     srv = http.server.HTTPServer(("127.0.0.1", port), Handler)
-    srv.timeout = timeout
+    deadline = time.monotonic() + timeout
+    try:
+        open_browser(url)
+        while not result and (left := deadline - time.monotonic()) > 0:
+            srv.timeout = left
+            srv.handle_request()
+    finally:
+        srv.server_close()
+    if "error" in result:
+        raise result["error"]
+    if "value" not in result:
+        raise TikTokError(f"no answer from {name} (timed out)")
+    return result["value"]
+
+
+def login(client: TikTokClient, port: int = 3455, open_browser: Any = None,
+          timeout: int = 300) -> dict[str, Any]:
+    """Desktop OAuth: a callback server on 127.0.0.1. Register
+    http://127.0.0.1:<port>/callback/ as a redirect URI in the TikTok developer portal."""
+    redirect = f"http://127.0.0.1:{port}/callback/"
+    verifier, challenge = pkce_pair()
+    state = secrets.token_urlsafe(24)
+
+    def finish(got: dict[str, str]) -> dict[str, Any]:
+        if not secrets.compare_digest(got.get("state", ""), state):
+            raise TikTokError("state mismatch - login aborted")
+        if "code" not in got:
+            raise TikTokError("TikTok refused: "
+                              f"{got.get('error_description') or got.get('error')}")
+        return client.exchange(got["code"], redirect, verifier)
+
     url = client.authorize_url(redirect, state, challenge)
-    (open_browser or (lambda u: print(f"Open this link to connect TikTok:\n{u}")))(url)
-    srv.handle_request()
-    srv.server_close()
-    if not got:
-        raise TikTokError("no answer from TikTok (timed out)")
-    if not secrets.compare_digest(got.get("state", ""), state):
-        raise TikTokError("state mismatch - login aborted")
-    if "code" not in got:
-        raise TikTokError(f"TikTok refused: {got.get('error_description') or got.get('error')}")
-    return client.exchange(got["code"], redirect, verifier)
+    return oauth_callback("TikTok", port, "/callback/", url,
+                          open_browser or (lambda u: print(f"Open this link to connect "
+                                                           f"TikTok:\n{u}")),
+                          timeout, finish)
 
 
 # ------------------------------------------------------------------ queue
