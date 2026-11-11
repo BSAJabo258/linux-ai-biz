@@ -11,7 +11,9 @@ The connector manager (Phase 2, 2026-11-11): ``check`` starts an approved server
 tools within a time limit and records the result in ``BAU_HOME/mcp/health.json``; the owner
 pins that tool list (``bau mcp pin``, its SHA-256 in the record as ``schema_sha256``). From
 then on ``attach`` refuses the server whenever its tools, descriptions or input schemas
-differ from the pinned list, until the owner checks and pins again.
+differ from the pinned list, until the owner checks and pins again. A server never pinned does
+not start at all (an approval alone goes stale as soon as the server changes), and a server
+revoked while an agent is using it stops answering at that agent's next call (``live``).
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ import json
 import os
 import subprocess
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -110,20 +113,36 @@ class McpClient:
                 self.proc.kill()
 
 
-def _bound_call(client: McpClient, tool: str):
+def _bound_call(client: McpClient, tool: str, server: str = "", pinned: str = "",
+                live: Callable[[], dict[str, Any] | None] | None = None):
     """Bind the tool name in a closure: arguments from the model can never redirect an
-    approved capability to a different (unreviewed) tool."""
+    approved capability to a different (unreviewed) tool. With ``live``, the server's registry
+    record is read again before every call: revoked, removed or re-pinned since the agent
+    started, and the call is refused."""
     def call(**kwargs: Any) -> dict[str, Any]:
+        if live is not None:
+            now = live()
+            if now is None:
+                raise PermissionError(f"MCP server {server} is no longer registered")
+            if now.get("status") not in ("APPROVED", "ACTIVE"):
+                raise PermissionError(f"MCP server {server} is {now.get('status')}")
+            if now.get("schema_sha256") != pinned:
+                raise PermissionError(f"MCP server {server}'s pinned tool list changed")
         return client.call(tool, kwargs)
     return call
 
 
-def attach(gateway: Gateway, record: dict[str, Any], client: McpClient | None = None
+def attach(gateway: Gateway, record: dict[str, Any], client: McpClient | None = None,
+           live: Callable[[], dict[str, Any] | None] | None = None
            ) -> tuple[McpClient, dict[str, ToolSpec]]:
-    """Start an approved MCP server and register its tools on the gateway."""
+    """Start an approved, pinned MCP server and register its tools on the gateway. ``live``
+    returns the server's current registry record; every call checks it again."""
     if record.get("status") not in ("APPROVED", "ACTIVE"):
         raise PermissionError(f"MCP server {record.get('mcp_id')} is {record.get('status')}")
     server = record["mcp_id"]
+    if not record.get("schema_sha256"):
+        raise PermissionError(f"MCP server {server} is approved but its tool list is not pinned: "
+                              f"run `bau mcp check {server}`, then `bau mcp pin {server}`")
     client = client or McpClient(list(record["command"]), env=record.get("env"))
     client.initialize()
     tools = client.list_tools()
@@ -142,7 +161,7 @@ def attach(gateway: Gateway, record: dict[str, Any], client: McpClient | None = 
             continue                         # tool not reviewed: not exposed
         cap = f"run.mcp__{server}__{name}"
 
-        fn = _bound_call(client, name)
+        fn = _bound_call(client, name, server, pinned, live)
 
         gateway.register(cap, Handler(fn, "READ_ONLY" if name in read_only
                                       else "APPROVAL_REQUIRED",
@@ -211,6 +230,10 @@ def check(record: dict[str, Any], home: Path, client: McpClient | None = None,
            "tools": sorted(str(x.get("name")) for x in tools) if tools is not None else None,
            "schema_sha256": fp, "pinned": pinned,
            "changed": bool(pinned and fp and fp != pinned)}
+    if tools is not None:                          # what pinning now would change
+        was = set(record.get("schema_tools") or []) if pinned else set()
+        res["added"] = sorted(set(res["tools"]) - was) if pinned else []
+        res["removed"] = sorted(was - set(res["tools"]))
     if tools is not None and not pinned:
         res["next"] = f"bau mcp pin {server}  (you: keep this tool list as the approved one)"
     elif res["changed"]:

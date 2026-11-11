@@ -55,9 +55,13 @@ bau mcp revoke ID           # you: switch the server off for good
 `pin` and `revoke` work only for a person at a terminal.
 
 **Why pin.** A server can change after you approved it: a new tool, or a changed description
-(text a model reads). Once you pin a server, BAU checks its tools every time it starts. If
-anything changed, BAU refuses to start it and says so. Run `bau mcp check ID` to see the new
-list, then `bau mcp pin ID` if you want it, or `bau mcp revoke ID` if not.
+(text a model reads). So approving is not enough: BAU starts a server only after you pinned
+its tool list, and checks the tools every time it starts. If anything changed, BAU refuses to
+start it and says so. Run `bau mcp check ID`: it lists the tools `added` and `removed` since
+your pin. Then `bau mcp pin ID` if you want the change, or `bau mcp revoke ID` if not.
+
+**Revoke works at once.** An agent already using a server reads its record again before every
+call: revoked, removed or pinned again since it started, and the call is refused.
 
 A server that is not approved is never started here: untested code belongs in the sandbox.
 Finding new servers is Repo Scout's job (`bau scout find "mcp server for gmail"`); what it finds

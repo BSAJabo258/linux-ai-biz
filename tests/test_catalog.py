@@ -173,3 +173,42 @@ def test_cli_and_jarvis(tmp_path, monkeypatch, capsys):
     assert not err and out["approval_status"] == "REVOKED"
     out, err = a._run_tool("tool_catalog", {})
     assert not err and "counts" in out
+
+
+def test_an_approved_server_that_was_never_pinned_does_not_start(tmp_path):
+    """Approval alone is stale the moment the server changes: no pin, no tools."""
+    from bau.audit import AuditLog
+    from bau.gateway import Gateway
+    g = Gateway(audit=AuditLog(tmp_path / "a.jsonl", key=b""))
+    with pytest.raises(PermissionError, match="not pinned"):
+        mcp.attach(g, REC)
+    assert not any(c.startswith("run.mcp__") for c in g.table.levels)
+
+
+def test_check_says_which_tools_changed_before_the_owner_pins(tmp_path):
+    mcp.check(REC, tmp_path)
+    pinned = mcp.pin(REC, tmp_path, "human:owner")
+    res = mcp.check(dict(pinned, env={"FAKE_MCP_EXTRA": "1"}), tmp_path)
+    assert res["changed"] and res["added"] == ["send_mail"] and res["removed"] == []
+    same = mcp.check(pinned, tmp_path)
+    assert not same["changed"] and same["added"] == [] and same["removed"] == []
+
+
+def test_revoking_a_server_stops_an_agent_that_is_already_using_it(tmp_path):
+    from bau.audit import AuditLog
+    from bau.gateway import CallRequest, Gateway
+    mcp.check(REC, tmp_path)
+    now = {"rec": mcp.pin(REC, tmp_path, "human:owner")}
+    g = Gateway(audit=AuditLog(tmp_path / "a.jsonl", key=b""))
+    client, _ = mcp.attach(g, now["rec"], live=lambda: now["rec"])
+    try:
+        g.table.agent_ceiling["agent:x"] = "LOW_RISK"
+        assert g.invoke(CallRequest("agent:x", "run.mcp__fake__echo", {"text": "hi"}))["text"]
+        now["rec"] = dict(now["rec"], status="REVOKED")
+        with pytest.raises(PermissionError, match="REVOKED"):
+            g.invoke(CallRequest("agent:x", "run.mcp__fake__echo", {"text": "hi"}))
+        now["rec"] = None                                  # removed from the registry
+        with pytest.raises(PermissionError):
+            g.invoke(CallRequest("agent:x", "run.mcp__fake__echo", {"text": "hi"}))
+    finally:
+        client.close()

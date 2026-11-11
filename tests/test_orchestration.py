@@ -290,6 +290,10 @@ def test_mcp_tools_become_gated_capabilities(tmp_path, monkeypatch):
            "tools": ["echo", "delete_all"], "read_only_tools": ["echo"]}
     with pytest.raises(PermissionError):
         mcp.attach(gw(tmp_path), dict(rec, status="QUARANTINED"))
+    with pytest.raises(PermissionError, match="not pinned"):
+        mcp.attach(gw(tmp_path), rec)
+    mcp.check(rec, tmp_path)
+    rec = mcp.pin(rec, tmp_path, "human:owner")
     g = gw(tmp_path)
     client, specs = mcp.attach(g, rec)
     try:
