@@ -92,7 +92,7 @@ CONFIRMATION_NOTE = "PENDING_OWNER_CONFIRMATION"
 
 # Which node on the Jarvis screen lights up while a tool runs, and what it says.
 TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "strategist",
-             "portfolio": "strategist",
+             "portfolio": "strategist", "automaton": "strategist",
              "plan_mission": "strategist", "publish_queue": "publisher",
              "post_video": "publisher", "fanvue_queue": "publisher",
              "deadlines": "compliance", "money": "finance",
@@ -205,6 +205,9 @@ GROUND = (
     # it could not watch videos (2026-11-10). The video is watched first, the model tells it.
     (re.compile(r"https?://|\b(shorts?|youtube|video|watch)\b", re.I),
      "watch_video", lambda q: _video_args(q)),
+    # The automaton reached Jarvis only through the briefing (2026-11-11): asked in
+    # conversation, the small model had no tool for it. Its state and the portfolio first.
+    (re.compile(r"\b(automaton|portfolio|survival|tier)\b", re.I), "automaton", lambda q: {}),
     (re.compile(r"\b(cost|costs|spend|spent|usage|tokens|how much .{0,30}model)", re.I),
      "usage_today", lambda q: {}),
     (re.compile(r"\b(broken|status|waiting for me|attention|anything wrong|health|watchdog|"
@@ -425,6 +428,10 @@ class Assistant:
                          []), self.t_night),
             Tool("missions", "Missions and their status and next action.", _schema(),
                  self.t_missions),
+            Tool("automaton", "The automaton (make money or die): running or not, its day, "
+                 "survival tier, money kept and spent, budget left, days left to earn, and the "
+                 "mission portfolio. Read only: only the owner starts, stops or revives it.",
+                 _schema(), self.t_automaton),
             Tool("portfolio", "Every business mission at once: the owner's priority, budget "
                  "left, the money it really made and spent (from the ledger), and whether its "
                  "goal is met. Finished work is not a met goal.", _schema(),
@@ -733,6 +740,36 @@ class Assistant:
                  "next_action": m.get("next_action", ""),
                  **({"how": "run_mission (the owner confirms on screen)"}
                     if m["status"] == "READY" else {})} for m in latest.values()][-10:]
+
+    def t_automaton(self) -> dict[str, Any]:
+        from . import automaton
+        from .jarvis import portfolio
+        s, p = automaton.status(self.home), portfolio(self.home)
+        if s.get("dead"):
+            say = (f"The automaton is dead: {s['dead']['why']}. Only you revive it, at a "
+                   "terminal: bau automaton start.")
+        elif not s.get("on"):
+            say = ("The automaton is not running. Only you start it: the Automaton card, or "
+                   "bau automaton start --audience ... --per-day N at a terminal.")
+        else:
+            # Two numbers a small model mixed up on the real desktop (2026-11-11): money it may
+            # still SPEND and DAYS it has left to earn. Each gets its own sentence.
+            say = (f"The automaton is running, day {s['day']}, tier {s['tier']}. "
+                   f"Money kept so far: ${s['income_usd']:.2f}; spent: ${s['spent_usd']:.2f}. "
+                   f"Spending money left: ${s['money_left_usd']:.2f}. "
+                   f"It stops if it earns nothing in the next {s['days_left_to_earn']:g} days.")
+        n = p["active"]
+        t = p["totals"]
+        say += (f" Missions: {n} active mission{'' if n == 1 else 's'}; all money kept "
+                f"${t['kept_usd']:.2f}, costs ${t['cost_usd']:.2f}, profit ${t['profit_usd']:.2f}.")
+        top = [{"mission_id": m["mission_id"], "objective": m["objective"][:80],
+                "status": m["status"], "priority": m["priority"],
+                "profit_usd": m["money"]["profit_usd"], "budget_left_usd": m["budget_left_usd"],
+                "goal_met": (m["goal"] or {}).get("met")}
+               for m in p["missions"] if m["active"]][:3]
+        return {"say": say, "automaton": s,
+                "portfolio": {"active": n, "totals": t, "top": top},
+                "owner_only": "starting, stopping, reviving and growing it: the owner"}
 
     def t_portfolio(self) -> dict[str, Any]:
         from .jarvis import portfolio
