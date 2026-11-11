@@ -133,8 +133,12 @@ in Jarvis, accept its run card, and read back `bau jobs` and the mission's statu
 
 ## Later phases (order from the directive, each mapped before it starts)
 
-2. Tool catalog and MCP manager: join toolbox, capability map and registry statuses; owner
-   cards to discover, health-check and revoke an MCP server (`mcp.attach` stays the only way in).
+2. Tool catalog and MCP manager. **Built 2026-11-11** (`src/bau/catalog.py`, `mcp.check`,
+   `mcp.pin`, `bau catalog`, `bau mcp`, Jarvis `tool_catalog`; tests `tests/test_catalog.py`;
+   see `docs/TOOL-CATALOG.md`). Changed while building: check, pin and revoke are terminal
+   commands (pin is the owner's decision, like `set-status`); Jarvis cards for them, remote
+   servers and the MCP Registry as a discovery source are still to do. `mcp.attach` stays the
+   only way in.
 3. REA and Reverse API Engineer: research adapters, isolated, results untrusted, under the
    2026-11-08 rules.
 4. Browser lane (Playwright MCP, isolated profile) and desktop lane (Hybrid Computer Use on X11,

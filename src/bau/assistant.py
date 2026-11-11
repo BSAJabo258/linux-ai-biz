@@ -100,6 +100,7 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "workspaces": "producer", "draft_stage": "producer",
              "creator_batch": "producer",
              "toolbox": "scout", "capability_map": "scout", "open_source_watch": "scout",
+             "tool_catalog": "scout",
              "world_watch": "godseye", "web_search": "scout", "read_page": "scout",
              "watch_video": "scout",
              "video_clips": "studio", "make_video": "studio",
@@ -506,6 +507,13 @@ class Assistant:
                  "which researched tools would fill them and how, and the build order. "
                  "Give a layer id for its detail.", _schema({"layer": {"type": "string"}}),
                  self.t_capability_map),
+            Tool("tool_catalog", "Every tool BAU knows in one list, each with its state "
+                 "(discovered, inspected, licence verified, security reviewed, approved, "
+                 "enabled, revoked...) and the evidence for it: find a tool for a job, or "
+                 "see what is approved and in use. Give words to search, or an id for one "
+                 "tool's whole record.", _schema({"query": {"type": "string"},
+                                                    "id": {"type": "string"}}, []),
+                 self.t_tool_catalog),
             Tool("find_tools", "Search GitHub for open-source projects that provide a "
                  "capability (several phrasings), record them and rank them on evidence. "
                  "Nothing is installed or run; takes about half a minute.",
@@ -1001,6 +1009,22 @@ class Assistant:
         from .toolbox import CapabilityMap, Toolbox
         m = CapabilityMap(toolbox=Toolbox(self.home))
         return m.show(layer.strip()) if layer.strip() else m.summary()
+
+    def t_tool_catalog(self, query: str = "", id: str = "") -> dict[str, Any]:
+        from .catalog import Catalog
+        cat = Catalog(self.home)
+        if id.strip():
+            try:
+                return cat.show(id[:200])
+            except KeyError as e:
+                return {"error": e.args[0]}
+        if not query.strip():
+            return cat.summary()
+        rows = cat.find(query[:200])
+        return {"tools": [{k: r[k] for k in ("id", "name", "state", "license", "evidence")}
+                          for r in rows[:5 if self.lean else 10]],
+                "found": len(rows),
+                "if_nothing_fits": "find_tools searches GitHub for more (owner's go-ahead)"}
 
     def t_find_tools(self, request: str) -> dict[str, Any]:
         from .scout import Scout
