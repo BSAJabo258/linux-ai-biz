@@ -74,3 +74,10 @@ bau automaton grow --per-day 5                           # you, once it has earn
 `--audience` and `--per-day` have no default: they are yours to choose. `--budget` is 0 and
 `--days` is 30 unless you say otherwise. After it has died, release the HOLD
 (`bau governor release`) and start it again.
+
+## Ask Jarvis
+
+Ask "how is the automaton doing?" (or say portfolio, survival or tier). Jarvis reads its state
+and tells you: running or not, its day and tier, money kept and spent, spending money left,
+how many days it has left to earn, and your missions. He can only look: starting, stopping,
+reviving and growing it stay yours.
