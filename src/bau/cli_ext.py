@@ -583,6 +583,64 @@ def cmd_toolbox(a):
     return EXIT_OK
 
 
+def cmd_catalog(a):
+    from .catalog import Catalog
+    cat = Catalog()
+    try:
+        if a.show:
+            _out(cat.show(a.show))
+        elif a.query or a.state:
+            _out([{k: r[k] for k in ("id", "name", "state", "category", "license",
+                                     "evidence")} for r in cat.find(a.query or "", a.state or "")])
+        else:
+            _out(cat.summary())
+    except (KeyError, ValueError) as e:
+        print(f"bau: {e.args[0]}", file=sys.stderr)
+        return EXIT_ERROR
+    return EXIT_OK
+
+
+def cmd_mcp(a):
+    from . import mcp
+    from .registry import CapabilityRegistry
+    reg = CapabilityRegistry()
+    if a.mcp_cmd == "list":
+        h = mcp.health(bau_home())
+        _out([{"mcp_id": k, "status": r.get("status"), "source": r.get("source"),
+               "pinned": bool(r.get("schema_sha256")),
+               "last_check": {x: (h.get(k) or {}).get(x) for x in ("at", "ok", "changed")}}
+              for k, r in sorted(reg.data["mcp"].items())])
+        return EXIT_OK
+    rec = reg.data["mcp"].get(a.mcp_id)
+    if rec is None:
+        print(f"bau: MCP server {a.mcp_id} is not registered (`bau mcp list`)", file=sys.stderr)
+        return EXIT_ERROR
+    if a.mcp_cmd == "revoke":
+        return cmd_registry_status(argparse.Namespace(kind="mcp", key=a.mcp_id,
+                                                      status="REVOKED"))
+    if a.mcp_cmd == "check":
+        who = ("human:" if sys.stdin.isatty() else "process:") + getpass.getuser()
+        try:
+            res = mcp.check(rec, bau_home(), timeout=a.timeout, audit=AuditLog(), actor=who)
+        except PermissionError as e:
+            print(f"bau: {e}", file=sys.stderr)
+            return EXIT_BLOCKED
+        _out(res)
+        return EXIT_OK if res["ok"] and not res["changed"] else EXIT_BLOCKED
+    who = _human()                                  # pin: the owner's own decision
+    try:
+        new = mcp.pin(rec, bau_home(), who)
+    except ValueError as e:
+        print(f"bau: {e}", file=sys.stderr)
+        return EXIT_BLOCKED
+    reg.data["mcp"][a.mcp_id] = new
+    reg.save()
+    AuditLog().append("mcp.pinned", who, {"mcp_id": a.mcp_id, "tools": new["schema_tools"],
+                                          "schema_sha256": new["schema_sha256"]})
+    _out({k: new[k] for k in ("mcp_id", "schema_tools", "schema_sha256", "schema_pinned_by")})
+    return EXIT_OK
+
+
 def cmd_usage(a):
     from .usage import Usage
     u = Usage(audit=AuditLog())
@@ -1887,6 +1945,27 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("map", help="Jarvis's abilities by layer: what BAU has, gaps, order")
     x.add_argument("--layer", help="one layer, e.g. web, computer-use, memory")
     s.set_defaults(fn=cmd_toolbox)
+
+    s = sub.add_parser("catalog", help="every tool BAU knows, one record each, with its "
+                       "state (discovered ... enabled, revoked) and the evidence")
+    s.add_argument("query", nargs="?", help="words to look for, e.g. browser")
+    s.add_argument("--state", help="only one state, e.g. APPROVED")
+    s.add_argument("--show", metavar="ID", help="one tool's whole record")
+    s.set_defaults(fn=cmd_catalog)
+
+    s = sub.add_parser("mcp", help="MCP servers (connectors): list, health check, pin the "
+                       "approved tool list, revoke")
+    w = s.add_subparsers(dest="mcp_cmd", required=True)
+    w.add_parser("list", help="registered servers, status, last check")
+    x = w.add_parser("check", help="start an approved server, list its tools, stop it")
+    x.add_argument("mcp_id")
+    x.add_argument("--timeout", type=float, default=30.0, help="seconds (default 30)")
+    x = w.add_parser("pin", help="you: keep the last good check's tool list as the approved "
+                     "one (BAU refuses the server if it changes)")
+    x.add_argument("mcp_id")
+    x = w.add_parser("revoke", help="you: switch a server off for good")
+    x.add_argument("mcp_id")
+    s.set_defaults(fn=cmd_mcp)
 
     s = sub.add_parser("usage", help="tokens and dollars per model; your daily limits")
     w = s.add_subparsers(dest="usage_cmd")

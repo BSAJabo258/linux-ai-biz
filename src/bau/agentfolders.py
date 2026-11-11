@@ -402,7 +402,10 @@ def _run_once(a: Agent, task: str, home: Path, audit: Any,
                 rec = reg.data["mcp"].get(sid)
                 if rec is None:
                     raise PermissionError(f"MCP server {sid} is not registered")
-                client, extra = attach(gw, rec)
+                client, extra = attach(gw, rec,
+                                       live=lambda sid=sid: CapabilityRegistry(
+                                           home / "registry" / "capabilities.yaml"
+                                       ).data["mcp"].get(sid))
                 clients.append(client)
                 specs.update(extra)
                 tools += list(extra)
