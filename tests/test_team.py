@@ -366,3 +366,19 @@ def test_the_specialist_and_its_double_check_count_against_the_daily_limit(tmp_p
     assert len(made["claude-test"].calls) == 1      # the answer; the check was refused
     assert u.today()["usd"] == pytest.approx(Ledger(tmp_path).spent(), abs=0.01)
     assert u.over_limit()
+
+
+def test_a_takeover_continues_the_controllers_job_instead_of_starting_a_second(tmp_path):
+    # Phase 1 (docs/JARVIS_IMPLEMENTATION_MAP.md): one mission, one job, even when the
+    # specialist finishes what the boss started (before: one job per model).
+    from bau.jobs import JobStore
+    audit = home_with_team(tmp_path, takeover="auto")
+    agent(tmp_path, audit)
+    factory = factory_for({"qwen-boss": [LOOP] * 8,
+                           "claude-test": ["Two suppliers, each with a source."]})
+    job = JobStore(tmp_path).create("msn_t", "find mugs", "researcher", [])
+    res = AF.run("shop-researcher", "find mugs", tmp_path, audit, factory=factory,
+                 trust=lambda: network.Trust.TRUSTED, mission_id="msn_t", job=job)
+    assert res.status == "COMPLETED" and res.supervision["by"] == "specialist"
+    [only] = JobStore(tmp_path).all()
+    assert only.job_id == job.job_id and only.status == "COMPLETED"

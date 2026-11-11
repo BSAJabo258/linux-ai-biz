@@ -72,16 +72,31 @@ def agent_executor(home: Path, audit: Any, jarvis: Any = None, factory: Any = No
     else ends PAUSED for the owner's review, never COMPLETED on the agent's word."""
     from .supervisor import facts, unchecked
 
+    def run_one(name: str, objective: str, mission_id: str, job: Any) -> Any:
+        if run_agent is not None:
+            return run_agent(name, objective, mission_id, job=job)
+        from . import agentfolders as AF
+        return AF.run(name, objective, home, audit, jarvis=jarvis, factory=factory,
+                      mission_id=mission_id, job=job)
+
     def execute(m: Mission) -> dict[str, Any]:
         name = AGENT_FOR.get(m.mission_type)
         if name is None:
             raise PermissionError(f"no agent carries out {m.mission_type} missions yet")
-        if run_agent is None:
-            from . import agentfolders as AF
-            res = AF.run(name, m.objective, home, audit, jarvis=jarvis, factory=factory,
-                         mission_id=m.mission_id)
-        else:
-            res = run_agent(name, m.objective, m.mission_id)
+        # Through the executive controller (Phase 1, docs/JARVIS_IMPLEMENTATION_MAP.md): one
+        # job per mission run, kept in the jobs folder, honouring HOLD and the owner's cancel.
+        from .adapters.agent_folder import AgentFolderAdapter
+        from .executive import ExecutiveController, TaskContract
+        from .governor import hold_reason
+        from .jobs import JobStore
+        store = JobStore(home)
+        ctl = ExecutiveController(store, hold=lambda: hold_reason(home))
+        ctl.register(AgentFolderAdapter(store, run_one))
+        job_id = ctl.create_task(TaskContract(m.mission_id, m.objective, agent=name))
+        out = ctl.dispatch(job_id, "agent_folder")
+        res = out.evidence.get("run")
+        if res is None:                 # the agent itself crashed: the job says why
+            raise RuntimeError("; ".join(out.errors) or "the agent did not run")
         loose = unchecked(res.final_text, [m.objective, *res.evidence])
         # At least one fact the tools backed: on the real model (2026-11-10) an answer of only
         # questions back to the owner had nothing false in it, and counted as done.
@@ -94,7 +109,8 @@ def agent_executor(home: Path, audit: Any, jarvis: Any = None, factory: Any = No
                   if norm(f) in found and norm(f) not in asked]
         answered = bool((res.final_text or "").strip())
         verified = res.status == "COMPLETED" and answered and bool(backed) and not loose
-        return {"agent": name, "status": res.status, "report": (res.final_text or "")[:4000],
+        return {"agent": name, "job_id": job_id, "status": res.status,
+                "report": (res.final_text or "")[:4000],
                 "unbacked_facts": loose[:10], "verified": verified,
                 "cost_usd": res.cost_usd,
                 "tools_used": [c.get("capability") for c in res.tool_calls if c.get("ok")],
@@ -106,6 +122,27 @@ def agent_executor(home: Path, audit: Any, jarvis: Any = None, factory: Any = No
                     "(it may be asking you questions: answer them, or plan the mission again "
                     "more precisely)")}
     return execute
+
+
+def cancel_mission(j: Jarvis, mission_id: str, by: str) -> dict[str, Any]:
+    """The owner's cancel (`bau mission cancel`): every unfinished job of the mission is marked
+    CANCELLED through the executive controller; a running agent stops at its next step."""
+    if not by.startswith("human:"):
+        raise PermissionError("only the owner cancels a mission")
+    from .executive import ExecutiveController
+    from .jobs import TERMINAL, JobStore
+    m = j.get(mission_id)
+    if m is None:
+        raise KeyError(f"no mission {mission_id}")
+    store = JobStore(j.home)
+    ctl = ExecutiveController(store)
+    done = [ctl.cancel(job.job_id).job_id for job in store.all()
+            if job.mission_id == mission_id and job.status not in TERMINAL]
+    if m.status in ("READY", "RUNNING", "PAUSED"):
+        m.status, m.next_action = "CANCELLED", "cancelled by the owner"
+        j.save(m)
+    j.audit.append("mission.cancelled", by, {"mission_id": mission_id, "jobs": done})
+    return {"mission_id": mission_id, "status": m.status, "cancelled_jobs": done}
 
 
 class Jarvis:
@@ -237,6 +274,7 @@ class Jarvis:
         if held:
             raise PermissionError(f"BAU is on HOLD ({held}); a human must release it")
         m.status = "RUNNING"
+        m.steps["run_started"] = dt.datetime.now(dt.UTC).isoformat()
         self.save(m)
         try:
             result = executor(m) or {}
@@ -255,9 +293,12 @@ class Jarvis:
         ev = write_package("mission", {"mission": asdict(m), "result": result}, "jarvis",
                            self.audit, self.home)
         m.evidence.append(str(ev))
-        m.status = "COMPLETED" if verified else "PAUSED"
-        m.next_action = "learning loop (spec §110)" if verified else \
-            "verification failed - human review"
+        if result.get("status") == "CANCELLED":
+            m.status, m.next_action = "CANCELLED", "cancelled by the owner"
+        else:
+            m.status = "COMPLETED" if verified else "PAUSED"
+            m.next_action = "learning loop (spec §110)" if verified else \
+                "verification failed - human review"
         self.memory.add("mission", f"mission {m.mission_type}: {m.objective[:80]}",
                         json.dumps({"status": m.status, "gates": m.steps.get("laws"),
                                     "cost_usd": m.cost_usd})[:4000], tags=[m.mission_type],

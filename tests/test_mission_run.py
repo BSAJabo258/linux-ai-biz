@@ -17,7 +17,7 @@ def jarvis(home):
 
 
 def agent(text, evidence, status="COMPLETED"):
-    def run(name, objective, mission_id):
+    def run(name, objective, mission_id, job=None):
         assert name == "researcher"
         return RunResult(status, text, 3, [{"capability": "memory.search", "ok": True}], 0.0, 0,
                          evidence)
@@ -123,3 +123,71 @@ def test_the_researcher_can_search_the_web_and_then_only_reads(tmp_path):
     assert gw.brings_outside_content("search.web")           # the run may then only read
     text = (shipped_data() / "agents" / "researcher" / "AGENT.md").read_text()
     assert "search.web" in text.split("---")[1] and "do not stop to ask" in text
+
+
+# ------------------------------------------------------------ Phase 1: one controller, one job
+def jobs_for(home, mission_id):
+    from bau.jobs import JobStore
+    return [j for j in JobStore(home).all() if j.mission_id == mission_id]
+
+
+def test_a_mission_runs_through_the_executive_controller_with_one_linked_job(tmp_path):
+    seen = {}
+
+    def run(name, objective, mission_id, job=None):
+        seen["job"] = job
+        return RunResult("COMPLETED", "Remotion: https://github.com/remotion-dev/remotion", 2,
+                         [{"capability": "memory.search", "ok": True}], 0.0, 0,
+                         ["https://github.com/remotion-dev/remotion"])
+    j = jarvis(tmp_path)
+    m = j.plan("research open source video tools", "research", {})
+    m = j.run(m, agent_executor(tmp_path, j.audit, run_agent=run))
+    [job] = jobs_for(tmp_path, m.mission_id)                      # exactly one job
+    assert m.status == "COMPLETED" and m.steps["execute"]["job_id"] == job.job_id
+    assert seen["job"].job_id == job.job_id                        # the agent got that job
+    assert job.status == "COMPLETED" and job.agent == "researcher"
+
+
+def test_a_cancelled_run_ends_the_mission_cancelled_not_paused(tmp_path):
+    def run(name, objective, mission_id, job=None):
+        return RunResult("CANCELLED", "", 1, [], 0.0, 0, [])
+    j = jarvis(tmp_path)
+    m = j.plan("research", "research", {})
+    m = j.run(m, agent_executor(tmp_path, j.audit, run_agent=run))
+    assert m.status == "CANCELLED" and jobs_for(tmp_path, m.mission_id)[0].status == "CANCELLED"
+
+
+def test_bau_mission_cancel_marks_the_running_missions_job_cancelled(tmp_path, monkeypatch):
+    from bau.jarvis import cancel_mission
+    from bau.jobs import JobStore
+    j = jarvis(tmp_path)
+    m = j.plan("research", "research", {})
+    m.status = "RUNNING"
+    j.save(m)
+    job = JobStore(tmp_path).create(m.mission_id, m.objective, "researcher", [])
+    job.status = "RUNNING"
+    JobStore(tmp_path).checkpoint(job)
+    out = cancel_mission(j, m.mission_id, "human:owner")
+    assert out["cancelled_jobs"] == [job.job_id]
+    assert JobStore(tmp_path).load(job.job_id).status == "CANCELLED"
+    with pytest.raises(PermissionError):
+        cancel_mission(j, m.mission_id, "jarvis")                  # only a human cancels
+
+
+def test_a_mission_left_running_by_a_crash_is_paused_for_the_owner(tmp_path):
+    from bau.governor import Governor
+    from bau.jobs import JobStore
+    j = jarvis(tmp_path)
+    m = j.plan("research", "research", {})
+    m.status = "RUNNING"
+    j.save(m)
+    job = JobStore(tmp_path).create(m.mission_id, m.objective, "researcher", [])
+    job.status = "INTERRUPTED"                                     # what `bau recover` leaves
+    JobStore(tmp_path).checkpoint(job)
+    lone = j.plan("research again", "research", {})                # RUNNING with no job at all
+    lone.status = "RUNNING"
+    j.save(lone)
+    Governor(tmp_path, online=True).tick(executor=None)
+    for mid in (m.mission_id, lone.mission_id):
+        back = jarvis(tmp_path).get(mid)
+        assert back.status == "PAUSED" and "interrupted" in back.next_action
