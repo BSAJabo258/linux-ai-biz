@@ -57,6 +57,132 @@ class Mission:
     evidence: list[str] = field(default_factory=list)
     cost_usd: float = 0.0
     next_action: str = ""
+    # The portfolio (2026-11-11), set only by the owner (`bau mission set`): several missions
+    # at once, each with its priority, its own budget (None: no cap of its own) and a measured
+    # goal ({"metric": "profit_usd" | "revenue_usd", "at_least": USD, "by": date or None}).
+    priority: int = 0
+    budget_usd: float | None = None
+    goal: dict[str, Any] = field(default_factory=dict)
+    factory: str = ""
+
+
+def _mission(row: dict[str, Any]) -> Mission:
+    """A stored row as a Mission: older rows lack the newer fields (defaults), and a field a
+    later version adds is skipped rather than breaking every read."""
+    known = Mission.__dataclass_fields__
+    return Mission(**{k: v for k, v in row.items() if k in known})
+
+
+GOAL_METRICS = {"profit_usd", "revenue_usd"}
+OVER = {"CANCELLED", "FAILED"}
+
+
+def set_mission(j: Jarvis, mission_id: str, by: str, priority: int | None = None,
+                budget_usd: float | None = None, goal: dict[str, Any] | None = None,
+                factory: str | None = None) -> Mission:
+    """The owner's choices for one mission (priority, budget, goal, factory): never a model's,
+    never a default."""
+    import math
+    if not by.startswith("human:"):
+        raise PermissionError("only the owner sets a mission's priority, budget and goal")
+    m = j.get(mission_id)
+    if m is None:
+        raise KeyError(f"no mission {mission_id}")
+    if budget_usd is not None:
+        if not math.isfinite(budget_usd) or budget_usd < 0:
+            raise ValueError("a budget is a number of dollars, 0 or more")
+        m.budget_usd = round(float(budget_usd), 2)
+    if goal is not None:
+        at = goal.get("at_least")
+        if goal.get("metric") not in GOAL_METRICS or not isinstance(at, (int, float)) \
+                or isinstance(at, bool) or not math.isfinite(at) or at <= 0:
+            raise ValueError(f"a goal is one of {sorted(GOAL_METRICS)} with at_least > 0")
+        when = goal.get("by")
+        if when is not None:
+            dt.date.fromisoformat(str(when))
+        m.goal = {"metric": goal["metric"], "at_least": float(at),
+                  "by": str(when) if when else None}
+    if priority is not None:
+        m.priority = int(priority)
+    if factory is not None:
+        from .factories import definitions
+        if factory and factory not in definitions(j.home):
+            raise ValueError(f"unknown factory {factory}")
+        m.factory = factory
+    j.save(m)
+    j.audit.append("mission.set", by, {"mission_id": mission_id, "priority": m.priority,
+                                       "budget_usd": m.budget_usd, "goal": m.goal,
+                                       "factory": m.factory})
+    return m
+
+
+def _latest(home: Path) -> dict[str, dict[str, Any]]:
+    latest: dict[str, dict[str, Any]] = {}
+    for r in JsonlStore(home / "jobs" / "missions.jsonl"):
+        latest[r["mission_id"]] = r
+    return latest
+
+
+def mission_budget(home: Path, mission_id: str) -> float | None:
+    """The owner's budget for a mission, None when it has none (the gateway's mission cap)."""
+    r = _latest(home).get(mission_id)
+    return None if r is None else r.get("budget_usd")
+
+
+def portfolio(home: Path, now: dt.datetime | None = None) -> dict[str, Any]:
+    """Every mission at once, read from the one mission store, its jobs and the ledger: status,
+    the owner's priority, budget left, its money (economics.pnl) and whether its goal is met.
+    Work finished is not a goal met: only the ledger meets a goal. Active missions first, by
+    priority. Nothing here moves money or changes a limit."""
+    from .economics import Ledger, pnl
+    from .jobs import JobStore
+    now = now or dt.datetime.now(dt.UTC)
+    led = Ledger(home)
+    jobs: dict[str, list[dict[str, Any]]] = {}
+    for jb in JobStore(home).all():
+        jobs.setdefault(jb.mission_id, []).append(
+            {"job_id": jb.job_id, "agent": jb.agent, "status": jb.status})
+    rows, keys = [], ("kept_usd", "cost_usd", "profit_usd", "refunds_usd", "fees_usd")
+    totals = dict.fromkeys(keys, 0.0)
+    for r in _latest(home).values():
+        m = _mission(r)
+        money = pnl(led, m.mission_id)
+        goal = None
+        if m.goal:
+            got = money["profit_usd" if m.goal["metric"] == "profit_usd" else "kept_usd"]
+            goal = {**m.goal, "measured": got, "met": got >= m.goal["at_least"]}
+            if not goal["met"] and m.goal.get("by") and \
+                    now.date() > dt.date.fromisoformat(m.goal["by"]):
+                goal["note"] = f"past its date ({m.goal['by']}) and not met"
+        active = m.status not in OVER and (not goal["met"] if goal else
+                                           m.status != "COMPLETED")
+        rows.append({"mission_id": m.mission_id, "objective": m.objective[:160],
+                     "type": m.mission_type, "factory": m.factory or None,
+                     "status": m.status, "active": active, "priority": m.priority,
+                     "budget_usd": m.budget_usd,
+                     "budget_left_usd": None if m.budget_usd is None
+                     else round(m.budget_usd - money["cost_usd"], 4),
+                     "goal": goal, "money": money, "jobs": jobs.get(m.mission_id, []),
+                     "next_action": m.next_action, "evidence": m.evidence[-1:]})
+        for k in keys:
+            totals[k] += money[k]
+    rows.sort(key=lambda x: (not x["active"], -x["priority"], x["mission_id"]))
+    # Everything else in the ledger: rows with no mission (Fanvue's sync today) and rows under
+    # an id that is not a mission (a factory run's id). The totals are the whole ledger.
+    mine = {x["mission_id"] for x in rows}
+    other = {r.get("mission_id", "") for r in [*led.revenue, *led.costs]} - mine
+    loose = dict.fromkeys(keys, 0.0)
+    for oid in other:
+        p = pnl(led, oid)
+        for k in keys:
+            loose[k] += p[k]
+    loose = {k: round(v, 2) for k, v in loose.items()}
+    loose["ids"] = sorted(other)
+    for k in keys:
+        totals[k] = round(totals[k] + loose[k], 2)
+    return {"missions": rows, "active": sum(1 for x in rows if x["active"]),
+            "unattributed": loose, "totals": totals,
+            "one_store": str(home / "jobs" / "missions.jsonl")}
 
 
 # Mission types an approved agent folder can carry out (the audit, 2026-11-10: missions were
@@ -166,13 +292,13 @@ class Jarvis:
         for r in self.store:
             if r["mission_id"] == mission_id:
                 found = r
-        return Mission(**found) if found else None
+        return _mission(found) if found else None
 
     def list(self) -> list[Mission]:
         latest: dict[str, dict[str, Any]] = {}
         for r in self.store:
             latest[r["mission_id"]] = r
-        return [Mission(**r) for r in latest.values()]
+        return [_mission(r) for r in latest.values()]
 
     # ------------------------------------------------------------ planning (steps 1-14)
     def plan(self, objective: str, mission_type: str, facts: dict[str, dict[str, Any]],
@@ -273,6 +399,13 @@ class Jarvis:
         held = hold_reason(self.home)
         if held:
             raise PermissionError(f"BAU is on HOLD ({held}); a human must release it")
+        if m.budget_usd is not None:
+            from .economics import Ledger
+            spent = Ledger(self.home).spent(mission_id=m.mission_id)
+            if spent > m.budget_usd:
+                raise PermissionError(f"mission {m.mission_id} is over its budget "
+                                      f"(${spent:.2f} of ${m.budget_usd:.2f}): the owner "
+                                      "raises it with `bau mission set` or stops it")
         m.status = "RUNNING"
         m.steps["run_started"] = dt.datetime.now(dt.UTC).isoformat()
         self.save(m)

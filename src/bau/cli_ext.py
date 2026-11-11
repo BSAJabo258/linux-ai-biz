@@ -273,6 +273,27 @@ def cmd_mission(a):
         except KeyError as e:
             print(str(e), file=sys.stderr)
             return EXIT_BLOCKED
+    elif a.mission_cmd == "set":
+        from .jarvis import set_mission
+        who = _human()
+        if a.goal_profit is not None and a.goal_revenue is not None:
+            print("one goal: --goal-profit or --goal-revenue", file=sys.stderr)
+            return EXIT_ERROR
+        goal = ({"metric": "profit_usd", "at_least": a.goal_profit, "by": a.by}
+                if a.goal_profit is not None else
+                {"metric": "revenue_usd", "at_least": a.goal_revenue, "by": a.by}
+                if a.goal_revenue is not None else None)
+        try:
+            m = set_mission(j, a.mission_id, who, priority=a.priority, budget_usd=a.budget,
+                            goal=goal, factory=a.factory)
+        except (KeyError, ValueError) as e:
+            print(f"bau: {e.args[0]}", file=sys.stderr)
+            return EXIT_ERROR
+        _out({k: getattr(m, k) for k in ("mission_id", "priority", "budget_usd", "goal",
+                                         "factory")})
+    elif a.mission_cmd == "portfolio":
+        from .jarvis import portfolio
+        _out(portfolio(j.home))
     elif a.mission_cmd == "approve":
         from .security.permissions import SshApprovals, load_approval
         m = j.get(a.mission_id)
@@ -1751,6 +1772,17 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = js.add_parser("approve")
     x.add_argument("mission_id")
     x.add_argument("--approval", required=True)
+    js.add_parser("portfolio", help="every mission at once: priority, budget left, its real "
+                                    "money from the ledger, goal met or not")
+    x = js.add_parser("set", help="you: a mission's priority, budget and goal")
+    x.add_argument("mission_id")
+    x.add_argument("--priority", type=int, help="higher comes first")
+    x.add_argument("--budget", type=float, help="dollars it may spend in all (0: free only)")
+    x.add_argument("--goal-profit", type=float, help="success: at least this profit, in USD")
+    x.add_argument("--goal-revenue", type=float,
+                   help="success: at least this money received, in USD")
+    x.add_argument("--by", help="the goal's date, YYYY-MM-DD")
+    x.add_argument("--factory", help="the factory this mission belongs to")
     s.set_defaults(fn=cmd_mission)
 
     s = sub.add_parser("legal-queue", help="legal review queue (spec §120)")
