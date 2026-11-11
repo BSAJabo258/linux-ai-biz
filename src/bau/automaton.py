@@ -145,12 +145,16 @@ def status(home: Path | None = None, now: dt.datetime | None = None) -> dict[str
     now = now or _now()
     start_t = _ts(st["started_at"])
     eco = home / "economics"
-    income = [r for r in _rows(eco / "revenue.jsonl", start_t) if float(r.get("usd", 0)) > 0]
+    # Ledger.sale rows (gross_usd, fees, refund): what was kept counts; a refund lowers it and
+    # never counts as income (2026-11-11: this read a `usd` field the ledger never writes).
+    from .economics import received_usd
+    kept = [(r, received_usd(r)) for r in _rows(eco / "revenue.jsonl", start_t)]
+    income = [r for r, usd in kept if usd > 0]
     spent = round(sum(float(r.get("usd", 0)) for r in _rows(eco / "costs.jsonl", start_t)), 4)
     last = max([_ts(r["ts"]) for r in income], default=start_t)
     days = int(st.get("die_after_days", 30))
     left = days - (now - last).total_seconds() / 86400
-    income_usd = round(sum(float(r["usd"]) for r in income), 2)
+    income_usd = round(max(sum(usd for _, usd in kept), 0.0), 2)
     earned = round(min(float(st.get("reinvest_cap_usd", 0)),
                        income_usd * float(st.get("reinvest_pct", 0)) / 100), 2)
     money_left = round(float(st.get("budget_usd", 0)) + earned - spent, 4)

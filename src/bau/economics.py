@@ -125,6 +125,14 @@ class Budgets:
         return True, ""
 
 
+def received_usd(row: dict[str, Any]) -> float:
+    """Money one revenue row really left the business with: the gross (negative for a refund)
+    less the platform's and the payment provider's fees (a refunded fee comes back negative)."""
+    gross = float(row.get("gross_usd") or 0)
+    return ((-gross if row.get("refund") else gross)
+            - float(row.get("platform_fee") or 0) - float(row.get("payment_fee") or 0))
+
+
 def metrics(ledger: Ledger, since: dt.datetime | None = None,
             jobs: list[Any] | None = None) -> dict[str, Any]:
     """Business metrics (spec §84). Every figure is computed from the ledgers."""

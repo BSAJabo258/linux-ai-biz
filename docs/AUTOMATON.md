@@ -20,7 +20,9 @@ Every 30 minutes the autopilot:
   it uses only this computer's own models and free tools; Claude and other paid models are
   skipped while it runs. Any spending past the budget and it dies.
 - **Time:** it must earn something every 30 days (`--days`). Each payment resets the clock.
-  No income for 30 days and it dies.
+  No income for 30 days and it dies. Income is the money actually kept, read from the
+  ledger (`economics/revenue.jsonl`): the sale less Fanvue's cut and payment fees; a refund
+  lowers it and never resets the clock.
 
 ## Its means: earnings it may spend, tiers, growing
 

@@ -42,6 +42,15 @@ def setup_all_done(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def no_real_platform_keys(tmp_path, monkeypatch):
+    """Tests never read this computer's /etc/bau/platforms.env: on the owner's desktop it holds
+    real Fanvue keys, and the Connect Fanvue setup card leaked into 5 tests (2026-11-11)."""
+    from bau import fanvue, tiktok
+    for mod in (fanvue, tiktok):
+        monkeypatch.setattr(mod.app_credentials, "__defaults__", (tmp_path / "no-platforms.env",))
+
+
+@pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):
     home = tmp_path / "bauhome"
     home.mkdir()

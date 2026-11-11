@@ -4,7 +4,6 @@ card, hosted models are skipped while the budget is $0, and it dies (governor HO
 off) after 30 days without income or on any spending past its budget."""
 
 import datetime as dt
-import json
 
 import pytest
 from test_creator_feed import fake_draw, home  # noqa: F401 - the shared fixture
@@ -24,10 +23,13 @@ def day(n):
 
 
 def ledger(home, name, when, usd):  # noqa: F811
-    p = home / "economics" / name
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("a") as f:
-        f.write(json.dumps({"ts": when.isoformat(), "kind": "x", "usd": usd}) + "\n")
+    """Rows written the way BAU really writes them (Ledger.sale / Ledger.cost). A hand-written
+    row once hid that the automaton read a field the ledger never writes (2026-11-11)."""
+    from bau.economics import Ledger
+    if name == "revenue.jsonl":
+        Ledger(home).sale(usd, when=when)
+    else:
+        Ledger(home).cost("model", usd, when=when)
 
 
 def test_only_the_owner_switches_it_on_and_it_turns_autopost_on(home):  # noqa: F811
@@ -151,3 +153,20 @@ def test_it_grows_only_after_earning_and_only_on_the_owners_word(home):  # noqa:
     assert not s["grow_ready"]                    # next time only after twice as much
     ledger(home, "revenue.jsonl", day(3), 30.0)
     assert M.status(home)["grow_ready"]
+
+
+def test_it_counts_the_money_fanvue_really_paid(home):  # noqa: F811
+    """What fanvue.sync_earnings writes: gross, Fanvue's cut as the platform fee, a refund
+    as a refund row. Income is what was kept; a refund lowers it and never resets the clock."""
+    from bau.economics import Ledger
+    M.start(home, "human:owner", "subscribers", 3, now=T0, reinvest_pct=50,
+            reinvest_cap_usd=100)
+    led = Ledger(home)
+    led.sale(20.0, factory="fanvue", platform_fee=4.0, when=day(4))
+    led.sale(14.99, factory="fanvue", platform_fee=3.0, when=day(5))
+    led.sale(14.99, factory="fanvue", platform_fee=-3.0, refund=True, when=day(6))
+    s = M.status(home, day(7))
+    assert s["income_usd"] == 16.0 and s["earned_budget_usd"] == 8.0
+    assert s["last_income_at"] == day(5).isoformat(timespec="seconds")
+    assert not M.check(home, day(34)).get("dead")                # 30 days after day 5 ...
+    assert M.check(home, day(35))["dead"]["why"] == "no income in 30 days"   # ... not day 6
