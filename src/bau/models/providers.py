@@ -401,9 +401,11 @@ def build(record: dict[str, Any]) -> Provider:
                                  effort=record.get("effort", "high"))
     if kind == "local_http":
         # Inside the BAU container the model server is another container: BAU_LLM_ENDPOINT
-        # points every on-machine model there (e.g. http://llm:8080).
-        local = record.get("deployment") == "local" and os.environ.get("BAU_LLM_ENDPOINT")
-        return LocalHTTPProvider(base_url=local or record.get("endpoint", "http://127.0.0.1:8080"),
+        # points every on-machine model there (e.g. http://llm:8080). The desktop's
+        # bau-llm.service listens on loopback port 8080 as well.
+        env_local = record.get("deployment") == "local" and os.environ.get("BAU_LLM_ENDPOINT")
+        return LocalHTTPProvider(base_url=env_local or record.get("endpoint",
+                                                                  "http://127.0.0.1:8080"),
                                  model=record.get("api_model", record["model_id"]),
                                  template_kwargs=record.get("chat_template_kwargs"))
     if kind == "openai_compat":

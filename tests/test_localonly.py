@@ -2,6 +2,8 @@
 decision 2026-10-26: cloud models keep the data, so Claude, OpenAI, Z.ai and NVIDIA's
 hosted models are off). Every model is built in providers.build(), so the check is there."""
 
+from pathlib import Path
+
 import pytest
 
 from bau import localonly as privacy
@@ -90,7 +92,8 @@ def test_team_refuses_a_cloud_specialist_when_local_only(isolated_home):
 def test_the_command_needs_a_person_and_shows_the_choice(tmp_path):
     import subprocess
     import sys
-    env = {"BAU_HOME": str(tmp_path), "PATH": "/usr/bin:/bin", "HOME": str(tmp_path)}
+    env = {"BAU_HOME": str(tmp_path), "PATH": "/usr/bin:/bin", "HOME": str(tmp_path),
+           "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
     run = [sys.executable, "-m", "bau.cli", "privacy"]
     r = subprocess.run(run, capture_output=True, text=True, env=env, timeout=60)
     assert r.returncode == 0 and "not chosen yet" in r.stdout
