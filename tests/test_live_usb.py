@@ -218,7 +218,7 @@ def test_live_image_installs_the_claude_sdk_offline():
 # Fakes for jarvis-setup: storage unlocked, owner in the bau group, sudo without root
 # (chown skipped), and a `bau` that keeps model status in a file and logs every call.
 FAKES = {
-    "jarvis-storage": "exit 0",
+    "jarvis-storage": 'echo "jarvis-storage BAU_HOME=$BAU_HOME" >> "$LOG"\nexit 0',
     "id": "echo owner bau bau-approvers",
     "sudo": '[[ $1 == chown ]] && exit 0\necho "sudo $*" >> "$LOG"\nexec "$@"',
     "bau": """echo "bau $*" >> "$LOG"
@@ -243,9 +243,9 @@ def run_setup(tmp_path, answers, bench_exit=0):
         (bin_dir / name).write_text("#!/bin/bash\n" + body + "\n")
         (bin_dir / name).chmod(0o755)
     (tmp_path / "state").write_text("NOT_EVALUATED")
-    # BAU_SETUP_HOME: an installed machine's /var/lib/bau/models must not change the answers
+    # Keep model files in a temporary runtime BAU_HOME, never the installed machine.
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "BAU_ETC": str(etc),
-           "BAU_SETUP_HOME": str(tmp_path / "home"),
+           "BAU_HOME": str(tmp_path / "home"),
            "LOG": str(tmp_path / "log"), "STATE": str(tmp_path / "state"),
            "BENCH_EXIT": str(bench_exit)}
     r = subprocess.run(["bash", str(script)], input=answers, env=env, capture_output=True,
@@ -270,7 +270,8 @@ def test_live_setup_keeps_the_claude_key_private_and_waits_for_the_owner(tmp_pat
     (tmp_path / "declined").mkdir()
     r, env_file, log, _ = run_setup(tmp_path / "declined", "n\nn\n")   # no Claude, no model
     assert r.returncode == 0 and not env_file.exists()
-    assert "bench" not in log and "set-status" not in log
+    assert "bau models bench" not in log and "bau set-status" not in log
+    assert f"jarvis-storage BAU_HOME={tmp_path / 'declined' / 'home'}" in log
 
 
 @pytest.mark.skipif(not __import__("shutil").which("bash"), reason="needs bash")

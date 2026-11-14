@@ -19,7 +19,7 @@ step() {
   fi
 }
 
-# shellcheck disable=SC2329  # called through step below
+# shellcheck disable=SC2317,SC2329  # called indirectly through step below
 shell_scripts() {
   local files
   files="$({ git ls-files --cached --others --exclude-standard '*.sh'; git grep --untracked -lE '^#!.*\b(ba)?sh\b' -- ':!*.sh' ':!*.md'; } | sort -u)"

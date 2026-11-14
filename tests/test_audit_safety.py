@@ -5,6 +5,7 @@ that allow kids; consequential actions wait on HOLD; tool results reach models a
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 from bau.factories import FactoryRun, FactoryRunner
 
@@ -46,7 +47,8 @@ def _bau(home, *args, stdin=subprocess.DEVNULL):
     return subprocess.run([sys.executable, "-m", "bau.cli", *args], capture_output=True,
                           text=True, stdin=stdin, timeout=120,
                           env={"BAU_HOME": str(home), "PATH": "/usr/bin:/bin",
-                               "HOME": str(home)})
+                               "HOME": str(home),
+                               "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")})
 
 
 def test_registry_add_cannot_approve_and_needs_a_person(tmp_path):
