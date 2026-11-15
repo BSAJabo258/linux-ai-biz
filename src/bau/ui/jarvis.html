@@ -212,10 +212,12 @@ body.showtime #timeline{display:block}body.showtime aside.r{display:none}
 #worldbox .box{width:min(1400px,calc(100% - 24px))}
 #w-wrap{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:12px;align-items:start}
 #w-floor{width:100%;height:auto;display:block;cursor:pointer}
-#w-info{font-size:12px;line-height:1.5;border-left:1px solid var(--line);padding-left:12px;overflow-wrap:anywhere}
+#w-side{border-left:1px solid var(--line);padding-left:12px}
+#w-list{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}#w-list button{font:inherit;font-size:11px;padding:3px 7px}
+#w-info{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 #w-info h3{margin:0 0 6px;color:var(--cyan);font-size:14px}#w-info dt{color:var(--dim)}#w-info dd{margin:0 0 6px}
 #w-info code{color:var(--amber)}
-@media (max-width:760px){#w-wrap{grid-template-columns:1fr}#w-info{border-left:0;padding-left:0}}
+@media (max-width:760px){#w-wrap{grid-template-columns:1fr}#w-side{border-left:0;padding-left:0}}
 .overlay .box{width:min(980px,calc(100% - 24px));max-height:calc(100% - 40px);overflow:auto;background:var(--solid);
   border:1px solid var(--cyan);padding:16px}
 .overlay h2{margin:0 0 10px;font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--cyan)}
@@ -318,7 +320,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <button class="act" id="world-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Operations world</h2><div id="w-counts"></div><div id="w-help">Scroll to zoom · drag to move · double-click to see it all · click a character</div>
   <div id="w-wrap"><canvas id="w-floor" width="1800" height="1120" aria-label="The floor: each robot is one of your agents"></canvas>
-  <div id="w-info"><p>Each character is one of your agents, or Jarvis himself. Its room comes from its latest real job; with nothing to do it waits in the Headquarters lounge. Click a character.</p></div></div></div></div>
+  <div id="w-side"><div id="w-list" aria-label="Characters"></div><div id="w-info"><p>Each character is one of your agents, or Jarvis himself. Its room comes from its latest real job; with nothing to do it waits in the Headquarters lounge. Click a character.</p></div></div></div></div></div>
 <div id="help" class="overlay" role="dialog" aria-label="Keyboard keys"><div class="box">
   <button class="act" id="help-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Keyboard keys</h2>
@@ -2946,7 +2948,7 @@ function roomProps(x, id, rx, ry, light) { // what makes each department itself;
     [[-14, 0], [14, 0], [0, 10]].forEach(([dx, dy]) => { x.beginPath(); x.moveTo(a, b - 50); x.lineTo(a + dx, b + dy); x.stroke(); });
     x.fillStyle = "#222"; x.fillRect(a - 14, b - 66, 24, 16); x.fillStyle = "#3fd6ff"; x.fillRect(a + 8, b - 62, 8, 8);
     const [c, d] = iso(rx + 0.4, ry + 3.4, 0); x.beginPath(); x.moveTo(c, d); x.lineTo(c, d - 70); x.stroke();                  // a ring light
-    x.save(); x.shadowColor = "#fff"; x.shadowBlur = 12; x.strokeStyle = "#f6f0ff"; x.lineWidth = 5; x.beginPath(); x.arc(c, d - 86, 16, 0, 6.283); x.stroke(); x.restore(); }
+    x.strokeStyle = light ? "#8aa0b2" : "#3a4a5a"; x.lineWidth = 5; x.beginPath(); x.arc(c, d - 86, 16, 0, 6.283); x.stroke(); }     // lit live, only while someone films
   if (id === "finance") { cabinet(x, ...L(0.05, 3.2), light); box(x, ...L(3.3, 3.25), 0.5, 0.5, 46, light ? "#7f8a94" : "#3a4048");      // files and a safe
     const [a, b] = iso(rx + 3.55, ry + 3.75, 24); x.strokeStyle = "#ffcf4d"; x.lineWidth = 3; x.beginPath(); x.arc(a, b, 7, 0, 6.283); x.stroke(); }
   if (id === "market") { [[0.05, 3.0], [3.2, 3.1]].forEach(([a, b], k) => { box(x, ...L(a, b), 0.6, 0.6, 30, light ? "#c9a27a" : "#5a4636");   // stalls of goods
@@ -2958,7 +2960,7 @@ function roomProps(x, id, rx, ry, light) { // what makes each department itself;
     [0.4, 0.9, 2.8].forEach(o => box(x, rx + o, ry + 0.55, 0.28, 0.25, 12, "#9fb2bf", 30)); box(x, ...L(3.4, 3.4), 0.4, 0.4, 26, "#8a6d3b"); box(x, ...L(3.4, 3.4), 0.4, 0.4, 24, "#a5844b", 26); }
   if (id === "delivery") { [[0.05, 0.3], [0.05, 2.95]].forEach(([a, b]) => { box(x, ...L(a, b), 0.45, 1.0, 76, light ? "#c9d6df" : "#1d3042");
       [0, 1, 2].forEach(k => box(x, rx + a + 0.05, ry + b + 0.06 + k * 0.32, 0.36, 0.26, 22, ["#ffcf4d", "#3fd6ff", "#a98bff"][k], 76)); });
-    box(x, ...L(1.4, 0.4), 2.4, 0.5, 18, light ? "#7f8a94" : "#2a3440"); for (let k = 0; k < 8; k++) { const [a, b] = iso(rx + 1.5 + k * 0.29, ry + 0.65, 19); x.fillStyle = "#9fb2bf"; x.fillRect(a - 3, b - 1, 6, 2); } }
+    box(x, ...L(3.05, 0.4), 0.9, 0.5, 18, light ? "#7f8a94" : "#2a3440"); for (let k = 0; k < 3; k++) { const [a, b] = iso(rx + 3.15 + k * 0.29, ry + 0.65, 19); x.fillStyle = "#9fb2bf"; x.fillRect(a - 3, b - 1, 6, 2); } }   // the conveyor, clear of the door
   if (id === "hq") { [[0.2, 0.5], [0.2, 2.3]].forEach(([a, b]) => { box(x, ...L(a, b), 0.55, 1.2, 18, light ? "#8aa3b2" : "#2a3f52"); box(x, ...L(a, b), 0.18, 1.2, 40, light ? "#9bb4c3" : "#33495e"); });
     box(x, ...L(1.2, 1.5), 0.6, 0.6, 14, light ? "#c9d6df" : "#22384a"); plant(x, ...L(0.25, 3.6), light, true); plant(x, ...L(7.6, 0.3), light, true); plant(x, ...L(7.6, 3.6), light);
     [[5.6, 0.5], [6.6, 0.5]].forEach(([a, b]) => cabinet(x, ...L(a, b), light));
@@ -2988,10 +2990,12 @@ function path(from, to) { // tiles from one point to another, through doors only
   if (!(key(g) in prev)) return [to];
   const out = []; for (let c = g; c; c = prev[key(c)]) out.unshift([c[0] + 0.5, c[1] + 0.5]);
   out.shift(); out.push(to); return out; }
-function spotOf(a, i) { const [rx, ry] = W_ROOMS[a.room] || W_ROOMS.hq;
+function spotOf(a, i) { const [rx, ry, rw] = W_ROOMS[a.room] || W_ROOMS.hq;
   if (a.name === "jarvis" && a.room === "hq") return [rx + 4.0, ry + 3.45];                    // at his console, in front of the core
-  const list = WORK.has(a.room) ? SPOTS.work : a.room === "hq" ? SPOTS.hq : SPOTS.other, p = list[i % list.length];
-  return [rx + p[0] + Math.floor(i / list.length) * 0.3, ry + p[1]]; }
+  const list = WORK.has(a.room) ? SPOTS.work : a.room === "hq" ? SPOTS.hq : SPOTS.other;
+  if (i < list.length) return [rx + list[i][0], ry + list[i][1]];
+  const j = i - list.length, cols = rw * 2 - 1;                                             // more than the room's seats: a grid, still inside the room
+  return [rx + 0.4 + (j % cols) * 0.5, ry + 3.7 - (Math.floor(j / cols) % 5) * 0.5]; }
 function wStars(x, w, h, light) { if (light) return; let s = 7; const r = () => (s = (s * 9301 + 49297) % 233280) / 233280;
   for (let i = 0; i < 160; i++) { x.fillStyle = `rgba(${150 + r() * 100 | 0},${190 + r() * 60 | 0},255,${0.15 + r() * 0.5})`; x.fillRect(r() * w, r() * h, r() < 0.15 ? 2 : 1, r() < 0.15 ? 2 : 1); } }
 let W_STATIONS = {};
@@ -3060,6 +3064,8 @@ function drawWorld(t) {
     let go = 2.2 * dt; while (go > 0 && m.path.length) { const [px, py] = m.path[0], dx = px - m.x, dy = py - m.y, d = Math.hypot(dx, dy);
       if (d <= go) { m.x = px; m.y = py; m.path.shift(); go -= d; } else { m.x += dx / d * go; m.y += dy / d * go; m.dir = [dx, dy]; go = 0; } } }
   wScreens(x, t);
+  if (OPS.agents.some(a => a.room === "studio" && a.state === "working")) { const [c, d] = iso(W_ROOMS.studio[0] + 0.4, W_ROOMS.studio[1] + 3.4, 0);
+    x.save(); x.shadowColor = "#fff"; x.shadowBlur = 12; x.strokeStyle = "#f6f0ff"; x.lineWidth = 5; x.beginPath(); x.arc(c, d - 86, 16, 0, 6.283); x.stroke(); x.restore(); }
   const placed = OPS.agents.map(a => [a, W_MOVE[a.name]]).filter(([, m]) => m).sort((p, q) => (p[1].x + p[1].y) - (q[1].x + q[1].y));
   const holos = []; let core = false;
   for (const [a, m] of placed) {
@@ -3103,19 +3109,30 @@ function worldInfo(a) {
   if (j && /^(PENDING|RUNNING|WAITING_FOR_APPROVAL)$/.test(j.status) && j.mission_id && j.mission_id !== "adhoc") {
     const p = el("p", null, "To stop it, at a terminal: "); p.appendChild(el("code", null, "bau mission cancel " + j.mission_id)); box2.appendChild(p); }
 }
+let W_SEQ = 0, W_GEN = 0;
 async function loadWorld() {
-  try { OPS = await apiJson("/api/world"); } catch (e) { $("w-counts").textContent = e.message; return; }
+  const seq = ++W_SEQ; let got;
+  try { got = await apiJson("/api/world"); } catch (e) { if (seq === W_SEQ) $("w-counts").textContent = e.message; return; }
+  if (seq !== W_SEQ) return;                                                                  // a newer read already answered
+  OPS = got;
   if (!W_SHEET) { try { W_META = await apiJson("/world/characters.json"); const im = new Image(); im.src = "/world/characters.png"; await im.decode(); W_SHEET = im; } catch (e) { $("w-counts").textContent = "The characters did not load: " + e.message; } }
-  const byRoom = {}; OPS.agents.forEach(a => { (byRoom[a.room] = byRoom[a.room] || []).push(a); });
-  for (const a of OPS.agents) { const to = spotOf(a, byRoom[a.room].indexOf(a)), m = W_MOVE[a.name], dest = to.join(",");
-    if (!m || REDUCED) W_MOVE[a.name] = { x: to[0], y: to[1], path: [], dest, dir: [0, 1] };     // first sight: where it is now
-    else if (m.dest !== dest) { m.path = path([m.x, m.y], to); m.dest = dest; } }                  // its job changed: it walks there
+  // A character keeps its seat while it stays in its room: another one leaving never moves it.
+  const taken = {}; OPS.agents.forEach(a => { const m = W_MOVE[a.name]; if (m && m.room === a.room) (taken[a.room] = taken[a.room] || new Set()).add(m.seat); });
+  for (const a of OPS.agents) { let m = W_MOVE[a.name];
+    if (m && m.room === a.room && !REDUCED) continue;                                         // same room: nothing to do
+    const used = taken[a.room] = taken[a.room] || new Set(); let seat = 0; while (used.has(seat)) seat++; used.add(seat);
+    const to = spotOf(a, seat);
+    if (!m || REDUCED) W_MOVE[a.name] = { x: to[0], y: to[1], path: [], room: a.room, seat, dir: [0, 1] };   // first sight: where it is now
+    else { m.path = path([m.x, m.y], to); m.room = a.room; m.seat = seat; } }                // its job moved it: it walks there
   const n = OPS.counts; $("w-counts").textContent = ""; const s = $("w-counts");
   s.appendChild(document.createTextNode(`${OPS.agents.length} characters, each a real agent: `));
   [["working", "working"], ["waiting for you", "waiting for you"], ["failed", "stopped"], ["done", "delivered today"], ["idle", "free"]].forEach(([st, label]) => {
     const k = OPS.agents.filter(a => st === "failed" ? a.room === "repair" : a.state === st).length; s.appendChild(el("b", null, String(k))); s.appendChild(document.createTextNode(` ${label} · `)); });
   if (OPS.hold) s.appendChild(el("b", null, "HOLD: " + OPS.hold));
   if (W_SEL) { W_SEL = OPS.agents.find(a => a.name === W_SEL.name) || null; worldInfo(W_SEL); }
+  const list = $("w-list"); list.textContent = "";                                            // the same characters, for the keyboard
+  for (const a of OPS.agents) { const b = el("button", "act", a.name); b.title = `${a.name}: ${a.state}`;
+    b.setAttribute("aria-pressed", String(a === W_SEL)); b.onclick = () => { W_SEL = a; worldInfo(a); if (REDUCED) drawWorld(0); loadList(); }; list.appendChild(b); }
   if (REDUCED) drawWorld(0);
 }
 function wPoint(e) { const c = $("w-floor"), r = c.getBoundingClientRect();
@@ -3128,13 +3145,16 @@ addEventListener("pointermove", (e) => { if (!W_DRAG || W_VIEW.z === 1) return; 
   if (Math.hypot(mx - W_DRAG.p[0], my - W_DRAG.p[1]) > 6) W_DRAG.moved = true; W_VIEW.x = W_DRAG.v.x + mx - W_DRAG.p[0]; W_VIEW.y = W_DRAG.v.y + my - W_DRAG.p[1]; if (REDUCED && OPS) drawWorld(0); });
 addEventListener("pointerup", () => { setTimeout(() => { W_DRAG = null; }, 0); });
 $("w-floor").ondblclick = () => { W_VIEW = { z: 1, x: 0, y: 0 }; if (REDUCED && OPS) drawWorld(0); };
+function loadList() { [...$("w-list").children].forEach(b => b.setAttribute("aria-pressed", String(!!W_SEL && b.textContent === W_SEL.name))); }
 $("w-floor").onclick = (e) => { if (W_DRAG && W_DRAG.moved) return; const [px, py] = wPoint(e);
   const mx = (px - W_VIEW.x) / W_VIEW.z, my = (py - W_VIEW.y) / W_VIEW.z;
   const hit = W_HITS.slice().reverse().find(([hx, hy, w, h]) => mx >= hx && mx <= hx + w && my >= hy && my <= hy + h);
-  W_SEL = hit ? hit[4] : null; worldInfo(W_SEL); if (REDUCED && OPS) drawWorld(0); };
-function closeWorld() { overlay("worldbox", false); clearInterval(worldTimer); cancelAnimationFrame(worldAnim); }
+  W_SEL = hit ? hit[4] : null; worldInfo(W_SEL); loadList(); if (REDUCED && OPS) drawWorld(0); };
+function closeWorld() { W_GEN++; overlay("worldbox", false); clearInterval(worldTimer); cancelAnimationFrame(worldAnim); }
 $("c-world").onclick = async () => { if ($("worldbox").classList.contains("show")) { closeWorld(); return; }
-  overlay("worldbox", true); await loadWorld(); clearInterval(worldTimer); worldTimer = setInterval(loadWorld, 5000);
+  const gen = ++W_GEN; overlay("worldbox", true); await loadWorld();
+  if (gen !== W_GEN) return;                                                                  // closed while it was loading
+  clearInterval(worldTimer); worldTimer = setInterval(loadWorld, 5000);
   cancelAnimationFrame(worldAnim); worldAnim = requestAnimationFrame(worldLoop); };
 $("world-close").onclick = closeWorld;
 

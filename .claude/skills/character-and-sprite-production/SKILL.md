@@ -31,6 +31,9 @@ python3 scripts/world_sprites.py              # writes the sheet and its JSON
 python3 -m pytest -q tests/test_world_art.py  # the sheet matches the script; all looks differ
 ```
 
+A new character or animation also changes what the test expects: add its name to the
+expected characters (or animations) in `tests/test_world_art.py`, in the same commit.
+
 Then make a design sheet (every character, every animation, 5x, on a dark background) with
 Pillow and look at it yourself. Check that:
 - arms that go up show beside the head, not behind it;

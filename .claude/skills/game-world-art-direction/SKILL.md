@@ -20,8 +20,10 @@ repository: their licence is unknown).
    - **Camera:** isometric 2:1 tiles (`TW`/`TH` in `src/bau/ui/jarvis.html`), back walls only.
    - **Characters:** characters come from `src/bau/ui/world/characters.png` only, never
      drawn shapes.
-   - **Honesty:** nothing glows, moves or fills a room unless a record in `src/bau/world.py`
-     says so. Empty departments stay empty and say who would work there.
+   - **Honesty:** nothing that signals work glows, moves or fills a room unless a record in
+     `src/bau/world.py` says so: screens, panels, the core's turning, a ring light, a
+     character. The building's own light (the slab's edge, each room's light pool, the glass
+     rims) is always on. Empty departments stay empty and say who would work there.
 4. If the owner sends new pictures, update the reference table first, then build.
 
 ## When you are done

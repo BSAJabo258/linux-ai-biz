@@ -28,7 +28,7 @@ Tests prove the data. Only a browser proves what the owner sees.
 
 | Shot | How |
 |---|---|
-| the whole world, dark and light | `setTheme('dark')` / `setTheme('light')`, screenshot `#worldbox .box` |
+| the whole world, dark and light | `setTheme('dark')` / `setTheme('light')`, then `drawWorld(0)` (with reduced motion nothing redraws by itself), screenshot `#worldbox .box` |
 | each department close up | set `W_VIEW` to 2.4x on the room's middle tile |
 | the character sheet | every character, every animation, 5x, from the PNG |
 | a working agent | its screen lit, its panel showing its real task |
@@ -43,7 +43,8 @@ and fix it if any of these is true:
 - two characters look alike;
 - a name, sign or panel covers a character;
 - text is unreadable in either theme;
-- something lights or moves without a record behind it;
+- something that signals work (a screen, a panel, the core turning, a character) lights or
+  moves without a record behind it (the building's own light is always on);
 - it looks like a dashboard.
 
 ## Report
