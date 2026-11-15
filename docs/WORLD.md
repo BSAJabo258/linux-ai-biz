@@ -1,40 +1,59 @@
 # The operations world
 
-Built 2026-11-15 from your three reference pictures (one frame takes about 2 ms to draw on a
-computer's processor alone, measured in a headless browser): an isometric floor of rooms, one robot
-for each of your agents. Tested in a browser here with sample jobs; not yet on your screen.
+Built 2026-11-15 from your three reference pictures; the full art direction is
+`docs/visual/VISUAL_ART_DIRECTION.md`. Checked in a browser here with sample jobs; not yet on
+your own screen.
 
 ## Open it
 
-In Jarvis, press **WORLD** at the top. Click a robot to see its record. **Close** or Esc
-closes it.
+In Jarvis, press **WORLD** at the top.
+- **Zoom:** scroll on the floor; it zooms where you point.
+- **Move:** drag the floor.
+- **See it all again:** double-click.
+- **Read a character's record:** click it.
+- **Close:** **Close** or Esc.
 
 ## What you see is real
 
-Every robot is one of your agents (`bau agents list`). The room it stands in comes only from
-its latest job in BAU's job store, the same jobs `bau jobs` lists:
+A cut-away pixel-art headquarters at night. Jarvis's glass core is in the middle, with his
+console and a lounge, and the departments sit around it, each furnished for its trade:
 
-| Room | When |
+| Department | Who works there |
 |---|---|
-| Research lab, Content studio, Workshop | its job is running (the researcher works in the lab, the producer in the studio, every other agent in the workshop) |
-| Waiting for you | its job waits for your approval |
-| Stopped | its job failed, was interrupted, paused or waits for the network |
-| Delivered | its job finished in the last 24 hours |
-| Available | no job, or its last one finished more than a day ago |
+| Research library | the researcher, and Jarvis when he researches |
+| The Forge | any agent that has no room of its own |
+| Testing lab | Jarvis when his autopilot tests a tool in the sandbox |
+| Innovation lab | Jarvis when he scans or inspects a project |
+| Studio | the producer, and Jarvis when he drafts |
+| Finance, Market | no agent works here yet: they stay empty, and say so |
+| Waiting for you | an agent whose job waits for your approval |
+| Stopped | an agent whose job failed, was interrupted or paused |
+| Delivered | an agent whose job finished in the last 24 hours |
+| Headquarters lounge | an agent with nothing to do |
 
-The building is drawn in the style of your pictures: glass rooms with lit rims on a slab with
-a violet light along its foot, server racks, wall displays, desks with monitors and chairs,
-plants, sofas in the lounge, shelves of finished work, a repair bench, and Jarvis's glass core
-in the middle. The furniture is fixed; only what an agent is doing changes.
+Every character is one of your agents (`bau agents list`), or Jarvis himself. Each is
+designed for its job:
+- **Jarvis:** a cape, a halo and a tablet.
+- **The researcher:** a lab coat, glasses and a book.
+- **The producer:** a beret, headphones and a camera.
+- **Any other agent:** a hard hat and a wrench.
 
-Only a working robot moves (a small bob), its own desk screen lights up, and a green panel
-floats above it with its real task, as in your second picture. If a running job has not
-saved a step for 30 minutes, the robot says "quiet N min": the job may be stuck. The core in
-the middle glows while any agent works, and turns red with HOLD. With reduced motion turned on
-in your computer's settings, nothing moves.
+Where a character stands comes only from its latest job: the job store (`bau jobs`), or, for
+Jarvis, his autopilot's queue (`bau autopilot`).
 
-Clicking a robot shows its job: the task, status, model, last step, steps done and left,
-cost, errors and files made. To stop a running mission, the panel shows the exact command:
+When that job changes, the character walks to its new room through the doors. Nothing walks
+for show:
+- **Working:** the character uses its tool, its own desk screen lights up, and a green panel
+  above it shows its real task.
+- **Waiting for you:** it raises a hand and shows "!".
+- **Stopped:** it shows red crosses for eyes.
+- **Done:** it holds up a green check.
+- **Quiet:** if a running job has not saved a step for 30 minutes, it says "quiet N min".
+- **The core:** its rings turn only while someone works, and it turns red with HOLD.
+- **Reduced motion:** if it is turned on in your computer's settings, nothing moves.
+
+Clicking a character shows its record: task, status, model, last step, cost, errors and
+files made. For a running mission it also shows the exact command to stop it,
 `bau mission cancel MISSION_ID`.
 
 The world only reads: it changes nothing.

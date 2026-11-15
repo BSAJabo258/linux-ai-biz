@@ -208,7 +208,7 @@ body.showtime #timeline{display:block}body.showtime aside.r{display:none}
 .tl{overflow-wrap:anywhere}.tl b{color:var(--cyan);font-weight:600}.tl small{color:var(--dim);display:block}
 .overlay{position:fixed;inset:0;display:none;place-items:center;background:rgba(1,4,8,.6);z-index:14}
 .overlay.show{display:grid}
-#w-counts{font-size:12px;color:var(--dim);margin-bottom:8px}#w-counts b{color:var(--ink);font-weight:600}
+#w-counts{font-size:12px;color:var(--dim)}#w-help{font-size:11px;color:var(--dim);margin:2px 0 8px;opacity:.8}#w-counts b{color:var(--ink);font-weight:600}
 #worldbox .box{width:min(1400px,calc(100% - 24px))}
 #w-wrap{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:12px;align-items:start}
 #w-floor{width:100%;height:auto;display:block;cursor:pointer}
@@ -316,9 +316,9 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <h2>Mission Control</h2><div class="tabs" id="mc-tabs"></div><div id="mc-body"></div></div></div>
 <div id="worldbox" class="overlay" role="dialog" aria-label="Operations world"><div class="box">
   <button class="act" id="world-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
-  <h2>Operations world</h2><div id="w-counts"></div>
-  <div id="w-wrap"><canvas id="w-floor" width="1800" height="1140" aria-label="The floor: each robot is one of your agents"></canvas>
-  <div id="w-info"><p>Each robot is one of your agents. Its room comes from its latest real job; with no job it waits in Available. Click a robot.</p></div></div></div></div>
+  <h2>Operations world</h2><div id="w-counts"></div><div id="w-help">Scroll to zoom · drag to move · double-click to see it all · click a character</div>
+  <div id="w-wrap"><canvas id="w-floor" width="1800" height="1120" aria-label="The floor: each robot is one of your agents"></canvas>
+  <div id="w-info"><p>Each character is one of your agents, or Jarvis himself. Its room comes from its latest real job; with nothing to do it waits in the Headquarters lounge. Click a character.</p></div></div></div></div>
 <div id="help" class="overlay" role="dialog" aria-label="Keyboard keys"><div class="box">
   <button class="act" id="help-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Keyboard keys</h2>
@@ -2858,224 +2858,279 @@ $("c-mind").onclick = () => { document.body.classList.toggle("showmind");
   if (on) { loadMind(); mindTimer = setInterval(loadMind, 15000); } };
 
 // ---------------------------------------------------------------- the operations world
-// An isometric floor (the owner's reference pictures, 2026-11-15). Every robot is an agent from
-// /api/world; its room is its latest real job's state. Only a working robot moves (a small bob
-// and its desk screen), and not at all with reduced motion.
-const W_ROOMS = { research: [0, 0, 4, 4], studio: [4, 0, 4, 4], workshop: [8, 0, 4, 4],
-  approvals: [0, 4, 4, 4], hq: [4, 4, 4, 4], repair: [8, 4, 4, 4], lounge: [0, 8, 6, 4], delivery: [6, 8, 6, 4] };
-const W_TINT = { research: [63, 214, 255], studio: [169, 139, 255], workshop: [70, 242, 164], approvals: [255, 179, 64],
-  hq: [63, 214, 255], repair: [255, 77, 94], lounge: [93, 138, 163], delivery: [255, 207, 77] };
-const W_EYE = { working: "#46f2a4", "waiting for you": "#ffb340", done: "#3fd6ff", idle: "#8fb3c7" };
-const TW = 140, TH = 70, OX = 900, OY = 230, SLAB = 34, WALL = 92;
+// A pixel-art headquarters in the style of the owner's reference pictures (2026-11-15; the
+// art direction: docs/visual/VISUAL_ART_DIRECTION.md). Every character is an agent from
+// /api/world: Jarvis (his autopilot's jobs), the agent folders, any agent with jobs. A
+// character stands where its latest real job puts it and walks there through the doors only
+// when that job changes; nothing moves for show, and nothing at all with reduced motion.
+const W_ROOMS = { research: [0, 0, 4, 4], forge: [4, 0, 4, 4], testing: [8, 0, 4, 4], innovation: [12, 0, 4, 4],
+  approvals: [0, 4, 4, 4], hq: [4, 4, 8, 4], repair: [12, 4, 4, 4],
+  studio: [0, 8, 4, 4], finance: [4, 8, 4, 4], market: [8, 8, 4, 4], delivery: [12, 8, 4, 4] };
+const W_TINT = { research: [63, 214, 255], forge: [255, 140, 40], testing: [70, 242, 164], innovation: [169, 139, 255],
+  approvals: [255, 179, 64], hq: [120, 160, 255], repair: [255, 77, 94], studio: [255, 110, 200],
+  finance: [255, 207, 77], market: [80, 220, 200], delivery: [140, 200, 90] };
+const GW = 16, GH = 12, TW = 112, TH = 56, OX = 800, OY = 250, SLAB = 30, WALL = 84;
+const WORK = new Set(["research", "forge", "testing", "innovation", "studio", "finance", "market"]);
+const DESKS = [[0.2, 0.45], [2.9, 0.45]];                       // two workstations per department
+const SPOTS = { work: [[0.7, 1.6], [3.4, 1.6], [1.2, 2.9], [2.9, 2.9]],
+  hq: [[0.9, 1.7], [2.0, 1.7], [0.9, 3.0], [2.0, 3.0], [6.0, 1.7], [7.1, 1.7], [6.0, 3.0], [7.1, 3.0]],
+  other: [[0.9, 1.8], [2.3, 1.8], [3.4, 1.8], [0.9, 3.1], [2.3, 3.1], [3.4, 3.1]] };
 let OPS = null, worldTimer = null, worldAnim = 0, W_HITS = [], W_SEL = null, W_STATIC = null, W_STATIC_KEY = "";
+let W_SHEET = null, W_META = null, W_MOVE = {}, W_LAST = 0, W_VIEW = { z: 1, x: 0, y: 0 }, W_DRAG = null;
 const iso = (x, y, z = 0) => [OX + (x - y) * TW / 2, OY + (x + y) * TH / 2 - z];
 function poly(x, pts, fill, stroke, lw) { x.beginPath(); pts.forEach(([a, b], i) => x[i ? "lineTo" : "moveTo"](a, b)); x.closePath();
   if (fill) { x.fillStyle = fill; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.lineWidth = lw || 1; x.stroke(); } }
 function shade(hex, k) { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.max(0, Math.min(255, Math.round(v * k))));
   return "#" + c.map(v => v.toString(16).padStart(2, "0")).join(""); }
-// A box standing on tile (tx, ty), sw by sd tiles, h pixels tall, raised z pixels: the three faces you see.
-function box(x, tx, ty, sw, sd, h, top, z = 0) {
+function box(x, tx, ty, sw, sd, h, top, z = 0) { // a block on tile (tx, ty): the three faces you see
   const g = (a, b, zz) => iso(a, b, zz), A = g(tx, ty, z + h), B = g(tx + sw, ty, z + h), C = g(tx + sw, ty + sd, z + h), D = g(tx, ty + sd, z + h);
   poly(x, [g(tx, ty + sd, z), g(tx + sw, ty + sd, z), C, D], shade(top, 0.62));
   poly(x, [g(tx + sw, ty + sd, z), g(tx + sw, ty, z), B, C], shade(top, 0.8));
-  poly(x, [A, B, C, D], top, shade(top, 1.25), 1);
-  return { A, B, C, D }; }
-// A flat panel on a back wall: along x (y fixed) or along y (x fixed), between heights z0 and z1.
-function panel(x, axis, fixed, from, to, z0, z1, fill, stroke) {
-  const p = axis === "x" ? [iso(from, fixed, z0), iso(to, fixed, z0), iso(to, fixed, z1), iso(from, fixed, z1)]
-                         : [iso(fixed, from, z0), iso(fixed, to, z0), iso(fixed, to, z1), iso(fixed, from, z1)];
-  poly(x, p, fill, stroke, 2); return p; }
-function plant(x, tx, ty, light) { box(x, tx, ty, 0.3, 0.3, 26, light ? "#c9a27a" : "#5a4636");
-  const [cx, cy] = iso(tx + 0.15, ty + 0.15, 40);
-  [[0, -16, 15], [-12, -4, 12], [12, -4, 12], [-6, 8, 11], [7, 7, 11]].forEach(([dx, dy, r], i) => {
-    x.fillStyle = ["#2f9e6b", "#3fbf80", "#2a8a5d", "#46d48e", "#37a874"][i]; x.beginPath(); x.arc(cx + dx, cy + dy, r, 0, 6.283); x.fill(); }); }
-function rack(x, tx, ty, light) { const b = box(x, tx, ty, 0.42, 0.7, 118, light ? "#9fb2bf" : "#1a2a3a");
-  for (let r = 0; r < 9; r++) for (let k = 0; k < 3; k++) { const [px, py] = iso(tx + 0.42, ty + 0.12 + k * 0.2, 14 + r * 11);
-    x.fillStyle = (r + k) % 3 ? "rgba(63,214,255,.55)" : "rgba(70,242,164,.6)"; x.fillRect(px - 2, py - 2, 4, 3); } return b; }
-function desk(x, tx, ty, light) { // desk, chair and a dark monitor; the screen is lit later only for a working agent
-  box(x, tx + 0.25, ty + 0.62, 0.36, 0.3, 22, light ? "#5d7383" : "#203447");                 // chair
-  box(x, tx, ty, 0.9, 0.5, 34, light ? "#d8e3ea" : "#2b4458");                                // desk
-  box(x, tx + 0.3, ty + 0.08, 0.32, 0.06, 4, light ? "#3d5262" : "#0d1b27", 34);              // monitor foot
-  return panel(x, "x", ty + 0.11, tx + 0.12, tx + 0.8, 40, 78, light ? "#2c3e4c" : "#0b1620", light ? "#516a7c" : "#2a4458"); }
-function sofa(x, tx, ty, color) { box(x, tx, ty, 1.4, 0.55, 20, color); box(x, tx, ty, 1.4, 0.16, 42, shade(color, 1.1)); }
-function crate(x, tx, ty, z, color) { box(x, tx, ty, 0.36, 0.36, 26, color, z); }
-// Fixed furniture per room and the spots where robots stand (in front of a desk where there is one).
-const W_LAYOUT = {
-  research: { desks: [[1.0, 0.9], [2.4, 0.9], [1.0, 2.3], [2.4, 2.3]], racks: [[0.08, 0.4], [0.08, 1.3], [0.08, 2.2]], plants: [[3.5, 3.4]], screen: ["x", 1.2, 3.6] },
-  studio: { desks: [[1.0, 0.9], [2.4, 0.9], [1.0, 2.3], [2.4, 2.3]], plants: [[0.2, 3.4]], screen: ["x", 0.5, 3.6] },
-  workshop: { desks: [[1.0, 0.9], [2.4, 0.9], [1.0, 2.3], [2.4, 2.3]], racks: [[3.45, 0.2], [3.45, 1.1]], plants: [[0.2, 3.4]], screen: ["y", 0.6, 2.4] },
-  approvals: { counter: [0.6, 1.0, 2.8, 0.5], spots: [[1.1, 2.1], [2.5, 2.1], [1.1, 3.2], [2.5, 3.2]], plants: [[3.5, 0.3]], screen: ["y", 1.0, 3.0] },
-  repair: { bench: [0.6, 0.6, 2.4, 0.55], spots: [[1.2, 1.8], [2.6, 1.8], [1.2, 3.0], [2.6, 3.0]], crates: [[3.4, 3.3]], screen: ["x", 0.6, 2.4] },
-  lounge: { sofas: [[0.6, 0.5], [3.0, 0.5]], table: [1.9, 1.5], spots: [[1.0, 2.2], [2.4, 2.2], [3.8, 2.2], [1.6, 3.3], [3.0, 3.3], [4.4, 3.3]], plants: [[5.5, 0.3], [0.2, 3.4]] },
-  delivery: { shelves: [[0.4, 0.3], [2.2, 0.3], [4.0, 0.3]], spots: [[1.0, 2.0], [2.4, 2.0], [3.8, 2.0], [1.6, 3.1], [3.0, 3.1], [4.4, 3.1]] } };
-function spotsFor(id) { const L = W_LAYOUT[id] || W_LAYOUT.lounge, [rx, ry] = W_ROOMS[id] || W_ROOMS.lounge;
-  const s = L.spots || L.desks.map(([a, b]) => [a + 0.45, b + 0.95]); return s.map(([a, b]) => [rx + a, ry + b]); }
+  poly(x, [A, B, C, D], top, shade(top, 1.25), 1); return { A, B, C, D }; }
+function face(x, tx, ty, sw, z0, z1, fill, stroke) { // a vertical face toward the viewer's left (along x at y = ty)
+  const p = [iso(tx, ty, z0), iso(tx + sw, ty, z0), iso(tx + sw, ty, z1), iso(tx, ty, z1)]; poly(x, p, fill, stroke, 1.5); return p; }
+function faceY(x, tx, ty, sd, z0, z1, fill, stroke) { // a vertical face along y at x = tx
+  const p = [iso(tx, ty, z0), iso(tx, ty + sd, z0), iso(tx, ty + sd, z1), iso(tx, ty, z1)]; poly(x, p, fill, stroke, 1.5); return p; }
+function onFace(p, u, v) { // a point on a face: u along it, v up it (0..1)
+  return [p[0][0] + (p[1][0] - p[0][0]) * u + (p[3][0] - p[0][0]) * v, p[0][1] + (p[1][1] - p[0][1]) * u + (p[3][1] - p[0][1]) * v]; }
+function lineOn(x, p, u0, v0, u1, v1, col, w) { x.strokeStyle = col; x.lineWidth = w || 2; x.beginPath(); x.moveTo(...onFace(p, u0, v0)); x.lineTo(...onFace(p, u1, v1)); x.stroke(); }
+function plant(x, tx, ty, light, big) { box(x, tx, ty, 0.28, 0.28, 24, light ? "#c9a27a" : "#5a4636");
+  const [cx, cy] = iso(tx + 0.14, ty + 0.14, big ? 46 : 36), r = big ? 1.3 : 1;
+  [[0, -16, 14], [-12, -4, 11], [12, -4, 11], [-6, 8, 10], [7, 7, 10], [0, -28, 9]].forEach(([dx, dy, rr], i) => {
+    x.fillStyle = ["#2f9e6b", "#3fbf80", "#2a8a5d", "#46d48e", "#37a874", "#5ae09c"][i]; x.beginPath(); x.arc(cx + dx * r, cy + dy * r, rr * r, 0, 6.283); x.fill(); }); }
+function shelf(x, tx, ty, light) { // a bookcase on the left wall: spines in rows
+  const b = box(x, tx, ty, 0.3, 1.0, 104, light ? "#a07850" : "#4a3020"), p = faceY(x, tx + 0.3, ty, 1.0, 4, 100, null);
+  const cols = ["#c0392b", "#2e86c1", "#d4ac0d", "#239b56", "#8e44ad", "#e67e22", "#ecf0f1"];
+  for (let r = 0; r < 4; r++) for (let k = 0; k < 9; k++) { const u = 0.04 + k * 0.105, v = 0.05 + r * 0.245;
+    const q = [onFace(p, u, v), onFace(p, u + 0.08, v), onFace(p, u + 0.08, v + 0.19 - (k % 3) * 0.02), onFace(p, u, v + 0.19 - (k % 3) * 0.02)];
+    poly(x, q, cols[(k * 3 + r * 5) % cols.length]); }
+  return b; }
+function rack(x, tx, ty, light) { box(x, tx, ty, 0.3, 0.7, 112, light ? "#9fb2bf" : "#1a2a3a"); const p = faceY(x, tx + 0.3, ty, 0.7, 4, 108, null);
+  for (let r = 0; r < 10; r++) { lineOn(x, p, 0.08, 0.06 + r * 0.095, 0.92, 0.06 + r * 0.095, light ? "#7f93a1" : "#0c1824", 2);
+    for (let k = 0; k < 3; k++) { const [a, b] = onFace(p, 0.15 + k * 0.12, 0.09 + r * 0.095); x.fillStyle = (r + k) % 4 ? "rgba(63,214,255,.8)" : "rgba(70,242,164,.9)"; x.fillRect(a - 2, b - 2, 4, 3); } } }
+function cabinet(x, tx, ty, light, col) { box(x, tx, ty, 0.6, 0.4, 54, col || (light ? "#b8c4cc" : "#2a3a48")); const p = face(x, tx, ty + 0.4, 0.6, 2, 52, null);
+  for (let r = 0; r < 3; r++) { lineOn(x, p, 0.05, 0.33 * r + 0.02, 0.95, 0.33 * r + 0.02, "rgba(0,0,0,.35)", 1.5); lineOn(x, p, 0.42, 0.33 * r + 0.18, 0.58, 0.33 * r + 0.18, "#c9d6df", 2); } }
+// A workstation: desk, chair, and the department's own equipment. The screen is dark until a
+// working agent sits at it (drawn live in wScreens).
+function workstation(x, id, tx, ty, light) {
+  const top = light ? "#d8e3ea" : "#2b4458";
+  box(x, tx + 0.3, ty + 0.62, 0.36, 0.3, 20, light ? "#5d7383" : "#203447");                       // chair
+  box(x, tx + 0.3, ty + 0.62, 0.36, 0.08, 40, light ? "#5d7383" : "#203447", 0);
+  if (id === "studio") { box(x, tx, ty, 1.0, 0.5, 30, light ? "#3d4a58" : "#1a2230");              // a mixing console
+    for (let k = 0; k < 8; k++) { const [a, b] = iso(tx + 0.1 + k * 0.1, ty + 0.25, 31); x.fillStyle = ["#ff6ec8", "#3fd6ff", "#ffcf4d"][k % 3]; x.fillRect(a - 2, b - 3 - (k * 7 % 5), 3, 5); } }
+  else box(x, tx, ty, 1.0, 0.5, 32, top);
+  const screens = id === "forge" ? [[0.05, 0.45], [0.52, 0.45]] : [[0.18, 0.66]];                  // the Forge has two monitors
+  for (const [u, w] of screens) { box(x, tx + u + w * 0.4, ty + 0.12, 0.1, 0.08, 8, light ? "#3d5262" : "#0d1b27", 32);
+    face(x, tx + u, ty + 0.14, w, 40, 72, light ? "#2c3e4c" : "#0a1520", light ? "#516a7c" : "#2a4458"); }
+  if (id === "research") { box(x, tx + 0.72, ty + 0.1, 0.22, 0.22, 4, "#f2ead8", 32); const [a, b] = iso(tx + 0.83, ty + 0.2, 56); // a lamp and a book
+    x.fillStyle = "#ffe48a"; x.beginPath(); x.arc(a, b, 7, 0, 6.283); x.fill(); }
+  if (id === "testing") box(x, tx + 0.74, ty + 0.12, 0.2, 0.22, 16, "#46f2a4", 32);                // a meter
+  if (id === "finance") { box(x, tx + 0.74, ty + 0.15, 0.2, 0.2, 5, "#e8e0c8", 32); box(x, tx + 0.74, ty + 0.15, 0.2, 0.2, 5, "#d8d0b8", 37); }
+  if (id === "innovation") { const [a, b] = iso(tx + 0.85, ty + 0.25, 50); x.strokeStyle = "rgba(169,139,255,.9)"; x.lineWidth = 2; x.strokeRect(a - 7, b - 7, 14, 14); }
+  return screens.map(([u, w]) => [tx + u, ty + 0.14, w]); }
+function roomProps(x, id, rx, ry, light) { // what makes each department itself; back to front
+  const L = (a, b) => [rx + a, ry + b];
+  if (id === "research") { shelf(x, ...L(0.05, 0.25), light); shelf(x, ...L(0.05, 2.95), light); plant(x, ...L(3.6, 3.55), light, true); }
+  if (id === "forge") { rack(x, ...L(0.05, 3.1), light); const p = face(x, rx + 1.4, ry + 0.02, 1.2, 30, 76, light ? "#c9d6df" : "#16232f", rgba(W_TINT.forge, 0.7)); // tool wall
+    for (let k = 0; k < 5; k++) { lineOn(x, p, 0.1 + k * 0.19, 0.2, 0.1 + k * 0.19, 0.8, "#aab7c2", 3); lineOn(x, p, 0.06 + k * 0.19, 0.72, 0.14 + k * 0.19, 0.8, "#aab7c2", 3); }
+    box(x, ...L(3.3, 3.2), 0.5, 0.5, 44, light ? "#c9d6df" : "#3a2a1a"); box(x, ...L(3.38, 3.28), 0.34, 0.34, 6, "#ff8c28", 44); } // a 3D printer
+  if (id === "testing") { cabinet(x, ...L(0.05, 3.2), light, light ? "#c9e8d8" : "#1e3a30"); const p = face(x, rx + 1.4, ry + 0.02, 1.2, 34, 78, "#071a12", rgba(W_TINT.testing, 0.8));
+    for (let k = 0; k < 6; k++) lineOn(x, p, 0.1, 0.12 + k * 0.14, 0.1 + 0.15 * (1 + (k * 5) % 5), 0.12 + k * 0.14, k === 4 ? "#ff4d5e" : "#46f2a4", 3); }
+  if (id === "innovation") { box(x, ...L(3.15, 3.1), 0.55, 0.55, 26, light ? "#c9d6df" : "#1e2a40"); const [a, b] = iso(rx + 3.42, ry + 3.37, 70); // a prototype on a pedestal
+    x.strokeStyle = "rgba(169,139,255,.95)"; x.lineWidth = 2; x.strokeRect(a - 16, b - 16, 32, 32); x.strokeRect(a - 8, b - 24, 32, 32);
+    [[-16, -16, -8, -24], [16, -16, 24, -24], [-16, 16, -8, 8], [16, 16, 24, 8]].forEach(([p1, q1, p2, q2]) => { x.beginPath(); x.moveTo(a + p1, b + q1); x.lineTo(a + p2, b + q2); x.stroke(); });
+    const p = face(x, rx + 1.4, ry + 0.02, 1.2, 30, 78, light ? "#f4f4f4" : "#e8eef2", rgba(W_TINT.innovation, 0.8)); // a whiteboard with notes
+    [["#ffcf4d", 0.1, 0.6], ["#ff6ec8", 0.35, 0.65], ["#3fd6ff", 0.6, 0.55], ["#46f2a4", 0.2, 0.25], ["#ffcf4d", 0.55, 0.2]].forEach(([c, u, v]) =>
+      poly(x, [onFace(p, u, v), onFace(p, u + 0.14, v), onFace(p, u + 0.14, v + 0.25), onFace(p, u, v + 0.25)], c)); }
+  if (id === "studio") { const [a, b] = iso(rx + 3.4, ry + 3.2, 0); x.strokeStyle = light ? "#3d4a58" : "#8aa0b2"; x.lineWidth = 3; // a camera on a tripod
+    [[-14, 0], [14, 0], [0, 10]].forEach(([dx, dy]) => { x.beginPath(); x.moveTo(a, b - 50); x.lineTo(a + dx, b + dy); x.stroke(); });
+    x.fillStyle = "#222"; x.fillRect(a - 14, b - 66, 24, 16); x.fillStyle = "#3fd6ff"; x.fillRect(a + 8, b - 62, 8, 8);
+    const [c, d] = iso(rx + 0.4, ry + 3.4, 0); x.beginPath(); x.moveTo(c, d); x.lineTo(c, d - 70); x.stroke();                  // a ring light
+    x.save(); x.shadowColor = "#fff"; x.shadowBlur = 12; x.strokeStyle = "#f6f0ff"; x.lineWidth = 5; x.beginPath(); x.arc(c, d - 86, 16, 0, 6.283); x.stroke(); x.restore(); }
+  if (id === "finance") { cabinet(x, ...L(0.05, 3.2), light); box(x, ...L(3.3, 3.25), 0.5, 0.5, 46, light ? "#7f8a94" : "#3a4048");      // files and a safe
+    const [a, b] = iso(rx + 3.55, ry + 3.75, 24); x.strokeStyle = "#ffcf4d"; x.lineWidth = 3; x.beginPath(); x.arc(a, b, 7, 0, 6.283); x.stroke(); }
+  if (id === "market") { [[0.05, 3.0], [3.2, 3.1]].forEach(([a, b], k) => { box(x, ...L(a, b), 0.6, 0.6, 30, light ? "#c9a27a" : "#5a4636");   // stalls of goods
+      [0, 1].forEach(j => box(x, rx + a + 0.08 + j * 0.25, ry + b + 0.15, 0.2, 0.2, 18, ["#ff6ec8", "#3fd6ff", "#ffcf4d", "#46f2a4"][k * 2 + j], 30)); });
+    const p = face(x, rx + 1.3, ry + 0.02, 1.4, 34, 80, "#06171a", rgba(W_TINT.market, 0.8)); for (let k = 0; k < 8; k++) lineOn(x, p, 0.06 + k * 0.11, 0.2, 0.06 + k * 0.11, 0.2 + 0.08 * (1 + (k * 7) % 8), "#50dcc8", 6); }
+  if (id === "approvals") { [[0.3, 0.45], [2.7, 0.45]].forEach(([a, b]) => { box(x, ...L(a, b), 1.1, 0.5, 36, light ? "#e6c78f" : "#4a3a1e"); box(x, rx + a + 0.05, ry + b + 0.05, 1.0, 0.4, 3, "#ffb340", 36); });
+    const [a, b] = iso(rx + 1.0, ry + 0.7, 40); x.fillStyle = "#ffcf4d"; x.beginPath(); x.arc(a, b, 6, Math.PI, 0); x.fill(); plant(x, ...L(3.55, 3.5), light); }
+  if (id === "repair") { box(x, ...L(0.3, 0.45), 1.3, 0.5, 30, light ? "#d7a0a6" : "#4a1f27"); box(x, ...L(2.6, 0.45), 1.2, 0.5, 30, light ? "#d7a0a6" : "#4a1f27");
+    [0.4, 0.9, 2.8].forEach(o => box(x, rx + o, ry + 0.55, 0.28, 0.25, 12, "#9fb2bf", 30)); box(x, ...L(3.4, 3.4), 0.4, 0.4, 26, "#8a6d3b"); box(x, ...L(3.4, 3.4), 0.4, 0.4, 24, "#a5844b", 26); }
+  if (id === "delivery") { [[0.05, 0.3], [0.05, 2.95]].forEach(([a, b]) => { box(x, ...L(a, b), 0.45, 1.0, 76, light ? "#c9d6df" : "#1d3042");
+      [0, 1, 2].forEach(k => box(x, rx + a + 0.05, ry + b + 0.06 + k * 0.32, 0.36, 0.26, 22, ["#ffcf4d", "#3fd6ff", "#a98bff"][k], 76)); });
+    box(x, ...L(1.4, 0.4), 2.4, 0.5, 18, light ? "#7f8a94" : "#2a3440"); for (let k = 0; k < 8; k++) { const [a, b] = iso(rx + 1.5 + k * 0.29, ry + 0.65, 19); x.fillStyle = "#9fb2bf"; x.fillRect(a - 3, b - 1, 6, 2); } }
+  if (id === "hq") { [[0.2, 0.5], [0.2, 2.3]].forEach(([a, b]) => { box(x, ...L(a, b), 0.55, 1.2, 18, light ? "#8aa3b2" : "#2a3f52"); box(x, ...L(a, b), 0.18, 1.2, 40, light ? "#9bb4c3" : "#33495e"); });
+    box(x, ...L(1.2, 1.5), 0.6, 0.6, 14, light ? "#c9d6df" : "#22384a"); plant(x, ...L(0.25, 3.6), light, true); plant(x, ...L(7.6, 0.3), light, true); plant(x, ...L(7.6, 3.6), light);
+    [[5.6, 0.5], [6.6, 0.5]].forEach(([a, b]) => cabinet(x, ...L(a, b), light));
+    const p = face(x, rx + 2.6, ry + 0.02, 2.8, 30, 80, "#07101e", rgba(W_TINT.hq, 0.9)); for (let k = 0; k < 3; k++) lineOn(x, p, 0.05 + k * 0.32, 0.5, 0.3 + k * 0.32, 0.5 + 0.2 * Math.sin(k), "#78a0ff", 2); }
+  if (WORK.has(id)) return DESKS.map(([a, b]) => workstation(x, id, rx + a, ry + b, light));
+  return []; }
+function doors() { // a door in the middle of every 4 tiles of each inside wall
+  const d = new Set();
+  for (const [, [rx, ry, rw, rh]] of Object.entries(W_ROOMS)) {
+    if (ry > 0) for (let k = 0; k < rw / 4; k++) d.add(`${rx + 2 + 4 * k},${ry},v`);
+    if (rx > 0) for (let k = 0; k < rh / 4; k++) d.add(`${rx},${ry + 2 + 4 * k},h`); }
+  return d; }
+const W_DOORS = doors();
+function roomAt(tx, ty) { for (const [id, [rx, ry, rw, rh]] of Object.entries(W_ROOMS)) if (tx >= rx && tx < rx + rw && ty >= ry && ty < ry + rh) return id; return null; }
+function blocked(tx, ty) { const id = roomAt(tx, ty); if (!id) return true; const [rx, ry] = W_ROOMS[id];
+  if (ty === ry && !W_DOORS.has(`${tx},${ty},v`)) return true;               // furniture along every back wall
+  return id === "hq" && tx >= 7 && tx <= 8 && ty >= 5 && ty <= 6; }       // Jarvis's core
+function path(from, to) { // tiles from one point to another, through doors only (breadth-first)
+  const s = [Math.floor(from[0]), Math.floor(from[1])], g = [Math.floor(to[0]), Math.floor(to[1])], key = p => p[0] + "," + p[1];
+  const prev = { [key(s)]: null }, q = [s];
+  while (q.length) { const c = q.shift(); if (c[0] === g[0] && c[1] === g[1]) break;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = [c[0] + dx, c[1] + dy];
+      if (n[0] < 0 || n[1] < 0 || n[0] >= GW || n[1] >= GH || key(n) in prev) continue;
+      if (blocked(...n) && !(n[0] === g[0] && n[1] === g[1])) continue;
+      if (roomAt(...c) !== roomAt(...n)) { const door = dy ? `${n[0]},${Math.max(c[1], n[1])},v` : `${Math.max(c[0], n[0])},${n[1]},h`; if (!W_DOORS.has(door)) continue; }
+      prev[key(n)] = c; q.push(n); } }
+  if (!(key(g) in prev)) return [to];
+  const out = []; for (let c = g; c; c = prev[key(c)]) out.unshift([c[0] + 0.5, c[1] + 0.5]);
+  out.shift(); out.push(to); return out; }
+function spotOf(a, i) { const [rx, ry] = W_ROOMS[a.room] || W_ROOMS.hq;
+  if (a.name === "jarvis" && a.room === "hq") return [rx + 4.0, ry + 3.45];                    // at his console, in front of the core
+  const list = WORK.has(a.room) ? SPOTS.work : a.room === "hq" ? SPOTS.hq : SPOTS.other, p = list[i % list.length];
+  return [rx + p[0] + Math.floor(i / list.length) * 0.3, ry + p[1]]; }
 function wStars(x, w, h, light) { if (light) return; let s = 7; const r = () => (s = (s * 9301 + 49297) % 233280) / 233280;
-  for (let i = 0; i < 140; i++) { x.fillStyle = `rgba(${150 + r() * 100 | 0},${190 + r() * 60 | 0},255,${0.15 + r() * 0.5})`; x.fillRect(r() * w, r() * h, r() < 0.15 ? 2 : 1, r() < 0.15 ? 2 : 1); } }
-function drawStatic(c, light) { // everything that never moves, drawn once into an offscreen canvas
-  const x = c.getContext("2d"), g = x.createRadialGradient(OX, OY + 420, 80, OX, OY + 420, 1100);
-  g.addColorStop(0, light ? "#f4f9fc" : "#0c1a2b"); g.addColorStop(1, light ? "#dbe7ef" : "#02060b");
-  x.fillStyle = g; x.fillRect(0, 0, c.width, c.height); wStars(x, c.width, c.height, light);
-  // the slab: dark sides and a violet light along its foot, as in the reference
-  const [a, b] = iso(0, 12), [c2, d] = iso(12, 12), [e, f] = iso(12, 0);
-  poly(x, [[a, b], [c2, d], [c2, d + SLAB], [a, b + SLAB]], light ? "#b8c8d3" : "#0b1724");
-  poly(x, [[c2, d], [e, f], [e, f + SLAB], [c2, d + SLAB]], light ? "#a3b6c3" : "#08111c");
-  x.save(); x.shadowColor = "#7b5cff"; x.shadowBlur = 24; x.strokeStyle = "#8a6dff"; x.lineWidth = 4;
-  x.beginPath(); x.moveTo(a, b + SLAB); x.lineTo(c2, d + SLAB); x.lineTo(e, f + SLAB); x.stroke(); x.restore();
-  for (const [id, [rx, ry, rw, rh]] of Object.entries(W_ROOMS)) { // floors: a soft tint, a fine grid
-    const tint = W_TINT[id];
-    for (let i = 0; i < rw; i++) for (let j = 0; j < rh; j++) {
-      const base = light ? [236, 243, 247] : [14, 28, 42], k = (i + j) % 2 ? 0.07 : 0.11;
+  for (let i = 0; i < 160; i++) { x.fillStyle = `rgba(${150 + r() * 100 | 0},${190 + r() * 60 | 0},255,${0.15 + r() * 0.5})`; x.fillRect(r() * w, r() * h, r() < 0.15 ? 2 : 1, r() < 0.15 ? 2 : 1); } }
+let W_STATIONS = {};
+function drawStatic(c, light) { // everything that never moves, drawn once and kept
+  const x = c.getContext("2d"), g = x.createRadialGradient(OX, OY + 400, 80, OX, OY + 400, 1200);
+  g.addColorStop(0, light ? "#f4f9fc" : "#0c1a2b"); g.addColorStop(1, light ? "#dbe7ef" : "#02060b"); x.fillStyle = g; x.fillRect(0, 0, c.width, c.height); wStars(x, c.width, c.height, light);
+  const [a, b] = iso(0, GH), [c2, d] = iso(GW, GH), [e, f] = iso(GW, 0);
+  poly(x, [[a, b], [c2, d], [c2, d + SLAB], [a, b + SLAB]], light ? "#b8c8d3" : "#0b1724"); poly(x, [[c2, d], [e, f], [e, f + SLAB], [c2, d + SLAB]], light ? "#a3b6c3" : "#08111c");
+  x.save(); x.shadowColor = "#7b5cff"; x.shadowBlur = 24; x.strokeStyle = "#8a6dff"; x.lineWidth = 4; x.beginPath(); x.moveTo(a, b + SLAB); x.lineTo(c2, d + SLAB); x.lineTo(e, f + SLAB); x.stroke(); x.restore();
+  for (const [id, [rx, ry, rw, rh]] of Object.entries(W_ROOMS)) { const tint = W_TINT[id];       // floors
+    for (let i = 0; i < rw; i++) for (let j = 0; j < rh; j++) { const base = light ? [236, 243, 247] : [14, 28, 42], k = (i + j) % 2 ? 0.07 : 0.12;
       poly(x, [iso(rx + i, ry + j), iso(rx + i + 1, ry + j), iso(rx + i + 1, ry + j + 1), iso(rx + i, ry + j + 1)],
-        `rgb(${base.map((v, n) => Math.round(v * (1 - k) + tint[n] * k)).join(",")})`, rgba(tint, light ? 0.25 : 0.18)); }
-  }
-  for (const [id, [rx, ry, rw, rh]] of Object.entries(W_ROOMS)) { // back walls: glass, posts, a lit rim
-    const tint = W_TINT[id], glass = rgba(tint, light ? 0.13 : 0.09);
-    panel(x, "x", ry, rx, rx + rw, 0, WALL, glass); panel(x, "y", rx, ry, ry + rh, 0, WALL, glass);
-    for (let k = 0; k <= rw; k++) { const [p, q] = iso(rx + k, ry), [, q2] = iso(rx + k, ry, WALL); x.fillStyle = rgba(tint, 0.35); x.fillRect(p - 2, q2, 4, q - q2); }
-    for (let k = 1; k <= rh; k++) { const [p, q] = iso(rx, ry + k), [, q2] = iso(rx, ry + k, WALL); x.fillStyle = rgba(tint, 0.35); x.fillRect(p - 2, q2, 4, q - q2); }
-    x.save(); x.shadowColor = rgba(tint, 1); x.shadowBlur = 10; x.strokeStyle = rgba(tint, 0.9); x.lineWidth = 3;
-    x.beginPath(); x.moveTo(...iso(rx, ry + rh, WALL)); x.lineTo(...iso(rx, ry, WALL)); x.lineTo(...iso(rx + rw, ry, WALL)); x.stroke(); x.restore();
-    const L = W_LAYOUT[id]; if (!L || !L.screen) continue; // a wall display with a chart drawn on it
-    const [ax, at, ato] = L.screen, p = ax === "x" ? panel(x, "x", ry + 0.02, rx + at, rx + ato, 34, 80, light ? "#22384a" : "#071624", rgba(tint, 0.8))
-                                                   : panel(x, "y", rx + 0.02, ry + at, ry + ato, 34, 80, light ? "#22384a" : "#071624", rgba(tint, 0.8));
-    x.strokeStyle = rgba(tint, 0.85); x.lineWidth = 2; x.beginPath();
-    for (let k = 0; k <= 10; k++) { const u = k / 10, v = 0.3 + 0.4 * Math.abs(Math.sin(k * 1.7 + rx));
-      const px = p[0][0] + (p[1][0] - p[0][0]) * u + (p[3][0] - p[0][0]) * v, py = p[0][1] + (p[1][1] - p[0][1]) * u + (p[3][1] - p[0][1]) * v;
-      x[k ? "lineTo" : "moveTo"](px, py); } x.stroke();
-  }
-  const props = []; // furniture, back to front
-  for (const [id, [rx, ry]] of Object.entries(W_ROOMS)) { const L = W_LAYOUT[id]; if (!L) continue;
-    (L.racks || []).forEach(([a, b]) => props.push([rx + a + ry + b, () => rack(x, rx + a, ry + b, light)]));
-    (L.desks || []).forEach(([a, b]) => props.push([rx + a + ry + b, () => desk(x, rx + a, ry + b, light)]));
-    (L.plants || []).forEach(([a, b]) => props.push([rx + a + ry + b + 0.3, () => plant(x, rx + a, ry + b, light)]));
-    (L.sofas || []).forEach(([a, b]) => props.push([rx + a + ry + b, () => sofa(x, rx + a, ry + b, light ? "#8aa3b2" : "#2a3f52")]));
-    if (L.table) props.push([rx + L.table[0] + ry + L.table[1], () => box(x, rx + L.table[0], ry + L.table[1], 0.9, 0.5, 16, light ? "#c9d6df" : "#22384a")]);
-    if (L.counter) { const [a, b, w, d] = L.counter; props.push([rx + a + ry + b, () => { box(x, rx + a, ry + b, w, d, 38, light ? "#e6c78f" : "#4a3a1e");
-      box(x, rx + a + 0.1, ry + b + 0.05, w - 0.2, d - 0.1, 3, "#ffb340", 38); }]); }
-    if (L.bench) { const [a, b, w, d] = L.bench; props.push([rx + a + ry + b, () => { box(x, rx + a, ry + b, w, d, 30, light ? "#d7a0a6" : "#4a1f27");
-      [0.3, 1.0, 1.7].forEach(o => box(x, rx + a + o, ry + b + 0.1, 0.3, 0.25, 12, "#9fb2bf", 30)); }]); }
-    (L.crates || []).forEach(([a, b]) => props.push([rx + a + ry + b, () => { crate(x, rx + a, ry + b, 0, "#8a6d3b"); crate(x, rx + a, ry + b, 26, "#a5844b"); }]));
-    (L.shelves || []).forEach(([a, b]) => props.push([rx + a + ry + b, () => { box(x, rx + a, ry + b, 1.2, 0.45, 70, light ? "#c9d6df" : "#1d3042");
-      [0, 1, 2].forEach(k => crate(x, rx + a + 0.08 + k * 0.38, ry + b + 0.05, 70, ["#ffcf4d", "#3fd6ff", "#a98bff"][k])); }]));
-  }
-  props.sort((p, q) => p[0] - q[0]).forEach(p => p[1]());
-  // Jarvis's core: a platform, a glass cylinder; its inner light is drawn live
-  const [hx, hy] = iso(6, 6);
-  x.fillStyle = light ? "#c9d6df" : "#14263a"; x.beginPath(); x.ellipse(hx, hy, 150, 64, 0, 0, 6.283); x.fill();
-  x.strokeStyle = rgba([169, 139, 255], 0.7); x.lineWidth = 3; x.stroke();
-  x.fillStyle = light ? "#b5c6d2" : "#0f1e30"; x.beginPath(); x.ellipse(hx, hy - 10, 118, 50, 0, 0, 6.283); x.fill();
-}
-function wRobot(x, cx, cy, state, t, moving, sel) { // a robot from a small pixel map, feet at (cx, cy)
-  const P = 7, bob = moving ? Math.round(Math.sin(t / 260) * 2) : 0, eye = W_EYE[state] || "#ff4d5e";
-  const MAP = ["....aa....", "....aa....", ".oooooooo.", "ohhhhhhhho", "ohvvvvvvho", "ohveevveho", "ohvvvvvvho", "ohhhhhhhho",
-               ".oooooooo.", "...nnnn...", ".oobbbboo.", "abbbbbbbba", "abbbllbbba", "abbbbbbbba", ".obbbbbbo.", "..gg..gg..", "..gg..gg..", ".ggg..ggg."];
-  const C = { a: "#9fb4c2", o: "#3a4d5c", h: "#e3edf3", v: "#0a1824", e: eye, n: "#7f95a4", b: "#cfdde6", l: eye, g: "#6f8696" };
-  x.fillStyle = "rgba(0,0,0,.4)"; x.beginPath(); x.ellipse(cx, cy, 6 * P, 2.2 * P, 0, 0, 6.283); x.fill();
-  if (sel) { x.strokeStyle = "#ffb340"; x.lineWidth = 3; x.beginPath(); x.ellipse(cx, cy, 7.5 * P, 3 * P, 0, 0, 6.283); x.stroke(); }
-  const x0 = cx - 5 * P, y0 = cy - MAP.length * P + bob;
-  MAP.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === ".") return; x.fillStyle = C[ch]; x.fillRect(x0 + i * P, y0 + j * P, P, P); }));
-  x.fillStyle = "rgba(255,255,255,.35)"; x.fillRect(x0 + 2 * P, y0 + 3 * P, 2 * P, P);           // a highlight on the head
-  if (state === "working" || state === "waiting for you") { x.save(); x.shadowColor = eye; x.shadowBlur = 12; x.fillStyle = eye;
-    x.fillRect(x0 + 3 * P, y0 + 5 * P, P, P); x.fillRect(x0 + 6 * P, y0 + 5 * P, P, P); x.restore(); }
-}
-function holo(x, cx, cy, text, t, light) { // a floating panel above a working robot, showing its real task
-  const w = 250, h = 74, y = cy - 230, a = REDUCED ? 0.85 : 0.75 + 0.1 * Math.sin(t / 500);
+        `rgb(${base.map((v, n) => Math.round(v * (1 - k) + tint[n] * k)).join(",")})`, rgba(tint, light ? 0.25 : 0.16)); }
+    const [lx, ly] = iso(rx + rw / 2, ry + rh / 2); const glow = x.createRadialGradient(lx, ly, 10, lx, ly, rw * 60);   // each room's own light pooled on its floor
+    glow.addColorStop(0, rgba(tint, light ? 0.12 : 0.16)); glow.addColorStop(1, rgba(tint, 0)); x.fillStyle = glow;
+    poly(x, [iso(rx, ry), iso(rx + rw, ry), iso(rx + rw, ry + rh), iso(rx, ry + rh)], glow); }
+  for (const [id, [rx, ry, rw, rh]] of Object.entries(W_ROOMS)) { const tint = W_TINT[id], glass = rgba(tint, light ? 0.14 : 0.1); // walls with door gaps
+    for (let i = 0; i < rw; i++) { if (W_DOORS.has(`${rx + i},${ry},v`)) { face(x, rx + i, ry, 1, WALL - 18, WALL, glass); continue; } face(x, rx + i, ry, 1, 0, WALL, glass); }
+    for (let j = 0; j < rh; j++) { if (W_DOORS.has(`${rx},${ry + j},h`)) { faceY(x, rx, ry + j, 1, WALL - 18, WALL, glass); continue; } faceY(x, rx, ry + j, 1, 0, WALL, glass); }
+    for (let k = 0; k <= rw; k++) { const [p, q] = iso(rx + k, ry), [, q2] = iso(rx + k, ry, WALL); x.fillStyle = rgba(tint, 0.4); x.fillRect(p - 2, q2, 4, q - q2); }
+    for (let k = 1; k <= rh; k++) { const [p, q] = iso(rx, ry + k), [, q2] = iso(rx, ry + k, WALL); x.fillStyle = rgba(tint, 0.4); x.fillRect(p - 2, q2, 4, q - q2); }
+    x.save(); x.shadowColor = rgba(tint, 1); x.shadowBlur = 10; x.strokeStyle = rgba(tint, 0.95); x.lineWidth = 3;
+    x.beginPath(); x.moveTo(...iso(rx, ry + rh, WALL)); x.lineTo(...iso(rx, ry, WALL)); x.lineTo(...iso(rx + rw, ry, WALL)); x.stroke(); x.restore(); }
+  W_STATIONS = {}; const order = Object.entries(W_ROOMS).sort((p, q) => (p[1][0] + p[1][1]) - (q[1][0] + q[1][1]));
+  for (const [id, [rx, ry]] of order) W_STATIONS[id] = roomProps(x, id, rx, ry, light);
+  const [hx, hy] = iso(8, 6); x.fillStyle = light ? "#c9d6df" : "#14263a"; x.beginPath(); x.ellipse(hx, hy, 130, 56, 0, 0, 6.283); x.fill();
+  x.strokeStyle = rgba([169, 139, 255], 0.7); x.lineWidth = 3; x.stroke(); x.fillStyle = light ? "#b5c6d2" : "#0f1e30"; x.beginPath(); x.ellipse(hx, hy - 8, 102, 44, 0, 0, 6.283); x.fill();
+  box(x, 7.55, 7.45, 0.9, 0.25, 30, light ? "#c9d6df" : "#22384a"); face(x, 7.65, 7.5, 0.7, 34, 54, "#0a1830", rgba([120, 160, 255], 0.9)); }   // Jarvis's console
+function wScreens(x, t) { // a working agent's own workstation screen, showing its kind of work
+  OPS.agents.forEach(a => { if (a.state !== "working" || !WORK.has(a.room)) return;
+    const i = OPS.agents.filter(b => b.room === a.room).indexOf(a), st = (W_STATIONS[a.room] || [])[i]; if (!st) return;
+    const m = W_MOVE[a.name]; if (m && m.path.length) return;                               // not there yet
+    for (const [tx, ty, w] of st) { const p = [iso(tx, ty, 41), iso(tx + w, ty, 41), iso(tx + w, ty, 71), iso(tx, ty, 71)];
+      x.save(); x.shadowColor = rgba(W_TINT[a.room], 1); x.shadowBlur = 14; poly(x, p, "#06140e"); x.restore();
+      const col = rgba(W_TINT[a.room], 1), k = REDUCED ? 0 : Math.floor(t / 300);
+      for (let r = 0; r < 5; r++) lineOn(x, p, 0.08, 0.82 - r * 0.16, 0.08 + 0.2 + 0.6 * (((r + k) * 37) % 10) / 10, 0.82 - r * 0.16, col, 2); } }); }
+function wSprite(x, look, anim, k, cx, cy, flip) { const m = W_META.characters[look] || W_META.characters.engineer, A = m.animations[anim];
+  const [fw, fh] = W_META.frame, S = W_META.scale; x.save(); x.imageSmoothingEnabled = false;
+  if (flip) { x.translate(cx, 0); x.scale(-1, 1); x.translate(-cx, 0); }
+  x.drawImage(W_SHEET, (k % A.frames) * fw, A.row * fh, fw, fh, cx - fw * S / 2, cy - fh * S + 4, fw * S, fh * S); x.restore(); }
+const W_ANIM = { working: ["work", 180], "waiting for you": ["wait", 500], done: ["done", 600], idle: ["idle", 1400] };
+function holo(x, cx, cy, text, t, light) { const w = 260, h = 70, y = cy - 230, a = REDUCED ? 0.85 : 0.78 + 0.1 * Math.sin(t / 500);
   x.save(); x.shadowColor = "#46f2a4"; x.shadowBlur = 18; x.fillStyle = light ? `rgba(225,255,240,${0.92 * a})` : `rgba(70,242,164,${0.16 * a})`; x.strokeStyle = `rgba(70,242,164,${a})`; x.lineWidth = 2;
   x.beginPath(); x.moveTo(cx - w / 2, y + 14); x.lineTo(cx + w / 2, y); x.lineTo(cx + w / 2, y + h - 14); x.lineTo(cx - w / 2, y + h); x.closePath(); x.fill(); x.stroke(); x.restore();
   x.font = "600 17px ui-monospace,Consolas,monospace"; x.fillStyle = light ? "#0b5e3a" : "#c9ffe4"; x.textAlign = "left";
-  const words = String(text).split(/\s+/), lines = [""]; for (const wd of words) { if ((lines[lines.length - 1] + " " + wd).length > 26) { if (lines.length === 2) { lines[1] += "…"; break; } lines.push(wd); } else lines[lines.length - 1] = (lines[lines.length - 1] + " " + wd).trim(); }
-  lines.forEach((ln, i) => x.fillText(ln, cx - w / 2 + 14, y + 34 + i * 22 - i * 3));
-  x.strokeStyle = "rgba(70,242,164,.45)"; x.setLineDash([4, 5]); x.beginPath(); x.moveTo(cx, y + h - 6); x.lineTo(cx, cy - 135); x.stroke(); x.setLineDash([]); }
+  const lines = [""]; for (const wd of String(text).split(/\s+/)) { if ((lines[lines.length - 1] + " " + wd).length > 26) { if (lines.length === 2) { lines[1] += "…"; break; } lines.push(wd); } else lines[lines.length - 1] = (lines[lines.length - 1] + " " + wd).trim(); }
+  lines.forEach((ln, i) => x.fillText(ln, cx - w / 2 + 14, y + 33 + i * 19));
+  x.strokeStyle = "rgba(70,242,164,.45)"; x.setLineDash([4, 5]); x.beginPath(); x.moveTo(cx, y + h - 6); x.lineTo(cx, cy - 140); x.stroke(); x.setLineDash([]); }
+function wCore(x, t, ink, under) { const busy = OPS.agents.some(a => a.state === "working"), [hx, hy] = iso(8, 6), H = 200, col = OPS.hold ? [255, 77, 94] : [169, 139, 255], cy0 = hy - 8;
+  const glass = x.createLinearGradient(hx - 70, 0, hx + 70, 0); glass.addColorStop(0, rgba(col, 0.28)); glass.addColorStop(0.5, rgba(col, 0.05)); glass.addColorStop(1, rgba(col, 0.28));
+  x.fillStyle = glass; x.fillRect(hx - 70, cy0 - H, 140, H); x.strokeStyle = rgba(col, 0.65); x.lineWidth = 2; x.beginPath(); x.moveTo(hx - 70, cy0 - H); x.lineTo(hx - 70, cy0); x.moveTo(hx + 70, cy0 - H); x.lineTo(hx + 70, cy0); x.stroke();
+  const c2 = x.createLinearGradient(hx - 20, 0, hx + 20, 0); c2.addColorStop(0, rgba(col, 0.5)); c2.addColorStop(0.5, rgba([230, 240, 255], 0.9)); c2.addColorStop(1, rgba(col, 0.5)); x.fillStyle = c2; x.fillRect(hx - 18, cy0 - H + 8, 36, H - 12);
+  for (let k = 0; k < 7; k++) { const ph = busy && !REDUCED ? (t / 900 + k / 7) % 1 : k / 7, yy = cy0 - 18 - ph * (H - 36);
+    x.save(); x.shadowColor = rgba(col, 1); x.shadowBlur = busy ? 16 : 6; x.strokeStyle = rgba(col, busy ? 0.95 : 0.45); x.lineWidth = 4; x.beginPath(); x.ellipse(hx, yy, 52, 20, 0, 0, 6.283); x.stroke(); x.restore(); }
+  x.fillStyle = rgba(col, 0.32); x.strokeStyle = rgba(col, 0.8); x.beginPath(); x.ellipse(hx, cy0 - H, 70, 27, 0, 0, 6.283); x.fill(); x.stroke();
+  x.font = "800 22px ui-monospace,Consolas,monospace"; x.textAlign = "center"; x.fillStyle = OPS.hold ? "#ff4d5e" : ink; x.fillText(OPS.hold ? "HOLD" : "HQ CORE", hx, cy0 - H + 8); }
 function drawWorld(t) {
   const c = $("w-floor"), x = c.getContext("2d"); W_HITS = [];
-  const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue("--ink").trim() || "#cfefff";
-  const light = document.documentElement.dataset.theme === "light", key = (light ? "L" : "D") + c.width;
+  const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#cfefff", light = document.documentElement.dataset.theme === "light", key = (light ? "L" : "D") + c.width;
   if (W_STATIC_KEY !== key) { W_STATIC = document.createElement("canvas"); W_STATIC.width = c.width; W_STATIC.height = c.height; drawStatic(W_STATIC, light); W_STATIC_KEY = key; }
-  x.drawImage(W_STATIC, 0, 0);
-  const busy = OPS.agents.some(a => a.state === "working"), [hx, hy] = iso(6, 6), H = 210;
-  function core() { // the core's light: brighter and turning only while an agent works; red on HOLD
-    const col = OPS.hold ? [255, 77, 94] : [169, 139, 255], cy0 = hy - 10;
-    const glass = x.createLinearGradient(hx - 74, 0, hx + 74, 0); glass.addColorStop(0, rgba(col, 0.28)); glass.addColorStop(0.5, rgba(col, 0.05)); glass.addColorStop(1, rgba(col, 0.28));
-    x.fillStyle = glass; x.fillRect(hx - 74, cy0 - H, 148, H);
-    x.strokeStyle = rgba(col, 0.65); x.lineWidth = 2; x.beginPath(); x.moveTo(hx - 74, cy0 - H); x.lineTo(hx - 74, cy0); x.moveTo(hx + 74, cy0 - H); x.lineTo(hx + 74, cy0); x.stroke();
-    const col2 = x.createLinearGradient(hx - 22, 0, hx + 22, 0); col2.addColorStop(0, rgba(col, 0.5)); col2.addColorStop(0.5, rgba([230, 240, 255], 0.9)); col2.addColorStop(1, rgba(col, 0.5));
-    x.fillStyle = col2; x.fillRect(hx - 20, cy0 - H + 8, 40, H - 12);
-    for (let k = 0; k < 7; k++) { const ph = busy && !REDUCED ? (t / 900 + k / 7) % 1 : k / 7, yy = cy0 - 18 - ph * (H - 36);
-      x.save(); x.shadowColor = rgba(col, 1); x.shadowBlur = busy ? 16 : 6; x.strokeStyle = rgba(col, busy ? 0.95 : 0.45); x.lineWidth = 4;
-      x.beginPath(); x.ellipse(hx, yy, 56, 21, 0, 0, 6.283); x.stroke(); x.restore(); }
-    x.fillStyle = rgba(col, 0.32); x.strokeStyle = rgba(col, 0.8); x.beginPath(); x.ellipse(hx, cy0 - H, 74, 29, 0, 0, 6.283); x.fill(); x.stroke();
-    x.font = "800 24px ui-monospace,Consolas,monospace"; x.textAlign = "center"; x.fillStyle = OPS.hold ? "#ff4d5e" : ink;
-    x.fillText(OPS.hold ? "HOLD" : "JARVIS", hx, cy0 - H + 8);
-  }
-  // Room names on the building's outside edge, never over a robot: above the back walls for the
-  // rooms at the back, on the lit slab for the rooms at the front.
-  const SIGN = { research: [0, 3.0, WALL + 30], studio: [6, 0, WALL + 30], workshop: [10.6, 0, WALL + 30], approvals: [0, 6, WALL + 30],
-    lounge: [3, 12, -SLAB / 2 - 12], delivery: [9, 12, -SLAB / 2 - 12], repair: [12, 6, -SLAB / 2 - 12] };
-  for (const [id, [sx, sy, sz]] of Object.entries(SIGN)) {
-    const name = ((OPS.rooms.find(r => r.id === id) || {}).name || id).toUpperCase(), [lx, ly] = iso(sx, sy, sz);
-    const n = OPS.counts[id] || 0, text = n ? `${name} · ${n}` : name;
-    x.font = "800 21px ui-monospace,Consolas,monospace"; x.textAlign = "center"; const w = x.measureText(text).width + 22;
-    x.fillStyle = light ? "rgba(255,255,255,.9)" : "rgba(2,6,11,.82)"; x.fillRect(lx - w / 2, ly - 22, w, 30);
-    x.strokeStyle = rgba(W_TINT[id], 0.85); x.lineWidth = 1.5; x.strokeRect(lx - w / 2, ly - 22, w, 30);
-    x.fillStyle = rgba(W_TINT[id], 1); x.fillText(text, lx, ly); }
-  const placed = [];
-  const byRoom = {}; for (const a of OPS.agents) (byRoom[a.room] = byRoom[a.room] || []).push(a);
-  for (const [id, list] of Object.entries(byRoom)) { const s = spotsFor(id), [rx, ry, rw] = W_ROOMS[id] || W_ROOMS.lounge;
-    list.forEach((a, i) => { const p = s[i] || [rx + 0.6 + (i % rw) * 0.9, ry + 3.6]; placed.push([p[0] + p[1], a, i, p, id]); }); }
-  placed.sort((p, q) => p[0] - q[0]);
-  const holos = []; let coreDrawn = false;
-  for (const [depth, a, i, [sx, sy], id] of placed) {
-    if (!coreDrawn && depth > 12) { core(); coreDrawn = true; }          // robots behind the core first
-    const [cx, cy] = iso(sx, sy), moving = a.state === "working" && !REDUCED;
-    const L = W_LAYOUT[id]; if (L && L.desks && a.state === "working") { // its own desk screen lights up
-      const [dx, dy] = L.desks[i] || L.desks[0], [rx, ry] = W_ROOMS[id];
-      const p = [iso(rx + dx + 0.16, ry + dy + 0.11, 44), iso(rx + dx + 0.76, ry + dy + 0.11, 44), iso(rx + dx + 0.76, ry + dy + 0.11, 74), iso(rx + dx + 0.16, ry + dy + 0.11, 74)];
-      x.save(); x.shadowColor = "#46f2a4"; x.shadowBlur = 16; poly(x, p, rgba([70, 242, 164], moving ? 0.65 + 0.25 * Math.sin(t / 170 + i) : 0.85)); x.restore(); }
-    wRobot(x, cx, cy, a.state, t + i * 500, moving, a === W_SEL);
-    x.font = "700 21px ui-monospace,Consolas,monospace"; x.textAlign = "center";
-    const w = x.measureText(a.name).width + 16; x.fillStyle = light ? "rgba(255,255,255,.85)" : "rgba(2,6,11,.72)"; x.fillRect(cx - w / 2, cy + 12, w, 28);
-    x.fillStyle = a === W_SEL ? "#ffb340" : ink; x.fillText(a.name, cx, cy + 33);
-    if (a.quiet_minutes) { x.fillStyle = "#ffb340"; x.fillText(`quiet ${a.quiet_minutes} min`, cx, cy + 60); }
-    if (a.state === "working" && a.job) holos.push([cx, cy, a.job.objective]);
-    W_HITS.push([cx - 50, cy - 140, 100, 185, a]);
-  }
-  if (!coreDrawn) core();
+  x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = light ? "#dbe7ef" : "#02060b"; x.fillRect(0, 0, c.width, c.height);
+  x.setTransform(W_VIEW.z, 0, 0, W_VIEW.z, W_VIEW.x, W_VIEW.y);              // your zoom and position
+  x.drawImage(W_STATIC, 0, 0); if (!W_SHEET) return;
+  const dt = Math.min(0.1, (t - (W_LAST || t)) / 1000); W_LAST = t;
+  for (const a of OPS.agents) { const m = W_MOVE[a.name]; if (!m || !m.path.length) continue;      // walking: 2.2 tiles a second
+    let go = 2.2 * dt; while (go > 0 && m.path.length) { const [px, py] = m.path[0], dx = px - m.x, dy = py - m.y, d = Math.hypot(dx, dy);
+      if (d <= go) { m.x = px; m.y = py; m.path.shift(); go -= d; } else { m.x += dx / d * go; m.y += dy / d * go; m.dir = [dx, dy]; go = 0; } } }
+  wScreens(x, t);
+  const placed = OPS.agents.map(a => [a, W_MOVE[a.name]]).filter(([, m]) => m).sort((p, q) => (p[1].x + p[1].y) - (q[1].x + q[1].y));
+  const holos = []; let core = false;
+  for (const [a, m] of placed) {
+    if (!core && m.x + m.y > 14) { wCore(x, t, ink); core = true; }
+    const [cx, cy] = iso(m.x, m.y), walking = m.path.length > 0;
+    let anim, k;
+    if (walking) { const sdy = m.dir[0] + m.dir[1], sdx = m.dir[0] - m.dir[1]; anim = sdy < 0 ? "walk_back" : "walk_front"; k = Math.floor(t / 140); m.flip = sdx < 0; }
+    else { const [an, ms] = W_ANIM[a.state] || ["blocked", 400]; anim = an; k = REDUCED ? 0 : Math.floor(t / ms); m.flip = false; }
+    x.fillStyle = "rgba(0,0,0,.4)"; x.beginPath(); x.ellipse(cx, cy, 34, 13, 0, 0, 6.283); x.fill();
+    if (a === W_SEL) { x.strokeStyle = "#ffb340"; x.lineWidth = 3; x.beginPath(); x.ellipse(cx, cy, 44, 17, 0, 0, 6.283); x.stroke(); }
+    wSprite(x, a.look || "engineer", anim, k, cx, cy, m.flip);
+    x.font = "700 19px ui-monospace,Consolas,monospace"; x.textAlign = "center"; const w = x.measureText(a.name).width + 16;
+    x.fillStyle = light ? "rgba(255,255,255,.88)" : "rgba(2,6,11,.74)"; x.fillRect(cx - w / 2, cy + 12, w, 26); x.fillStyle = a === W_SEL ? "#ffb340" : ink; x.fillText(a.name, cx, cy + 31);
+    if (a.quiet_minutes) { x.fillStyle = "#ffb340"; x.fillText(`quiet ${a.quiet_minutes} min`, cx, cy + 56); }
+    if (!walking && a.state === "working" && a.job) holos.push([cx, cy, a.job.objective]);
+    W_HITS.push([cx - 50, cy - 140, 100, 180, a]); }
+  if (!core) wCore(x, t, ink);
   holos.forEach(([cx, cy, txt]) => holo(x, cx, cy, txt, t, light));
-}
+  const SIGN = { research: [0, 2, WALL + 26], forge: [6, 0, WALL + 26], testing: [10, 0, WALL + 26], innovation: [14, 0, WALL + 26], approvals: [0, 6, WALL + 26],
+    studio: [2, 12, -SLAB / 2 - 10], finance: [6, 12, -SLAB / 2 - 10], market: [10, 12, -SLAB / 2 - 10], delivery: [14, 12, -SLAB / 2 - 10], repair: [16, 6, -SLAB / 2 - 10] };
+  for (const [id, [sx, sy, sz]] of Object.entries(SIGN)) { const r = OPS.rooms.find(q => q.id === id) || { name: id }, [lx, ly] = iso(sx, sy, sz), n = OPS.counts[id] || 0;
+    const text = (r.name + (n ? ` · ${n}` : "")).toUpperCase(); x.font = "800 19px ui-monospace,Consolas,monospace"; x.textAlign = "center"; const w = x.measureText(text).width + 20;
+    x.fillStyle = light ? "rgba(255,255,255,.9)" : "rgba(2,6,11,.82)"; x.fillRect(lx - w / 2, ly - 20, w, 28); x.strokeStyle = rgba(W_TINT[id], 0.85); x.lineWidth = 1.5; x.strokeRect(lx - w / 2, ly - 20, w, 28);
+    x.fillStyle = rgba(W_TINT[id], 1); x.fillText(text, lx, ly); } }
 function worldLoop(t) { if (!$("worldbox").classList.contains("show")) return; if (OPS) drawWorld(t);
   worldAnim = REDUCED ? 0 : requestAnimationFrame(worldLoop); }
 function worldInfo(a) {
-  const box = $("w-info"); box.textContent = ""; if (!a) return;
-  box.appendChild(el("h3", null, a.name)); const dl = el("dl");
+  const box2 = $("w-info"); box2.textContent = ""; if (!a) return;
+  box2.appendChild(el("h3", null, a.name)); const dl = el("dl");
   const row = (k, v) => { if (v === null || v === undefined || v === "" || (Array.isArray(v) && !v.length)) return;
     dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, Array.isArray(v) ? v.join(", ") : String(v))); };
-  row("State", a.state); row("Room", (OPS.rooms.find(r => r.id === a.room) || {}).name); row("What it does", a.description);
+  const room = OPS.rooms.find(r => r.id === a.room) || {};
+  row("State", a.state); row("Room", room.name); row("Who works here", room.who); row("What it does", a.description);
   row("Your approval", a.approval); row("Brain", a.brain); row("Tools", a.tools); row("Connectors", a.mcp);
   const j = a.job;
   if (j) { row("Job", j.job_id); row("Mission", j.mission_id); row("Task", j.objective); row("Job status", j.status);
-    row("Model", j.model); row("Last step", j.updated_at); row("Steps", `${j.steps_done} done, ${j.steps_left} left`);
-    row("Cost", "$" + j.cost_usd); row("Errors", j.errors); row("Files made", j.artifacts); row("Next", j.next_action); }
+    row("Model", j.model); row("Last step", j.updated_at); if (j.steps_done || j.steps_left) row("Steps", `${j.steps_done} done, ${j.steps_left} left`);
+    if (j.cost_usd) row("Cost", "$" + j.cost_usd); row("Errors", j.errors); row("Files made", j.artifacts); row("Next", j.next_action); }
   else row("Job", "none yet");
-  box.appendChild(dl);
+  box2.appendChild(dl);
   if (j && /^(PENDING|RUNNING|WAITING_FOR_APPROVAL)$/.test(j.status) && j.mission_id && j.mission_id !== "adhoc") {
-    const p = el("p", null, "To stop it, at a terminal: "); p.appendChild(el("code", null, "bau mission cancel " + j.mission_id)); box.appendChild(p); }
+    const p = el("p", null, "To stop it, at a terminal: "); p.appendChild(el("code", null, "bau mission cancel " + j.mission_id)); box2.appendChild(p); }
 }
 async function loadWorld() {
   try { OPS = await apiJson("/api/world"); } catch (e) { $("w-counts").textContent = e.message; return; }
-  const n = OPS.counts, total = OPS.agents.length;
-  $("w-counts").textContent = ""; const s = $("w-counts");
-  const part = (k, label) => { s.appendChild(el("b", null, String(n[k] || 0))); s.appendChild(document.createTextNode(` ${label} · `)); };
-  s.appendChild(document.createTextNode(`${total} agents: `));
-  part("research", "researching"); part("studio", "in the studio"); part("workshop", "in the workshop");
-  part("approvals", "waiting for you"); part("repair", "stopped"); part("delivery", "delivered today"); part("lounge", "available");
+  if (!W_SHEET) { try { W_META = await apiJson("/world/characters.json"); const im = new Image(); im.src = "/world/characters.png"; await im.decode(); W_SHEET = im; } catch (e) { $("w-counts").textContent = "The characters did not load: " + e.message; } }
+  const byRoom = {}; OPS.agents.forEach(a => { (byRoom[a.room] = byRoom[a.room] || []).push(a); });
+  for (const a of OPS.agents) { const to = spotOf(a, byRoom[a.room].indexOf(a)), m = W_MOVE[a.name], dest = to.join(",");
+    if (!m || REDUCED) W_MOVE[a.name] = { x: to[0], y: to[1], path: [], dest, dir: [0, 1] };     // first sight: where it is now
+    else if (m.dest !== dest) { m.path = path([m.x, m.y], to); m.dest = dest; } }                  // its job changed: it walks there
+  const n = OPS.counts; $("w-counts").textContent = ""; const s = $("w-counts");
+  s.appendChild(document.createTextNode(`${OPS.agents.length} characters, each a real agent: `));
+  [["working", "working"], ["waiting for you", "waiting for you"], ["failed", "stopped"], ["done", "delivered today"], ["idle", "free"]].forEach(([st, label]) => {
+    const k = OPS.agents.filter(a => st === "failed" ? a.room === "repair" : a.state === st).length; s.appendChild(el("b", null, String(k))); s.appendChild(document.createTextNode(` ${label} · `)); });
   if (OPS.hold) s.appendChild(el("b", null, "HOLD: " + OPS.hold));
   if (W_SEL) { W_SEL = OPS.agents.find(a => a.name === W_SEL.name) || null; worldInfo(W_SEL); }
   if (REDUCED) drawWorld(0);
 }
-$("w-floor").onclick = (e) => { const c = $("w-floor"), r = c.getBoundingClientRect();
-  const mx = (e.clientX - r.left) * c.width / r.width, my = (e.clientY - r.top) * c.height / r.height;
-  const hit = W_HITS.find(([hx, hy, w, h]) => mx >= hx && mx <= hx + w && my >= hy && my <= hy + h);
+function wPoint(e) { const c = $("w-floor"), r = c.getBoundingClientRect();
+  return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; }
+$("w-floor").addEventListener("wheel", (e) => { e.preventDefault(); const [mx, my] = wPoint(e), z0 = W_VIEW.z;   // zoom where you point
+  const z = Math.min(3.5, Math.max(1, z0 * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); W_VIEW.x = mx - (mx - W_VIEW.x) * z / z0; W_VIEW.y = my - (my - W_VIEW.y) * z / z0; W_VIEW.z = z;
+  if (z === 1) W_VIEW.x = W_VIEW.y = 0; if (REDUCED && OPS) drawWorld(0); }, { passive: false });
+$("w-floor").onpointerdown = (e) => { W_DRAG = { p: wPoint(e), v: { ...W_VIEW }, moved: false }; };
+addEventListener("pointermove", (e) => { if (!W_DRAG || W_VIEW.z === 1) return; const [mx, my] = wPoint(e);
+  if (Math.hypot(mx - W_DRAG.p[0], my - W_DRAG.p[1]) > 6) W_DRAG.moved = true; W_VIEW.x = W_DRAG.v.x + mx - W_DRAG.p[0]; W_VIEW.y = W_DRAG.v.y + my - W_DRAG.p[1]; if (REDUCED && OPS) drawWorld(0); });
+addEventListener("pointerup", () => { setTimeout(() => { W_DRAG = null; }, 0); });
+$("w-floor").ondblclick = () => { W_VIEW = { z: 1, x: 0, y: 0 }; if (REDUCED && OPS) drawWorld(0); };
+$("w-floor").onclick = (e) => { if (W_DRAG && W_DRAG.moved) return; const [px, py] = wPoint(e);
+  const mx = (px - W_VIEW.x) / W_VIEW.z, my = (py - W_VIEW.y) / W_VIEW.z;
+  const hit = W_HITS.slice().reverse().find(([hx, hy, w, h]) => mx >= hx && mx <= hx + w && my >= hy && my <= hy + h);
   W_SEL = hit ? hit[4] : null; worldInfo(W_SEL); if (REDUCED && OPS) drawWorld(0); };
 function closeWorld() { overlay("worldbox", false); clearInterval(worldTimer); cancelAnimationFrame(worldAnim); }
 $("c-world").onclick = async () => { if ($("worldbox").classList.contains("show")) { closeWorld(); return; }

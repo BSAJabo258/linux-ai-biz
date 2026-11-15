@@ -14,18 +14,30 @@ from typing import Any
 
 from .home import bau_home
 
-# Rooms on the floor, in the order the screen lays them out. ``hq`` is Jarvis's core.
-ROOMS = (("hq", "Jarvis core"), ("research", "Research lab"), ("studio", "Content studio"),
-         ("workshop", "Workshop"), ("approvals", "Waiting for you"), ("delivery", "Delivered"),
-         ("repair", "Stopped"), ("lounge", "Available"))
-# Where an agent works while its job runs; any other agent works in the workshop.
+# Rooms on the floor (docs/visual/VISUAL_ART_DIRECTION.md), with who really works in each.
+# ``hq`` is Jarvis's core; agents with no job wait in its lounge.
+ROOMS = (("hq", "Headquarters", "Jarvis's core; agents with nothing to do wait in its lounge"),
+         ("research", "Research library", "the researcher, and Jarvis when he researches"),
+         ("forge", "The Forge", "any agent without a room of its own"),
+         ("testing", "Testing lab", "Jarvis when his autopilot tests a tool in the sandbox"),
+         ("innovation", "Innovation lab", "Jarvis when he scans or inspects a project"),
+         ("studio", "Studio", "the producer, and Jarvis when he drafts"),
+         ("finance", "Finance", "no agent works here yet"),
+         ("market", "Market", "no agent works here yet"),
+         ("approvals", "Waiting for you", "an agent whose job waits for your approval"),
+         ("repair", "Stopped", "an agent whose job failed, was interrupted or paused"),
+         ("delivery", "Delivered", "an agent whose job finished in the last 24 hours"))
+# Where an agent works while its job runs; any other agent works in the Forge.
 DESK = {"researcher": "research", "producer": "studio"}
+LOOK = {"researcher": "researcher", "producer": "producer", "jarvis": "jarvis"}
+# Jarvis's autopilot jobs (autopilot.GO) and the room each is done in.
+JOB_ROOM = {"scan": "innovation", "inspect": "innovation", "blueprint": "innovation",
+            "sandbox_test": "testing", "research": "research", "learn": "research",
+            "draft": "studio"}
 WORKING = {"PENDING", "RUNNING"}
 STOPPED = {"PAUSED", "WAITING_FOR_NETWORK", "INTERRUPTED", "FAILED", "ROLLED_BACK"}
 RECENT = dt.timedelta(hours=24)          # a finished job stays in its room this long
 QUIET = dt.timedelta(minutes=30)         # a running job with no checkpoint this long is flagged
-
-
 def _when(s: str) -> dt.datetime | None:
     try:
         t = dt.datetime.fromisoformat(s)
@@ -37,18 +49,18 @@ def _when(s: str) -> dt.datetime | None:
 def place(name: str, job: Any, now: dt.datetime) -> tuple[str, str]:
     """(room, state) for an agent from its latest job; ``job`` None means it has none."""
     if job is None:
-        return "lounge", "idle"
+        return "hq", "idle"
     at = _when(job.updated_at)
     fresh = at is not None and now - at < RECENT
     if job.status in WORKING:
-        return DESK.get(name, "workshop"), "working"
+        return DESK.get(name, "forge"), "working"
     if job.status == "WAITING_FOR_APPROVAL":
         return "approvals", "waiting for you"
     if job.status in STOPPED:
         return "repair", job.status.lower().replace("_", " ")
     if job.status == "COMPLETED" and fresh:
         return "delivery", "done"
-    return "lounge", "idle"
+    return "hq", "idle"
 
 
 def _agent_name(job_agent: str) -> str:
@@ -92,9 +104,40 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
                           "artifacts": job.artifacts[-5:], "next_action": job.next_action}
             if state == "working" and at is not None and now - at > QUIET:
                 rec["quiet_minutes"] = int((now - at).total_seconds() // 60)
+        rec["look"] = LOOK.get(name, "engineer")
         agents.append(rec)
+    agents.insert(0, jarvis(home, now))
     held = hold_reason(home)
-    counts = {r: sum(1 for a in agents if a["room"] == r) for r, _ in ROOMS if r != "hq"}
-    return {"rooms": [{"id": r, "name": n} for r, n in ROOMS], "agents": agents,
+    counts = {r: sum(1 for a in agents if a["room"] == r) for r, _, _ in ROOMS}
+    return {"rooms": [{"id": r, "name": n, "who": w} for r, n, w in ROOMS], "agents": agents,
             "hold": held, "counts": counts, "at": now.isoformat(timespec="seconds"),
             "how_to_read": "each robot is an agent; its room is its latest job's state"}
+
+
+def jarvis(home: Path, now: dt.datetime) -> dict[str, Any]:
+    """Jarvis himself: his autopilot's latest task (autopilot.py) puts him in the room where
+    that kind of job is done; with none running he is at his core."""
+    from . import autopilot
+    tasks = autopilot._load(home).get("tasks", [])
+    live = [t for t in tasks if t.get("state") in ("running", "waiting_owner")]
+    t = max(live, key=lambda t: t.get("started") or t.get("created") or "", default=None)
+    if t is None:
+        ended = [t for t in tasks if t.get("state") in ("done", "failed") and t.get("finished")]
+        t = max(ended, key=lambda t: t["finished"], default=None)
+        if t is not None and (_when(t["finished"]) is None or now - _when(t["finished"]) > RECENT):
+            t = None
+    room, state = "hq", "idle"
+    if t is not None:
+        room, state = {"running": (JOB_ROOM.get(t["kind"], "hq"), "working"),
+                       "waiting_owner": ("approvals", "waiting for you"),
+                       "done": ("delivery", "done"),
+                       "failed": ("repair", "failed")}[t["state"]]
+    return {"name": "jarvis", "look": "jarvis", "room": room, "state": state,
+            "description": "Jarvis: his autopilot works its own queue (bau autopilot)",
+            "brain": "the boss model", "tools": [], "mcp": [], "approval": "built in",
+            "job": None if t is None else {
+                "job_id": t["id"], "mission_id": "", "objective": t.get("title", "")[:300],
+                "status": t["state"].upper(), "model": None,
+                "updated_at": t.get("finished") or t.get("started") or t.get("created"),
+                "steps_done": 0, "steps_left": 0, "cost_usd": 0.0, "errors": [],
+                "artifacts": [], "next_action": t.get("note") or None}}
