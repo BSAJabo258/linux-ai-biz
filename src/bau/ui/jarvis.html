@@ -208,6 +208,14 @@ body.showtime #timeline{display:block}body.showtime aside.r{display:none}
 .tl{overflow-wrap:anywhere}.tl b{color:var(--cyan);font-weight:600}.tl small{color:var(--dim);display:block}
 .overlay{position:fixed;inset:0;display:none;place-items:center;background:rgba(1,4,8,.6);z-index:14}
 .overlay.show{display:grid}
+#w-counts{font-size:12px;color:var(--dim);margin-bottom:8px}#w-counts b{color:var(--ink);font-weight:600}
+#worldbox .box{width:min(1400px,calc(100% - 24px))}
+#w-wrap{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:12px;align-items:start}
+#w-floor{width:100%;height:auto;display:block;cursor:pointer}
+#w-info{font-size:12px;line-height:1.5;border-left:1px solid var(--line);padding-left:12px;overflow-wrap:anywhere}
+#w-info h3{margin:0 0 6px;color:var(--cyan);font-size:14px}#w-info dt{color:var(--dim)}#w-info dd{margin:0 0 6px}
+#w-info code{color:var(--amber)}
+@media (max-width:760px){#w-wrap{grid-template-columns:1fr}#w-info{border-left:0;padding-left:0}}
 .overlay .box{width:min(980px,calc(100% - 24px));max-height:calc(100% - 40px);overflow:auto;background:var(--solid);
   border:1px solid var(--cyan);padding:16px}
 .overlay h2{margin:0 0 10px;font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--cyan)}
@@ -259,6 +267,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
     <span class="chip" id="c-hold" hidden>HOLD</span>
     <button class="chip" id="c-time" title="Timeline: everything that happened">TIMELINE</button>
     <button class="chip" id="c-mind" title="The autopilot: his mind, the compass, the vote, his jobs">AUTOPILOT</button>
+    <button class="chip" id="c-world" title="The operations world: every agent, in the room its real job puts it">WORLD</button>
     <button class="chip" id="c-mc" title="Mission Control">MISSION CONTROL</button>
     <button class="chip" id="c-log" title="Show the conversation log">LOG</button>
     <button class="chip" id="c-mute" title="Mute voice">VOICE ON</button>
@@ -305,6 +314,11 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 <div id="mcbox" class="overlay" role="dialog" aria-label="Mission Control"><div class="box">
   <button class="act" id="mc-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Mission Control</h2><div class="tabs" id="mc-tabs"></div><div id="mc-body"></div></div></div>
+<div id="worldbox" class="overlay" role="dialog" aria-label="Operations world"><div class="box">
+  <button class="act" id="world-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
+  <h2>Operations world</h2><div id="w-counts"></div>
+  <div id="w-wrap"><canvas id="w-floor" width="1520" height="900" aria-label="The floor: each robot is one of your agents"></canvas>
+  <div id="w-info"><p>Each robot is one of your agents. Its room comes from its latest real job; with no job it waits in Available. Click a robot.</p></div></div></div></div>
 <div id="help" class="overlay" role="dialog" aria-label="Keyboard keys"><div class="box">
   <button class="act" id="help-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Keyboard keys</h2>
@@ -2843,6 +2857,135 @@ $("c-mind").onclick = () => { document.body.classList.toggle("showmind");
   const on = document.body.classList.contains("showmind"); clearInterval(mindTimer);
   if (on) { loadMind(); mindTimer = setInterval(loadMind, 15000); } };
 
+// ---------------------------------------------------------------- the operations world
+// An isometric floor (the owner's reference pictures, 2026-11-15). Every robot is an agent from
+// /api/world; its room is its latest real job's state. Only a working robot moves (a small bob
+// and its desk screen), and not at all with reduced motion.
+const W_ROOMS = { research: [0, 0, 4, 4], studio: [4, 0, 4, 4], workshop: [8, 0, 4, 4],
+  approvals: [0, 4, 4, 4], hq: [4, 4, 4, 4], repair: [8, 4, 4, 4], lounge: [0, 8, 6, 4], delivery: [6, 8, 6, 4] };
+const W_TINT = { research: [63, 214, 255], studio: [169, 139, 255], workshop: [70, 242, 164], approvals: [255, 179, 64],
+  hq: [63, 214, 255], repair: [255, 77, 94], lounge: [93, 138, 163], delivery: [255, 207, 77] };
+const W_EYE = { working: "#46f2a4", "waiting for you": "#ffb340", done: "#3fd6ff", idle: "#7d98a8" };
+const W_DESKS = new Set(["research", "studio", "workshop"]);
+const TW = 124, TH = 62, OX = 760, OY = 120;
+let OPS = null, worldTimer = null, worldAnim = 0, W_HITS = [], W_SEL = null;
+const iso = (x, y) => [OX + (x - y) * TW / 2, OY + (x + y) * TH / 2];
+function wTile(x, ctx, tx, ty, fill, stroke) { const [a, b] = iso(tx, ty), [c, d] = iso(tx + 1, ty), [e, f] = iso(tx + 1, ty + 1), [g, h] = iso(tx, ty + 1);
+  x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.lineTo(e, f); x.lineTo(g, h); x.closePath(); x.fillStyle = fill; x.fill();
+  if (stroke) { x.strokeStyle = stroke; x.lineWidth = 1; x.stroke(); } }
+function wBox(x, cx, cy, w, d, h, top, side) { // a small isometric block standing on (cx, cy)
+  x.fillStyle = side; x.beginPath(); x.moveTo(cx - w, cy); x.lineTo(cx, cy + d); x.lineTo(cx, cy + d - h); x.lineTo(cx - w, cy - h); x.closePath(); x.fill();
+  x.fillStyle = shade(side, 0.75); x.beginPath(); x.moveTo(cx + w, cy); x.lineTo(cx, cy + d); x.lineTo(cx, cy + d - h); x.lineTo(cx + w, cy - h); x.closePath(); x.fill();
+  x.fillStyle = top; x.beginPath(); x.moveTo(cx, cy - d - h); x.lineTo(cx + w, cy - h); x.lineTo(cx, cy + d - h); x.lineTo(cx - w, cy - h); x.closePath(); x.fill(); }
+function shade(hex, k) { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * k));
+  return "#" + c.map(v => v.toString(16).padStart(2, "0")).join(""); }
+function wRobot(x, cx, cy, state, t, moving) { // pixel robot, feet at (cx, cy); 4 px "pixels"
+  const P = 8, bob = moving ? Math.round(Math.sin(t / 260) * 1.5) : 0, y0 = cy - 15 * P + bob, x0 = cx - 4 * P;
+  const px = (i, j, w, h, c) => { x.fillStyle = c; x.fillRect(x0 + i * P, y0 + j * P, w * P, h * P); };
+  x.fillStyle = "rgba(0,0,0,.35)"; x.beginPath(); x.ellipse(cx, cy, 5 * P, 2 * P, 0, 0, 6.283); x.fill();
+  px(3, 0, 2, 1, "#9fb4c2");                               // antenna
+  px(1, 1, 6, 5, "#d7e3ea"); px(1, 5, 6, 1, "#a9bcc8");     // head
+  px(2, 2, 4, 2, "#0b1a26"); const eye = W_EYE[state] || "#ff4d5e";
+  px(2, 2, 1, 1, eye); px(5, 2, 1, 1, eye);                 // visor and eyes
+  px(2, 7, 4, 4, "#c3d2dc"); px(3, 8, 2, 1, eye);           // body with its status light
+  px(1, 7, 1, 3, "#a9bcc8"); px(6, 7, 1, 3, "#a9bcc8");     // arms
+  px(2, 11, 1, 3, "#8ea3b1"); px(5, 11, 1, 3, "#8ea3b1");   // legs
+}
+function drawWorld(t) {
+  const c = $("w-floor"), x = c.getContext("2d"); x.clearRect(0, 0, c.width, c.height); W_HITS = [];
+  const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue("--ink").trim() || "#cfefff";
+  const light = document.documentElement.dataset.theme === "light";
+  { // the slab under the whole floor, its front edges lit like the reference
+    const [a, b] = iso(0, 12), [c2, d] = iso(12, 12), [e, f] = iso(12, 0), T = 26;
+    x.fillStyle = light ? "#b8c8d3" : "#0a1622"; x.beginPath(); x.moveTo(a, b); x.lineTo(c2, d); x.lineTo(c2, d + T); x.lineTo(a, b + T); x.closePath(); x.fill();
+    x.fillStyle = light ? "#a3b6c3" : "#07111b"; x.beginPath(); x.moveTo(c2, d); x.lineTo(e, f); x.lineTo(e, f + T); x.lineTo(c2, d + T); x.closePath(); x.fill();
+    x.strokeStyle = rgba([110, 90, 255], 0.9); x.lineWidth = 3; x.shadowColor = "#6e5aff"; x.shadowBlur = 14;
+    x.beginPath(); x.moveTo(a, b + T); x.lineTo(c2, d + T); x.lineTo(e, f + T); x.stroke(); x.shadowBlur = 0; }
+  for (const [id, [rx, ry, rw, rh]] of Object.entries(W_ROOMS)) {
+    const tint = W_TINT[id];
+    for (let i = 0; i < rw; i++) for (let j = 0; j < rh; j++)
+      wTile(x, null, rx + i, ry + j, rgba(tint, (i + j) % 2 ? 0.10 : 0.16), rgba(tint, 0.28));
+    const [a, b] = iso(rx, ry), [c2, d] = iso(rx + rw, ry), [e, f] = iso(rx, ry + rh); // back walls, glass
+    x.fillStyle = rgba(tint, 0.10); x.strokeStyle = rgba(tint, 0.55); x.lineWidth = 2;
+    x.beginPath(); x.moveTo(a, b); x.lineTo(c2, d); x.lineTo(c2, d - 48); x.lineTo(a, b - 48); x.closePath(); x.fill(); x.stroke();
+    x.beginPath(); x.moveTo(a, b); x.lineTo(e, f); x.lineTo(e, f - 48); x.lineTo(a, b - 48); x.closePath(); x.fill(); x.stroke();
+  }
+  for (const [id, [rx, ry, rw, rh]] of Object.entries(W_ROOMS)) { // names on top of every wall
+    if (id === "hq") continue;
+    const room = (OPS.rooms.find(r => r.id === id) || {}).name || id, [lx, ly] = iso(rx + rw / 2 + 0.3, ry + rh / 2 + 0.9);
+    x.font = "700 24px ui-monospace,Consolas,monospace"; x.textAlign = "center";
+    x.fillStyle = light ? "rgba(255,255,255,.75)" : "rgba(2,6,11,.6)"; const w = x.measureText(room).width + 18;
+    x.fillRect(lx - w / 2, ly - 18, w, 30); x.fillStyle = rgba(W_TINT[id], light ? 1 : 0.95);
+    x.fillText(room.toUpperCase(), lx, ly + 5);
+  }
+  const busy = OPS.agents.some(a => a.state === "working");
+  const [hx, hy] = iso(6, 6); // Jarvis core: stacked rings, brighter only while an agent works
+  for (let k = 0; k < 7; k++) { const glow = busy && !REDUCED ? 0.5 + 0.35 * Math.sin(t / 400 + k) : 0.35;
+    x.strokeStyle = rgba(OPS.hold ? [255, 77, 94] : [169, 139, 255], glow); x.lineWidth = 6;
+    x.beginPath(); x.ellipse(hx, hy - 20 - k * 26, 70 - k * 4, 28 - k, 0, 0, 6.283); x.stroke(); }
+  x.font = "600 20px ui-monospace,Consolas,monospace"; x.fillStyle = OPS.hold ? "#ff4d5e" : ink;
+  x.fillText(OPS.hold ? "HOLD" : "JARVIS CORE", hx, hy + 44);
+  const byRoom = {}, spots = [];
+  for (const a of OPS.agents) (byRoom[a.room] = byRoom[a.room] || []).push(a);
+  for (const [id, list] of Object.entries(byRoom)) { // two spots per row, off the room's name
+    const [rx, ry, rw] = W_ROOMS[id] || W_ROOMS.lounge, per = Math.max(1, Math.floor(rw / 2));
+    list.forEach((a, i) => spots.push([id, a, i, rx + 0.9 + (i % per) * 2.2, ry + 0.7 + Math.floor(i / per) * 2.6])); }
+  spots.sort((p, q) => (p[3] + p[4]) - (q[3] + q[4]));            // back to front
+  for (const [id, a, i, sx, sy] of spots) { const [cx, cy] = iso(sx, sy); {
+      const moving = a.state === "working" && !REDUCED;
+      if (W_DESKS.has(id)) { // the desk in front: its screen is lit only while the job runs
+        wBox(x, cx + 46, cy + 30, 46, 23, 34, light ? "#c9d6df" : "#22384a", light ? "#9fb2bf" : "#15283a");
+        x.fillStyle = light ? "#5d7383" : "#0b1a26"; x.fillRect(cx + 26, cy - 40, 40, 30);
+        x.fillStyle = a.state === "working" ? rgba([70, 242, 164], moving ? 0.6 + 0.3 * Math.sin(t / 180 + i) : 0.8) : (light ? "#7f93a1" : "#13283a");
+        x.fillRect(cx + 29, cy - 37, 34, 24); }
+      wRobot(x, cx, cy, a.state, t + i * 500, moving);
+      x.font = "600 21px ui-monospace,Consolas,monospace"; x.textAlign = "center"; x.fillStyle = a === W_SEL ? "#ffb340" : ink;
+      x.fillText(a.name, cx, cy + 32);
+      if (a.quiet_minutes) { x.fillStyle = "#ffb340"; x.fillText(`quiet ${a.quiet_minutes} min`, cx, cy + 54); }
+      if (a === W_SEL) { x.strokeStyle = "#ffb340"; x.lineWidth = 2; x.beginPath(); x.ellipse(cx, cy, 40, 16, 0, 0, 6.283); x.stroke(); }
+      W_HITS.push([cx - 44, cy - 130, 88, 170, a]);
+    } }
+}
+function worldLoop(t) { if (!$("worldbox").classList.contains("show")) return; if (OPS) drawWorld(t);
+  worldAnim = REDUCED ? 0 : requestAnimationFrame(worldLoop); }
+function worldInfo(a) {
+  const box = $("w-info"); box.textContent = ""; if (!a) return;
+  box.appendChild(el("h3", null, a.name)); const dl = el("dl");
+  const row = (k, v) => { if (v === null || v === undefined || v === "" || (Array.isArray(v) && !v.length)) return;
+    dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, Array.isArray(v) ? v.join(", ") : String(v))); };
+  row("State", a.state); row("Room", (OPS.rooms.find(r => r.id === a.room) || {}).name); row("What it does", a.description);
+  row("Your approval", a.approval); row("Brain", a.brain); row("Tools", a.tools); row("Connectors", a.mcp);
+  const j = a.job;
+  if (j) { row("Job", j.job_id); row("Mission", j.mission_id); row("Task", j.objective); row("Job status", j.status);
+    row("Model", j.model); row("Last step", j.updated_at); row("Steps", `${j.steps_done} done, ${j.steps_left} left`);
+    row("Cost", "$" + j.cost_usd); row("Errors", j.errors); row("Files made", j.artifacts); row("Next", j.next_action); }
+  else row("Job", "none yet");
+  box.appendChild(dl);
+  if (j && /^(PENDING|RUNNING|WAITING_FOR_APPROVAL)$/.test(j.status) && j.mission_id && j.mission_id !== "adhoc") {
+    const p = el("p", null, "To stop it, at a terminal: "); p.appendChild(el("code", null, "bau mission cancel " + j.mission_id)); box.appendChild(p); }
+}
+async function loadWorld() {
+  try { OPS = await apiJson("/api/world"); } catch (e) { $("w-counts").textContent = e.message; return; }
+  const n = OPS.counts, total = OPS.agents.length;
+  $("w-counts").textContent = ""; const s = $("w-counts");
+  const part = (k, label) => { s.appendChild(el("b", null, String(n[k] || 0))); s.appendChild(document.createTextNode(` ${label} · `)); };
+  s.appendChild(document.createTextNode(`${total} agents: `));
+  part("research", "researching"); part("studio", "in the studio"); part("workshop", "in the workshop");
+  part("approvals", "waiting for you"); part("repair", "stopped"); part("delivery", "delivered today"); part("lounge", "available");
+  if (OPS.hold) s.appendChild(el("b", null, "HOLD: " + OPS.hold));
+  if (W_SEL) { W_SEL = OPS.agents.find(a => a.name === W_SEL.name) || null; worldInfo(W_SEL); }
+  if (REDUCED) drawWorld(0);
+}
+$("w-floor").onclick = (e) => { const c = $("w-floor"), r = c.getBoundingClientRect();
+  const mx = (e.clientX - r.left) * c.width / r.width, my = (e.clientY - r.top) * c.height / r.height;
+  const hit = W_HITS.find(([hx, hy, w, h]) => mx >= hx && mx <= hx + w && my >= hy && my <= hy + h);
+  W_SEL = hit ? hit[4] : null; worldInfo(W_SEL); if (REDUCED && OPS) drawWorld(0); };
+function closeWorld() { overlay("worldbox", false); clearInterval(worldTimer); cancelAnimationFrame(worldAnim); }
+$("c-world").onclick = async () => { if ($("worldbox").classList.contains("show")) { closeWorld(); return; }
+  overlay("worldbox", true); await loadWorld(); clearInterval(worldTimer); worldTimer = setInterval(loadWorld, 5000);
+  cancelAnimationFrame(worldAnim); worldAnim = requestAnimationFrame(worldLoop); };
+$("world-close").onclick = closeWorld;
+
 // ---------------------------------------------------------------- Mission Control, inside
 const MC = [["status", "Status"], ["missions", "Missions"], ["jobs", "Jobs"], ["regulations", "Regulations"],
   ["legal-queue", "Legal queue"], ["economics", "Money"], ["governor", "Watchdog"], ["incidents", "Incidents"], ["brain", "Second Brain"]];
@@ -2950,6 +3093,7 @@ addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if ($("help").classList.contains("show")) overlay("help", false);
     else if ($("mcbox").classList.contains("show")) overlay("mcbox", false);
+    else if ($("worldbox").classList.contains("show")) closeWorld();
     else if (document.body.classList.contains("showtime")) document.body.classList.remove("showtime");
     else if (SEL) closeDetail();
     return; }
