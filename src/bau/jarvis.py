@@ -188,6 +188,9 @@ def portfolio(home: Path, now: dt.datetime | None = None) -> dict[str, Any]:
 # Mission types an approved agent folder can carry out (the audit, 2026-11-10: missions were
 # planned and never ran; `bau mission` had no run and nothing executed a plan).
 AGENT_FOR = {"research": "researcher"}
+# The tools a mission type cannot be done without: checked before its agent starts
+# (agentfolders.readiness), so a missing search service stops it before any work, not halfway.
+NEEDS = {"research": ("search.web",)}
 
 
 def agent_executor(home: Path, audit: Any, jarvis: Any = None, factory: Any = None,
@@ -209,6 +212,17 @@ def agent_executor(home: Path, audit: Any, jarvis: Any = None, factory: Any = No
         name = AGENT_FOR.get(m.mission_type)
         if name is None:
             raise PermissionError(f"no agent carries out {m.mission_type} missions yet")
+        from . import agentfolders as AF
+        if run_agent is None:           # the test hook stands in for a real agent folder
+            ready = AF.readiness(name, home, NEEDS.get(m.mission_type, ()), jarvis=jarvis,
+                                 factory=factory)
+            if not ready["ready"]:
+                gaps = [c for c in ready["checks"] if not c["ok"]]
+                return {"agent": name, "status": "NOT_READY", "verified": False,
+                        "readiness": gaps, "cost_usd": 0.0,
+                        "why_not_verified": "the agent is not ready, nothing ran: " + "; ".join(
+                            f"{c['problem']} ({c['fix']})" if c["fix"] else c["problem"]
+                            for c in gaps)}
         # Through the executive controller (Phase 1, docs/JARVIS_IMPLEMENTATION_MAP.md): one
         # job per mission run, kept in the jobs folder, honouring HOLD and the owner's cancel.
         from .adapters.agent_folder import AgentFolderAdapter
@@ -419,6 +433,13 @@ class Jarvis:
                                                            "error": type(e).__name__})
             raise
         m.steps["execute"] = {k: v for k, v in result.items() if k != "artifacts"}
+        if result.get("status") == "NOT_READY":        # nothing ran: fix it, then run again
+            m.status, m.next_action = "READY", result["why_not_verified"][:500]
+            self.save(m)
+            self.audit.append("mission.not_ready", "jarvis", {
+                "mission_id": m.mission_id, "agent": result.get("agent"),
+                "missing": [c["check"] for c in result.get("readiness", [])]})
+            return m
         verified = bool(result.get("verified", result.get("status") == "COMPLETED"))
         m.steps["verify"] = verified
         m.cost_usd = float(result.get("cost_usd", 0.0))
