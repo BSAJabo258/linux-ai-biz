@@ -2,6 +2,7 @@
 only from its latest real job. No job: Available. Nothing is made up for the screen."""
 
 import datetime as dt
+import json
 
 from bau.jobs import JobStore
 from bau.world import world
@@ -9,14 +10,14 @@ from bau.world import world
 NOW = dt.datetime(2026, 11, 15, 12, 0, tzinfo=dt.UTC)
 
 
-def job(home, agent, status, minutes_ago=1, mission="m1"):
+def job(home, agent, status, minutes_ago=1, mission="m1", job_id=None):
     store = JobStore(home)
     j = store.create(mission, "find mug suppliers", agent, ["agent_loop"])
+    (home / "jobs" / f"{j.job_id}.json").unlink()
+    j.job_id = job_id or j.job_id
     j.status = status
-    store.checkpoint(j)
-    j = store.load(j.job_id)
     j.updated_at = (NOW - dt.timedelta(minutes=minutes_ago)).isoformat()
-    (home / "jobs" / f"{j.job_id}.json").write_text(__import__("json").dumps(j.__dict__))
+    (home / "jobs" / f"{j.job_id}.json").write_text(json.dumps(j.__dict__))
     return j
 
 
@@ -33,8 +34,10 @@ def test_agents_with_no_job_wait_in_available(tmp_path):
 
 
 def test_the_room_follows_the_latest_real_job(tmp_path):
-    job(tmp_path, "researcher", "COMPLETED", minutes_ago=90)
-    job(tmp_path, "researcher", "RUNNING", minutes_ago=2)            # the latest one counts
+    # The latest by time counts, whatever the file order: the older job sorts first, then last.
+    job(tmp_path, "researcher", "COMPLETED", minutes_ago=90, job_id="job_000000000000")
+    job(tmp_path, "researcher", "RUNNING", minutes_ago=2, job_id="job_555555555555")
+    job(tmp_path, "researcher", "FAILED", minutes_ago=200, job_id="job_ffffffffffff")
     job(tmp_path, "folder:producer", "WAITING_FOR_APPROVAL")
     assert rooms(tmp_path)["researcher"] == ("research", "working")
     assert rooms(tmp_path)["producer"] == ("approvals", "waiting for you")
