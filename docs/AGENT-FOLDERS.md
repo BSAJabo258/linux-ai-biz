@@ -33,6 +33,23 @@ bau agents run researcher "Which mug suppliers ship to Ohio in under a week?"
 Or ask Jarvis: "ask the researcher which mug suppliers ship fast". Jarvis can only ask an
 agent you approved.
 
+### Ready before it starts
+
+```bash
+bau agents ready researcher --needs search.web
+```
+
+This checks, before any work, whether the agent is equipped for the job: its folder is
+valid, your approval still matches it, it has every tool the job needs, the services those
+tools use answer (the researcher's web search needs the search service on this computer),
+its MCP servers are approved and pinned, a model is there to run it, and BAU is not on HOLD.
+Each failed check says what is missing and the command that fixes it. Nothing is installed,
+approved or granted by it.
+
+A mission runs this check first (a research mission needs `search.web`). If anything is
+missing, the agent does not start, no job is made, and the mission stays READY with what to
+fix, so the same run card works once it is fixed.
+
 ## Make your own
 
 Start from one of the shipped agents:
