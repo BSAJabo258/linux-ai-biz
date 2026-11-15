@@ -145,7 +145,11 @@ log "BAU $(/usr/local/bin/bau --version) installed"
 
 # ---------------------------------------------------------------- 6. host hardening
 [[ -f /etc/bau/cloud ]] && CLOUD=1
+# The desktop as headquarters (bau hq on, docs/LAPTOP-STATION.md): a re-run keeps its rules.
+HQ=0
+[[ -f /etc/bau/hq ]] && HQ=1
 fw="${HERE}/hardening/nftables.conf"
+((HQ)) && fw="${HERE}/hardening/nftables-hq.conf"
 if ((CLOUD)); then
   fw="${HERE}/hardening/nftables-cloud.conf"
   date -u +%FT%TZ > /etc/bau/cloud
@@ -170,7 +174,13 @@ for u in "${HERE}"/systemd/*.service "${HERE}"/systemd/*.timer; do
   [[ "$(basename "$u")" == bau-jarvis.service ]] && continue    # cloud only, below
   install -m 0644 "$u" /etc/systemd/system/
 done
-if ((CLOUD)); then
+if ((HQ)); then
+  # Jarvis keeps running as the login that turned headquarters on (bau hq on), whoever
+  # re-runs the installer: the laptop's key reaches that login's Jarvis.
+  hq_admin="$(sed -n 's/^admin=//p' /etc/bau/hq | head -1)"
+  [[ -n "${hq_admin}" ]] && getent passwd "${hq_admin}" >/dev/null && ADMIN="${hq_admin}"
+fi
+if ((CLOUD || HQ)); then
   home="$(getent passwd "${ADMIN}" | cut -d: -f6)"
   runuser -u "${ADMIN}" -- mkdir -p -m 0700 "${home}/.config/bau"
   sed -e "s|@ADMIN@|${ADMIN}|g" -e "s|@HOME@|${home}|g" "${HERE}/systemd/bau-jarvis.service" \
@@ -186,7 +196,7 @@ systemctl start bau-regwatch.timer bau-governor.timer bau-scout-watch.timer bau-
 # restart, not start: on an upgrade the dashboard must load the new code now,
 # not at the next reboot (timer jobs pick up new code on their next run).
 systemctl restart bau-ui.service
-if ((CLOUD)); then
+if ((CLOUD || HQ)); then
   systemctl enable bau-jarvis.service >/dev/null
   systemctl restart bau-jarvis.service
 fi
