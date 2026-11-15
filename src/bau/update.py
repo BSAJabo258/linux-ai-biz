@@ -249,8 +249,11 @@ def run(opener: Any = None, runner: Callable[[list[str]], int] | None = None,
     ui_was_up = runner(["systemctl", "is-active", "--quiet", "bau-ui.service"]) == 0
     # Stopped while pip swaps the files: on the owner's desktop (2026-11-01) Mission Control
     # restarted mid-install, found no bau.cli five times and systemd gave up on it.
+    # Only what runs: a unit this computer does not have (bau-jarvis.service before HQ) made
+    # systemctl print "Unit not loaded" in red on the owner's desktop (2026-11-15).
     for unit in SERVICES:
-        runner(["systemctl", "stop", unit])
+        if runner(["systemctl", "is-active", "--quiet", unit]) == 0:
+            runner(["systemctl", "stop", unit])
 
     why = None if _pip(runner, new) else "pip could not install it"
     why = why or _healthy(runner, ui_check, sleep, ui_was_up)
