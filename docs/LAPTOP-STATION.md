@@ -13,8 +13,9 @@ server with BAU's own settings; not yet on your two computers.
   through one encrypted SSH tunnel to the desktop. It runs no Jarvis of its own and needs no
   models, so it keeps its space and memory free.
 - **What the laptop's key can do on the desktop: two things only.** Carry the tunnel to
-  Jarvis, and print Jarvis's address. It cannot open a shell, run a command or reach any
-  other port. All of this was tried and refused on a real SSH server.
+  Jarvis, and print Jarvis's address. It cannot open a shell, run a command, reach any
+  other port, or open a connection back into the desktop. All of this was tried and refused
+  on a real SSH server.
 - **The desktop cannot reach into the laptop.** The laptop accepts no incoming connections,
   so nothing can be pushed to it.
 - **If the home network drops,** the tunnel comes back by itself within seconds. Jarvis's
@@ -39,7 +40,7 @@ It prints the next line for the laptop, with your desktop's address in it.
 From now on, open Jarvis on the desktop itself with:
 
 ```bash
-xdg-open "$(bau jarvis url | tail -1)"
+xdg-open "$(bau jarvis url | tail -1 | sed 's/^[[:space:]]*//')"
 ```
 
 ### 2. On the laptop

@@ -46,7 +46,10 @@ def sshd_conf(admin: str) -> str:
     return ("# BAU headquarters (bau hq on): the laptop station's key is the only way in.\n"
             "PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin no\n"
             f"AllowUsers {admin}\nX11Forwarding no\nAllowAgentForwarding no\n"
-            "PermitTunnel no\nGatewayPorts no\n")
+            "PermitTunnel no\nGatewayPorts no\n"
+            # Only -L tunnels (the station's one to Jarvis): no reverse listeners on this
+            # computer and no Unix-socket forwards, which permitopen does not cover.
+            "AllowTcpForwarding local\nAllowStreamLocalForwarding no\n")
 
 
 def firewall() -> str:

@@ -174,6 +174,12 @@ for u in "${HERE}"/systemd/*.service "${HERE}"/systemd/*.timer; do
   [[ "$(basename "$u")" == bau-jarvis.service ]] && continue    # cloud only, below
   install -m 0644 "$u" /etc/systemd/system/
 done
+if ((HQ)); then
+  # Jarvis keeps running as the login that turned headquarters on (bau hq on), whoever
+  # re-runs the installer: the laptop's key reaches that login's Jarvis.
+  hq_admin="$(sed -n 's/^admin=//p' /etc/bau/hq | head -1)"
+  [[ -n "${hq_admin}" ]] && getent passwd "${hq_admin}" >/dev/null && ADMIN="${hq_admin}"
+fi
 if ((CLOUD || HQ)); then
   home="$(getent passwd "${ADMIN}" | cut -d: -f6)"
   runuser -u "${ADMIN}" -- mkdir -p -m 0700 "${home}/.config/bau"

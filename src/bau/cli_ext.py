@@ -662,8 +662,13 @@ def cmd_mcp(a):
     return EXIT_OK
 
 
-def _sh(*args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(list(args), capture_output=True, text=True, check=check)
+def _sh(*args: str, check: bool = True, timeout: float | None = None
+        ) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(list(args), capture_output=True, text=True, check=check,
+                              timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(list(args), 124, "", f"no answer in {timeout:g} s")
 
 
 def cmd_hq(a):
@@ -711,9 +716,13 @@ def cmd_hq(a):
         print("bau hq: no SSH server on this computer yet. Install it, then run this again:\n"
               "  sudo apt install openssh-server", file=sys.stderr)
         return EXIT_BLOCKED
+    before = S.SSHD_CONF.read_text() if S.SSHD_CONF.exists() else None
     S.SSHD_CONF.write_text(S.sshd_conf(admin))
     if _sh("sshd", "-t", check=False).returncode:
-        S.SSHD_CONF.unlink()
+        if before is None:
+            S.SSHD_CONF.unlink()
+        else:
+            S.SSHD_CONF.write_text(before)                 # put back what was there
         print("bau hq: sshd refused the settings; nothing changed", file=sys.stderr)
         return EXIT_ERROR
     S.FIREWALL.write_text(S.firewall())
@@ -761,6 +770,7 @@ def cmd_station(a):
         desk.write_text(S.launcher(shutil_which("bau") or "/usr/local/bin/bau"))
         _sh("systemctl", "--user", "daemon-reload", check=False)
         _sh("systemctl", "--user", "enable", "--now", "bau-hq-link.service", check=False)
+        _sh("systemctl", "--user", "restart", "bau-hq-link.service", check=False)  # a new desktop
         pub = (key.with_suffix(".pub")).read_text().strip()
         print("On the desktop, at a terminal, run this one line:\n")
         print(f"  sudo bau hq allow '{pub}'\n")
@@ -785,7 +795,8 @@ def cmd_station(a):
         return EXIT_OK if link.stdout.strip() == "active" else EXIT_BLOCKED
     # open: the desktop prints Jarvis's address (the only command this key may run)
     got = _sh("ssh", "-T", "-i", str(key), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes",
-              "-o", "ConnectTimeout=8", desktop, check=False)
+              "-o", "ConnectTimeout=8", "-o", "ServerAliveInterval=5",
+              "-o", "ServerAliveCountMax=2", desktop, check=False, timeout=30)
     try:
         url = S.world_url(got.stdout)
     except ValueError as e:

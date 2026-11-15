@@ -32,7 +32,8 @@ def test_a_station_key_can_only_reach_jarvis(tmp_path):
 def test_ssh_takes_keys_for_the_owner_only():
     conf = S.sshd_conf("owner")
     for want in ("PasswordAuthentication no", "PermitRootLogin no", "AllowUsers owner",
-                 "AllowAgentForwarding no", "X11Forwarding no", "GatewayPorts no"):
+                 "AllowAgentForwarding no", "X11Forwarding no", "GatewayPorts no",
+                 "AllowTcpForwarding local", "AllowStreamLocalForwarding no"):
         assert want in conf
     for bad in ("root", "Owner", "a b", "x\nPermitRootLogin yes"):
         with pytest.raises(ValueError):
@@ -65,6 +66,7 @@ def test_jarvis_runs_for_good_on_this_computer_only():
         S.jarvis_unit("root", "/root")
     sh = (ROOT / "installer/payload/install.sh").read_text()
     assert '[[ -f /etc/bau/hq ]] && HQ=1' in sh and "nftables-hq.conf" in sh
+    assert "sed -n 's/^admin=//p' /etc/bau/hq" in sh             # Jarvis stays the HQ login's
 
 
 def test_the_laptop_tunnel_reconnects_and_forwards_jarvis_only():
@@ -97,7 +99,7 @@ def test_station_commands(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     ran = []
 
-    def fake(*args, check=True):
+    def fake(*args, check=True, timeout=None):
         ran.append(args)
         if args[0] == "ssh-keygen":
             f = Path(args[-1])
@@ -115,6 +117,9 @@ def test_station_commands(tmp_path, monkeypatch, capsys):
     opened = []
     monkeypatch.setattr("webbrowser.open", opened.append)
     assert main(["station", "open"]) == 0 and opened[0].endswith("#world")
+    assert ("systemctl", "--user", "restart", "bau-hq-link.service") in ran   # a new desktop
+    ssh = next(a for a in ran if a[0] == "ssh")
+    assert "ServerAliveInterval=5" in ssh
     assert main(["station", "pair", "owner@bad host"]) != 0
     if __import__("os").geteuid() != 0:
         assert main(["hq", "on"]) != 0                         # needs sudo
