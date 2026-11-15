@@ -1058,6 +1058,12 @@ def cmd_agents(a):
                   "next": f"edit {dest / 'AGENT.md'}, then: bau agents approve {a.name}"})
         elif a.agents_cmd == "add-skill":
             _out(AF.add_skill(Path(a.folder), None))
+        elif a.agents_cmd == "ready":
+            from .assistant import load_env_file, pick_model
+            load_env_file()
+            r = AF.readiness(a.name, None, a.needs or (), jarvis=pick_model())
+            _out(r)
+            return EXIT_OK if r["ready"] else EXIT_BLOCKED
         elif a.agents_cmd == "run":
             from dataclasses import asdict
 
@@ -2188,6 +2194,11 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--from", dest="start_from", default="producer")
     x = w.add_parser("add-skill", help="bring in a downloaded skill folder (text only)")
     x.add_argument("folder")
+    x = w.add_parser("ready", help="is an agent equipped for a job before it starts: folder, "
+                     "approval, tools, the services they need, connectors, model, HOLD")
+    x.add_argument("name")
+    x.add_argument("--needs", action="append", metavar="TOOL",
+                   help="a tool the job cannot be done without (repeat)")
     s.set_defaults(fn=cmd_agents)
 
     s = sub.add_parser("keys", help="bring your API keys from another computer (names only shown)")

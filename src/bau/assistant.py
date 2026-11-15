@@ -717,6 +717,8 @@ class Assistant:
         # The owner's screen said "Done." after both missions came back PAUSED (2026-11-10).
         say = (f"Mission {m.mission_id} is done and checked: every fact in its report is backed "
                "by what its tools found." if m.status == "COMPLETED" else
+               f"Mission {m.mission_id} did not start: {ex.get('why_not_verified')}."
+               if ex.get("status") == "NOT_READY" else
                f"Mission {m.mission_id} is {m.status.lower()}, not done: "
                f"{ex.get('why_not_verified') or m.next_action}.")
         return {"say": say, "mission_id": m.mission_id, "status": m.status,
