@@ -3261,6 +3261,8 @@ async function wake() {
   if (woke) return; woke = true; wokeAt = performance.now(); ensureAudio(); try { if (actx) actx.resume(); } catch (e) {}
   try { speechSynthesis.getVoices(); } catch (e) {}
   const w = $("wake"); w.style.transition = "opacity .6s"; w.style.opacity = "0"; setTimeout(() => w.remove(), 600);
+  // The laptop station opens Jarvis on his world (bau station open adds #world).
+  if (location.hash === "#world" && !$("worldbox").classList.contains("show")) $("c-world").click();
   setState("thinking"); caption("");
   try { handle(await settle(await apiJson("/api/briefing"))); }
   catch (e) { caption(e.message); setState("idle"); }
