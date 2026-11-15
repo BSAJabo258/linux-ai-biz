@@ -174,7 +174,7 @@ def test_bau_mission_cancel_marks_the_running_missions_job_cancelled(tmp_path, m
         cancel_mission(j, m.mission_id, "jarvis")                  # only a human cancels
 
 
-def test_a_mission_left_running_by_a_crash_is_paused_for_the_owner(tmp_path):
+def test_a_mission_left_running_by_a_crash_can_be_run_again(tmp_path):
     from bau.governor import Governor
     from bau.jobs import JobStore
     j = jarvis(tmp_path)
@@ -190,4 +190,50 @@ def test_a_mission_left_running_by_a_crash_is_paused_for_the_owner(tmp_path):
     Governor(tmp_path, online=True).tick(executor=None)
     for mid in (m.mission_id, lone.mission_id):
         back = jarvis(tmp_path).get(mid)
-        assert back.status == "PAUSED" and "interrupted" in back.next_action
+        assert back.status == "READY" and "interrupted" in back.next_action
+    # "Run it again" is true: the owner's run works (only READY runs).
+    again = jarvis(tmp_path).run(jarvis(tmp_path).get(m.mission_id), agent_executor(
+        tmp_path, j.audit, run_agent=agent("x", [])))
+    assert again.status == "PAUSED"                    # ran; its answer was not backed
+
+
+def test_an_agent_that_is_not_ready_does_not_start(tmp_path, monkeypatch):
+    """Readiness (2026-11-15): before the researcher starts, its folder, the owner's approval,
+    the tools the job needs, the services they need and a model are checked. Here it is not
+    approved and has no model: nothing runs, no job is made, and the mission stays READY with
+    what is missing and how to fix it."""
+    from bau import agentfolders as AF
+    from bau.jobs import JobStore
+    ran = []
+    monkeypatch.setattr(AF, "run", lambda *a, **k: ran.append(a))
+    j = jarvis(tmp_path)
+    m = j.plan("research open source video tools", "research", {})
+    m = j.run(m, agent_executor(tmp_path, j.audit))
+    assert ran == [] and JobStore(tmp_path).all() == []
+    assert m.status == "READY" and "not ready, nothing ran" in m.next_action
+    assert "bau agents approve researcher" in m.next_action
+    missing = [c["check"] for c in m.steps["execute"]["readiness"]]
+    assert "owner's approval" in missing and "model" in missing
+    assert '"mission.not_ready"' in (tmp_path / "audit" / "chain.jsonl").read_text()
+
+
+def test_readiness_names_each_gap_and_passes_when_equipped(tmp_path, monkeypatch):
+    from bau import agentfolders as AF
+    from bau.models.providers import ScriptedProvider
+    model = (ScriptedProvider([]), {"id": "fake"})
+    monkeypatch.setattr(AF, "SERVICES", {"search.web": lambda home: "search is down"})
+    r = AF.readiness("researcher", tmp_path, ["search.web", "artifact.publish"], jarvis=model)
+    bad = {c["check"]: c for c in r["checks"] if not c["ok"]}
+    assert not r["ready"]
+    assert "artifact.publish" in bad["tools for this job"]["problem"]
+    assert bad["service for search.web"]["problem"] == "search is down"
+    assert "owner's approval" in bad and "model" not in bad
+    AF.approve("researcher", "human:owner", tmp_path)
+    monkeypatch.setattr(AF, "SERVICES", {"search.web": lambda home: None})
+    r = AF.readiness("researcher", tmp_path, ["search.web"], jarvis=model)
+    assert r["ready"], r
+    (tmp_path / "governor").mkdir()
+    (tmp_path / "governor" / "hold.json").write_text('{"reason": "test"}')
+    r = AF.readiness("researcher", tmp_path, ["search.web"], jarvis=model)
+    assert not r["ready"] and [c["check"] for c in r["checks"] if not c["ok"]] == ["not on HOLD"]
+    assert not AF.readiness("nobody", tmp_path)["ready"]

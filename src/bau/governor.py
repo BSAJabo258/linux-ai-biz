@@ -246,7 +246,8 @@ class Governor:
     def _crashed_missions(self, store: Any, latest: dict[str, dict[str, Any]]
                           ) -> list[Finding]:
         """A mission still RUNNING whose job is gone, interrupted or waiting was left by a crash
-        (Phase 1): it becomes PAUSED, so the owner can run it again. Never resumed silently."""
+        (Phase 1): it goes back to READY, so the owner's run card can run it again (only READY
+        runs; PAUSED could not, found 2026-11-15). Never resumed silently."""
         from .jobs import JobStore
         live = {"RUNNING", "PENDING", "WAITING_FOR_APPROVAL"}
         by_mission: dict[str, list[str]] = {}
@@ -263,12 +264,13 @@ class Governor:
                 continue
             if not states and started and _ts(started) > stale:
                 continue                 # just started: its job is being created
-            m["status"] = "PAUSED"
+            m["status"] = "READY"
             m["next_action"] = "interrupted before it finished: run it again"
             store.append(m)
             latest[m["mission_id"]] = m
             out.append(Finding("missions", "WARN", m["mission_id"],
-                               "left RUNNING by an interruption", "paused for the owner"))
+                               "left RUNNING by an interruption",
+                               "ready for the owner to run again"))
         return out
 
     def _agents(self, st, since, executor) -> list[Finding]:
