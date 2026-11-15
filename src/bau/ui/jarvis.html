@@ -3119,7 +3119,7 @@ async function loadWorld() {
   // A character keeps its seat while it stays in its room: another one leaving never moves it.
   const taken = {}; OPS.agents.forEach(a => { const m = W_MOVE[a.name]; if (m && m.room === a.room) (taken[a.room] = taken[a.room] || new Set()).add(m.seat); });
   for (const a of OPS.agents) { let m = W_MOVE[a.name];
-    if (m && m.room === a.room && !REDUCED) continue;                                         // same room: nothing to do
+    if (m && m.room === a.room) continue;                                                     // same room: keep the seat
     const used = taken[a.room] = taken[a.room] || new Set(); let seat = 0; while (used.has(seat)) seat++; used.add(seat);
     const to = spotOf(a, seat);
     if (!m || REDUCED) W_MOVE[a.name] = { x: to[0], y: to[1], path: [], room: a.room, seat, dir: [0, 1] };   // first sight: where it is now
@@ -3130,9 +3130,11 @@ async function loadWorld() {
     const k = OPS.agents.filter(a => st === "failed" ? a.room === "repair" : a.state === st).length; s.appendChild(el("b", null, String(k))); s.appendChild(document.createTextNode(` ${label} · `)); });
   if (OPS.hold) s.appendChild(el("b", null, "HOLD: " + OPS.hold));
   if (W_SEL) { W_SEL = OPS.agents.find(a => a.name === W_SEL.name) || null; worldInfo(W_SEL); }
-  const list = $("w-list"); list.textContent = "";                                            // the same characters, for the keyboard
+  const list = $("w-list"), had = list.contains(document.activeElement) ? document.activeElement.textContent : null;
+  list.textContent = "";                                                                      // the same characters, for the keyboard
   for (const a of OPS.agents) { const b = el("button", "act", a.name); b.title = `${a.name}: ${a.state}`;
-    b.setAttribute("aria-pressed", String(a === W_SEL)); b.onclick = () => { W_SEL = a; worldInfo(a); if (REDUCED) drawWorld(0); loadList(); }; list.appendChild(b); }
+    b.setAttribute("aria-pressed", String(a === W_SEL)); b.onclick = () => { W_SEL = a; worldInfo(a); if (REDUCED) drawWorld(0); loadList(); }; list.appendChild(b);
+    if (a.name === had) b.focus(); }                                                          // keep the keyboard where it was
   if (REDUCED) drawWorld(0);
 }
 function wPoint(e) { const c = $("w-floor"), r = c.getBoundingClientRect();
