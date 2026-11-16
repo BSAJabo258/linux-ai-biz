@@ -303,3 +303,19 @@ def test_services_stop_before_pip_and_imports_are_checked_as_bau(box, monkeypatc
     imp = next(c for c in box.cmds if "-c" in c)
     assert imp[:4] == ["runuser", "-u", "bau", "--"]
     assert ["systemctl", "reset-failed", "bau-ui.service"] in box.cmds
+
+
+# The owner's desktop, 2026-11-15: bau-jarvis.service is not installed there before HQ, and
+# stopping it printed "Unit not loaded" in red. Only running units are stopped.
+def test_a_unit_that_is_not_running_is_not_stopped(box):
+    real = box.run
+
+    def run(cmd):
+        if cmd[:3] == ["systemctl", "is-active", "--quiet"] and cmd[3] == "bau-jarvis.service":
+            box.cmds.append(cmd)
+            return 3                          # systemctl: not active (or not loaded)
+        return real(cmd)
+    box.run = run
+    assert box.go()["result"] == "installed"
+    assert ["systemctl", "stop", "bau-jarvis.service"] not in box.cmds
+    assert ["systemctl", "stop", "bau-ui.service"] in box.cmds
