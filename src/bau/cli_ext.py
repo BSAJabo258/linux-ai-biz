@@ -677,7 +677,7 @@ def cmd_hq(a):
 
     from . import station as S
     if a.hq_cmd == "status":
-        ak = Path(pwd.getpwnam(a.admin or getpass.getuser()).pw_dir) / ".ssh" / "authorized_keys"
+        ak = Path(pwd.getpwnam(a.admin or _hq_admin(S.MARK)).pw_dir) / ".ssh" / "authorized_keys"
         _out({"headquarters": S.MARK.read_text().strip() if S.MARK.exists() else "off",
               "stations": S.stations(ak),
               "jarvis_service": _sh("systemctl", "is-active", "bau-jarvis.service",
@@ -736,15 +736,42 @@ def cmd_hq(a):
     _sh("systemctl", "enable", "--now", "ssh")
     _sh("systemctl", "reload", "ssh")
     _sh("systemctl", "enable", "--now", "bau-jarvis.service")
+    jarvis_state = _jarvis_started()
     S.MARK.parent.mkdir(parents=True, exist_ok=True)
     S.MARK.write_text(f"admin={admin}\non={S.stamp()}\n")
     AuditLog().append("hq.on", who, {"inbound": "ssh 22, home network, keys only",
                                      "jarvis": "127.0.0.1:8766"})
     ips = _sh("hostname", "-I", check=False).stdout.split()
-    _out({"headquarters": "on", "jarvis": "running for good on 127.0.0.1:8766",
+    _out({"headquarters": "on",
+          "jarvis": "running for good on 127.0.0.1:8766" if jarvis_state == "active"
+                    else f"NOT running ({jarvis_state}): {JARVIS_PORT_HINT}",
           "ssh": "keys only, home network only",
           "next": f"on the laptop: bau station pair {admin}@{ips[0] if ips else 'THIS-COMPUTER'}"})
-    return EXIT_OK
+    return EXIT_OK if jarvis_state == "active" else EXIT_ERROR
+
+
+# The owner's desktop, 2026-11-16: the menu's Jarvis held 8766, so the service restarted 626
+# times with "Address already in use".
+JARVIS_PORT_HINT = ("close the Jarvis window (Ctrl+C), then "
+                    "`sudo systemctl restart bau-jarvis.service`")
+
+
+def _jarvis_started(sleep=None) -> str:
+    """bau-jarvis.service's state a few seconds after start: a service that cannot open its
+    port reads "active" for a moment, then restarts."""
+    import time
+    (sleep or time.sleep)(4)
+    return _sh("systemctl", "is-active", "bau-jarvis.service",
+               check=False).stdout.strip() or "unknown"
+
+
+def _hq_admin(mark: Path) -> str:
+    """Whose login headquarters runs as: the marker's admin, else the sudo user, else me."""
+    if mark.exists():
+        for line in mark.read_text().splitlines():
+            if line.startswith("admin=") and line[6:]:
+                return line[6:]
+    return os.environ.get("SUDO_USER") or getpass.getuser()
 
 
 def cmd_station(a):
@@ -1576,6 +1603,9 @@ def cmd_jarvis(a):
             raise PermissionError("Jarvis runs as the owner's own login, not root or 'bau'")
         owner = f"human:{who}"
     else:
+        from .station import MARK
+        if MARK.exists() and not a.text:
+            return _open_hq_jarvis(key_file, a.port, a.no_browser)
         owner = _human()
     load_env_file()
     jv = build_assistant(owner=owner)
@@ -1603,6 +1633,22 @@ def cmd_jarvis(a):
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
+    return EXIT_OK
+
+
+def _open_hq_jarvis(key_file: Path, port: int, no_browser: bool) -> int:
+    """Headquarters on: Jarvis already runs for good (bau-jarvis.service) on this port, so
+    open him instead of starting a second one that would take his port."""
+    from .ui.jarvis_server import service_key
+    state = _sh("systemctl", "is-active", "bau-jarvis.service", check=False).stdout.strip()
+    if state != "active":
+        print(f"Jarvis runs for good on this computer (headquarters on), but he is {state or 'off'}"
+              ".\nStart him: sudo systemctl restart bau-jarvis.service", file=sys.stderr)
+        return EXIT_ERROR
+    url = f"http://127.0.0.1:{port}/?k={service_key(key_file)}"
+    print(f"Jarvis runs for good on this computer. Open: {url}", file=sys.stderr)
+    if not no_browser:
+        _open_browser(url)
     return EXIT_OK
 
 
