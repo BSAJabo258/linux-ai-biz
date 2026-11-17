@@ -71,7 +71,7 @@ build() {
   cmake -S "${WORK}/src" -B "${WORK}/build" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
     -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_CUDA=ON \
     -DCMAKE_CUDA_ARCHITECTURES="${arch}" -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
-    -DLLAMA_BUILD_SERVER=ON >/dev/null
+    -DLLAMA_BUILD_SERVER=ON -DLLAMA_USE_PREBUILT_UI=OFF >/dev/null   # no web page: image/inside.sh
   cmake --build "${WORK}/build" --target llama-server -j "$(nproc)" >/dev/null
   [[ -f ${WORK}/build/bin/libggml-cuda.so ]] || { say "Built without CUDA: refusing."; exit 1; }
   rm -rf "${DEST}.new" && mkdir -p "${DEST}.new"

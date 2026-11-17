@@ -449,3 +449,16 @@ def test_the_desktops_wifi_card_keeps_power_saving_off():
             / "bau-mt7921-powersave.conf").read_text()
     lines = [x for x in conf.splitlines() if x and not x.startswith("#")]
     assert lines == ["[connection-bau-mt7921]", "match-device=driver:mt7921e", "wifi.powersave=2"]
+
+
+# build-live failed on 2026-11-17: llama.cpp's build downloaded its chat page from a Hugging
+# Face bucket whose "latest" no longer passes the pinned build's own check ("missing required
+# asset workbox[hash].js"). BAU starts the server with --no-webui, so neither build fetches
+# the page: the stick and the desktop's CUDA build no longer depend on that download.
+def test_llama_cpp_builds_never_download_its_web_page():
+    inside = (ROOT / "image" / "inside.sh").read_text()
+    cuda = (CONF / "includes.chroot" / "usr" / "local" / "sbin" / "bau-llm-cuda").read_text()
+    for script in (inside, cuda):
+        assert script.count("cmake -S") == 1 and "-DLLAMA_USE_PREBUILT_UI=OFF" in script
+    unit = (CONF / "includes.chroot" / "etc" / "systemd" / "system" / "bau-llm.service").read_text()
+    assert "--no-webui" in unit
