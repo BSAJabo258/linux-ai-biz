@@ -195,6 +195,16 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 self._send(200, (resources.files("bau.ui") / "world" / path[7:]).read_bytes(),
                            WORLD_ART[path])
                 return
+            if path.startswith("/world/portrait/") and path.endswith(".png"):
+                if not self._guard(api=False):       # a painted portrait (docs/WORLD.md)
+                    return
+                from ..world import portrait_file
+                got = portrait_file(assistant.home, path[16:-4])
+                if got is None:
+                    self._send(404, b"no portrait", "text/plain")
+                else:
+                    self._send(200, got.read_bytes(), "image/png")
+                return
             if not path.startswith("/api/"):
                 self._send(404, b"not found", "text/plain")
                 return

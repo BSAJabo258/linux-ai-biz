@@ -217,6 +217,7 @@ body.showtime #timeline{display:block}body.showtime aside.r{display:none}
 #w-info{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 #w-info h3{margin:0 0 6px;color:var(--cyan);font-size:14px}#w-info dt{color:var(--dim)}#w-info dd{margin:0 0 6px}
 #w-info code{color:var(--amber)}
+.w-portrait{display:block;width:100%;max-width:260px;border-radius:8px;margin:0 0 8px;border:1px solid var(--cyan)}
 @media (max-width:760px){#w-wrap{grid-template-columns:1fr}#w-side{border-left:0;padding-left:0}}
 .overlay .box{width:min(980px,calc(100% - 24px));max-height:calc(100% - 40px);overflow:auto;background:var(--solid);
   border:1px solid var(--cyan);padding:16px}
@@ -319,8 +320,8 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 <div id="worldbox" class="overlay" role="dialog" aria-label="Operations world"><div class="box">
   <button class="act" id="world-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Operations world</h2><div id="w-counts"></div><div id="w-help">Scroll to zoom · drag to move · double-click to see it all · click a character</div>
-  <div id="w-wrap"><canvas id="w-floor" width="1800" height="1120" aria-label="The floor: each robot is one of your agents"></canvas>
-  <div id="w-side"><div id="w-list" aria-label="Characters"></div><div id="w-info"><p>Each character is one of your agents, or Jarvis himself. Its room comes from its latest real job; with nothing to do it waits in the Headquarters lounge. Click a character.</p></div></div></div></div></div>
+  <div id="w-wrap"><canvas id="w-floor" width="1800" height="1120" aria-label="The floor: each character is one of your agents"></canvas>
+  <div id="w-side"><div id="w-list" aria-label="Characters"></div><div id="w-info"><p>Each character is one of your agents, or Jarvis herself. Her room comes from her latest real job; with nothing to do she waits in the Headquarters lounge. Click a character.</p></div></div></div></div></div>
 <div id="help" class="overlay" role="dialog" aria-label="Keyboard keys"><div class="box">
   <button class="act" id="help-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Keyboard keys</h2>
@@ -3094,7 +3095,9 @@ function worldLoop(t) { if (!$("worldbox").classList.contains("show")) return; i
   worldAnim = REDUCED ? 0 : requestAnimationFrame(worldLoop); }
 function worldInfo(a) {
   const box2 = $("w-info"); box2.textContent = ""; if (!a) return;
-  box2.appendChild(el("h3", null, a.name)); const dl = el("dl");
+  box2.appendChild(el("h3", null, a.name));
+  if (a.portrait) { const im = el("img", "w-portrait"); im.src = "/world/portrait/" + encodeURIComponent(a.look) + ".png"; im.alt = a.name + "'s portrait"; box2.appendChild(im); }
+  const dl = el("dl");
   const row = (k, v) => { if (v === null || v === undefined || v === "" || (Array.isArray(v) && !v.length)) return;
     dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, Array.isArray(v) ? v.join(", ") : String(v))); };
   const room = OPS.rooms.find(r => r.id === a.room) || {};
