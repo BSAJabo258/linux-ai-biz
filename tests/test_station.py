@@ -123,3 +123,42 @@ def test_station_commands(tmp_path, monkeypatch, capsys):
     assert main(["station", "pair", "owner@bad host"]) != 0
     if __import__("os").geteuid() != 0:
         assert main(["hq", "on"]) != 0                         # needs sudo
+
+
+# The owner's desktop, 2026-11-16: the menu's Jarvis held port 8766, so bau-jarvis.service
+# restarted 626 times ("Address already in use"). With headquarters on, `bau jarvis` opens
+# the one that runs for good instead of starting a second.
+def test_with_headquarters_on_the_menu_opens_the_jarvis_that_runs_for_good(tmp_path,
+                                                                          monkeypatch, capsys):
+    from bau import cli_ext, station
+    from bau.cli import main
+    mark = tmp_path / "hq"
+    mark.write_text("admin=owner\non=2026-11-17T00:42:49+00:00\n")
+    monkeypatch.setattr(station, "MARK", mark)
+    keyf = tmp_path / "jarvis.key"
+    state = {"now": "active"}
+    monkeypatch.setattr(cli_ext, "_sh", lambda *a, check=True, timeout=None:
+                        subprocess.CompletedProcess(a, 0, state["now"] + "\n", ""))
+    monkeypatch.setattr("bau.assistant.build_assistant",
+                        lambda **k: (_ for _ in ()).throw(AssertionError("second Jarvis")))
+    opened = []
+    monkeypatch.setattr(cli_ext, "_open_browser", opened.append)
+    assert main(["jarvis", "--key-file", str(keyf)]) == 0
+    assert opened[0].startswith("http://127.0.0.1:8766/?k=")
+    assert keyf.read_text().strip() in opened[0]
+    state["now"] = "activating"
+    assert main(["jarvis", "--key-file", str(keyf)]) != 0          # says how to start him
+    assert "systemctl restart bau-jarvis.service" in capsys.readouterr().err
+
+
+def test_hq_on_checks_jarvis_really_started_and_status_reads_the_admin(tmp_path, monkeypatch):
+    from bau import cli_ext
+    seen = []
+    monkeypatch.setattr(cli_ext, "_sh", lambda *a, check=True, timeout=None:
+                        subprocess.CompletedProcess(a, 0, "activating\n", ""))
+    assert cli_ext._jarvis_started(sleep=seen.append) == "activating" and seen == [4]
+    mark = tmp_path / "hq"
+    monkeypatch.setenv("SUDO_USER", "someone")
+    assert cli_ext._hq_admin(mark) == "someone"
+    mark.write_text("admin=bauadmin\non=x\n")
+    assert cli_ext._hq_admin(mark) == "bauadmin"
