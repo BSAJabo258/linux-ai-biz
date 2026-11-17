@@ -1,7 +1,7 @@
 {
  "anchor": [
-  16,
-  43
+  48,
+  131
  ],
  "characters": {
   "analyst": {
@@ -35,7 +35,7 @@
      "row": 38
     }
    },
-   "role": "big dark curls, gold and bronze two-piece, a tablet"
+   "role": "big dark curls, gold glossy two-piece, a tablet"
   },
   "architect": {
    "animations": {
@@ -237,8 +237,8 @@
   }
  },
  "frame": [
-  32,
-  44
+  96,
+  132
  ],
- "scale": 3
+ "scale": 1
 }

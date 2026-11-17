@@ -54,8 +54,11 @@ The owner's AI assistants, from his picture of 2026-11-17 (an illustration of se
 neon operations office; kept out of the repository like the first three, its source and
 licence unknown): glamorous adult women in glossy neon two-piece outfits with chokers,
 armbands and boots, each with her own hair, skin, colours and the tool of her job
-(`scripts/world_sprites.py`, sheet `src/bau/ui/world/characters.png`, 32 by 44 art pixels a
-frame, drawn 3x, a dark outline, a shine on every glossy piece). All are fictional adults;
+(`scripts/world_sprites.py`, sheet `src/bau/ui/world/characters.png`). High definition (the
+owner, 2026-11-17: "best graphics possible"): each 96 by 132 frame is designed on a 64 by 88
+grid, drawn three times bigger and smoothed down, so skin, hair and the glossy outfits are
+softly shaded, the faces have eyes with irises and lashes, brows and glossy lips; then a crisp
+dark outline and a neon rim light in her own colour. All are fictional adults;
 none is drawn from a real person.
 
 | Character | Who it is | Her look | What she works with |

@@ -38,13 +38,15 @@ Then make a design sheet (every character, every animation, 5x, on a dark backgr
 Pillow and look at it yourself. Check that:
 - arms that go up show beside the head, not behind it;
 - the walking legs change between frames;
-- the eyes read at 3x.
+- the eyes, brows and lips read at normal size.
 
 ## Rules
 
-- Frames are 32 by 44 art pixels and transparent outside the character. Nothing is
-  antialiased: the page draws them with smoothing off.
-- Light comes from the top left: a lighter row on top, a darker column on the right.
+- Frames are 96 by 132 pixels, shown at their own size, transparent outside the character.
+  Each is designed on a 64 by 88 grid, drawn three times bigger and smoothed down (soft
+  shading inside), then given a hard silhouette, a dark outline and a rim light in her trim
+  colour; the page draws them with smoothing off, so zooming keeps them crisp.
+- Light comes from the top left: a highlight top left, a shade on the right of every part.
 - Do not import sprites from elsewhere unless their licence allows business use (the owner's
   only-free-open-source rule) and the source is written in the asset table of the art
   direction document.
