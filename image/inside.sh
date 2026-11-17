@@ -33,12 +33,16 @@ if [[ ! -x ${llama}/llama-server ]]; then
     "${src}"
   [[ $(git -C "${src}" rev-parse HEAD) == "${LLAMA_COMMIT}" ]] \
     || { echo "llama.cpp ${LLAMA_TAG} is not commit ${LLAMA_COMMIT}: refusing" >&2; exit 1; }
+  # No web page: by default this build downloads llama.cpp's chat page from a Hugging Face
+  # bucket, whose "latest" no longer passes this build's own file check (build-live failed
+  # 2026-11-17: "missing required asset workbox[hash].js"). BAU runs it with --no-webui.
   # Portable: one CPU backend per instruction-set level, picked at run time on the owner's PC,
   # plus the Vulkan backend for the desktop's NVIDIA card (docs/DESKTOP.md); it is a separate
   # loadable part, and bau-llm-start keeps it off unless NVIDIA's driver is loaded.
   cmake -S "${src}" -B "${src}/build" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
     -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_VULKAN=ON \
-    -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON >/dev/null
+    -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON \
+    -DLLAMA_USE_PREBUILT_UI=OFF >/dev/null
   cmake --build "${src}/build" --target llama-server -j "$(nproc)" >/dev/null
   rm -rf "${llama}"
   mkdir -p "${llama}"
