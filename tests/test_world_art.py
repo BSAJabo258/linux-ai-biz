@@ -31,7 +31,8 @@ def test_the_committed_sheet_is_what_the_script_draws():
 def test_every_character_has_every_animation_and_its_own_look():
     meta = json.loads((ART / "characters.json").read_text())
     w, h = meta["frame"]
-    assert set(meta["characters"]) == {"jarvis", "researcher", "producer", "engineer"}
+    assert set(meta["characters"]) == {"jarvis", "researcher", "producer", "engineer",
+                                       "coordinator", "analyst", "architect"}
     for who, c in meta["characters"].items():
         assert set(c["animations"]) == {"idle", "walk_front", "walk_back", "work", "wait",
                                         "blocked", "done"}, who

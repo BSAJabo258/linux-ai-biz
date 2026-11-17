@@ -4,6 +4,105 @@
   43
  ],
  "characters": {
+  "analyst": {
+   "animations": {
+    "blocked": {
+     "frames": 2,
+     "row": 40
+    },
+    "done": {
+     "frames": 2,
+     "row": 41
+    },
+    "idle": {
+     "frames": 2,
+     "row": 35
+    },
+    "wait": {
+     "frames": 2,
+     "row": 39
+    },
+    "walk_back": {
+     "frames": 4,
+     "row": 37
+    },
+    "walk_front": {
+     "frames": 4,
+     "row": 36
+    },
+    "work": {
+     "frames": 4,
+     "row": 38
+    }
+   },
+   "role": "big dark curls, gold and bronze two-piece, a tablet"
+  },
+  "architect": {
+   "animations": {
+    "blocked": {
+     "frames": 2,
+     "row": 47
+    },
+    "done": {
+     "frames": 2,
+     "row": 48
+    },
+    "idle": {
+     "frames": 2,
+     "row": 42
+    },
+    "wait": {
+     "frames": 2,
+     "row": 46
+    },
+    "walk_back": {
+     "frames": 4,
+     "row": 44
+    },
+    "walk_front": {
+     "frames": 4,
+     "row": 43
+    },
+    "work": {
+     "frames": 4,
+     "row": 45
+    }
+   },
+   "role": "long platinum hair, white glossy two-piece, a tablet"
+  },
+  "coordinator": {
+   "animations": {
+    "blocked": {
+     "frames": 2,
+     "row": 33
+    },
+    "done": {
+     "frames": 2,
+     "row": 34
+    },
+    "idle": {
+     "frames": 2,
+     "row": 28
+    },
+    "wait": {
+     "frames": 2,
+     "row": 32
+    },
+    "walk_back": {
+     "frames": 4,
+     "row": 30
+    },
+    "walk_front": {
+     "frames": 4,
+     "row": 29
+    },
+    "work": {
+     "frames": 4,
+     "row": 31
+    }
+   },
+   "role": "long black hair, violet glossy two-piece and boots, a tablet"
+  },
   "engineer": {
    "animations": {
     "blocked": {
@@ -35,7 +134,7 @@
      "row": 24
     }
    },
-   "role": "an orange hard hat, a hi-vis vest, a tool belt and a wrench"
+   "role": "long blonde hair, glasses, black and gold two-piece, a gold wrench"
   },
   "jarvis": {
    "animations": {
@@ -68,7 +167,7 @@
      "row": 3
     }
    },
-   "role": "the executive: violet cape, gold halo, a tablet he plans on"
+   "role": "the lead: long black hair, black and cyan glossy two-piece, glowing choker, a tablet she plans on"
   },
   "producer": {
    "animations": {
@@ -101,7 +200,7 @@
      "row": 17
     }
    },
-   "role": "a beret and headphones, a magenta jacket, films with a camera"
+   "role": "long red hair, red glossy two-piece, films with a camera"
   },
   "researcher": {
    "animations": {
@@ -134,7 +233,7 @@
      "row": 10
     }
    },
-   "role": "a lab coat, round glasses, a bulb on its antenna, reads a book"
+   "role": "dark hair up in a bun, glasses, royal-blue two-piece, reads a book"
   }
  },
  "frame": [

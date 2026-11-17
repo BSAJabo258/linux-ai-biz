@@ -1,6 +1,6 @@
 ---
 name: character-and-sprite-production
-description: Design and draw the operations world's characters as pixel-art sprite sheets (scripts/world_sprites.py). Use to add a character for a new agent, change a character's look, add an animation, or for "design the agents", "sprites", "the robots all look the same".
+description: Design and draw the operations world's characters as pixel-art sprite sheets (scripts/world_sprites.py). Use to add a character for a new agent, change a character's look, add an animation, or for "design the agents", "sprites", "the assistants all look the same".
 ---
 
 # Character and sprite production

@@ -88,3 +88,76 @@ def test_rooms_say_who_works_there(tmp_path):
     w = world(tmp_path, NOW)
     who = {r["id"]: r["who"] for r in w["rooms"]}
     assert who["finance"] == "no agent works here yet" and "researcher" in who["research"]
+
+
+# The owner's picture, 2026-11-17: his AI assistants are seven different women. An agent with
+# no look of its own gets one of the other four, and always the same one.
+def test_every_other_agent_gets_one_of_the_other_looks_and_keeps_it(tmp_path):
+    from bau.world import OTHER_LOOKS
+    job(tmp_path, "scout", "RUNNING")
+    job(tmp_path, "tester", "RUNNING")
+    looks = [{a["name"]: a["look"] for a in world(tmp_path, NOW)["agents"]} for _ in range(2)]
+    assert looks[0] == looks[1]
+    assert looks[0]["scout"] in OTHER_LOOKS and looks[0]["tester"] in OTHER_LOOKS
+    assert looks[0]["jarvis"] == "jarvis"
+
+
+def test_portraits_are_drawn_safely_and_never_left_for_fanvue(tmp_path):
+    from bau.media.comfy import NEGATIVE, ComfyError
+    from bau.world import PORTRAIT_LOOKS, PORTRAIT_NEGATIVE, draw_portraits
+    asked = []
+
+    def drawer(home, prompt, name, negative, **size):
+        asked.append((name, prompt, negative, size))
+        if name.endswith("analyst"):
+            raise ComfyError("the picture could pass for under 20 (0.30)")
+        media = home / "artifacts" / "media"
+        media.mkdir(parents=True, exist_ok=True)
+        (media / f"{name}.png").write_bytes(b"\x89PNG portrait")
+        (media / f"{name}.png.provenance.json").write_text("{}")
+    done = {d["look"]: d["result"] for d in draw_portraits(tmp_path, drawer=drawer)}
+    assert set(done) == set(PORTRAIT_LOOKS) and done["jarvis"] == "drawn"
+    assert done["analyst"].startswith("not drawn: the picture could pass")   # the rest go on
+    assert not list((tmp_path / "artifacts" / "media").glob("*.png"))       # none for Fanvue
+    assert (tmp_path / "world" / "portraits" / "jarvis.png").read_bytes() == b"\x89PNG portrait"
+    for _, prompt, negative, _size in asked:
+        assert "adult woman" in prompt and negative == PORTRAIT_NEGATIVE
+        assert "nudity" in negative and "child" in negative
+    assert "child" in NEGATIVE                                  # the sfw lane's own words too
+    assert {a["name"]: a["portrait"] for a in world(tmp_path, NOW)["agents"]}["jarvis"] is True
+    asked.clear()
+    again = {d["look"]: d["result"] for d in draw_portraits(tmp_path, drawer=drawer)}
+    assert again["jarvis"] == "already drawn" and [a[0] for a in asked] == [
+        "world-portrait-analyst"]
+    assert draw_portraits(tmp_path, ["../etc"], drawer=drawer)[0]["result"] == "unknown look"
+    rows = (tmp_path / "audit" / "chain.jsonl").read_text()
+    assert rows.count('"world.portrait"') == len(PORTRAIT_LOOKS) - 1
+
+
+def test_the_page_gets_only_the_fixed_portraits(tmp_path):
+    import http.client
+    import threading
+
+    from test_assistant import make
+
+    from bau.assistant import Voice
+    from bau.ui.jarvis_server import serve
+    (tmp_path / "world" / "portraits").mkdir(parents=True)
+    (tmp_path / "world" / "portraits" / "jarvis.png").write_bytes(b"\x89PNG jarvis")
+    (tmp_path / "secret.png").write_bytes(b"\x89PNG secret")
+    srv, key = serve(make(tmp_path), Voice(tmp_path), 0, key="k" * 24)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        port = srv.server_address[1]
+
+        def get(path):
+            c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+            c.request("GET", path, headers={"Host": f"127.0.0.1:{port}"})
+            r = c.getresponse()
+            return r.status, r.read()
+        assert get("/world/portrait/jarvis.png") == (200, b"\x89PNG jarvis")
+        assert get("/world/portrait/producer.png")[0] == 404          # not drawn yet
+        assert get("/world/portrait/../../secret.png")[0] == 404
+        assert get("/world/portrait/%2e%2e%2fsecret.png")[0] == 404
+    finally:
+        srv.shutdown()

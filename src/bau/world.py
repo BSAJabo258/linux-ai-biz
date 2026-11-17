@@ -1,14 +1,17 @@
-"""The operations world (the owner's ask, 2026-11-15: an isometric floor of robot workers, from
-his three reference pictures): every robot on the screen is one of the owner's agents, and the
-room it stands in comes only from its latest real job in ``jobs/``. An agent with no job sits in
+"""The operations world (the owner's ask, 2026-11-15: an isometric floor of workers, from his
+three reference pictures; 2026-11-17: the workers are his AI assistants, glamorous adult women
+from his picture): every character on the screen is one of the owner's agents, and the room
+she stands in comes only from her latest real job in ``jobs/``. An agent with no job sits in
 the lounge; nothing walks, types or glows unless a job says so.
 
-Read-only: it reads the agent folders, the job store and HOLD, and changes nothing.
+``world()`` only reads: the agent folders, the job store and HOLD. ``draw_portraits()`` (the
+owner's ``bau world portraits``) paints each look once on the desktop's ComfyUI.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -17,11 +20,11 @@ from .home import bau_home
 # Rooms on the floor (docs/visual/VISUAL_ART_DIRECTION.md), with who really works in each.
 # ``hq`` is Jarvis's core; agents with no job wait in its lounge.
 ROOMS = (("hq", "Headquarters", "Jarvis's core; agents with nothing to do wait in its lounge"),
-         ("research", "Research library", "the researcher, and Jarvis when he researches"),
+         ("research", "Research library", "the researcher, and Jarvis when she researches"),
          ("forge", "The Forge", "any agent without a room of its own"),
-         ("testing", "Testing lab", "Jarvis when his autopilot tests a tool in the sandbox"),
-         ("innovation", "Innovation lab", "Jarvis when he scans or inspects a project"),
-         ("studio", "Studio", "the producer, and Jarvis when he drafts"),
+         ("testing", "Testing lab", "Jarvis when her autopilot tests a tool in the sandbox"),
+         ("innovation", "Innovation lab", "Jarvis when she scans or inspects a project"),
+         ("studio", "Studio", "the producer, and Jarvis when she drafts"),
          ("finance", "Finance", "no agent works here yet"),
          ("market", "Market", "no agent works here yet"),
          ("approvals", "Waiting for you", "an agent whose job waits for your approval"),
@@ -30,6 +33,35 @@ ROOMS = (("hq", "Headquarters", "Jarvis's core; agents with nothing to do wait i
 # Where an agent works while its job runs; any other agent works in the Forge.
 DESK = {"researcher": "research", "producer": "studio"}
 LOOK = {"researcher": "researcher", "producer": "producer", "jarvis": "jarvis"}
+# Any other agent gets one of these looks, always the same one for the same name.
+OTHER_LOOKS = ("engineer", "coordinator", "analyst", "architect")
+# Painted portraits of each look (the owner's picture, 2026-11-17), shown in her record card.
+# Drawn by ComfyUI's sfw lane (media/comfy.py: minors refused, the age check, provenance), then
+# moved out of artifacts/media at once: the Fanvue queue picks from there, and these are never
+# posted. Fictional adult women, none drawn from a real person.
+PORTRAIT_LOOKS = ("jarvis", "researcher", "producer", "engineer", *OTHER_LOOKS[1:])
+PORTRAIT_WHO = {
+    "jarvis": "long straight black hair, tan skin, black glossy two-piece with glowing cyan "
+              "trim and a cyan choker, holding a holographic tablet, the team's leader",
+    "researcher": "dark hair in a high bun, glasses, brown skin, royal blue glossy two-piece, "
+                  "reading at a computer desk",
+    "producer": "long wavy red hair, fair skin, red glossy two-piece, holding a camera",
+    "engineer": "long blonde hair, glasses, black and gold glossy two-piece, gold armbands, "
+                "at a workstation",
+    "coordinator": "long black hair, violet glossy two-piece and thigh-high violet boots, "
+                   "holding a holographic tablet",
+    "analyst": "big dark curly hair, deep brown skin, gold glossy two-piece, holding a "
+               "holographic tablet",
+    "architect": "long platinum hair, fair skin, white glossy two-piece with cyan trim, "
+                 "holding a holographic tablet",
+}
+PORTRAIT_STYLE = ("digital painting, glamorous adult woman in her late twenties, {who}, "
+                  "futuristic operations office at night, holographic screens, city skyline "
+                  "windows, purple and blue neon light, confident smile, from the waist up, "
+                  "highly detailed")
+PORTRAIT_NEGATIVE = ("child, childlike, minor, teen, young-looking, school uniform, nudity, "
+                     "nipples, explicit, character sheet, real person, celebrity, text, "
+                     "watermark, logo")
 # Jarvis's autopilot jobs (autopilot.GO) and the room each is done in.
 JOB_ROOM = {"scan": "innovation", "inspect": "innovation", "blueprint": "innovation",
             "sandbox_test": "testing", "research": "research", "learn": "research",
@@ -104,9 +136,11 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
                           "artifacts": job.artifacts[-5:], "next_action": job.next_action}
             if state == "working" and at is not None and now - at > QUIET:
                 rec["quiet_minutes"] = int((now - at).total_seconds() // 60)
-        rec["look"] = LOOK.get(name, "engineer")
+        rec["look"] = LOOK.get(name) or OTHER_LOOKS[zlib.crc32(name.encode()) % len(OTHER_LOOKS)]
         agents.append(rec)
     agents.insert(0, jarvis(home, now))
+    for rec in agents:
+        rec["portrait"] = portrait_file(home, rec["look"]) is not None
     held = hold_reason(home)
     counts = {r: sum(1 for a in agents if a["room"] == r) for r, _, _ in ROOMS}
     return {"rooms": [{"id": r, "name": n, "who": w} for r, n, w in ROOMS], "agents": agents,
@@ -115,8 +149,8 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
 
 
 def jarvis(home: Path, now: dt.datetime) -> dict[str, Any]:
-    """Jarvis himself: his autopilot's latest task (autopilot.py) puts him in the room where
-    that kind of job is done; with none running he is at his core."""
+    """Jarvis herself: her autopilot's latest task (autopilot.py) puts her in the room where
+    that kind of job is done; with none running she is at her core."""
     from . import autopilot
     tasks = autopilot._load(home).get("tasks", [])
     live = [t for t in tasks if t.get("state") in ("running", "waiting_owner")]
@@ -133,7 +167,7 @@ def jarvis(home: Path, now: dt.datetime) -> dict[str, Any]:
                        "done": ("delivery", "done"),
                        "failed": ("repair", "failed")}[t["state"]]
     return {"name": "jarvis", "look": "jarvis", "room": room, "state": state,
-            "description": "Jarvis: his autopilot works its own queue (bau autopilot)",
+            "description": "Jarvis: her autopilot works its own queue (bau autopilot)",
             "brain": "the boss model", "tools": [], "mcp": [], "approval": "built in",
             "job": None if t is None else {
                 "job_id": t["id"], "mission_id": "", "objective": t.get("title", "")[:300],
@@ -141,3 +175,45 @@ def jarvis(home: Path, now: dt.datetime) -> dict[str, Any]:
                 "updated_at": t.get("finished") or t.get("started") or t.get("created"),
                 "steps_done": 0, "steps_left": 0, "cost_usd": 0.0, "errors": [],
                 "artifacts": [], "next_action": t.get("note") or None}}
+
+
+def portrait_file(home: Path, look: str) -> Path | None:
+    """Her painted portrait, if one was drawn; only the fixed looks, never a path from a request."""
+    if look not in PORTRAIT_LOOKS:
+        return None
+    f = home / "world" / "portraits" / f"{look}.png"
+    return f if f.is_file() else None
+
+
+def draw_portraits(home: Path, looks: list[str] | None = None, again: bool = False,
+                   drawer: Any = None) -> list[dict[str, Any]]:
+    """Paint each look's portrait on this computer's ComfyUI (the owner's command). One that
+    exists is kept unless ``again``; a failed one is reported and the rest go on."""
+    from .audit import AuditLog
+    from .media import comfy
+    drawer = drawer or comfy.draw
+    out_dir = home / "world" / "portraits"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    done = []
+    for look in looks or list(PORTRAIT_LOOKS):
+        if look not in PORTRAIT_LOOKS:
+            done.append({"look": look, "result": "unknown look"})
+            continue
+        if portrait_file(home, look) and not again:
+            done.append({"look": look, "result": "already drawn"})
+            continue
+        name = f"world-portrait-{look}"
+        try:
+            drawer(home, PORTRAIT_STYLE.format(who=PORTRAIT_WHO[look]), name,
+                   negative=PORTRAIT_NEGATIVE, width=832, height=1216)
+        except comfy.ComfyError as e:
+            done.append({"look": look, "result": f"not drawn: {e}"})
+            continue
+        media = home / "artifacts" / "media"
+        (media / f"{name}.png").replace(out_dir / f"{look}.png")    # never left for Fanvue
+        prov = media / f"{name}.png.provenance.json"
+        if prov.exists():
+            prov.replace(out_dir / f"{look}.png.provenance.json")
+        AuditLog(home / "audit" / "chain.jsonl").append("world.portrait", "bau", {"look": look})
+        done.append({"look": look, "result": "drawn"})
+    return done

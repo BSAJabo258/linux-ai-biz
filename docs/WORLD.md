@@ -20,32 +20,54 @@ console and a lounge, and the departments sit around it, each furnished for its 
 
 | Department | Who works there |
 |---|---|
-| Research library | the researcher, and Jarvis when he researches |
+| Research library | the researcher, and Jarvis when she researches |
 | The Forge | any agent that has no room of its own |
-| Testing lab | Jarvis when his autopilot tests a tool in the sandbox |
-| Innovation lab | Jarvis when he scans or inspects a project |
-| Studio | the producer, and Jarvis when he drafts |
+| Testing lab | Jarvis when her autopilot tests a tool in the sandbox |
+| Innovation lab | Jarvis when she scans or inspects a project |
+| Studio | the producer, and Jarvis when she drafts |
 | Finance, Market | no agent works here yet: they stay empty, and say so |
 | Waiting for you | an agent whose job waits for your approval |
 | Stopped | an agent whose job failed, was interrupted or paused |
 | Delivered | an agent whose job finished in the last 24 hours |
 | Headquarters lounge | an agent with nothing to do |
 
-Every character is one of your agents (`bau agents list`), or Jarvis himself. Each is
-designed for its job:
-- **Jarvis:** a cape, a halo and a tablet.
-- **The researcher:** a lab coat, glasses and a book.
-- **The producer:** a beret, headphones and a camera.
-- **Any other agent:** a hard hat and a wrench.
+Every character is one of your agents (`bau agents list`), or Jarvis herself. Since
+2026-11-17 they are drawn from your picture of your AI assistants: glamorous adult women in
+glossy neon two-pieces, with chokers, armbands and boots, each with her own look and the tool
+of her job:
+- **Jarvis:** long black hair, black and cyan, a glowing choker and a tablet.
+- **The researcher:** dark hair in a bun, glasses, royal blue, and a book.
+- **The producer:** long red hair, red, and a camera.
+- **Any other agent** gets one of four more looks, always the same one for the same agent:
+  blonde with glasses in black and gold (a gold wrench), black hair in violet, dark curls in
+  gold, or platinum hair in white (each with a tablet).
+
+All of them are fictional adults; none is drawn from a real person.
+
+## Painted portraits
+
+Click a character and her record shows a large painted portrait in the style of your picture,
+once it has been drawn. They are drawn on the desktop by its own picture setup (ComfyUI,
+`docs/PICTURES.md`), once:
+
+```bash
+bau world portraits
+```
+
+It paints all seven (one with `--look NAME`, again with `--again`). Every portrait goes
+through the same checks as the creator's pictures: anything about minors is refused, the age
+check looks at each one and throws away any that could pass for under 20, and it is kept with
+a record of how it was made. Portraits are kept in their own folder, never with the creator's
+pictures, so they are never posted to Fanvue. Not yet run on your desktop.
 
 Where a character stands comes only from its latest job: the job store (`bau jobs`), or, for
-Jarvis, his autopilot's queue (`bau autopilot`).
+Jarvis, her autopilot's queue (`bau autopilot`).
 
 When that job changes, the character walks to its new room through the doors. Nothing walks
 for show:
 - **Working:** the character uses its tool, its own desk screen lights up, and a green panel
   above it shows its real task.
-- **Waiting for you:** it raises a hand and shows "!".
+- **Waiting for you:** she raises a hand and shows "!".
 - **Stopped:** it shows red crosses for eyes.
 - **Done:** it holds up a green check.
 - **Quiet:** if a running job has not saved a step for 30 minutes, it says "quiet N min".

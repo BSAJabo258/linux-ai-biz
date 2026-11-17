@@ -671,6 +671,14 @@ def _sh(*args: str, check: bool = True, timeout: float | None = None
         return subprocess.CompletedProcess(list(args), 124, "", f"no answer in {timeout:g} s")
 
 
+def cmd_world(a):
+    """The operations world: paint each AI assistant's portrait on this computer (docs/WORLD.md)."""
+    from .world import draw_portraits
+    done = draw_portraits(bau_home(), [a.look] if a.look else None, again=a.again)
+    _out(done)
+    return EXIT_OK if all(d["result"] in ("drawn", "already drawn") for d in done) else EXIT_ERROR
+
+
 def cmd_hq(a):
     """The desktop as headquarters for the laptop station (docs/LAPTOP-STATION.md)."""
     import pwd
@@ -2185,6 +2193,15 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("map", help="Jarvis's abilities by layer: what BAU has, gaps, order")
     x.add_argument("--layer", help="one layer, e.g. web, computer-use, memory")
     s.set_defaults(fn=cmd_toolbox)
+
+    s = sub.add_parser("world", help="the operations world (docs/WORLD.md)")
+    w = s.add_subparsers(dest="world_cmd", required=True)
+    x = w.add_parser("portraits", help="paint each AI assistant's portrait with this computer's "
+                     "ComfyUI (the desktop)")
+    x.add_argument("--look", help="only this one (jarvis, researcher, producer, engineer, "
+                   "coordinator, analyst, architect)")
+    x.add_argument("--again", action="store_true", help="paint it again even if it exists")
+    s.set_defaults(fn=cmd_world)
 
     s = sub.add_parser("hq", help="the desktop as headquarters for the laptop station "
                        "(docs/LAPTOP-STATION.md)")

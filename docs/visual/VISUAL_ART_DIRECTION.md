@@ -50,21 +50,30 @@ picture 1. There is a light theme too: the same rooms on a pale floor.
 
 ## Characters
 
-Small robots in the style of pictures 2 and 3, each one designed for its job so it can be
-recognised before its card is opened (`scripts/world_sprites.py`, sheet
-`src/bau/ui/world/characters.png`, 32 by 44 art pixels a frame, drawn 3x, a dark outline,
-lit from the top left):
+The owner's AI assistants, from his picture of 2026-11-17 (an illustration of seven women in a
+neon operations office; kept out of the repository like the first three, its source and
+licence unknown): glamorous adult women in glossy neon two-piece outfits with chokers,
+armbands and boots, each with her own hair, skin, colours and the tool of her job
+(`scripts/world_sprites.py`, sheet `src/bau/ui/world/characters.png`, 32 by 44 art pixels a
+frame, drawn 3x, a dark outline, a shine on every glossy piece). All are fictional adults;
+none is drawn from a real person.
 
-| Character | Who it is | Its look | What it works with |
+| Character | Who it is | Her look | What she works with |
 |---|---|---|---|
-| jarvis | Jarvis, his autopilot's jobs | violet cape with a gold hem, a gold halo, cream head | a tablet with his plan |
-| researcher | the researcher agent folder | a white lab coat, round glasses, a light bulb on its antenna | an open book, pages turning |
-| producer | the producer agent folder | a beret, headphones, a magenta jacket | a camera at its eye, with a flash |
-| engineer | any other agent | an orange hard hat, a hi-vis vest, a tool belt | a wrench, with sparks |
+| jarvis | Jarvis, her autopilot's jobs | long black hair, black and cyan, a glowing choker | a tablet with her plan |
+| researcher | the researcher agent folder | dark hair in a bun, glasses, royal blue | an open book, pages turning |
+| producer | the producer agent folder | long red hair, red | a camera at her eye, with a flash |
+| engineer | other agents | long blonde hair, glasses, black and gold | a gold wrench |
+| coordinator | other agents | long black hair, violet, violet boots | a tablet |
+| analyst | other agents | big dark curls, gold | a tablet |
+| architect | other agents | long platinum hair, white | a tablet |
 
-Every character has the same seven animations: idle (a blink), walking toward you and away
-(four frames each), working (four frames, its own tool), waiting for the owner (a hand up and
-"!"), blocked (red crosses for eyes, sparks) and done (both hands up, a green check).
+Any agent without a look of her own gets one of the last four, always the same one for the
+same name (`world.OTHER_LOOKS`). Every character has the same seven animations: idle (a
+blink), walking toward you and away (four frames each), working (four frames, her own tool),
+waiting for the owner (a hand up and "!"), blocked (red crosses for eyes, sparks) and done
+(both hands up, a green check). Her painted portrait (`bau world portraits`, docs/WORLD.md)
+shows in her record card.
 
 ## Rooms and workstations
 

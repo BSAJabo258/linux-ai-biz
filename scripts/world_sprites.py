@@ -3,8 +3,9 @@
 
 Run:  python3 scripts/world_sprites.py
 Writes src/bau/ui/world/characters.png (every character, every animation) and characters.json
-(where each frame is). Each character is designed from parts: a robot body in the style of the
-owner's reference pictures, then its role's own colours, clothes and tools. Same input, same
+(where each frame is). Each character is one of the owner's AI assistants, drawn from his
+picture of 2026-11-17: glamorous adult women in glossy neon two-piece outfits with chokers and
+armbands, each with her own hair, skin, colours and the tool of her job. Same input, same
 pixels: tests/test_world_art.py rebuilds the sheet and compares it byte for byte.
 """
 
@@ -20,22 +21,43 @@ OUT = Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "world"
 ANIMS = (("idle", 2), ("walk_front", 4), ("walk_back", 4), ("work", 4), ("wait", 2),
          ("blocked", 2), ("done", 2))
 OUTLINE = (16, 24, 36, 255)
+LIPS = (196, 70, 96)
+LASH = (30, 20, 24)
 
-# The cast: the real agents (agent folders researcher and producer), Jarvis himself (his
-# autopilot does real jobs), and an engineer for any agent the owner adds later.
+# The cast: the real agents (agent folders researcher and producer), Jarvis herself (her
+# autopilot does real jobs), and four more looks for the agents the owner adds. All are
+# fictional adult women; none is drawn from a real person.
 CAST = {
-    "jarvis": {"head": (238, 232, 214), "body": (112, 86, 214), "trim": (255, 207, 77),
-               "eye": (63, 214, 255), "visor": (12, 18, 40), "limb": (150, 132, 210),
-               "role": "the executive: violet cape, gold halo, a tablet he plans on"},
-    "researcher": {"head": (226, 236, 242), "body": (244, 248, 250), "trim": (40, 170, 190),
-                   "eye": (70, 242, 164), "visor": (10, 26, 36), "limb": (150, 172, 186),
-                   "role": "a lab coat, round glasses, a bulb on its antenna, reads a book"},
-    "producer": {"head": (232, 226, 240), "body": (170, 60, 150), "trim": (255, 120, 200),
-                 "eye": (255, 179, 64), "visor": (30, 10, 30), "limb": (160, 140, 170),
-                 "role": "a beret and headphones, a magenta jacket, films with a camera"},
-    "engineer": {"head": (220, 228, 234), "body": (70, 90, 110), "trim": (255, 140, 40),
-                 "eye": (63, 214, 255), "visor": (10, 20, 30), "limb": (130, 146, 160),
-                 "role": "an orange hard hat, a hi-vis vest, a tool belt and a wrench"},
+    "jarvis": {"skin": (196, 136, 98), "hair": (24, 18, 22), "suit": (22, 24, 34),
+               "trim": (63, 214, 255), "eye": (90, 60, 40), "long": 30, "bun": False,
+               "glasses": False,
+               "role": "the lead: long black hair, black and cyan glossy two-piece, glowing "
+                       "choker, a tablet she plans on"},
+    "researcher": {"skin": (178, 118, 84), "hair": (34, 24, 26), "suit": (40, 70, 200),
+                   "trim": (120, 200, 255), "eye": (70, 50, 36), "long": 0, "bun": True,
+                   "glasses": True,
+                   "role": "dark hair up in a bun, glasses, royal-blue two-piece, reads a book"},
+    "producer": {"skin": (240, 196, 170), "hair": (190, 40, 36), "suit": (170, 20, 34),
+                 "trim": (255, 110, 120), "eye": (60, 110, 70), "long": 26, "bun": False,
+                 "glasses": False,
+                 "role": "long red hair, red glossy two-piece, films with a camera"},
+    "engineer": {"skin": (228, 182, 150), "hair": (246, 222, 150), "suit": (34, 30, 30),
+                 "trim": (255, 200, 70), "eye": (60, 100, 150), "long": 24, "bun": False,
+                 "glasses": True,
+                 "role": "long blonde hair, glasses, black and gold two-piece, a gold wrench"},
+    # More looks from the same picture, for agents without one of their own (world.py)
+    "coordinator": {"skin": (214, 160, 120), "hair": (20, 16, 26), "suit": (120, 50, 190),
+                    "trim": (200, 140, 255), "eye": (70, 50, 40), "long": 28, "bun": False,
+                    "glasses": False,
+                    "role": "long black hair, violet glossy two-piece and boots, a tablet"},
+    "analyst": {"skin": (120, 74, 50), "hair": (30, 20, 18), "suit": (200, 150, 40),
+                "trim": (255, 236, 150), "eye": (60, 40, 30), "long": 20, "bun": False,
+                "glasses": False, "curls": True,
+                "role": "big dark curls, gold and bronze two-piece, a tablet"},
+    "architect": {"skin": (236, 200, 176), "hair": (236, 236, 244), "suit": (210, 220, 236),
+                  "trim": (120, 220, 255), "eye": (80, 120, 170), "long": 26, "bun": False,
+                  "glasses": False,
+                  "role": "long platinum hair, white glossy two-piece, a tablet"},
 }
 
 
@@ -62,9 +84,14 @@ class Frame:
     def shaded(self, x: int, y: int, w: int, h: int, c: tuple[int, ...]) -> None:
         """A rounded block lit from the top left, like the references."""
         self.rect(x, y, w, h, c, round_=True)
-        self.rect(x + w - 2, y + 1, 1, h - 2, _shade(c, 0.78))
-        self.rect(x + 1, y + h - 2, w - 2, 1, _shade(c, 0.82))
-        self.rect(x + 1, y + 1, w - 3, 1, _shade(c, 1.12))
+        self.rect(x + w - 1, y + 1, 1, h - 2, _shade(c, 0.78))
+        self.rect(x + 1, y + 1, max(1, w - 2), 1, _shade(c, 1.12))
+
+    def gloss(self, x: int, y: int, w: int, h: int, c: tuple[int, ...]) -> None:
+        """A glossy piece of the outfit: the colour, a dark edge and a bright shine."""
+        self.rect(x, y, w, h, c, round_=w > 2 and h > 2)
+        self.rect(x, y + h - 1, w, 1, _shade(c, 0.6))
+        self.dot(x + 1, y, _shade(c, 2.2) if max(c[:3]) < 60 else _shade(c, 1.45))
 
     def dot(self, x: int, y: int, c: tuple[int, ...]) -> None:
         if 0 <= x < W and 0 <= y < H:
@@ -88,122 +115,128 @@ class Frame:
 
 def body(f: Frame, p: dict, who: str, back: bool, lift: int = 0, leg: int = 0,
          arm_l: int = 0, arm_r: int = 0, bob: int = 0) -> None:
-    """The robot: legs, torso, arms, head. ``leg`` swings the legs (-1, 0, 1), ``arm_*`` raise
-    the arms by that many pixels, ``bob`` moves the upper body down."""
+    """The woman: hair behind, legs in glossy boots, the two-piece, arms, head and hair.
+    ``leg`` swings the legs (-1, 0, 1), ``arm_*`` raise the arms by that many pixels, ``bob``
+    moves the upper body down."""
     y0 = bob
-    if who == "jarvis":                                             # the cape, behind him
-        f.rect(8, 24 + y0, 16, 16, _shade(p["body"], 0.7))
-        f.rect(8, 39 + y0, 16, 1, p["trim"])
-    f.shaded(11, 35 - max(0, leg) * 3, 4, 7, p["limb"])            # legs
-    f.shaded(17, 35 - max(0, -leg) * 3, 4, 7, p["limb"])
-    f.rect(10, 41 - max(0, leg) * 3, 6, 2, _shade(p["limb"], 0.6))  # feet
-    f.rect(16, 41 - max(0, -leg) * 3, 6, 2, _shade(p["limb"], 0.6))
-    coat = who == "researcher"
-    f.shaded(10, 23 + y0, 12, 14 if coat else 12, p["body"])         # torso
-    if who == "engineer":                                           # hi-vis vest and belt
-        f.rect(11, 27 + y0, 10, 1, (255, 222, 60))
-        f.rect(11, 30 + y0, 10, 1, (255, 222, 60))
-        f.rect(10, 33 + y0, 12, 2, (120, 80, 40))
-        f.rect(15, 33 + y0, 2, 2, (220, 190, 90))
-    elif not back:
-        f.rect(14, 24 + y0, 4, 2, p["trim"])                        # collar
-        f.rect(15, 28 + y0, 2, 2, p["eye"])                          # status light
-    if arm_l < 6:                                                   # arms (raised: after the head)
-        f.shaded(7, 24 + y0 - arm_l, 3, 9, p["limb"])
-    if arm_r < 6:
-        f.shaded(22, 24 + y0 - arm_r, 3, 9, p["limb"])
-    f.rect(14, 21 + y0, 4, 2, _shade(p["limb"], 0.8))               # neck
-    f.shaded(8, 8 + y0, 16, 14, p["head"])                          # head
-    if not back:
-        f.rect(10, 11 + y0, 12, 7, p["visor"])
-        f.rect(10, 11 + y0, 12, 1, _shade(p["visor"], 1.8))
+    sk, hair, suit, trim = p["skin"], p["hair"], p["suit"], p["trim"]
+    if p["long"]:                                                   # long hair, behind her
+        f.rect(11, 8 + y0, 10, p["long"] - 8 - (0 if back else 4), hair, round_=True)
+    for x, up in ((12, max(0, leg)), (17, max(0, -leg))):           # legs
+        f.shaded(x, 28 - up * 2, 3, 7, sk)                          # thighs
+        f.gloss(x, 34 - up * 2, 3, 7, suit)                         # boots
+        f.rect(x, 34 - up * 2, 3, 1, trim)                          # boot top
+        f.rect(x + (0 if x < 16 else 1), 41 - up * 2, 2, 2, _shade(suit, 0.7))  # heel
+    f.shaded(11, 24 + y0, 10, 5, sk)                                # hips
+    f.gloss(11, 24 + y0, 10, 3, suit)                               # bottom
+    f.rect(11, 24 + y0, 10, 1, trim)                                # waistband glow
+    f.shaded(13, 20 + y0, 6, 5, sk)                                 # waist
+    f.dot(15, 22 + y0, _shade(sk, 0.8))                             # navel
+    f.shaded(11, 16 + y0, 10, 5, sk)                                # shoulders and chest
+    if back:
+        f.rect(11, 18 + y0, 10, 1, suit)                            # the top's strap
     else:
-        f.rect(11, 12 + y0, 10, 2, _shade(p["head"], 0.8))          # seam on the back
-        f.rect(12, 16 + y0, 8, 1, _shade(p["head"], 0.8))
-    if arm_l >= 6:                                                  # an arm up beside the head
-        f.shaded(4, 12 + y0, 3, 12, p["limb"])
-        f.rect(4, 10 + y0, 3, 3, _shade(p["limb"], 1.1), round_=True)
-    if arm_r >= 6:
-        f.shaded(25, 12 + y0, 3, 12, p["limb"])
-        f.rect(25, 10 + y0, 3, 3, _shade(p["limb"], 1.1), round_=True)
-    # role pieces on the head
-    if who == "jarvis":
-        f.rect(15, 4 + y0, 2, 4, p["trim"])
-        for x in range(11, 21):
-            f.dot(x, 2 + y0, p["trim"])
-        f.dot(10, 3 + y0, p["trim"])
-        f.dot(21, 3 + y0, p["trim"])
-    elif who == "researcher":
-        f.rect(15, 5 + y0, 2, 3, p["limb"])
-        f.rect(14, 3 + y0, 4, 3, (255, 236, 120), round_=True)     # the bulb
-    elif who == "producer":
-        f.rect(7, 13 + y0, 2, 5, (40, 30, 50))                       # headphones
-        f.rect(23, 13 + y0, 2, 5, (40, 30, 50))
-        f.rect(8, 7 + y0, 16, 1, (40, 30, 50))
-        f.rect(8, 5 + y0, 14, 3, (110, 30, 90), round_=True)        # beret
-        f.rect(18, 4 + y0, 2, 1, (110, 30, 90))
-    elif who == "engineer":
-        f.rect(8, 4 + y0, 16, 5, p["trim"], round_=True)             # hard hat
-        f.rect(6, 8 + y0, 20, 2, _shade(p["trim"], 0.8))
-        f.rect(11, 5 + y0, 10, 1, _shade(p["trim"], 1.2))
+        f.gloss(11, 17 + y0, 5, 3, suit)                            # the top
+        f.gloss(16, 17 + y0, 5, 3, suit)
+        f.dot(15, 17 + y0, trim)
+        f.dot(16, 17 + y0, trim)
+    for x, a in ((9, arm_l), (21, arm_r)):                          # arms (raised: after the head)
+        if a < 6:
+            f.shaded(x, 16 + y0 - a, 2, 10, sk)
+            f.rect(x, 19 + y0 - a, 2, 1, suit)                      # armband
+            f.dot(x, 19 + y0 - a, trim)
+    f.rect(15, 14 + y0, 2, 2, sk)                                   # neck
+    f.rect(14, 15 + y0, 4, 1, trim)                                 # choker
+    f.shaded(12, 5 + y0, 8, 10, sk)                                 # face
+    f.rect(11, 4 + y0, 10, 3, hair, round_=True)                    # hair on top
+    if back:
+        f.rect(12, 5 + y0, 8, 10, hair, round_=True)
+    else:
+        f.rect(11, 6 + y0, 2, 7 if p["long"] else 3, hair)          # hair at the sides
+        f.rect(19, 6 + y0, 2, 7 if p["long"] else 3, hair)
+        f.rect(13, 6 + y0, 3, 1, hair)                              # a swept fringe
+    if p.get("curls"):                                              # curls round the head
+        for x, y in ((10, 6), (21, 6), (10, 10), (21, 10), (11, 3), (20, 3), (15, 2), (10, 14),
+                     (21, 14)):
+            f.rect(x, y + y0, 2, 2, hair, round_=False)
+    if p["bun"]:
+        f.rect(13, 1 + y0, 6, 4, hair, round_=True)
+        f.dot(14, 2 + y0, _shade(hair, 2.0))
+    if who == "jarvis" and not back:                                # her mark on the top
+        f.glow(15, 19 + y0, trim)
+    for x, a in ((9, arm_l), (21, arm_r)):                          # an arm up beside the head
+        if a >= 6:
+            f.shaded(x, 4 + y0, 2, 12, sk)
+            f.rect(x, 9 + y0, 2, 1, suit)
 
 
 def eyes(f: Frame, p: dict, bob: int, kind: str = "open") -> None:
     if kind == "closed":
-        f.rect(12, 14 + bob, 3, 1, p["eye"])
-        f.rect(17, 14 + bob, 3, 1, p["eye"])
+        f.rect(13, 10 + bob, 2, 1, LASH)
+        f.rect(17, 10 + bob, 2, 1, LASH)
     elif kind == "x":
-        for d in range(3):
-            f.dot(12 + d, 13 + bob + d, (255, 77, 94))
-            f.dot(14 - d, 13 + bob + d, (255, 77, 94))
-            f.dot(17 + d, 13 + bob + d, (255, 77, 94))
-            f.dot(19 - d, 13 + bob + d, (255, 77, 94))
+        for d in range(2):
+            f.dot(13 + d, 9 + bob + d, (255, 77, 94))
+            f.dot(14 - d, 9 + bob + d, (255, 77, 94))
+            f.dot(17 + d, 9 + bob + d, (255, 77, 94))
+            f.dot(18 - d, 9 + bob + d, (255, 77, 94))
     else:
-        f.rect(12, 13 + bob, 3, 3, p["eye"])
-        f.rect(17, 13 + bob, 3, 3, p["eye"])
-        f.dot(12, 13 + bob, (255, 255, 255))
-        f.dot(17, 13 + bob, (255, 255, 255))
+        f.rect(13, 9 + bob, 2, 1, LASH)                             # lashes
+        f.rect(17, 9 + bob, 2, 1, LASH)
+        f.dot(13, 10 + bob, (250, 250, 250))
+        f.dot(14, 10 + bob, p["eye"])
+        f.dot(17, 10 + bob, p["eye"])
+        f.dot(18, 10 + bob, (250, 250, 250))
+        f.dot(12, 9 + bob, LASH)                                    # winged liner
+        f.dot(19, 9 + bob, LASH)
+    f.rect(15, 13 + bob, 2, 1, LIPS)
 
 
 def glasses(f: Frame, bob: int) -> None:
-    for cx in (11, 16):
-        for i in range(5):
-            f.dot(cx + i, 12 + bob, (200, 170, 90))
-            f.dot(cx + i, 16 + bob, (200, 170, 90))
-        f.dot(cx, 13 + bob, (200, 170, 90))
-        f.dot(cx + 4, 13 + bob, (200, 170, 90))
+    """Thin frames round the eyes, so the eyes still show."""
+    for cx in (12, 16):
+        f.rect(cx, 8 + bob, 4, 1, (60, 40, 40))
+        f.dot(cx, 9 + bob, (60, 40, 40))
+        f.dot(cx + 3, 9 + bob, (60, 40, 40))
+        f.dot(cx, 10 + bob, (60, 40, 40))
+        f.dot(cx + 3, 10 + bob, (60, 40, 40))
+        f.rect(cx + 1, 11 + bob, 2, 1, (60, 40, 40))
 
 
 def tool(f: Frame, who: str, p: dict, k: int, bob: int) -> None:
-    """What each role works with; ``k`` is the frame (0-3)."""
+    """What each assistant works with; ``k`` is the frame (0-3)."""
     if who == "jarvis":                                             # tablet with a plan on it
-        f.rect(9, 26 + bob, 14, 8, (20, 30, 50))
-        f.rect(10, 27 + bob, 12, 6, (63, 214, 255) if k % 2 == 0 else (120, 230, 255))
+        f.rect(9, 21 + bob, 14, 7, (20, 30, 50))
+        f.rect(10, 22 + bob, 12, 5, (63, 214, 255) if k % 2 == 0 else (120, 230, 255))
         for i in range(k + 1):
-            f.rect(11 + i * 3, 31 + bob - i, 2, 1 + i, (255, 207, 77))
+            f.rect(11 + i * 3, 25 + bob - i, 2, 1 + i, (255, 255, 255))
     elif who == "researcher":                                       # an open book
-        f.rect(8, 27 + bob, 16, 7, (120, 70, 40))
-        f.rect(9, 27 + bob, 7, 6, (250, 246, 230))
-        f.rect(16, 27 + bob, 7, 6, (250, 246, 230))
-        for r in range(3):
-            f.rect(10, 28 + bob + r * 2, 5, 1, (150, 150, 160))
-            f.rect(17, 28 + bob + r * 2, 5, 1, (150, 150, 160))
-        f.rect(16 - 2 + k, 26 + bob, 1, 7, (220, 214, 200))           # the page turning
+        f.rect(9, 21 + bob, 14, 6, (60, 40, 90))
+        f.rect(10, 21 + bob, 6, 5, (250, 246, 230))
+        f.rect(16, 21 + bob, 6, 5, (250, 246, 230))
+        for r in range(2):
+            f.rect(11, 22 + bob + r * 2, 4, 1, (150, 150, 170))
+            f.rect(17, 22 + bob + r * 2, 4, 1, (150, 150, 170))
+        f.rect(14 + k, 20 + bob, 1, 6, (220, 214, 200))             # the page turning
     elif who == "producer":                                         # a camera at the eye
-        f.rect(18, 12 + bob, 9, 6, (35, 35, 45))
-        f.rect(21, 13 + bob, 4, 4, (90, 160, 220))
-        f.rect(19, 11 + bob, 3, 1, (35, 35, 45))
+        f.rect(18, 7 + bob, 9, 6, (35, 35, 45))
+        f.rect(21, 8 + bob, 4, 4, (90, 160, 220))
+        f.rect(19, 6 + bob, 3, 1, (35, 35, 45))
         if k == 2:
-            f.glow(26, 10 + bob, (255, 255, 255))
-            f.glow(27, 9 + bob, (255, 255, 200))
-            f.glow(25, 9 + bob, (255, 255, 200))
-    else:                                                           # a wrench, swung
-        y = (22, 25, 28, 25)[k] + bob
-        f.rect(24, y, 2, 8, (170, 180, 190))
-        f.rect(23, y - 2, 4, 3, (170, 180, 190))
+            f.glow(26, 5 + bob, (255, 255, 255))
+            f.glow(27, 4 + bob, (255, 255, 200))
+            f.glow(25, 4 + bob, (255, 255, 200))
+    elif who != "engineer":                                         # a tablet in her colour
+        f.rect(9, 21 + bob, 14, 7, (20, 24, 40))
+        f.rect(10, 22 + bob, 12, 5, p["trim"] if k % 2 == 0 else _shade(p["trim"], 1.2))
+        f.rect(11 + k * 2, 24 + bob, 3, 1, (255, 255, 255))
+    else:                                                           # a gold wrench, swung
+        y = (12, 15, 18, 15)[k] + bob
+        f.rect(23, y, 2, 8, p["trim"])
+        f.rect(22, y - 2, 4, 3, p["trim"])
         if k == 2:
-            f.glow(27, y + 6, (255, 222, 60))
-            f.glow(28, y + 5, (255, 140, 40))
+            f.glow(26, y + 6, (255, 240, 160))
+            f.glow(27, y + 5, (255, 200, 70))
 
 
 def frames(who: str) -> dict[str, list[Image.Image]]:
@@ -219,7 +252,7 @@ def frames(who: str) -> dict[str, list[Image.Image]]:
     for k in range(2):
         f = make(bob=k)
         eyes(f, p, k, "closed" if k else "open")
-        if who == "researcher":
+        if p["glasses"]:
             glasses(f, k)
         out["idle"].append(f.finish())
     for name, back in (("walk_front", False), ("walk_back", True)):
@@ -230,7 +263,7 @@ def frames(who: str) -> dict[str, list[Image.Image]]:
                      arm_r=(-1, 0, 2, 0)[k] + 1)
             if not back:
                 eyes(f, p, bob)
-                if who == "researcher":
+                if p["glasses"]:
                     glasses(f, bob)
             out[name].append(f.finish())
     out["work"] = []
@@ -238,7 +271,7 @@ def frames(who: str) -> dict[str, list[Image.Image]]:
         bob = k % 2
         f = make(bob=bob, arm_l=3, arm_r=3 if who != "engineer" else (6, 3, 0, 3)[k])
         eyes(f, p, bob)
-        if who == "researcher":
+        if p["glasses"]:
             glasses(f, bob)
         tool(f, who, p, k, bob)
         out["work"].append(f.finish())
@@ -246,7 +279,7 @@ def frames(who: str) -> dict[str, list[Image.Image]]:
     for k in range(2):
         f = make(arm_r=10)
         eyes(f, p, 0)
-        if who == "researcher":
+        if p["glasses"]:
             glasses(f, 0)
         for j in range(4):                                          # "!" above the hand
             f.glow(30, 0 + j + k, (255, 179, 64))
