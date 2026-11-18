@@ -641,6 +641,15 @@ requestAnimationFrame(frame);
 // re-forming; a second wave at the golden ratio weaves over and under it. Each contour is drawn
 // as a lit, iridescent tube. On the graphics card; it lowers its own resolution if the frame
 // rate drops, and the 2D tapestry carries on alone if WebGL is missing.
+// The renderer's name, "" when unknown. Firefox's RENDERER is already the real one (and it warns
+// that the debug renderer extension is deprecated); Chrome's says "WebKit WebGL", so only then ask.
+function rendererName(gl) {
+  try { const who = String(gl.getParameter(gl.RENDERER) || "");
+    if (who && !/^WebKit/i.test(who)) return who;
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    return ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || "") : who; }
+  catch (e) { return ""; }
+}
 const FIFTH = (() => {
   const cv = $("fifth"); let gl = null;
   try { gl = cv.getContext("webgl", { alpha: true, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: false }); } catch (e) {}
@@ -738,10 +747,7 @@ void main() {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, "a"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   const U = {}; for (const n of ["uJc", "uFrac", "uC", "uR", "uT", "uLevel", "uKick", "uNa", "uNb", "uMix", "uLight", "uFreq", "uPx"]) U[n] = gl.getUniformLocation(prog, n);
-  let soft = false;                                          // a software renderer starts small
-  try { const ext = gl.getExtension("WEBGL_debug_renderer_info");
-    const who = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
-    soft = /llvmpipe|swiftshader|software|softpipe/i.test(who); } catch (e) {}
+  const soft = /llvmpipe|swiftshader|software|softpipe/i.test(rendererName(gl));   // starts small
   // Half the screen's pixels at most: the owner's RTX 3060 fell off the bus (Xid 79, 2026-11-10)
   // while this canvas drew beside the local model and ComfyUI; the field is kept light.
   return { gl, cv, U, scale: soft ? 0.35 : 0.5, phase: 0, frac: 0, Na: 5, Nb: 5, mix: 1, slow: 0, ema: 33, checkAt: 0, lost: false };
@@ -1997,8 +2003,7 @@ const liquid = (() => {
   try { gl = c && c.getContext("webgl", { premultipliedAlpha: true, antialias: false, depth: false,
     powerPreference: "low-power", failIfMajorPerformanceCaveat: true }); } catch (e) { gl = null; }
   if (gl) {                                 // drawn by the processor: not on an 8 GB laptop
-    const info = gl.getExtension("WEBGL_debug_renderer_info");
-    if (info && SOFTWARE_GL.test(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "")) gl = null;
+    if (SOFTWARE_GL.test(rendererName(gl))) gl = null;
   }
   if (REDUCED || !gl) return null;          // the still picture (#art) is used instead
   function program(vs, fs, attr) {
