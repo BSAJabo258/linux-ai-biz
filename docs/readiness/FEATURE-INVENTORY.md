@@ -61,7 +61,7 @@ agent), it was given in the throwaway home the way the unit tests give it
 | Mission portfolio (priority, budget, goal, money) | **WORKING** (read) | here: `bau mission portfolio` showed the mission with $0 from the ledger | `src/bau/jarvis.py` |
 | Supervisor and team (boss, thinker, specialist; loop stop; handover) | **IMPLEMENTED-UNTESTED** live | unit tests only; desktop 11-10: 0 agent runs | `src/bau/team.py`, `src/bau/supervisor.py` |
 | Autopilot (a queue Jarvis works every 30 min) | **WORKING** (on the desktop) | desktop 11-10: 9 tasks queued, 9 done. Not run here (needs the timer) | `src/bau/autopilot.py` |
-| Automaton ("make money or die") | **IMPLEMENTED-UNTESTED** live | unit tests; never started on the desktop. Jarvis's read tool for it is #176, merged after this audit's fixes | `src/bau/automaton.py` |
+| Automaton ("make money or die") | **IMPLEMENTED-UNTESTED** live | unit tests; never started on the desktop. Jarvis's read tool for it is #176, merged 2026-11-18 | `src/bau/automaton.py` |
 | Hands (terminal jobs, the owner's y each command) | **IMPLEMENTED-UNTESTED** live | unit tests only | `src/bau/hands.py` |
 | Workspaces (`bau ws`) | **PARTIALLY WORKING** | here: listed for real, but the model then wrongly said it "cannot create workspaces yet" (`bau ws` does), after 187 s | `src/bau/workspace.py` |
 

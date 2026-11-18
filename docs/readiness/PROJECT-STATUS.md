@@ -59,7 +59,7 @@ These percentages are judgments drawn from the inventory, not measurements.
 | Size | 123 Python modules, about 27,800 lines; 89 test files, 1193 tests passing and 17 skipped; 79 top-level `bau` commands and 301 subcommands |
 | Checks | `bash scripts/check.sh` ALL PASS on main; CI green on Python 3.11 and 3.13 |
 | Help screens | all 301 `bau ... --help` screens open without an error (checked 2026-11-18) |
-| Open work | #176 (Jarvis's automaton tool, fixed after review, merging), #169 (Fanvue's official connection: unmerged, conflicts) |
+| Open work | #169 (Fanvue's official connection: unmerged, conflicts) |
 | Old branches | about 290 on GitHub, most from merged work |
 | Desktop | headquarters; BAU `9ae6e0f` installed 11-17, update pending (KNOWN-ISSUES P0) |
 | Laptop | station; not installed yet |
@@ -73,7 +73,7 @@ Earlier audits and plans this one built on, and what came of their recommendatio
 |---|---|---|
 | The executive controller existed but nothing called it (`docs/automaton/CAPABILITY_MATRIX.md`, 11-10) | **yes** | every mission run now goes through it (Phase 1, 11-11); the soy-wax mission ran through it |
 | No `bau mission run` (same, 11-10) | **yes** | `bau mission run` exists and ran (via its function) |
-| Jarvis could not reach the automaton (same) | **yes, merging** | #176 |
+| Jarvis could not reach the automaton (same) | **yes** | #176, merged 2026-11-18 after three review rounds |
 | An agent could start without what its job needs (agent readiness, 11-15) | **yes** | `bau agents ready` named the gaps, then passed |
 | No retry or resume for failed work (same, 11-10) | **no** | `bau recover` marks interrupted jobs; nothing resumes them |
 | No benchmark history, real-model check run by hand (same) | **no** | still by hand; this audit's run is recorded here |
