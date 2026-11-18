@@ -113,7 +113,7 @@ def under_20(scores: dict[str, float]) -> float:
 def age_scores(path: Path) -> dict[str, float]:
     """Run the age model in ComfyUI's Python on the desktop (no PyTorch inside BAU)."""
     run = subprocess.run([str(AGE_PYTHON), "-I", str(Path(__file__).with_name("agecheck_run.py")),
-                          str(AGE_DIR), str(path)], capture_output=True, text=True, timeout=300)
+                          str(AGE_DIR), str(path)], capture_output=True, text=True, timeout=600)
     if run.returncode != 0:
         raise OSError((run.stderr or run.stdout).strip()[-300:] or "the age model did not run")
     return json.loads(run.stdout)
