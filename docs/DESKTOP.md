@@ -125,8 +125,8 @@ approved only after `bau models bench` on the desktop.
 
 ## Set up the desktop, step by step
 
-Steps 1 to 3 use the same stick as the laptop. The desktop parts switch on only on a
-computer with an NVIDIA card.
+Steps 1 to 3 are the same as for the laptop (the laptop has its own stick). The desktop
+parts switch on only on a computer with an NVIDIA card.
 
 1. **Before:** copy off anything on the D drive, write down the BitLocker key for C:, and
    turn off Windows Fast Startup (the list above).

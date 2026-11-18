@@ -93,8 +93,8 @@ def app_credentials(env_file: Path = Path("/etc/bau/platforms.env")) -> tuple[st
     env = {**_env_file(env_file), **os.environ}
     cid, secret = env.get("FANVUE_CLIENT_ID"), env.get("FANVUE_CLIENT_SECRET")
     if not cid or not secret:
-        raise FanvueError("set FANVUE_CLIENT_ID and FANVUE_CLIENT_SECRET (on the laptop: "
-                          "/etc/bau/platforms.env, via bau keys import)")
+        raise FanvueError("set FANVUE_CLIENT_ID and FANVUE_CLIENT_SECRET (on the desktop, "
+                          "headquarters: /etc/bau/platforms.env, via bau keys import)")
     return cid, secret
 
 
