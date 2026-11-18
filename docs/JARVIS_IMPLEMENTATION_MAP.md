@@ -172,6 +172,13 @@ its test failed). One mission store (`jobs/missions.jsonl`), no second database:
   (`runtime.build_gateway`, `Budgets.mission_caps`) pauses a step that would pass it. A $0
   budget still lets free (local) work run.
 
+**Unit 2, built 2026-11-11:** Jarvis knows the automaton. Before, it reached him only through
+the briefing. Jarvis `automaton` (read only; starting, stopping, reviving and growing stay the
+owner's) joins `automaton.status` and the portfolio; `GROUND` hands it to the small model on
+"automaton", "portfolio", "survival" or "tier" (`tests/test_jarvis_automaton.py`). On the real
+`qwen3.5-9b` (desktop, 2026-11-11) the first wording let it call money left to spend "remaining
+to earn"; one sentence per number fixed it, 2 of 2 runs right after.
+
 Next unit: `FactoryRun.mission_id`, and a factory's agent stages dispatched through
 `ExecutiveController` (today `cli_ext` factory hooks call `agents.run` directly, with the run
 id as the mission id); then `Job.depends_on`, checked by `dispatch`.
