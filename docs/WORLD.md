@@ -71,7 +71,9 @@ once it has been drawn. They are drawn on the desktop by its own picture setup (
 bau world portraits
 ```
 
-It paints all seven (one with `--look NAME`, again with `--again`). Every portrait goes
+It paints all seven (one with `--look NAME`, again with `--again`), saying each one as it
+goes; if the picture setup is not running on this computer, it says so and how to start it,
+and draws nothing. Every portrait goes
 through the same checks as the creator's pictures: anything about minors is refused, the age
 check looks at each one and throws away any that could pass for under 20, and it is kept with
 a record of how it was made. Portraits are kept in their own folder, never with the creator's
