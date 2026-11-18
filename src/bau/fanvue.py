@@ -522,6 +522,9 @@ def autopost_tick(home: Path, client: FanvueClient | None = None,
                   now: dt.datetime | None = None) -> dict[str, Any]:
     """One post at most per run of the autopilot (every 30 min), within the owner's number a
     day. A failure today stops it until tomorrow, so a broken login does not burn the queue."""
+    from .station import is_station
+    if is_station():                      # the laptop: the desktop's money machine posts
+        return {"autopost": "off (this laptop is the station; the desktop posts)"}
     choice = autopost_choice(home)
     if not choice or not choice.get("on"):
         return {"autopost": "off"}

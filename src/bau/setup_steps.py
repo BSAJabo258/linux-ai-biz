@@ -183,6 +183,9 @@ def _profile(home: Path) -> Path | None:
 
 def _done(step: str, home: Path, probe: Probe) -> bool | None:
     """True done, False waiting, None not for this computer."""
+    from . import station
+    if step not in ("updates", "laws") and station.is_station():
+        return None                       # the laptop station: the desktop does the work
     if step == "api_keys":
         return None if not _unused_keys(home) else False
     if step == "laws":                    # an empty or missing copy reads the shipped rules

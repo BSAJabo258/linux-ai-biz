@@ -108,3 +108,22 @@ def test_the_world_shows_the_money_score(tmp_path):
     w = world(tmp_path)
     m = w["system"]["money"]
     assert m["of"] == 9 and m["ready"] < 9 and m["next"]
+
+
+def test_on_the_laptop_station_it_points_at_the_desktop(tmp_path, monkeypatch, capsys):
+    from bau import station
+    from bau.cli import main
+    mark = tmp_path / "station"
+    mark.write_text("on=x\n")
+    monkeypatch.setattr(station, "STATION_MARK", mark)
+    monkeypatch.setenv("BAU_HOME", str(tmp_path))
+    monkeypatch.setattr(money, "links", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("read the laptop's own empty state")))
+    assert money.report(tmp_path) == money.STATION_TEXT
+    assert "runs on the desktop" in money.STATION_TEXT
+    assert money.summary(tmp_path)["station"] is True
+    assert main(["money"]) == 0
+    assert capsys.readouterr().out.strip() == money.STATION_TEXT
+    from bau.world import world
+    s = world(tmp_path)["system"]
+    assert s["station"] is True and s["money"]["station"] is True

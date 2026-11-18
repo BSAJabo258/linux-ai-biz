@@ -188,11 +188,14 @@ if ((CLOUD || HQ)); then
   chmod 0644 /etc/systemd/system/bau-jarvis.service
 fi
 systemctl daemon-reload
-systemctl enable bau-recover.service bau-regwatch.timer bau-governor.timer bau-scout-watch.timer \
-  bau-update.timer bau-autopilot.timer \
+# The laptop station (`sudo bau station role on`): the desktop's autopilot and open-source
+# watch do this work, so a re-run never switches them on here again.
+work_timers=(bau-scout-watch.timer bau-autopilot.timer)
+[[ -f /etc/bau/station ]] && work_timers=()
+systemctl enable bau-recover.service bau-regwatch.timer bau-governor.timer \
+  bau-update.timer "${work_timers[@]}" \
   bau-ui.service >/dev/null
-systemctl start bau-regwatch.timer bau-governor.timer bau-scout-watch.timer bau-update.timer \
-  bau-autopilot.timer
+systemctl start bau-regwatch.timer bau-governor.timer bau-update.timer "${work_timers[@]}"
 # restart, not start: on an upgrade the dashboard must load the new code now,
 # not at the next reboot (timer jobs pick up new code on their next run).
 systemctl restart bau-ui.service

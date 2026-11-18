@@ -259,3 +259,111 @@ def test_a_taken_port_does_not_restart_jarvis_forever():
     head = unit.split("[Service]")[0]
     assert "StartLimitIntervalSec=120" in head and "StartLimitBurst=5" in head
     assert "Restart=on-failure" in unit
+
+
+# ------------------------------------------------------------------ station mode (2026-11-18)
+# Nothing knew the laptop was the station: its menu Jarvis took the tunnel's port, and its
+# autopilot repeated the desktop's GitHub scans. `sudo bau station role on` is the switch.
+def test_a_station_is_the_system_marker_or_a_paired_login(tmp_path):
+    mark, home = tmp_path / "station", tmp_path / "home"
+    assert not S.is_station(home, mark)
+    mark.write_text("on=x\n")
+    assert S.is_station(home, mark)
+    mark.unlink()
+    (home / ".config" / "bau").mkdir(parents=True)
+    (home / ".config" / "bau" / "station.yaml").write_text("desktop: bauadmin@192.168.77.1\n")
+    assert S.is_station(home, mark)
+
+
+def station_on(tmp_path, monkeypatch):
+    mark = tmp_path / "etc-bau-station"
+    mark.write_text("on=2026-11-18T00:00:00+00:00\n")
+    monkeypatch.setattr(S, "STATION_MARK", mark)
+    return mark
+
+
+def test_role_on_and_off_switch_the_marker_and_the_desktops_timers(tmp_path, monkeypatch,
+                                                                    capsys):
+    from bau import cli_ext
+    from bau.cli import main
+    mark = tmp_path / "etc" / "bau" / "station"
+    monkeypatch.setattr(S, "STATION_MARK", mark)
+    ran = []
+    monkeypatch.setattr(cli_ext, "_sh", lambda *a, check=True, timeout=None:
+                        ran.append((a, check)) or subprocess.CompletedProcess(a, 0, "", ""))
+    monkeypatch.setattr(cli_ext.os, "geteuid", lambda: 1000)
+    assert main(["station", "role", "on"]) == cli_ext.EXIT_BLOCKED      # needs sudo
+    assert "sudo bau station role on" in capsys.readouterr().err
+    assert not mark.exists() and ran == []
+    monkeypatch.setattr(cli_ext.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(cli_ext, "_human", lambda: "human:bauadmin")
+    assert main(["station", "role", "on"]) == 0
+    assert mark.read_text().startswith("on=") and S.is_station(tmp_path / "none", mark)
+    assert ran == [(("systemctl", "disable", "--now", "bau-autopilot.timer",
+                     "bau-scout-watch.timer"), False)]
+    assert main(["station", "role", "off"]) == 0
+    assert not mark.exists()
+    assert ran[-1] == (("systemctl", "enable", "--now", "bau-autopilot.timer",
+                        "bau-scout-watch.timer"), False)
+    capsys.readouterr()
+    monkeypatch.setattr(cli_ext, "_sh", lambda *a, check=True, timeout=None:
+                        subprocess.CompletedProcess(a, 1, "", "Failed to connect to bus"))
+    assert main(["station", "role", "on"]) == cli_ext.EXIT_ERROR      # never claims "off"
+    assert "could not switch them off: Failed to connect to bus" in capsys.readouterr().out
+    mark.unlink()
+    hq = tmp_path / "hq"
+    hq.write_text("admin=bauadmin\n")
+    monkeypatch.setattr(S, "MARK", hq)
+    assert main(["station", "role", "on"]) == cli_ext.EXIT_BLOCKED    # the desktop is not one
+    assert "headquarters" in capsys.readouterr().err and not mark.exists()
+
+
+def test_pair_names_the_role_switch_as_the_next_step(tmp_path, monkeypatch, capsys):
+    from bau import cli_ext
+    from bau.cli import main
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    def fake(*args, check=True, timeout=None):
+        if args[0] == "ssh-keygen":
+            Path(args[-1]).write_text("PRIVATE")
+            Path(args[-1]).with_suffix(".pub").write_text(KEY + "\n")
+        return subprocess.CompletedProcess(args, 0, "active", "")
+    monkeypatch.setattr(cli_ext, "_sh", fake)
+    assert main(["station", "pair", "bauadmin@192.168.77.1"]) == 0
+    out = capsys.readouterr().out
+    assert "sudo bau station role on" in out and "systemctl disable" not in out
+
+
+def test_on_a_station_bau_jarvis_opens_the_desktops_and_never_starts_one(tmp_path,
+                                                                         monkeypatch):
+    from bau import cli_ext
+    from bau.cli import main
+    station_on(tmp_path, monkeypatch)
+    monkeypatch.setattr("bau.assistant.build_assistant",
+                        lambda **k: (_ for _ in ()).throw(AssertionError("second Jarvis")))
+    monkeypatch.setattr("bau.ui.jarvis_server.serve",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("bound a port")))
+    opened = []
+    monkeypatch.setattr(cli_ext, "cmd_station", lambda a: opened.append(a.station_cmd) or 0)
+    assert main(["jarvis"]) == 0 and opened == ["open"]
+    assert main(["jarvis", "--no-browser"]) == 0 and opened == ["open", "open"]
+
+
+def test_on_a_station_the_autopilot_runs_nothing(tmp_path, monkeypatch, capsys):
+    from bau import autopilot, autopilot_jobs, fanvue
+    from bau.cli import main
+    station_on(tmp_path, monkeypatch)
+    def boom(*a, **k):
+        raise AssertionError("ran on the station")
+    for mod, name in ((autopilot, "run"), (autopilot_jobs, "seed"), (fanvue, "autopost_tick")):
+        monkeypatch.setattr(mod, name, boom)
+    assert main(["autopilot", "run"]) == 0
+    assert "This laptop is a station" in capsys.readouterr().out
+
+
+def test_install_keeps_the_work_timers_off_on_a_station():
+    sh = (ROOT / "installer" / "payload" / "install.sh").read_text()
+    assert "[[ -f /etc/bau/station ]] && work_timers=()" in sh
+    enable = sh[sh.index("systemctl enable bau-recover.service"):]
+    enable = enable[:enable.index("bau-ui.service")]
+    assert "bau-autopilot.timer" not in enable and "bau-scout-watch.timer" not in enable
