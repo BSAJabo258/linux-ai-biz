@@ -164,7 +164,12 @@ def system(home: Path) -> dict[str, Any]:
     except OSError:
         paired = 0
     st = autopilot.status(home)
-    return {"headquarters": S.MARK.exists(), "stations_paired": paired,
+    from . import money
+    try:
+        cash = money.summary(home)
+    except Exception:  # noqa: BLE001 - the panel never breaks the world; the command says why
+        cash = None
+    return {"headquarters": S.MARK.exists(), "stations_paired": paired, "money": cash,
             "autopilot": {"paused": bool(st.get("paused")), "running": st.get("running", 0),
                           "queued": st.get("queued", 0),
                           "waiting_for_you": st.get("waiting_owner", 0)}}

@@ -3162,8 +3162,9 @@ async function loadWorld() {
       li.appendChild(el("b", null, t.agent + ": ")); li.appendChild(document.createTextNode(t.task + (t.state === "working" ? "" : " (waiting for you)"))); ul.appendChild(li); }); tasks.appendChild(ul); }
   else { const p = el("p", "none", "No agent is working right now. Ask Jarvis to start a mission, or at a terminal: "); p.appendChild(el("code", null, "bau mission list"));
     p.appendChild(document.createTextNode(" then ")); p.appendChild(el("code", null, "bau mission run ID")); tasks.appendChild(p); }
-  const sys = $("w-sys"), S = OPS.system, ap = S.autopilot; sys.textContent = "";
-  [["on", "This computer: Jarvis is running"],
+  const sys = $("w-sys"), S = OPS.system, ap = S.autopilot, M = S.money; sys.textContent = "";
+  [M ? [M.ready === M.of ? "on" : "warn", M.ready === M.of ? `Money machine: all ${M.of} links ready` : `Money machine: ${M.ready} of ${M.of} links ready. Next: ${M.next} (run bau money)`] : ["", "Money machine: unknown (run bau money)"],
+   ["on", "This computer: Jarvis is running"],
    [S.headquarters ? "on" : "", S.headquarters ? "Headquarters: on (laptops may connect)" : "Headquarters: off (sudo bau hq on)"],
    [S.stations_paired ? "on" : "", S.stations_paired ? `Laptop stations paired: ${S.stations_paired}` : "Laptop station: none paired yet"],
    [ap.paused ? "warn" : "on", ap.paused ? "Autopilot: paused by you" : `Autopilot: ${ap.running} running, ${ap.queued} queued` + (ap.waiting_for_you ? `, ${ap.waiting_for_you} waiting for you` : "")],
