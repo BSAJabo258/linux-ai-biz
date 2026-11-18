@@ -260,6 +260,21 @@ def test_hq_on_checks_jarvis_really_started_and_status_reads_the_admin(tmp_path,
     assert cli_ext._hq_admin(mark) == "bauadmin"
 
 
+# The owner's desktop: internet by USB from a tablet, a cable to the laptop (192.168.77.1).
+# The first address of `hostname -I` may be the tablet's, which changes on every replug.
+def test_hq_on_names_every_address_to_pair_with():
+    from bau import cli_ext
+    out = cli_ext._pair_next("bauadmin", "192.168.42.17 192.168.77.1 fe80::1 2600:abcd::5\n")
+    assert out["addresses"] == ["192.168.42.17", "192.168.77.1", "2600:abcd::5"]
+    assert out["next"] == [f"on the laptop: bau station pair bauadmin@{a}"
+                           for a in out["addresses"]]
+    assert "192.168.77.x" in out["hint"] and "replug" in out["hint"]
+    assert cli_ext._pair_next("bauadmin", "fe80::2 2600::1 10.0.0.5")["addresses"] == \
+        ["10.0.0.5", "2600::1"]                                       # IPv4 first
+    assert cli_ext._pair_next("bauadmin", "")["next"] == \
+        ["on the laptop: bau station pair bauadmin@THIS-COMPUTER"]
+
+
 SS_LINE = 'LISTEN 0 5 127.0.0.1:8766 0.0.0.0:* users:(("python3",pid=1234,fd=3))\n'
 
 

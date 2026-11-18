@@ -464,6 +464,7 @@ def run(step: str, home: Path, probe: Probe | None = None,
         return {"done": True, "said": "Saved in your creator profile."}
     cmd = _command(step, home)
     if not (terminal or _terminal)(f"BAU setup: {BY_ID[step].title}", cmd):
-        return {"error": f"No screen to open a terminal on. In a terminal, run: {cmd}"}
+        return {"error": ("No screen here to open a terminal on. Do this at the desktop, "
+                          f"in a terminal: {cmd}")}
     return {"started": True, "said": "A terminal window opened. Follow it there; this card "
                                      "goes away once the step is done."}
