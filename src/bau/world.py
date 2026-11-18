@@ -145,7 +145,28 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
     counts = {r: sum(1 for a in agents if a["room"] == r) for r, _, _ in ROOMS}
     return {"rooms": [{"id": r, "name": n, "who": w} for r, n, w in ROOMS], "agents": agents,
             "hold": held, "counts": counts, "at": now.isoformat(timespec="seconds"),
-            "how_to_read": "each robot is an agent; its room is its latest job's state"}
+            "tasks": [{"agent": a["name"], "state": a["state"], "task": a["job"]["objective"]}
+                      for a in agents if a["job"] and a["state"] in ("working", "waiting for you")],
+            "system": system(home),
+            "how_to_read": "each character is an agent; her room is her latest job's state"}
+
+
+def system(home: Path) -> dict[str, Any]:
+    """The status panel (the owner's picture, 2026-11-17), from records only: whether this
+    computer is headquarters, how many laptop stations may reach Jarvis, and the autopilot.
+    A station is "paired" when its key is allowed; whether it is connected right now is not
+    known here, so it is never said."""
+    from . import autopilot
+    from . import station as S
+    try:
+        paired = len(S.stations(Path.home() / ".ssh" / "authorized_keys"))
+    except OSError:
+        paired = 0
+    st = autopilot.status(home)
+    return {"headquarters": S.MARK.exists(), "stations_paired": paired,
+            "autopilot": {"paused": bool(st.get("paused")), "running": st.get("running", 0),
+                          "queued": st.get("queued", 0),
+                          "waiting_for_you": st.get("waiting_owner", 0)}}
 
 
 def jarvis(home: Path, now: dt.datetime) -> dict[str, Any]:

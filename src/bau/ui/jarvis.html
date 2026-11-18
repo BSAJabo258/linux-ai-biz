@@ -210,10 +210,21 @@ body.showtime #timeline{display:block}body.showtime aside.r{display:none}
 .overlay.show{display:grid}
 #w-counts{font-size:12px;color:var(--dim)}#w-help{font-size:11px;color:var(--dim);margin:2px 0 8px;opacity:.8}#w-counts b{color:var(--ink);font-weight:600}
 #worldbox .box{width:min(1400px,calc(100% - 24px))}
-#w-wrap{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:12px;align-items:start}
+#w-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:start}
+.w-panel{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:10px;background:rgba(63,214,255,.04)}
+.w-panel h3{margin:0 0 6px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan)}
+.w-panel ul{list-style:none;margin:0;padding:0;font-size:12px;line-height:1.5}.w-panel li{margin:0 0 4px}
+.w-panel .none{color:var(--dim);font-size:12px;margin:0}.w-panel code{color:var(--amber)}
+.w-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;background:var(--dim)}
+.w-dot.working{background:var(--green);box-shadow:0 0 6px var(--green)}.w-dot.waiting{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.w-dot.stopped{background:var(--red);box-shadow:0 0 6px var(--red)}.w-dot.done{background:#8cc85a}
+#w-list{display:flex;flex-direction:column;gap:3px}#w-list button{display:flex;align-items:center;gap:2px;width:100%;text-align:left;font:inherit;font-size:12px;padding:4px 7px}
+#w-list button small{margin-left:auto;color:var(--dim);font-size:11px}
+button.chip.world{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px rgba(63,214,255,.45);font-weight:600}
+#wake .go-world{margin-top:22px;font:inherit;font-size:13px;letter-spacing:.2em;text-transform:uppercase;padding:10px 18px;background:none;color:var(--cyan);border:1px solid var(--cyan);box-shadow:0 0 14px rgba(63,214,255,.5);cursor:pointer}
 #w-floor{width:100%;height:auto;display:block;cursor:pointer}
 #w-side{border-left:1px solid var(--line);padding-left:12px}
-#w-list{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}#w-list button{font:inherit;font-size:11px;padding:3px 7px}
+
 #w-info{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 #w-info h3{margin:0 0 6px;color:var(--cyan);font-size:14px}#w-info dt{color:var(--dim)}#w-info dd{margin:0 0 6px}
 #w-info code{color:var(--amber)}
@@ -270,7 +281,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
     <span class="chip" id="c-hold" hidden>HOLD</span>
     <button class="chip" id="c-time" title="Timeline: everything that happened">TIMELINE</button>
     <button class="chip" id="c-mind" title="The autopilot: his mind, the compass, the vote, his jobs">AUTOPILOT</button>
-    <button class="chip" id="c-world" title="The operations world: every agent, in the room its real job puts it">WORLD</button>
+    <button class="chip world" id="c-world" title="The operations world: every agent, in the room its real job puts it">OPERATIONS WORLD</button>
     <button class="chip" id="c-mc" title="Mission Control">MISSION CONTROL</button>
     <button class="chip" id="c-log" title="Show the conversation log">LOG</button>
     <button class="chip" id="c-mute" title="Mute voice">VOICE ON</button>
@@ -311,7 +322,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   </div>
 </footer>
 <div class="hint" id="hint">Type to talk · Hold the mic to speak · Enter to send</div>
-<div id="wake"><div><h1>JARVIS</h1><p>Tap or press any key to wake</p></div></div>
+<div id="wake"><div><h1>JARVIS</h1><p>Tap or press any key to wake</p><button class="go-world" id="wake-world">Open the operations world</button></div></div>
 <div id="confirm" role="alertdialog" aria-modal="false" aria-labelledby="confirm-title"><div class="box" tabindex="-1"><h2 id="confirm-title">Waiting for your confirmation</h2><video id="cvid" controls playsinline></video><img id="cimg" alt="The picture this post will carry"><pre id="csum"></pre><div id="cform"></div><p id="cneed"></p><p id="cnote"></p>
   <div class="btns"><button id="no" data-key="Esc" title="Not now (Esc)">Not now</button><button id="yes" title="Confirm">Confirm</button></div></div></div>
 <div id="mcbox" class="overlay" role="dialog" aria-label="Mission Control"><div class="box">
@@ -321,7 +332,9 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <button class="act" id="world-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Operations world</h2><div id="w-counts"></div><div id="w-help">Scroll to zoom · drag to move · double-click to see it all · click a character</div>
   <div id="w-wrap"><canvas id="w-floor" width="1800" height="1120" aria-label="The floor: each character is one of your agents"></canvas>
-  <div id="w-side"><div id="w-list" aria-label="Characters"></div><div id="w-info"><p>Each character is one of your agents, or Jarvis herself. Her room comes from her latest real job; with nothing to do she waits in the Headquarters lounge. Click a character.</p></div></div></div></div></div>
+  <div id="w-side"><section class="w-panel"><h3>Agents</h3><div id="w-list" aria-label="Agents"></div></section>
+  <section class="w-panel"><h3>Current tasks</h3><div id="w-tasks"></div></section>
+  <section class="w-panel"><h3>System status</h3><ul id="w-sys"></ul></section><div id="w-info"><p>Each character is one of your agents, or Jarvis herself. Her room comes from her latest real job; with nothing to do she waits in the Headquarters lounge. Click a character.</p></div></div></div></div></div>
 <div id="help" class="overlay" role="dialog" aria-label="Keyboard keys"><div class="box">
   <button class="act" id="help-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Keyboard keys</h2>
@@ -3133,11 +3146,24 @@ async function loadWorld() {
     const k = OPS.agents.filter(a => st === "failed" ? a.room === "repair" : a.state === st).length; s.appendChild(el("b", null, String(k))); s.appendChild(document.createTextNode(` ${label} · `)); });
   if (OPS.hold) s.appendChild(el("b", null, "HOLD: " + OPS.hold));
   if (W_SEL) { W_SEL = OPS.agents.find(a => a.name === W_SEL.name) || null; worldInfo(W_SEL); }
-  const list = $("w-list"), had = list.contains(document.activeElement) ? document.activeElement.textContent : null;
+  const list = $("w-list"), had = list.contains(document.activeElement) ? document.activeElement.dataset.name : null;
   list.textContent = "";                                                                      // the same characters, for the keyboard
-  for (const a of OPS.agents) { const b = el("button", "act", a.name); b.title = `${a.name}: ${a.state}`;
+  for (const a of OPS.agents) { const b = el("button", "act"); b.dataset.name = a.name; b.title = `${a.name}: ${a.state}`;
+    b.appendChild(el("span", "w-dot " + wDot(a))); b.appendChild(document.createTextNode(a.name)); b.appendChild(el("small", null, a.state));
     b.setAttribute("aria-pressed", String(a === W_SEL)); b.onclick = () => { W_SEL = a; worldInfo(a); if (REDUCED) drawWorld(0); loadList(); }; list.appendChild(b);
     if (a.name === had) b.focus(); }                                                          // keep the keyboard where it was
+  const tasks = $("w-tasks"); tasks.textContent = "";
+  if (OPS.tasks.length) { const ul = el("ul"); OPS.tasks.forEach(t => { const li = el("li"); li.appendChild(el("span", "w-dot " + (t.state === "working" ? "working" : "waiting")));
+      li.appendChild(el("b", null, t.agent + ": ")); li.appendChild(document.createTextNode(t.task + (t.state === "working" ? "" : " (waiting for you)"))); ul.appendChild(li); }); tasks.appendChild(ul); }
+  else { const p = el("p", "none", "No agent is working right now. Ask Jarvis to start a mission, or at a terminal: "); p.appendChild(el("code", null, "bau mission list"));
+    p.appendChild(document.createTextNode(" then ")); p.appendChild(el("code", null, "bau mission run ID")); tasks.appendChild(p); }
+  const sys = $("w-sys"), S = OPS.system, ap = S.autopilot; sys.textContent = "";
+  [["on", "This computer: Jarvis is running"],
+   [S.headquarters ? "on" : "", S.headquarters ? "Headquarters: on (laptops may connect)" : "Headquarters: off (sudo bau hq on)"],
+   [S.stations_paired ? "on" : "", S.stations_paired ? `Laptop stations paired: ${S.stations_paired}` : "Laptop station: none paired yet"],
+   [ap.paused ? "warn" : "on", ap.paused ? "Autopilot: paused by you" : `Autopilot: ${ap.running} running, ${ap.queued} queued` + (ap.waiting_for_you ? `, ${ap.waiting_for_you} waiting for you` : "")],
+   [OPS.hold ? "bad" : "on", OPS.hold ? "HOLD: " + OPS.hold : "No HOLD"]].forEach(([k, t]) => {
+    const li = el("li"); li.appendChild(el("span", "w-dot " + ({ on: "working", warn: "waiting", bad: "stopped" }[k] || ""))); li.appendChild(document.createTextNode(t)); sys.appendChild(li); });
   if (REDUCED) drawWorld(0);
 }
 function wPoint(e) { const c = $("w-floor"), r = c.getBoundingClientRect();
@@ -3150,7 +3176,8 @@ addEventListener("pointermove", (e) => { if (!W_DRAG || W_VIEW.z === 1) return; 
   if (Math.hypot(mx - W_DRAG.p[0], my - W_DRAG.p[1]) > 6) W_DRAG.moved = true; W_VIEW.x = W_DRAG.v.x + mx - W_DRAG.p[0]; W_VIEW.y = W_DRAG.v.y + my - W_DRAG.p[1]; if (REDUCED && OPS) drawWorld(0); });
 addEventListener("pointerup", () => { setTimeout(() => { W_DRAG = null; }, 0); });
 $("w-floor").ondblclick = () => { W_VIEW = { z: 1, x: 0, y: 0 }; if (REDUCED && OPS) drawWorld(0); };
-function loadList() { [...$("w-list").children].forEach(b => b.setAttribute("aria-pressed", String(!!W_SEL && b.textContent === W_SEL.name))); }
+function loadList() { [...$("w-list").children].forEach(b => b.setAttribute("aria-pressed", String(!!W_SEL && b.dataset.name === W_SEL.name))); }
+function wDot(a) { return a.state === "working" ? "working" : a.state === "waiting for you" ? "waiting" : a.room === "repair" ? "stopped" : a.state === "done" ? "done" : ""; }
 $("w-floor").onclick = (e) => { if (W_DRAG && W_DRAG.moved) return; const [px, py] = wPoint(e);
   const mx = (px - W_VIEW.x) / W_VIEW.z, my = (py - W_VIEW.y) / W_VIEW.z;
   const hit = W_HITS.slice().reverse().find(([hx, hy, w, h]) => mx >= hx && mx <= hx + w && my >= hy && my <= hy + h);
@@ -3162,6 +3189,10 @@ $("c-world").onclick = async () => { if ($("worldbox").classList.contains("show"
   clearInterval(worldTimer); worldTimer = setInterval(loadWorld, 5000);
   cancelAnimationFrame(worldAnim); worldAnim = requestAnimationFrame(worldLoop); };
 $("world-close").onclick = closeWorld;
+$("wake-world").onclick = (e) => { e.stopPropagation(); location.hash = "#world"; wake(); };
+async function worldBadge() { try { const w = await apiJson("/api/world"); const n = w.agents.filter(a => a.state === "working").length;
+  $("c-world").textContent = "OPERATIONS WORLD" + (n ? ` · ${n} WORKING` : ""); } catch (e) {} }
+setInterval(worldBadge, 30000); worldBadge();
 
 // ---------------------------------------------------------------- Mission Control, inside
 const MC = [["status", "Status"], ["missions", "Missions"], ["jobs", "Jobs"], ["regulations", "Regulations"],

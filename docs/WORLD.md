@@ -6,12 +6,29 @@ your own screen.
 
 ## Open it
 
-In Jarvis, press **WORLD** at the top.
+- **When Jarvis opens:** click **Open the operations world** on the first screen.
+- **Any time after:** click **OPERATIONS WORLD** (it glows) in the top row. While agents work
+  it says how many, for example `OPERATIONS WORLD · 2 WORKING`.
+- **From the laptop:** `bau station open` opens Jarvis straight on the world.
+
+Inside:
 - **Zoom:** scroll on the floor; it zooms where you point.
 - **Move:** drag the floor.
 - **See it all again:** double-click.
-- **Read a character's record:** click it.
+- **Read a character's record:** click it, or her name in the Agents panel.
 - **Close:** **Close** or Esc.
+
+## The panels beside the floor
+
+From your picture, filled only from real records, every 5 seconds:
+- **Agents:** every agent with a light: green working, amber waiting for you, red stopped,
+  grey free.
+- **Current tasks:** what each working agent is doing right now, and what waits for you. If
+  nothing runs it says so and how to start a mission (`bau mission list`, then
+  `bau mission run ID`).
+- **System status:** Jarvis running on this computer; headquarters on or off; how many laptop
+  stations are paired (paired, not "connected": BAU cannot see that from here); the
+  autopilot's jobs; HOLD.
 
 ## What you see is real
 
