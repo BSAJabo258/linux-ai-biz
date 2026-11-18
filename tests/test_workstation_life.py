@@ -104,3 +104,16 @@ def test_idle_workers_lose_health_by_the_day(home):
     later = dt.datetime.now(dt.UTC) + dt.timedelta(days=5)
     st = W.refresh(home, now=later)
     assert helper(st)["health"] == W.START_HEALTH - 5 * W.IDLE_DECAY_PER_DAY
+
+
+@pytest.mark.parametrize("status,kind", [("FAILED", "retry"), ("PAUSED", "continue"),
+                                         ("CANCELLED", None), ("WAITING_FOR_APPROVAL", None)])
+def test_only_failed_or_interrupted_jobs_come_back_as_work(home, status, kind):
+    from bau.jobs import JobStore
+    store = JobStore(home)
+    j = store.create("m1", "draft a caption", "folder:helper", ["step-1"])
+    j.status = status
+    store.checkpoint(j)
+    st = W.refresh(home)
+    made = [t for t in st["tasks"] if t.get("source_job") == j.job_id]
+    assert [t["kind"] for t in made] == ([kind] if kind else [])   # the owner's cancel holds

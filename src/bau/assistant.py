@@ -594,7 +594,8 @@ class Assistant:
                  "cannot be applied unless its tests pass.",
                  _schema({"proposal": {"type": "string"},
                           "tests": {"type": "array", "items": {"type": "string"}}},
-                         ["proposal"]), self.t_self_test, kind="act"),
+                         ["proposal"]), self.t_self_test, kind="confirm",
+                 stage=self._stage_self_test),
             Tool("self_diff", "Show the exact diff a proposed change would make, and whether "
                  "its tests passed.", _schema({"proposal": {"type": "string"}}, ["proposal"]),
                  self.t_self_diff),
@@ -1145,6 +1146,13 @@ class Assistant:
 
     def t_self_test(self, proposal: str, tests: list[str] | None = None) -> dict[str, Any]:
         return self.selflab.test(proposal, tests)
+
+    def _stage_self_test(self, proposal: str, tests: list[str] | None = None) -> dict[str, Any]:
+        d = self.selflab.diff(proposal)
+        return {"summary": f"Run the tests for {proposal}? This runs Jarvis's proposed code "
+                           "on this computer, in a copy with no keys and no BAU data. "
+                           f"{len(d['files'])} file(s):\n\n{d['diff'][:6000]}"
+                           + ("\n... more in self_diff ..." if len(d["diff"]) > 6000 else "")}
 
     def t_self_diff(self, proposal: str) -> dict[str, Any]:
         return self.selflab.diff(proposal)

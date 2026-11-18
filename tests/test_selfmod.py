@@ -72,6 +72,7 @@ def test_only_a_human_applies_and_a_changed_file_is_a_conflict(repo, tmp_path):
     s = lab(repo, tmp_path / "home")
     out = s.propose({"src/bau/thing.py": "VALUE = 2\n"}, "make the value two")
     s.test(out["proposal"])
+    s.card(out["proposal"])                     # the owner's card was shown
     with pytest.raises(PermissionError):
         s.apply(out["proposal"], "jarvis")
     (repo / "src" / "bau" / "thing.py").write_text("VALUE = 3\n")
@@ -116,7 +117,10 @@ def test_jarvis_stages_apply_and_needs_the_owner_to_confirm(repo, tmp_path):
     out = a._run_tool("self_propose", {"files": {"src/bau/thing.py": "VALUE = 2\n"},
                                        "reason": "make the value two"})[0]
     pid = out["proposal"]
-    assert a._run_tool("self_test", {"proposal": pid})[0]["passed"]
+    card = a._run_tool("self_test", {"proposal": pid})[0]   # proposed code runs: a card
+    assert card["status"] == "PENDING_OWNER_CONFIRMATION"
+    assert "VALUE = 2" in a.pending[card["pending_id"]].summary
+    a.confirm(card["pending_id"], True, "human:owner")
     staged = a._run_tool("self_apply", {"proposal": pid})[0]
     assert staged["status"] == "PENDING_OWNER_CONFIRMATION"
     assert (repo / "src" / "bau" / "thing.py").read_text() == "VALUE = 1\n"
@@ -155,3 +159,43 @@ def test_protected_safety_files_are_read_but_never_changed(repo, tmp_path):
     (pd / "proposal.json").write_text(json.dumps(rec))
     with pytest.raises(SelfModError, match="protected"):
         s.apply(r["proposal"], "human:owner")
+
+
+@pytest.mark.parametrize("path", ["src/bau/./gateway.py", "src//bau/gateway.py",
+                                  "src/bau/ui/../gateway.py", "./src/bau/gateway.py"])
+def test_no_second_spelling_of_a_protected_file(repo, tmp_path, path):
+    with pytest.raises(SelfModError):
+        lab(repo, tmp_path / "home").propose({path: "OPEN = True\n"}, "loosen")
+
+
+def test_apply_is_bound_to_the_change_on_the_card(repo, tmp_path):
+    s = lab(repo, tmp_path / "home")
+    pid = s.propose({"src/bau/thing.py": "VALUE = 2\n"}, "two")["proposal"]
+    s.test(pid)
+    with pytest.raises(SelfModError, match="card"):       # never shown: never applied
+        s.apply(pid, "human:owner")
+    s.card(pid)
+    s.propose({"src/bau/thing.py": "VALUE = 9\n"}, "swap after the card", pid)
+    s.test(pid)
+    with pytest.raises(SelfModError, match="card"):       # swapped after the card
+        s.apply(pid, "human:owner")
+    assert (repo / "src" / "bau" / "thing.py").read_text() == "VALUE = 1\n"
+
+
+def test_a_diff_too_long_for_the_card_is_refused(repo, tmp_path):
+    s = lab(repo, tmp_path / "home")
+    big = "".join(f"V{i} = {i}\n" for i in range(4000))
+    pid = s.propose({"src/bau/thing.py": big}, "big")["proposal"]
+    s.test(pid)
+    with pytest.raises(SelfModError, match="too large"):
+        s.card(pid)
+
+
+def test_proposed_code_runs_without_jarvis_keys(repo, tmp_path, monkeypatch):
+    monkeypatch.setenv("FANVUE_CLIENT_SECRET", "real-secret")
+    s = SelfLab(root=repo, home=tmp_path / "home", audit=AuditLog(tmp_path / "a.jsonl"))
+    pid = s.propose({"tests/test_env.py": "import os\n\ndef test_env():\n"
+                     "    assert 'FANVUE_CLIENT_SECRET' not in os.environ\n"
+                     "    assert os.environ['BAU_HOME'].endswith('run-home/bau')\n"},
+                    "env check")["proposal"]
+    assert s.test(pid, ["tests/test_env.py"])["passed"]

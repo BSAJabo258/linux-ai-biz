@@ -35,7 +35,9 @@ autopilot without a confirm card for each step. It says yes only when all of the
 - the worker has 25 health or more;
 - you have approved that agent folder once (`bau agents approve <name>`).
 
-Anything else waits for you, exactly as before. A task that waited only because the folder was
+Anything else waits for you, exactly as before. A failed job comes back as a retry and an
+interrupted one as "continue"; a job you cancelled, or one waiting for your approval, never
+comes back by itself. A task that waited only because the folder was
 not approved yet goes on by itself once you approve it.
 
 Only you or the autopilot can assign work or run a shift; Jarvis's model cannot. The autopilot

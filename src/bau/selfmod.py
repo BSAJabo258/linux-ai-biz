@@ -47,10 +47,16 @@ PROTECTED = frozenset({
     "src/bau/audit.py", "src/bau/keys.py", "src/bau/wipe_gate.py", "src/bau/localonly.py",
     "src/bau/network.py", "src/bau/sandbox.py", "src/bau/disclosure.py", "src/bau/claims.py",
     "src/bau/sanctions.py", "src/bau/money.py", "src/bau/autopilot.py",  # its Go/Vote/Ask lanes
+    # the tool menu and confirm cards, the CLI's human checks, the runtime, agent folder
+    # approval, the workstation's manager rule, missions, MCP pins and the updater
+    "src/bau/assistant.py", "src/bau/jarvis.py", "src/bau/cli.py", "src/bau/cli_ext.py",
+    "src/bau/runtime.py", "src/bau/agentfolders.py", "src/bau/workstation.py",
+    "src/bau/executive.py", "src/bau/mcp.py", "src/bau/catalog.py", "src/bau/update.py",
+    "src/bau/home.py",
     "tests/conftest.py",
 })
 PROTECTED_DIRS = ("src/bau/security/", "src/bau/privacy/", "src/bau/data/policies/",
-                  "src/bau/data/regulations/")
+                  "src/bau/data/regulations/", "src/bau/ui/", "src/bau/models/")
 NEW_TEST = re.compile(r"tests/test_[A-Za-z0-9_]+\.py$")
 MAX_FILE = 200_000
 MAX_TOTAL = 1_000_000
@@ -62,7 +68,8 @@ TEST_TIMEOUT = 600
 IGNORE = shutil.ignore_patterns(".git", ".venv", "venv", "node_modules", "__pycache__",
                                 ".pytest_cache", ".mypy_cache", ".ruff_cache", ".cache",
                                 "artifacts", "build", "dist", "*.iso", "*.img",
-                                "*.sandbox-work")
+                                "*.sandbox-work", ".env", ".env.*", "*.env", "*.key",
+                                "*.pem", "secrets", ".ssh")
 
 
 class SelfModError(ValueError):
@@ -73,9 +80,16 @@ def _sha(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+def _plain(raw: str) -> bool:
+    """One spelling per file: no '.', '..' or empty segments (``src/bau/./gateway.py`` and
+    ``src//bau/gateway.py`` would otherwise slip past the protected list)."""
+    return bool(raw) and "\x00" not in raw and \
+        all(seg not in ("", ".", "..") for seg in raw.split("/"))
+
+
 def _safe_dir(rel: str) -> str:
     raw = str(rel or "").strip().replace("\\", "/").strip("/")
-    if not raw or raw.startswith("/") or ".." in raw.split("/") or "\x00" in raw:
+    if not raw or raw.startswith("/") or not _plain(raw):
         raise SelfModError("path must stay inside this repository")
     if BLOCKED.search(raw):
         raise SelfModError("key, secret and approval files are never read here")
@@ -87,7 +101,7 @@ def _safe_dir(rel: str) -> str:
 def _safe(rel: str) -> str:
     """A repository-relative path under the three directories Jarvis may touch."""
     raw = str(rel or "").strip().replace("\\", "/")
-    if not raw or raw.startswith("/") or ".." in raw.split("/") or "\x00" in raw:
+    if not raw or raw.startswith("/") or not _plain(raw):
         raise SelfModError("path must stay inside this repository")
     if BLOCKED.search(raw):
         raise SelfModError("key, secret and approval files are never touched")
@@ -231,6 +245,9 @@ class SelfLab:
         total = 0
         for path, text in files.items():
             rel = _changeable(str(path))
+            real = (self.root / rel).resolve()
+            if real != self.root.resolve() / rel:
+                raise SelfModError(f"{rel}: goes through a link; not edited here")
             if not isinstance(text, str) or not text.strip():
                 raise SelfModError(f"{rel}: give the full file text")
             if rel.startswith("tests/"):
@@ -273,9 +290,13 @@ class SelfLab:
 
     # ---------------------------------------------------------------- tests and diff
     def _run(self, work: Path, cmd: list[str], timeout: int) -> subprocess.CompletedProcess:
-        env = os.environ.copy()
-        env["PYTHONPATH"] = str(work / "src")
-        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        # The proposed code runs here, so it gets nothing of Jarvis's: no keys, no tokens, no
+        # real BAU_HOME. Only a path to python and a throwaway home inside the proposal.
+        scratch = work.parent / "run-home"
+        scratch.mkdir(exist_ok=True)
+        env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8",
+               "HOME": str(scratch), "TMPDIR": str(scratch), "BAU_HOME": str(scratch / "bau"),
+               "PYTHONPATH": str(work / "src"), "PYTHONDONTWRITEBYTECODE": "1"}
         return subprocess.run(cmd, cwd=work, capture_output=True, text=True,
                               timeout=timeout, stdin=subprocess.DEVNULL, env=env)
 
@@ -323,11 +344,15 @@ class SelfLab:
         if not rec.get("tested"):
             raise SelfModError("the tests have not passed yet; run self_test first")
         d = self.diff(proposal)
+        if d["cut"]:
+            raise SelfModError("this change is too large to show in full on one card; split "
+                               "it into smaller proposals")
+        rec["shown_sha"] = _sha(json.dumps(rec["files"], sort_keys=True))
+        atomic_write_json(self._proposal_dir(proposal) / "proposal.json", rec)
         lines = sum(1 for ln in d["diff"].splitlines()
                     if ln.startswith(("+", "-")) and not ln.startswith(("+++", "---")))
         return {"summary": f"Apply {proposal} to my own code? {len(d['files'])} file(s), "
-                           f"{lines} changed lines; tests passed.\n\n{d['diff'][:5000]}"
-                           + ("\n... diff cut ..." if d["cut"] else "")}
+                           f"{lines} changed lines; tests passed.\n\n{d['diff']}"}
 
     def apply(self, proposal: str, by: str) -> dict[str, Any]:
         if not str(by).startswith("human:"):
@@ -339,6 +364,9 @@ class SelfLab:
             raise SelfModError("the tests have not passed; nothing is applied")
         for rel in rec["files"]:      # the record on disk is re-checked, not trusted
             _changeable(rel)
+        if rec.get("shown_sha") != _sha(json.dumps(rec["files"], sort_keys=True)):
+            raise SelfModError("the change is not the one on your card; ask Jarvis to show "
+                               "it again")
         for rel, meta in rec["base"].items():
             src = self.root / rel
             now = src.read_text(encoding="utf-8", errors="replace") if src.exists() else None

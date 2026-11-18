@@ -237,8 +237,12 @@ def process_jobs(st: dict[str, Any], home: Path, now: str) -> None:
         worker["stats"]["streak"] = 0
         worker["last_job"] = job.job_id
         worker["status"] = "idle"
-        kind = "retry" if job.status in ("FAILED", "CANCELLED") else "continue"
-        _job_task(st, job, role, kind)
+        # A failure is retried and an interrupted job continued, but a job the owner
+        # cancelled, or one waiting for the owner's approval, is never picked up again here.
+        if job.status in ("FAILED", "ROLLED_BACK"):
+            _job_task(st, job, role, "retry")
+        elif job.status in ("PAUSED", "INTERRUPTED", "WAITING_FOR_NETWORK"):
+            _job_task(st, job, role, "continue")
         _event(st, "failed" if delta < -15 else "stalled", worker,
                f"{text}: {job.objective[:120]}", job=job.job_id)
     st["seen_jobs"] = list(seen)[-MAX_SEEN:]
