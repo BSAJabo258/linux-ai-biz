@@ -149,8 +149,14 @@ def make_post(home: Path, task: dict[str, Any], draw: Any = None,
     if level >= 2:                               # the owner's limits never leave the picture
         negative += ", " + ", ".join(_limit_words(prof.get("explicit_boundaries") or []))
         price = round(float(prof["prices"]["nude" if level == 2 else "xxx"]) * 100)
+    extra = {}
+    if level < 2 and comfy.face_ready():         # her locked face (face.py), sfw lane only
+        from .face import locked
+        if (face := locked(home, prof)) is not None:
+            extra["face"] = face
     pic = (draw or comfy.draw)(home, comfy.creator_prompt(prof, scene, d["shot"]), name,
-                               negative=negative, lane="explicit" if level >= 2 else "sfw")
+                               negative=negative, lane="explicit" if level >= 2 else "sfw",
+                               **extra)
     from .automaton import running
     auto = running(home)                         # the automaton: no Accept card, it posts
     item = Queue(home).add(pic["file"], caption(home, prof, d["theme"], factory, level),

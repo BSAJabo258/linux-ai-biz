@@ -539,6 +539,30 @@ def cmd_creator(a):
               "you_keep_about": {k: round(v * 0.8, 2) for k, v in prices.items()},
               "note": "Fanvue keeps 20% (help.fanvue.com, read 2026-11-01); before tax"})
         return EXIT_OK
+    if a.creator_cmd == "face":           # her locked face (docs/PICTURES.md)
+        from . import face
+        from .creator_feed import _profile
+        from .home import bau_home
+        home = bau_home()
+        found = (Path(a.profile), yaml.safe_load(Path(a.profile).read_text()) or {}) \
+            if a.profile else _profile(home)
+        if found is None:
+            raise ValueError("no creator profile (bau creator init)")
+        prof = found[1]
+        if a.face_cmd == "show":
+            _out(face.status(home, prof))
+            return EXIT_OK
+        if a.face_cmd == "pick":
+            _out(face.pick(home, prof, a.number, _human(), AuditLog()))
+            return EXIT_OK
+        from .world import PICTURES_NOT_RUNNING, pictures_running
+        if not pictures_running():
+            print(f"bau creator face draw: {PICTURES_NOT_RUNNING}", file=sys.stderr)
+            return EXIT_BLOCKED
+        done = face.draw_candidates(home, prof, a.count)
+        _out({"candidates": done, "folder": str(face.faces_dir(home) / "candidates"),
+              "next": "look at them, then lock one: bau creator face pick N"})
+        return EXIT_OK
     creator = VirtualCreator(Path(a.profile))
     if a.creator_cmd == "draw":          # pictures on this computer (docs/PICTURES.md)
         import datetime as dt
@@ -2334,6 +2358,16 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--level", type=int, choices=[0, 1, 2, 3],
                    help="paid level: 0 teaser, 1 subscriber, 2 nude, 3 xxx (sets the tier)")
     x.add_argument("--out", help="write Markdown to a file instead of stdout")
+    x = w.add_parser("face", help="her locked face: the same woman in every sfw picture")
+    f = x.add_subparsers(dest="face_cmd", required=True)
+    y = f.add_parser("draw", help="draw candidate faces on this computer")
+    y.add_argument("--count", type=int, default=4)
+    y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
+    y = f.add_parser("pick", help="you: lock candidate N as her face")
+    y.add_argument("number", type=int)
+    y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
+    y = f.add_parser("show", help="is her face locked, and what is next")
+    y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
     x = w.add_parser("prices", help="you: your Fanvue prices in US dollars")
     x.add_argument("profile")
     x.add_argument("--subscription", type=float, required=True, help="a month")
