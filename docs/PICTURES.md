@@ -83,9 +83,30 @@ guard, and you still look at every picture. Videos are not age-checked yet.
   are made only by the autopilot's Fanvue feed, with Chroma, and only for Fanvue.
 - The picture program is only reached on this computer (127.0.0.1).
 
+## Her face lock: the same woman in every picture (2026-11-18)
+
+Your choice: one locked face for your creator. Set it up once, after the pictures setup:
+
+```bash
+sudo bash installer/bau-face-setup.sh   # the face nodes and two face models, about 3.4 GB
+bau creator face draw                   # 4 candidate faces (--count up to 8)
+bau creator face pick 2                 # you lock the one you like (here number 2)
+bau creator face show                   # is it locked, and what is next
+```
+
+The candidates land in `creators/faces/candidates` (never where Fanvue posts come from), each
+age-checked like every picture. Only you lock a face, at your terminal. From then on every
+level 0 and 1 picture is drawn from that face with IP-Adapter Plus Face (h94/IP-Adapter,
+Apache-2.0; the ComfyUI_IPAdapter_plus nodes, GPL-3.0, run inside ComfyUI). No InsightFace:
+its face models are for non-commercial use only. Each picture's record says which face it used.
+If the locked file is changed, BAU stops using it until you pick again. `bau money` shows the
+face lock as one of its links.
+
+Not tested on your card yet: the face nodes were checked in their code, not run here. The first
+`bau creator face draw` and the first feed picture after it are the test.
+
 ## Still to do
 
-- **Same face every time.** The prompt describes her the same way each time, but SDXL
-  alone does not keep one exact face across pictures. A face-lock step is the next thing to
-  add. Until then, pick the pictures that match her best.
+- **Her face on levels 2 and 3.** The face lock works on the safe-for-work model only; there
+  is no IP-Adapter for Chroma. The next step is a LoRA trained on her locked pictures.
 - Showing the pictures themselves on the week's card.

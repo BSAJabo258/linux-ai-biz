@@ -9,7 +9,7 @@ import yaml
 from bau import money
 
 ALL_UP = {"pictures_running": True, "pictures_installed": True, "autopilot_timer": True,
-          "fanvue_keys": True}
+          "fanvue_keys": True, "face_ready": True}
 
 
 def probe(**over):
@@ -20,7 +20,13 @@ def probe(**over):
 def ready_home(home):
     (home / "creators").mkdir(parents=True)
     (home / "creators" / "aria.yaml").write_text(yaml.safe_dump(
-        {"name": "Aria", "prices": {"subscription": 9.99, "nude": 10.99, "xxx": 14.99}}))
+        {"id": "aria", "name": "Aria",
+         "prices": {"subscription": 9.99, "nude": 10.99, "xxx": 14.99}}))
+    faces = home / "creators" / "faces" / "candidates"
+    faces.mkdir(parents=True)
+    (faces / "aria-1.png").write_bytes(b"face")
+    from bau import face
+    face.pick(home, {"id": "aria"}, 1, "human:owner")
     (home / "config").mkdir()
     (home / "config" / "brains.yaml").write_text(yaml.safe_dump({"small": "qwen-local"}))
     (home / "registry").mkdir()

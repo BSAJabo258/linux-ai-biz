@@ -29,6 +29,9 @@ def _probe(what: str) -> Any:
         return setup_steps.pictures_installed()
     if what == "autopilot_timer":
         return bool(setup_steps._probe("autopilot"))
+    if what == "face_ready":
+        from .media import comfy
+        return comfy.face_ready()
     if what == "fanvue_keys":
         from . import fanvue
         try:
@@ -78,6 +81,15 @@ def links(home: Path, probe: Probe | None = None) -> list[dict[str, Any]]:
                                    else "not set up"),
         "sudo systemctl start bau-pictures.service" if probe("pictures_installed")
         else "press Accept on the 'Set up pictures on this computer' card in Jarvis")
+    if prof_path is not None:
+        from .face import locked
+        installed = bool(probe("face_ready"))
+        face = locked(home, prof) is not None
+        add("her face lock (same woman in every sfw picture)", installed and face,
+            "locked" if face and installed else ("locked, face nodes not installed" if face
+                                                 else "not locked"),
+            "bau creator face draw, then bau creator face pick N" if installed
+            else "sudo bash bau-face-setup.sh (docs/PICTURES.md)")
     keys = bool(probe("fanvue_keys"))
     add("Fanvue app keys", keys, "on this computer" if keys else "missing",
         "press Accept on the 'Make your Fanvue app' card in Jarvis (docs/FANVUE.md)")

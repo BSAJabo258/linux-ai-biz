@@ -245,3 +245,26 @@ def test_on_the_laptop_station_the_feed_draws_nothing(home, tmp_path, monkeypatc
     mark.write_text("on=x\n")
     monkeypatch.setattr(station, "STATION_MARK", mark)
     assert C.fill(home) == 0 and A._load(home)["tasks"] == []
+
+
+def test_her_locked_face_is_used_on_sfw_posts_only(home, monkeypatch):
+    import yaml
+
+    from bau import face, team
+    from bau.media import comfy
+    monkeypatch.setattr(team, "show", lambda h: {"boss": None})
+    monkeypatch.setattr(comfy, "face_ready", lambda: True)
+    prof = yaml.safe_load((home / "creators" / "aria.yaml").read_text())
+    cand = home / "creators" / "faces" / "candidates"
+    cand.mkdir(parents=True)
+    (cand / f"{prof['id']}-1.png").write_bytes(b"face")
+    face.pick(home, prof, 1, "human:owner")
+    seen = []
+
+    def draw(home_, prompt, name, **kw):
+        seen.append(kw.get("face"))
+        return fake_draw([])(home_, prompt, name)
+    task = {"detail": {"job": "fanvue_post", "theme": "x", "level": 1, "shot": "medium",
+                       "parts": C.pick(1)}}
+    C.make_post(home, task, draw=draw)
+    assert seen[0] == face.locked(home, prof)
