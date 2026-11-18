@@ -91,7 +91,9 @@ def test_login_is_pkce_s256_with_the_documented_scopes_and_basic_client_auth(tmp
     _, _, headers, body = fake.calls[-1]
     assert headers["Authorization"] == "Basic " + base64.b64encode(b"cid:csecret").decode()
     assert "code_verifier=" in body.decode()
-    assert (tmp_path / "secrets" / "fanvue.json").stat().st_mode & 0o777 == 0o600
+    # the owner's login and the autopilot (bau group) share it; nobody else (credentials.py)
+    assert (tmp_path / "secrets" / "fanvue.json").stat().st_mode & 0o777 == 0o660
+    assert (tmp_path / "secrets").stat().st_mode & 0o7777 == 0o2770
 
 
 def test_refresh_tokens_rotate_and_the_new_one_is_kept(tmp_path):

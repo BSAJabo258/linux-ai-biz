@@ -2455,7 +2455,10 @@ async function answer(approve) {
   try { const r = await settle(await apiJson("/api/confirm", { id: item.id, approve, choices }));
     if (r.retry) { setState("idle"); caption(r.error); confirmQ.unshift(item); nextConfirm(); return; }
     // A finished action may say what really happened (a mission that ran but PAUSED is not "Done.").
-    const msg = !approve ? "Understood. I won't." : r.done ? ((r.result && r.result.say) || "Done.") : "That didn't go through: " + fmt((r.result || r).error || "unknown error");
+    const msg = !approve ? "Understood. I won't." : r.done ? ((r.result && (r.result.say || r.result.said)) || "Done.") : "That didn't go through: " + fmt((r.result || r).error || "unknown error");
+    // A sign-in card (Connect Fanvue) runs the terminal's own sign-in and hands back its link.
+    if (approve && r.done && r.result && /^https:\/\//.test(r.result.open || "")) {
+      window.open(r.result.open, "_blank", "noopener"); logLine("sys", "Sign in here: " + r.result.open); }
     logLine("sys", (approve ? "Confirmed: " : "Declined: ") + item.tool);
     if (r.result) renderCard({ tool: item.tool, data: r.result });
     loadNodes();

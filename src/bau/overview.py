@@ -106,7 +106,7 @@ def _fanvue(home: Path) -> dict[str, Any]:
     import json
 
     from . import fanvue as F
-    signed = F.TokenStore(home).load() is not None
+    signed = F.TokenStore(home).store.state() == "present"
     choice = F.autopost_choice(home) or {}
     items = F.Queue(home).items()
     today = dt.datetime.now(dt.UTC).date().isoformat()

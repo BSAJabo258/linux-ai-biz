@@ -93,9 +93,12 @@ def links(home: Path, probe: Probe | None = None) -> list[dict[str, Any]]:
     keys = bool(probe("fanvue_keys"))
     add("Fanvue app keys", keys, "on this computer" if keys else "missing",
         "press Accept on the 'Make your Fanvue app' card in Jarvis (docs/FANVUE.md)")
-    connected = fanvue.TokenStore(home).load() is not None
-    add("Fanvue connected", connected, "connected" if connected else "not connected",
-        "bau fanvue login")
+    # The same shared sign-in the terminal, Jarvis and the autopilot use (credentials.py).
+    sign_in = fanvue.TokenStore(home).store.state()
+    add("Fanvue connected", sign_in == "present",
+        {"present": "connected", "missing": "not connected",
+         "unreadable": "signed in, but this account cannot read the sign-in"}[sign_in],
+        "bau fanvue status (it names the exact fix), then bau fanvue login if asked")
     prices = prof.get("prices") or {}
     add("prices", bool(prices), ", ".join(f"{k} ${v}" for k, v in prices.items()) or "not set",
         "press Accept on the 'Set your Fanvue prices' card in Jarvis")

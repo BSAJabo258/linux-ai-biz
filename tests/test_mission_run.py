@@ -112,7 +112,7 @@ def test_a_paused_mission_says_so_instead_of_done(tmp_path):
     assert list(out)[0] == "say" and out["say"].startswith(f"Mission {mid} is paused, not done")
     from pathlib import Path
     page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
-    assert '(r.result && r.result.say) || "Done."' in page
+    assert '(r.result && (r.result.say || r.result.said)) || "Done."' in page
 
 
 def test_the_researcher_can_search_the_web_and_then_only_reads(tmp_path):

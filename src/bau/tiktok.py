@@ -32,7 +32,6 @@ import http.server
 import json
 import os
 import secrets
-import stat
 import subprocess
 import time
 import urllib.error
@@ -44,7 +43,8 @@ from pathlib import Path
 from typing import Any
 
 from .audit import AuditLog, ref
-from .home import atomic_write_json, bau_home
+from .credentials import CredentialError, Store
+from .home import bau_home
 from .store import JsonlStore
 
 API = "https://open.tiktokapis.com"
@@ -88,30 +88,29 @@ def pkce_pair() -> tuple[str, str]:
 # ------------------------------------------------------------------ credentials
 
 class TokenStore:
-    """Tokens live in BAU_HOME/secrets/tiktok.json, mode 0600. Never logged."""
+    """BAU_HOME/secrets/tiktok.json in the one shared credential store (credentials.py): the
+    owner's login, Jarvis and the autopilot read the same sign-in. Never logged."""
 
     def __init__(self, home: Path | None = None):
-        self.path = (home or bau_home()) / "secrets" / "tiktok.json"
+        self.store = Store("tiktok", home)
+        self.path = self.store.path
 
     def load(self) -> dict[str, Any] | None:
-        if not self.path.exists():
-            return None
-        return json.loads(self.path.read_text())
+        try:
+            return self.store.load()
+        except CredentialError as e:
+            raise TikTokError(str(e)) from None
 
     def save(self, tok: dict[str, Any]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.path.parent, stat.S_IRWXU)
         now = time.time()
-        rec = {"access_token": tok["access_token"], "refresh_token": tok["refresh_token"],
-               "open_id": tok.get("open_id", ""), "scope": tok.get("scope", ""),
-               "access_expires_at": now + int(tok.get("expires_in", 0)) - 60,
-               "refresh_expires_at": now + int(tok.get("refresh_expires_in", 0)) - 60}
-        atomic_write_json(self.path, rec)
-        os.chmod(self.path, stat.S_IRUSR | stat.S_IWUSR)
+        self.store.save({
+            "access_token": tok["access_token"], "refresh_token": tok["refresh_token"],
+            "open_id": tok.get("open_id", ""), "scope": tok.get("scope", ""),
+            "access_expires_at": now + int(tok.get("expires_in", 0)) - 60,
+            "refresh_expires_at": now + int(tok.get("refresh_expires_in", 0)) - 60})
 
     def clear(self) -> None:
-        if self.path.exists():
-            self.path.unlink()
+        self.store.clear()
 
 
 def _env_file(path: Path) -> dict[str, str]:
@@ -193,10 +192,15 @@ class TikTokClient:
             raise TikTokError("not connected: run `bau tiktok login`")
         if time.time() < tok["access_expires_at"]:
             return tok["access_token"]
-        if time.time() >= tok["refresh_expires_at"]:
-            raise TikTokError("TikTok login expired: run `bau tiktok login` again")
-        return self._token({"grant_type": "refresh_token",
-                            "refresh_token": tok["refresh_token"]})["access_token"]
+        # A rotated refresh token works once: Jarvis and the autopilot must not both spend it.
+        with self.tokens.store.refresh_lock():
+            tok = self.tokens.load() or tok          # another process may have just refreshed
+            if time.time() < tok["access_expires_at"]:
+                return tok["access_token"]
+            if time.time() >= tok["refresh_expires_at"]:
+                raise TikTokError("TikTok login expired: run `bau tiktok login` again")
+            return self._token({"grant_type": "refresh_token",
+                                "refresh_token": tok["refresh_token"]})["access_token"]
 
     # -------------------------------------------------------- Content Posting API
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
