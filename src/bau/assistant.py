@@ -757,6 +757,9 @@ class Assistant:
             p = None
         start = "bau automaton start --audience ... --per-day N"
         held = hold_reason(self.home)
+        choice = autopost_choice(self.home)
+        # True / False from the owner's setting; None when it is missing or not a setting.
+        autopost_on = bool(choice.get("on")) if isinstance(choice, dict) else None
         if s.get("dead"):
             # Its death set a HOLD: start alone would not post anything.
             say = (f"The automaton is dead: {s['dead']['why']}. Only you revive it, at a "
@@ -769,13 +772,17 @@ class Assistant:
             if held:                                 # starting it does not lift a HOLD
                 say += (f" BAU is also on HOLD ({held}): check why and run bau governor "
                         "release before posts can go out.")
-        elif held:
-            say = (f"The automaton is on, but blocked by a HOLD ({held}): nothing posts "
-                   "until you check why and run bau governor release.")
-        elif not (autopost_choice(self.home) or {}).get("on"):
-            # `bau fanvue autopost off` leaves the automaton on but posts nothing.
-            say = ("The automaton is on, but Fanvue autopost is off, so nothing posts. Only "
-                   "you switch it on: bau fanvue autopost on --audience ... --per-day N.")
+        elif held or not autopost_on:
+            # Each blocker is named: releasing a HOLD alone does not switch autopost back on.
+            stops = []
+            if held:
+                stops.append(f"a HOLD ({held}): check why and run bau governor release")
+            if autopost_on is False:      # `bau fanvue autopost off`: on, but posts nothing
+                stops.append("Fanvue autopost is off: only you switch it on, bau fanvue "
+                             "autopost on --audience ... --per-day N")
+            elif autopost_on is None:
+                stops.append("the autopost setting is missing or unreadable (fanvue/autopost.json)")
+            say = "The automaton is on, but nothing posts. Blocked by " + "; and ".join(stops) + "."
         else:
             # Two numbers a small model mixed up on the real desktop (2026-11-11): money it may
             # still SPEND and DAYS it has left to earn. Each gets its own sentence.
@@ -1650,12 +1657,14 @@ class Assistant:
             said = [r["text"] for r in self.history if r["role"] == "jarvis"][-1:]
             asked_run = RUN_MISSIONS.search(user_text) or (
                 YES.match(user_text) and any(RUN_MISSIONS.search(t) for t in said))
+            # Only the owner's own words name a week: grounded facts (a stored mission
+            # objective, say) must never put a card up.
+            m = WEEK_CMD.search(user_text)
             user_text = self._ground(user_text, cards)
             if asked_run:
                 user_text += self._stage_ready_missions(staged)
             # Naming a week plan that exists puts its card up at once: the small model did not
             # find schedule_week in its menu (real run, 2026-11-01). Staging changes nothing.
-            m = WEEK_CMD.search(user_text)
             if m and (self.home / "weeks" / f"{m.group(1)}.yaml").is_file():
                 out, err = self._run_tool("schedule_week", {"week": m.group(1)})
                 if not err and out.get("pending_id"):

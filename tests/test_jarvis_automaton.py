@@ -28,6 +28,8 @@ def test_running_it_reports_its_money_days_and_missions(tmp_path):
     Ledger(tmp_path).sale(20.0, factory="fanvue", platform_fee=4.0,
                           when=now - dt.timedelta(days=1))
     Ledger(tmp_path).cost("model", 3.0, when=now - dt.timedelta(hours=12))
+    Ledger(tmp_path).sale(100.0, factory="fanvue", platform_fee=20.0,   # before this start
+                          when=now - dt.timedelta(days=10))
     j = jarvis(tmp_path)
     m = j.plan("price a template pack", "research", {})
     J.set_mission(j, m.mission_id, "human:owner", priority=2,
@@ -37,6 +39,7 @@ def test_running_it_reports_its_money_days_and_missions(tmp_path):
     assert "running" in s and "day 4" in s and "money kept: $16.00" in s and "normal" in s
     assert "spent: $3.00" in s and "Spending money left: $5.00" in s and "next 29 days" in s
     assert "Since this start" in s and "Across the whole ledger" in s
+    assert "kept $96.00" in s                          # the whole ledger has the older $80
     assert "1 active mission" in s
     top = out["portfolio"]["top"][0]
     assert top["mission_id"] == m.mission_id and top["goal_met"] is False
@@ -67,7 +70,8 @@ def test_on_but_held_it_says_nothing_posts(tmp_path):
     M.start(tmp_path, "human:owner", "subscribers", 2)
     Governor(tmp_path).hold("checking a complaint", by="human:owner")
     s = lean(tmp_path, ["ok"]).t_automaton()["say"]
-    assert "blocked by a HOLD" in s and "checking a complaint" in s and "running" not in s
+    assert "Blocked by a HOLD (checking a complaint)" in s and "running" not in s
+    assert "autopost" not in s                         # autopost is on: only the HOLD blocks
 
 
 def test_an_unreadable_portfolio_keeps_the_status_and_never_says_zero(tmp_path, monkeypatch):
@@ -116,3 +120,30 @@ def test_stopped_and_held_it_says_both(tmp_path):
     s = lean(tmp_path, ["ok"]).t_automaton()["say"]
     assert "not running" in s and "HOLD (checking a complaint)" in s
     assert "bau governor release" in s
+
+
+def test_held_with_autopost_off_names_both_blockers(tmp_path):
+    from bau.fanvue import set_autopost
+    from bau.governor import Governor
+    M.start(tmp_path, "human:owner", "subscribers", 2)
+    set_autopost(tmp_path, False, "human:owner")
+    Governor(tmp_path).hold("checking a complaint", by="human:owner")
+    s = lean(tmp_path, ["ok"]).t_automaton()["say"]
+    assert "HOLD (checking a complaint)" in s and "bau fanvue autopost on" in s
+
+
+def test_a_broken_autopost_file_keeps_the_status(tmp_path):
+    M.start(tmp_path, "human:owner", "subscribers", 2)
+    (tmp_path / "fanvue" / "autopost.json").write_text("[1, 2]")
+    out = lean(tmp_path, ["ok"]).t_automaton()
+    assert "missing or unreadable" in out["say"] and out["automaton"]["on"] is True
+    assert "Missions:" in out["say"]
+
+
+def test_a_mission_objective_never_puts_a_week_card_up(tmp_path):
+    from test_week import plan
+    name = plan(tmp_path)
+    j = jarvis(tmp_path)
+    j.plan(f"schedule the week {name}", "research", {})     # stored text, not the owner's ask
+    r = lean(tmp_path, ["Here it is."]).ask("how is the automaton doing?")
+    assert not any(p["tool"] == "schedule_week" for p in r.pending)
