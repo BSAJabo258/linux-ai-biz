@@ -56,6 +56,15 @@ The setup run does five things:
 
 It ends with **Done**.
 
+## The laptop takes updates too
+
+The laptop (the operations station, [LAPTOP-STATION.md](LAPTOP-STATION.md)) gets the same
+nightly updates. It is installed from a new stick, so run this once on the laptop as well:
+
+```bash
+sudo bau update auto
+```
+
 ## See it, run it, stop it
 
 ```bash

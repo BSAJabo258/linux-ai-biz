@@ -94,7 +94,7 @@ class Higgsfield:
         if not self.configured:
             raise HiggsfieldError("no Higgsfield key: set HIGGSFIELD_API_KEY_ID and "
                                   "HIGGSFIELD_API_KEY_SECRET (a Codespaces secret, or "
-                                  "/etc/bau/models.env on the laptop)")
+                                  "/etc/bau/models.env on the desktop, headquarters)")
         h = {"Authorization": f"Key {self._key[0]}:{self._key[1]}",
              "Accept": "application/json", **(extra or {})}
         data = None

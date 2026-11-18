@@ -1,9 +1,11 @@
 # Your API keys: bring them over once, safely
 
-BAU reads your keys from two files on the laptop:
+BAU reads your keys from two files on the desktop (headquarters, where the business runs):
 - `/etc/bau/models.env`: Claude, Z.ai, NVIDIA, ElevenLabs, Higgsfield and other model or
   service keys;
 - `/etc/bau/platforms.env`: TikTok, Ayrshare (`AYRSHARE_API_KEY`, see WEEK.md) and other platform keys.
+
+The laptop is the operations station and needs no keys ([LAPTOP-STATION.md](LAPTOP-STATION.md)).
 
 Instead of typing each key, you can carry them all over from the computer that has them,
 in one locked file. Your keys are **never** pasted into a chat, never put on GitHub, and
@@ -35,7 +37,7 @@ bash bau-keys-export.sh                     # keys from your environment
 bash bau-keys-export.sh ~/project/.env      # and from .env files you name
 ```
 
-## 2. On the BAU laptop
+## 2. On the BAU desktop
 
 Plug in the USB stick, open a terminal in its folder, and run:
 
@@ -55,7 +57,7 @@ the files stays as it is.
 
 ## Good to know
 
-- Only key-shaped names are accepted, so a key file can never change how the laptop runs
+- Only key-shaped names are accepted, so a key file can never change how the computer runs
   (it refuses names like `PATH` or `LD_PRELOAD`).
 - A wrong passphrase changes nothing; just run it again.
 - New keys still need your approval where BAU asks for it. For example a model is only

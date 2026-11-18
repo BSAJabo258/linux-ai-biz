@@ -132,7 +132,7 @@ def app_credentials(env_file: Path = Path("/etc/bau/platforms.env")) -> tuple[st
     key, secret = env.get("TIKTOK_CLIENT_KEY"), env.get("TIKTOK_CLIENT_SECRET")
     if not key or not secret:
         raise TikTokError("set TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET "
-                          "(on the laptop: /etc/bau/platforms.env)")
+                          "(on the desktop, headquarters: /etc/bau/platforms.env)")
     return key, secret
 
 

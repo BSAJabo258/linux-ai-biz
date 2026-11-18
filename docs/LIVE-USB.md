@@ -129,14 +129,21 @@ When you want BAU on a laptop's own drive instead of running it from the stick:
    Debian installer can only do that on a whole drive, so "use the largest continuous free
    space" does not work here. "Entire disk" means **only the drive you pick**: the other
    drives (Windows, the stick you started from) are not touched. That drive is also your
-   storage: the system takes about 15 GB, the rest holds your files, BAU's data and the
-   AI models (about 6.5 GB). A 128 GB SanDisk is plenty. Pick it by its **name and size**
-   in the list; never the one that holds Windows, never the stick you started from.
+   storage: the system takes about 15 GB, the rest holds your files and BAU's data (and,
+   on the desktop, the AI models, about 6.5 GB). Install to your USB disk (for the laptop:
+   the 1 TB WD). Pick it by its **name and size** in the list; never the one that holds
+   Windows, never the stick you started from.
+
+   **The laptop is the operations station.** The desktop is headquarters: Jarvis, the
+   agents, the AI models, the keys and the business live there. The laptop needs no
+   models and no keys; it only shows the desktop's Jarvis. The 128 GB SanDisk stick
+   belongs to the desktop; the laptop is installed from its own 64 GB stick. See
+   [LAPTOP-STATION.md](LAPTOP-STATION.md).
 
    **Where the boot loader goes.** Near the end the installer asks **Install the GRUB boot
    loader to your primary drive?** Answer **No** unless BAU goes on the laptop's own
    drive, then pick the **same drive you installed to** (for a USB disk, the one named
-   after it, e.g. SanDisk; never the stick you started from). Not sure which is which?
+   after it, e.g. WD for the laptop; never the stick you started from). Not sure which is which?
    Press **Alt+F2**, then Enter, type `lsblk -o NAME,SIZE,MODEL` and compare the sizes;
    **Alt+F1** brings you back.
 
@@ -178,6 +185,9 @@ portable Jarvis and recovery stick.
 
 ## Your laptop: Dell XPS 13 9380
 
+This laptop is the **operations station**: it shows the desktop's Jarvis and runs no
+business itself ([LAPTOP-STATION.md](LAPTOP-STATION.md)).
+
 From your laptop check (October 2026):
 
 | Part | On BAU |
@@ -197,7 +207,7 @@ offers the USB stick. To ever install BAU on the internal drive next to Windows,
 must be "AHCI" (F2 at start > System Configuration > SATA Operation). **Do not switch it
 straight away**: Windows set up in RAID mode may then not start. Windows must be prepared
 first (start it once in Safe Mode, switch to AHCI, start Windows again). This is your
-choice; running BAU from the SanDisk does not need it.
+choice; running BAU from the 1 TB WD USB disk does not need it.
 
 ## If the desktop dies after a few minutes
 

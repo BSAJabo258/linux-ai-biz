@@ -225,6 +225,6 @@ def client(env_file: Path = Path("/etc/bau/platforms.env")) -> Ayrshare:
     from .tiktok import _env_file
     key = {**_env_file(env_file), **os.environ}.get("AYRSHARE_API_KEY")
     if not key:
-        raise WeekError("set AYRSHARE_API_KEY (on the laptop: /etc/bau/platforms.env, "
-                        "brought over with bau keys import)")
+        raise WeekError("set AYRSHARE_API_KEY (on the desktop, headquarters: "
+                        "/etc/bau/platforms.env, brought over with bau keys import)")
     return Ayrshare(key)
