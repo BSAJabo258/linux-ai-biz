@@ -27,14 +27,16 @@ def test_running_it_reports_its_money_days_and_missions(tmp_path):
             reinvest_pct=50, reinvest_cap_usd=10)
     Ledger(tmp_path).sale(20.0, factory="fanvue", platform_fee=4.0,
                           when=now - dt.timedelta(days=1))
+    Ledger(tmp_path).cost("model", 3.0, when=now - dt.timedelta(hours=12))
     j = jarvis(tmp_path)
     m = j.plan("price a template pack", "research", {})
     J.set_mission(j, m.mission_id, "human:owner", priority=2,
                   goal={"metric": "profit_usd", "at_least": 50})
     out = lean(tmp_path, ["ok"]).t_automaton()
     s = out["say"]
-    assert "running" in s and "day 4" in s and "kept so far: $16.00" in s and "normal" in s
-    assert "Spending money left: $8.00" in s and "next 29 days" in s
+    assert "running" in s and "day 4" in s and "money kept: $16.00" in s and "normal" in s
+    assert "spent: $3.00" in s and "Spending money left: $5.00" in s and "next 29 days" in s
+    assert "Since this start" in s and "Across the whole ledger" in s
     assert "1 active mission" in s
     top = out["portfolio"]["top"][0]
     assert top["mission_id"] == m.mission_id and top["goal_met"] is False
@@ -96,3 +98,21 @@ def test_asked_about_the_automaton_the_small_model_sees_it(tmp_path):
     assert [c["tool"] for c in r.cards][:1] == ["portfolio"]
     r = lean(tmp_path, ["Yes."]).ask("do we have tools to stay on the free tier?")
     assert not any(c["tool"] == "automaton" for c in r.cards)
+
+
+def test_on_with_autopost_off_it_says_nothing_posts(tmp_path):
+    from bau.fanvue import set_autopost
+    M.start(tmp_path, "human:owner", "subscribers", 2)
+    set_autopost(tmp_path, False, "human:owner")
+    s = lean(tmp_path, ["ok"]).t_automaton()["say"]
+    assert "autopost is off" in s and "bau fanvue autopost on" in s and "running" not in s
+
+
+def test_stopped_and_held_it_says_both(tmp_path):
+    from bau.governor import Governor
+    M.start(tmp_path, "human:owner", "subscribers", 2)
+    M.stop(tmp_path, "human:owner")
+    Governor(tmp_path).hold("checking a complaint", by="human:owner")
+    s = lean(tmp_path, ["ok"]).t_automaton()["say"]
+    assert "not running" in s and "HOLD (checking a complaint)" in s
+    assert "bau governor release" in s

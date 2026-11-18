@@ -747,6 +747,7 @@ class Assistant:
 
     def t_automaton(self) -> dict[str, Any]:
         from . import automaton
+        from .fanvue import autopost_choice
         from .governor import hold_reason
         from .jarvis import portfolio
         s = automaton.status(self.home)
@@ -765,14 +766,22 @@ class Assistant:
             say = ("The automaton is not running. Only you start it: " +
                    (f"{start} at a terminal." if s.get("started_at") else
                     f"the Automaton card, or {start} at a terminal."))
+            if held:                                 # starting it does not lift a HOLD
+                say += (f" BAU is also on HOLD ({held}): check why and run bau governor "
+                        "release before posts can go out.")
         elif held:
             say = (f"The automaton is on, but blocked by a HOLD ({held}): nothing posts "
                    "until you check why and run bau governor release.")
+        elif not (autopost_choice(self.home) or {}).get("on"):
+            # `bau fanvue autopost off` leaves the automaton on but posts nothing.
+            say = ("The automaton is on, but Fanvue autopost is off, so nothing posts. Only "
+                   "you switch it on: bau fanvue autopost on --audience ... --per-day N.")
         else:
             # Two numbers a small model mixed up on the real desktop (2026-11-11): money it may
             # still SPEND and DAYS it has left to earn. Each gets its own sentence.
             say = (f"The automaton is running, day {s['day']}, tier {s['tier']}. "
-                   f"Money kept so far: ${s['income_usd']:.2f}; spent: ${s['spent_usd']:.2f}. "
+                   f"Since this start, money kept: ${s['income_usd']:.2f}; "
+                   f"spent: ${s['spent_usd']:.2f}. "
                    f"Spending money left: ${s['money_left_usd']:.2f}. "
                    f"It stops if it earns nothing in the next {s['days_left_to_earn']:g} days.")
         if p is None:                                 # never shown as zero missions or $0
@@ -781,7 +790,8 @@ class Assistant:
         else:
             n = p["active"]
             t = p["totals"]
-            say += (f" Missions: {n} active mission{'' if n == 1 else 's'}; all money kept "
+            say += (f" Missions: {n} active mission{'' if n == 1 else 's'}. Across the whole "
+                    f"ledger, including money not tied to a mission: kept "
                     f"${t['kept_usd']:.2f}, costs ${t['cost_usd']:.2f}, "
                     f"profit ${t['profit_usd']:.2f}.")
             top = [{"mission_id": m["mission_id"], "objective": m["objective"][:80],
