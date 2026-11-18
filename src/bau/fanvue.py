@@ -17,7 +17,9 @@ tutorials/uploading-media, v1/api-reference pages for each path below):
          refresh tokens need offline_access, ROTATE and are single-use: always keep the new one.
          System scopes openid, offline_access, offline: request them on an API-only app.
          The redirect URI must match one registered on the app's Authentication tab exactly.
-         Unknown (not stated): whether a loopback http://127.0.0.1 redirect is accepted.
+         Read 2026-11-15: Fanvue's developer docs allow http://127.0.0.1 redirect addresses;
+         it must match exactly and the app must be saved. A wrong one shows Fanvue's own
+         page "invalid_request ... redirect_uri" and never calls back, so BAU only times out.
   Header X-Fanvue-API-Version: 2025-06-26 on every call.
   Me     GET /v1/users/me (read:self): uuid, handle, displayName, isCreator, isAiCreator.
   Upload POST /v1/media/uploads {name, filename, mediaType image|video|audio|document,
@@ -254,11 +256,18 @@ class FanvueHttp(Http):
             return e.code, ""
 
 
+def redirect_hint(redirect: str) -> str:
+    """What to do when Fanvue's own page says invalid_request / redirect_uri."""
+    return (f"If Fanvue showed invalid_request or redirect_uri, register exactly {redirect} "
+            "on your Fanvue app's Authentication tab and press Save, then run the login again.")
+
+
 def login(client: FanvueClient, port: int = PORT, open_browser: Any = None,
           timeout: int = 300) -> dict[str, Any]:
     """A callback server on 127.0.0.1. Register http://127.0.0.1:<port>/callback as a
     redirect URI on the Fanvue app's Authentication tab. The browser says "connected" only
-    once the token is saved on this computer (oauth_callback)."""
+    once the token is saved on this computer (oauth_callback). The address is printed before
+    the browser opens, and a refusal or a timeout repeats it (the owner's login, 2026-11-18)."""
     redirect = f"http://127.0.0.1:{port}/callback"
     verifier, challenge = pkce_pair()
     state = secrets.token_hex(32)
@@ -268,7 +277,8 @@ def login(client: FanvueClient, port: int = PORT, open_browser: Any = None,
             raise FanvueError("state mismatch - login aborted")
         if "code" not in got:
             raise FanvueError("Fanvue refused: "
-                              f"{got.get('error_description') or got.get('error')}")
+                              f"{got.get('error_description') or got.get('error')}\n"
+                              + redirect_hint(redirect))
         try:
             tok = client.exchange(got["code"], redirect, verifier)
         except OSError as e:          # the token could not be written in BAU_HOME/secrets
@@ -279,13 +289,15 @@ def login(client: FanvueClient, port: int = PORT, open_browser: Any = None,
         return tok
 
     url = client.authorize_url(redirect, state, challenge)
+    print(f"Fanvue sends you back to {redirect}\nRegister exactly that address on your "
+          "Fanvue app's Authentication tab and press Save.")
     try:
         return oauth_callback("Fanvue", port, "/callback", url,
                               open_browser or (lambda u: print(f"Open this link to connect "
                                                                f"Fanvue:\n{u}")),
                               timeout, finish)
     except TikTokError as e:          # the shared helper's timeout
-        raise FanvueError(str(e)) from None
+        raise FanvueError(f"{e}\n{redirect_hint(redirect)}") from None
 
 
 # ------------------------------------------------------------------ the queue
