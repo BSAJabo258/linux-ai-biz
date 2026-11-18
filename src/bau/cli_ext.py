@@ -830,7 +830,9 @@ def cmd_station(a):
         unit.parent.mkdir(parents=True, exist_ok=True)
         unit.write_text(unit_text)
         desk.parent.mkdir(parents=True, exist_ok=True)
-        desk.write_text(S.launcher(shutil_which("bau") or "/usr/local/bin/bau"))
+        from .cli import INSTALLED_BAU  # never bake a stale copy on PATH into it
+        exe = INSTALLED_BAU if Path(INSTALLED_BAU).exists() else shutil_which("bau")
+        desk.write_text(S.launcher(exe or INSTALLED_BAU))
         _sh("systemctl", "--user", "daemon-reload", check=False)
         _sh("systemctl", "--user", "enable", "--now", "bau-hq-link.service", check=False)
         _sh("systemctl", "--user", "restart", "bau-hq-link.service", check=False)  # a new desktop

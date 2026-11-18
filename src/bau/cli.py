@@ -510,6 +510,33 @@ def cmd_wipe_gate(a: argparse.Namespace) -> int:
 
 
 SBIN = ("/usr/sbin", "/sbin")     # where Debian puts admin tools such as nft and aa-status
+INSTALLED_BAU = "/usr/local/bin/bau"   # the real install: /opt/bau/venv linked here (install.sh)
+
+
+def bau_on_path(which=None, expected: str | None = None) -> str:
+    """'ok' when `bau` on PATH is the installed one, else what shadows it and the fix.
+
+    The owner's desktop: ~/.local/bin/bau (an old copy made by hand 2026-11-14) came before
+    /usr/local/bin/bau, so `bau` was old while `sudo bau` was updated. Off an installed
+    machine (dev checkout, CI, test drive) there is nothing to compare, so it is ok."""
+    import shutil
+    which = which or shutil.which
+    expected = expected or INSTALLED_BAU
+    if not Path(expected).exists():
+        return "ok"
+    found = which("bau")
+    if found is None:
+        return f"FAIL: bau is not on your PATH; the installed one is {expected}"
+    if Path(found).resolve() == Path(expected).resolve():
+        return "ok"
+    p = Path(found)
+    home = Path.home().resolve()
+    in_user_dir = p.name == "bau" and (p.is_symlink() or p.is_file()) and \
+        p.parent.resolve().is_relative_to(home)
+    fix = f"run: rm {found} ; hash -r" if in_user_dir else \
+        f"remove {found} or put {Path(expected).parent} first on your PATH, then run: hash -r"
+    return (f"FAIL: bau on your PATH is {found}, not the installed {expected} "
+            f"(an old copy runs without sudo); {fix}")
 
 
 def cmd_selftest(a: argparse.Namespace) -> int:
@@ -537,6 +564,7 @@ def cmd_selftest(a: argparse.Namespace) -> int:
         p = Path(os.environ.get(env) or Path("/etc/bau") / key)
         results[f"key:{key}"] = "ok" if p.exists() and (p.stat().st_mode & 0o007) == 0 \
             else "missing or world-readable"
+    results["bau_on_path"] = bau_on_path()
     signers = _allowed_signers()
     results["approvers"] = "ok" if signers.exists() and signers.read_text().strip() \
         else f"no human approver registered ({signers})"

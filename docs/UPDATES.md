@@ -64,6 +64,10 @@ sudo bau update now    # don't wait for tonight
 sudo bau update off    # stop automatic updates (sudo bau update auto turns them back on)
 ```
 
+If `bau update status` or a command looks old, run `type -a bau`: the first line must be
+`/usr/local/bin/bau`. If another copy comes first (for example `~/.local/bin/bau`), remove it
+with `rm ~/.local/bin/bau`, then run `hash -r`. `bau selftest` checks this too.
+
 Every update is written to the audit log:
 
 - `update.installed`: the new version is in and working.
