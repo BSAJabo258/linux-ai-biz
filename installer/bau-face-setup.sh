@@ -49,7 +49,7 @@ if [[ ! -d ${NODE_DIR}/.git ]]; then
 fi
 runuser -u comfyui -- git -C "${NODE_DIR}" fetch --quiet origin "${NODE_COMMIT}" || true
 runuser -u comfyui -- git -C "${NODE_DIR}" -c advice.detachedHead=false checkout --quiet "${NODE_COMMIT}"
-[[ $(git -C "${NODE_DIR}" rev-parse HEAD) == "${NODE_COMMIT}" ]] \
+[[ $(runuser -u comfyui -- git -C "${NODE_DIR}" rev-parse HEAD) == "${NODE_COMMIT}" ]] \
   || { say "the IP-Adapter nodes are not the pinned commit: stopping"; exit 1; }
 
 n=1
