@@ -57,6 +57,9 @@ def not_a_station(tmp_path, monkeypatch):
     tests the station itself)."""
     from bau import station
     monkeypatch.setattr(station, "STATION_MARK", tmp_path / "no-station-mark")
+    # Nor the desktop's /etc/bau/hq: with it, `bau jarvis` opens the live service instead
+    # and `station role on` refuses, so 3 tests failed on the owner's desktop (2026-11-18).
+    monkeypatch.setattr(station, "MARK", tmp_path / "no-hq-mark")
     monkeypatch.setattr(station, "_home", lambda: tmp_path / "no-station-home")
 
 

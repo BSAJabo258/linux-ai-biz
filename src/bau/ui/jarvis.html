@@ -60,6 +60,41 @@ body[data-state="thinking"] #art.on .spine{animation-duration:1.4s;opacity:1}
   background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
   background-size:48px 48px;mask-image:radial-gradient(ellipse at center,#000 30%,transparent 75%);
   -webkit-mask-image:radial-gradient(ellipse at center,#000 30%,transparent 75%)}
+
+/* The avatar: an original anime woman drawn in SVG, standing where the glass core was.
+   She is a layer, not a picture: the eyes blink, the hair sways, and the mouth moves with
+   the real voice level. Turn her back into the glass core with the AVATAR chip. */
+#avatar{position:fixed;left:0;top:0;height:var(--av-h,520px);width:calc(var(--av-h,520px)*.636);
+  transform:translate(-50%,-50%);z-index:2;pointer-events:none;opacity:0;transition:opacity .45s;
+  filter:drop-shadow(0 18px 28px rgba(0,0,0,.55)) drop-shadow(0 0 24px rgba(63,214,255,.16))}
+#avatar.on{opacity:1}
+body[data-state="listening"] #avatar{filter:drop-shadow(0 18px 28px rgba(0,0,0,.55)) drop-shadow(0 0 28px rgba(255,179,64,.34))}
+body[data-state="thinking"] #avatar{filter:drop-shadow(0 18px 28px rgba(0,0,0,.55)) drop-shadow(0 0 30px rgba(169,139,255,.42))}
+body[data-state="speaking"] #avatar{filter:drop-shadow(0 18px 28px rgba(0,0,0,.55)) drop-shadow(0 0 30px rgba(255,207,77,.38))}
+#avatar svg{display:block;width:100%;height:100%;overflow:visible}
+#avatar .av-aura{fill:url(#avAura);opacity:.7;animation:av-aura 5.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+#avatar .av-body{animation:av-breathe 5.6s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 92%}
+#avatar .av-head{animation:av-head 7.2s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 88%}
+#avatar .av-eye{animation:av-blink 6.4s infinite;transform-box:fill-box;transform-origin:center}
+#avatar .av-eye.right{animation-delay:.07s}
+#avatar .av-mouth{transform-box:fill-box;transform-origin:center}
+#avatar .av-hair-lock{transform-box:fill-box;transform-origin:top center;animation:av-sway 5.2s ease-in-out infinite}
+#avatar .av-hair-lock.right{animation-delay:-1.7s}
+body[data-state="thinking"] #avatar .av-eye{animation:none;transform:scaleY(.63)}
+body[data-state="thinking"] #avatar .av-brow{transform:translateY(-2px) rotate(-3deg);transform-box:fill-box;transform-origin:center}
+body[data-state="speaking"] #avatar .av-mouth{animation:av-talk .26s steps(2,end) infinite}
+body[data-state="speaking"] #avatar .av-aura{animation-duration:1.2s;opacity:1}
+body[data-state="listening"] #avatar .av-brow.right{transform:translateY(-3px) rotate(5deg);transform-box:fill-box;transform-origin:center}
+#avatar .av-circuit{stroke-dasharray:3 7;animation:av-flow 3.6s linear infinite}
+@keyframes av-breathe{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-4px) scaleY(1.008)}}
+@keyframes av-head{0%,100%{transform:rotate(-.6deg) translateY(0)}50%{transform:rotate(.7deg) translateY(-2px)}}
+@keyframes av-blink{0%,91%,97%,100%{transform:scaleY(1)}93.5%,95%{transform:scaleY(.06)}}
+@keyframes av-talk{0%,100%{transform:scaleY(.48)}50%{transform:scaleY(1.85)}}
+@keyframes av-sway{0%,100%{transform:rotate(-1.2deg)}50%{transform:rotate(1.4deg)}}
+@keyframes av-flow{to{stroke-dashoffset:-40}}
+@keyframes av-aura{0%,100%{transform:scale(.97);opacity:.55}50%{transform:scale(1.04);opacity:.85}}
+@media (max-width:760px){#avatar{width:calc(var(--av-h,420px)*.636)}}
+@media (prefers-reduced-motion: reduce){#avatar,#avatar *{animation:none!important}}
 header{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;
   padding:14px 20px;font-size:12px;text-transform:uppercase;letter-spacing:.24em;color:var(--dim)}
 header b{color:var(--cyan);font-weight:600}
@@ -273,6 +308,99 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 <canvas id="fifth" aria-hidden="true"></canvas>
 <canvas id="sacred" aria-hidden="true"></canvas>
 <canvas id="core" aria-hidden="true"></canvas>
+
+<div id="avatar" aria-hidden="true">
+<svg viewBox="0 0 280 440" preserveAspectRatio="xMidYMax meet" role="presentation">
+  <defs>
+    <radialGradient id="avAura" cx="50%" cy="42%" r="58%">
+      <stop offset="0" stop-color="#3fd6ff" stop-opacity=".42"/>
+      <stop offset=".6" stop-color="#a98bff" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#3fd6ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="avHair" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17243a"/><stop offset=".42" stop-color="#263752"/>
+      <stop offset="1" stop-color="#0a111d"/>
+    </linearGradient>
+    <linearGradient id="avSkin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe6d2"/><stop offset=".68" stop-color="#f6c7ae"/>
+      <stop offset="1" stop-color="#e6a98d"/>
+    </linearGradient>
+    <linearGradient id="avCoat" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101a2a"/><stop offset=".48" stop-color="#18283e"/>
+      <stop offset="1" stop-color="#08111d"/>
+    </linearGradient>
+    <linearGradient id="avIris" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7ff4ff"/><stop offset=".48" stop-color="#2aa9dd"/>
+      <stop offset="1" stop-color="#7456e8"/>
+    </linearGradient>
+    <linearGradient id="avLips" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff9b9b"/><stop offset="1" stop-color="#b94f68"/>
+    </linearGradient>
+    <linearGradient id="avRim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffcf4d" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#3fd6ff" stop-opacity=".2"/>
+    </linearGradient>
+  </defs>
+  <ellipse class="av-aura" cx="140" cy="220" rx="118" ry="202"/>
+  <g class="av-body">
+    <path class="av-hair-back" d="M77 94 C58 135 54 216 68 302 C78 348 104 372 140 374 C176 372 202 348 212 302 C226 216 222 135 203 94 Z" fill="url(#avHair)"/>
+    <path class="av-hair-glow" d="M82 112 C66 178 68 258 80 316" fill="none" stroke="#3fd6ff" stroke-opacity=".22" stroke-width="3"/>
+    <path class="av-hair-glow" d="M198 112 C214 178 212 258 200 316" fill="none" stroke="#a98bff" stroke-opacity=".24" stroke-width="3"/>
+    <path class="av-coat" d="M82 258 C98 239 120 229 140 229 C160 229 182 239 198 258 L223 432 L57 432 Z" fill="url(#avCoat)" stroke="#3fd6ff" stroke-opacity=".28"/>
+    <path d="M124 230 L156 230 L166 302 L114 302 Z" fill="#07111d"/>
+    <path d="M122 231 L140 264 L158 231" fill="none" stroke="#3fd6ff" stroke-opacity=".45" stroke-width="1.5"/>
+    <path d="M106 268 L96 320 L118 306" fill="#050b13" stroke="#a98bff" stroke-opacity=".35"/>
+    <path d="M174 268 L184 320 L162 306" fill="#050b13" stroke="#3fd6ff" stroke-opacity=".35"/>
+    <path class="av-circuit" d="M96 344 H118 V368 M184 338 H160 V362 M122 400 H142 V420" fill="none" stroke="#3fd6ff" stroke-opacity=".55" stroke-width="1.2"/>
+    <path class="av-neck" d="M123 186 L157 186 L155 231 C148 241 132 241 125 231 Z" fill="url(#avSkin)"/>
+    <path d="M123 207 C133 217 147 217 157 207" fill="none" stroke="#b97862" stroke-opacity=".35"/>
+    <g class="av-head">
+      <path class="av-ear" d="M101 104 C92 98 89 110 96 120 C99 125 104 126 107 120" fill="url(#avSkin)" stroke="#d7957b" stroke-opacity=".4"/>
+      <path class="av-ear" d="M179 104 C188 98 191 110 184 120 C181 125 176 126 173 120" fill="url(#avSkin)" stroke="#d7957b" stroke-opacity=".4"/>
+      <path class="av-face" d="M102 82 C102 48 119 31 140 31 C161 31 178 48 178 82 L175 116 C172 146 158 165 140 168 C122 165 108 146 105 116 Z" fill="url(#avSkin)" stroke="#e0a187" stroke-opacity=".5"/>
+      <path d="M106 89 C110 62 121 43 140 42 C159 43 170 62 174 89" fill="none" stroke="#fff4e9" stroke-opacity=".18" stroke-width="7"/>
+      <ellipse cx="116" cy="127" rx="10" ry="5" fill="#ff8c94" opacity=".17"/>
+      <ellipse cx="164" cy="127" rx="10" ry="5" fill="#ff8c94" opacity=".17"/>
+      <g class="av-eye">
+        <ellipse cx="117" cy="111" rx="12.5" ry="14.5" fill="#f8fdff"/>
+        <ellipse cx="117" cy="113" rx="8.2" ry="11.5" fill="url(#avIris)"/>
+        <ellipse cx="117" cy="115" rx="3.6" ry="7" fill="#07111d"/>
+        <circle cx="113" cy="106" r="3.2" fill="#ffffff" opacity=".95"/>
+        <circle cx="121" cy="119" r="1.5" fill="#bff8ff" opacity=".9"/>
+        <path d="M104 105 C110 94 124 92 130 102" fill="none" stroke="#111828" stroke-width="3.4" stroke-linecap="round"/>
+        <path d="M132 101 L138 98" stroke="#111828" stroke-width="2.2" stroke-linecap="round"/>
+      </g>
+      <g class="av-eye right">
+        <ellipse cx="163" cy="111" rx="12.5" ry="14.5" fill="#f8fdff"/>
+        <ellipse cx="163" cy="113" rx="8.2" ry="11.5" fill="url(#avIris)"/>
+        <ellipse cx="163" cy="115" rx="3.6" ry="7" fill="#07111d"/>
+        <circle cx="159" cy="106" r="3.2" fill="#ffffff" opacity=".95"/>
+        <circle cx="167" cy="119" r="1.5" fill="#bff8ff" opacity=".9"/>
+        <path d="M150 105 C156 94 170 92 176 102" fill="none" stroke="#111828" stroke-width="3.4" stroke-linecap="round"/>
+        <path d="M142 101 L148 98" stroke="#111828" stroke-width="2.2" stroke-linecap="round"/>
+      </g>
+      <path class="av-brow" d="M105 90 C111 83 122 82 130 87" fill="none" stroke="#2a1b24" stroke-width="2.3" stroke-linecap="round"/>
+      <path class="av-brow right" d="M150 87 C158 82 169 83 175 90" fill="none" stroke="#2a1b24" stroke-width="2.3" stroke-linecap="round"/>
+      <path d="M139 120 C137 128 135 132 139 134 C142 134 144 132 143 129" fill="none" stroke="#c37f69" stroke-width="1.4" stroke-linecap="round"/>
+      <ellipse class="av-mouth" cx="140" cy="145" rx="9.5" ry="2.7" fill="url(#avLips)"/>
+      <path d="M132 145 C136 149 144 149 148 145" fill="none" stroke="#7e2e43" stroke-opacity=".55" stroke-width="1"/>
+      <path class="av-hair" d="M96 93 C94 60 113 29 141 29 C169 29 187 57 184 93 C178 78 169 66 156 59 C150 70 136 78 116 76 C108 79 101 84 96 93 Z" fill="url(#avHair)"/>
+      <path d="M103 83 C112 65 127 57 141 58 C154 60 165 68 174 83 C162 79 153 80 145 85 C134 95 117 94 103 83 Z" fill="#0a111d" opacity=".55"/>
+      <path class="av-hair-lock" d="M101 83 C92 125 93 176 106 226 C99 181 102 128 113 91 Z" fill="url(#avHair)"/>
+      <path class="av-hair-lock right" d="M179 83 C188 125 187 176 174 226 C181 181 178 128 167 91 Z" fill="url(#avHair)"/>
+      <path d="M106 78 C116 66 130 61 141 62" fill="none" stroke="#3fd6ff" stroke-opacity=".28" stroke-width="2"/>
+      <path d="M174 78 C164 66 151 61 141 62" fill="none" stroke="#a98bff" stroke-opacity=".28" stroke-width="2"/>
+      <path d="M184 107 L193 115 L184 123" fill="none" stroke="#ffcf4d" stroke-width="1.6"/>
+      <circle cx="185" cy="126" r="2.4" fill="#ffcf4d" opacity=".9"/>
+    </g>
+    <path d="M114 258 C124 270 132 296 136 326 L140 356 L144 326 C148 296 156 270 166 258" fill="none" stroke="#3fd6ff" stroke-opacity=".28"/>
+    <path d="M140 264 L140 352" stroke="#a98bff" stroke-opacity=".28" stroke-width="1"/>
+    <path d="M88 292 C76 322 72 364 74 400" fill="none" stroke="url(#avRim)" stroke-width="2"/>
+    <path d="M192 292 C204 322 208 364 206 400" fill="none" stroke="url(#avRim)" stroke-width="2"/>
+  </g>
+</svg>
+</div>
+
 <div class="grid"></div>
 <header>
   <div><b>BAU</b> · JARVIS</div>
@@ -283,10 +411,12 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
     <button class="chip" id="c-mind" title="The autopilot: his mind, the compass, the vote, his jobs">AUTOPILOT</button>
     <button class="chip world" id="c-world" title="The operations world: every agent, in the room its real job puts it">OPERATIONS WORLD</button>
     <button class="chip" id="c-mc" title="Mission Control">MISSION CONTROL</button>
+    <button class="chip" id="c-work" title="The AI workstation: agents deliver work, health, death and succession">WORKSTATION</button>
     <button class="chip" id="c-log" title="Show the conversation log">LOG</button>
     <button class="chip" id="c-mute" title="Mute voice">VOICE ON</button>
     <button class="chip" id="c-wake" title="Listen for the word 'Jarvis' in this tab only, until you leave the page">WAKE WORD OFF</button>
     <button class="chip" id="c-alerts" title="Notify me when something needs me and this page is in the background">ALERTS OFF</button>
+    <button class="chip" id="c-av" title="Jarvis as an animated avatar, or the glass core">AVATAR ON</button>
     <button class="chip" id="c-geo" title="The sacred-geometry tapestry behind Jarvis: on or off">TAPESTRY ON</button>
     <button class="chip" id="c-theme" title="Light or dark">THEME</button>
     <button class="chip" id="c-help" title="Keyboard keys" aria-label="Keyboard keys">?</button>
@@ -399,6 +529,21 @@ let analyser = null, actx = null, buf = null;
 let micAnalyser = null, micSrc = null;   // the mic gets its own analyser: never to the speakers
 const LABEL = { idle: "STANDBY", listening: "LISTENING", thinking: "PROCESSING", speaking: "SPEAKING" };
 const HUE = { idle: [63, 214, 255], listening: [255, 179, 64], thinking: [169, 139, 255], speaking: [63, 214, 255] };
+const AVATAR = { el: $("avatar"), on: true, h: 0 };
+try { AVATAR.on = localStorage.getItem("jarvis-avatar") !== "0"; } catch (e) {}
+function paintAvatar() {
+  AVATAR.el.classList.toggle("on", AVATAR.on);
+  const b = $("c-av"); b.textContent = AVATAR.on ? "AVATAR ON" : "GLASS CORE"; b.classList.toggle("on", AVATAR.on);
+}
+function placeAvatar(X, Y, R) {
+  const h = Math.min(innerHeight * (W < 760 ? 0.52 : 0.64), R * (W < 760 ? 5.2 : 4.8));
+  if (Math.abs(h - AVATAR.h) > 0.5) { AVATAR.h = h; AVATAR.el.style.setProperty("--av-h", h + "px"); }
+  AVATAR.el.style.left = X + "px"; AVATAR.el.style.top = (Y + R * 0.05) + "px";
+}
+paintAvatar();
+$("c-av").onclick = () => { AVATAR.on = !AVATAR.on;
+  try { localStorage.setItem("jarvis-avatar", AVATAR.on ? "1" : "0"); } catch (e) {}
+  paintAvatar(); };
 function setState(s) { STATE = s; $("statelabel").textContent = LABEL[s];
   document.body.dataset.state = s;
   const pill = document.getElementById("speakpill"); if (pill) pill.hidden = s !== "speaking"; }
@@ -551,11 +696,12 @@ function burst(x, y, tx, ty, c) {
   for (let i = 0; i < (REDUCED ? 4 : 18); i++) SPARKS.push({ x, y, tx, ty, t: -i * 0.04, c, wob: Math.random() * 6.283 });
   if (SPARKS.length > 240) SPARKS.splice(0, SPARKS.length - 240);
 }
-function drawSpectrum(X, Y, R, now) {
+function drawSpectrum(X, Y, R, now, show = true) {
   const s = spectrum(now), n = s.length, light = themeLight(); SPEC = s;
   BASS = (s[0] + s[1] + s[2] + s[3]) / 4; bassAvg += (BASS - bassAvg) * 0.05;
   if (BASS > bassAvg * 1.35 && BASS > 0.25 && KICK < 0.2) { KICK = 1; if (!REDUCED) shock(X, Y, R, STATE === "speaking" ? GOLD : col); }
   KICK *= 0.9;
+  if (!show) return;
   const r0 = R * (1.08 + KICK * 0.05);
   cx.save(); cx.lineCap = "round"; cx.globalCompositeOperation = themeLight() ? "source-over" : "lighter";
   cx.lineWidth = Math.max(1.5, R * 0.018);
@@ -605,27 +751,29 @@ function frame(now) {
     offX += (offTarget - offX) * 0.12;
     const { X, Y, R } = centre();
     CORE = [X, Y, R];
+    placeAvatar(X, Y, R);
     const spin = STATE === "thinking" ? 3.2 : STATE === "listening" ? 1.6 : 1;
     spinA += dt * 0.00035 * spin * SPEED;
     drawStreams(X, Y, R, now);
     drawTraces(now);
     drawLinks(X, Y, R, now);
-    // thin HUD rings and ticks round the halo
-    cx.lineCap = "round";
-    for (const [f, w, len, sp, dashes] of rings) {
-      const rr = R * f, base = now * sp * spin * SPEED;
-      cx.lineWidth = w; cx.strokeStyle = rgba(col, 0.22);
-      const step = 6.283 / dashes;
-      for (let d = 0; d < dashes; d++) { const a = base + d * step;
-        cx.beginPath(); cx.arc(X, Y, rr, a, a + Math.min(len / dashes, step * 0.5)); cx.stroke(); }
+    // thin HUD rings and ticks round the glass core; the avatar has her own aura
+    if (!AVATAR.on) {
+      cx.lineCap = "round";
+      for (const [f, w, len, sp, dashes] of rings) {
+        const rr = R * f, base = now * sp * spin * SPEED;
+        cx.lineWidth = w; cx.strokeStyle = rgba(col, 0.22);
+        const step = 6.283 / dashes;
+        for (let d = 0; d < dashes; d++) { const a = base + d * step;
+          cx.beginPath(); cx.arc(X, Y, rr, a, a + Math.min(len / dashes, step * 0.5)); cx.stroke(); }
+      }
+      cx.strokeStyle = rgba(col, 0.3); cx.lineWidth = 1;
+      for (let i = 0; i < 72; i++) { const a = i * 0.0873, r1 = R * 1.68, r2 = r1 + (i % 6 ? 4 : 10);
+        cx.beginPath(); cx.moveTo(X + Math.cos(a) * r1, Y + Math.sin(a) * r1);
+        cx.lineTo(X + Math.cos(a) * r2, Y + Math.sin(a) * r2); cx.stroke(); }
     }
-    cx.strokeStyle = rgba(col, 0.3); cx.lineWidth = 1;
-    for (let i = 0; i < 72; i++) { const a = i * 0.0873, r1 = R * 1.68, r2 = r1 + (i % 6 ? 4 : 10);
-      cx.beginPath(); cx.moveTo(X + Math.cos(a) * r1, Y + Math.sin(a) * r1);
-      cx.lineTo(X + Math.cos(a) * r2, Y + Math.sin(a) * r2); cx.stroke(); }
-    drawSpectrum(X, Y, R, now);
-    drawMind(X, Y, R, now);
-    drawHalo(X, Y, R, now);
+    drawSpectrum(X, Y, R, now, !AVATAR.on);
+    if (!AVATAR.on) { drawMind(X, Y, R, now); drawHalo(X, Y, R, now); }
     drawShocks(dt);
     drawWave(now);
   } catch (e) { /* never let one bad frame stop the animation */ }
@@ -1219,8 +1367,9 @@ function stopSpeaking() {
   if (STATE === "speaking") setState("idle");
 }
 function pickVoice() {
-  try { const vs = speechSynthesis.getVoices();
-    return vs.find(v => /en-GB/i.test(v.lang) && /male|daniel|george|arthur/i.test(v.name))
+  try { const vs = speechSynthesis.getVoices(), female = /female|samantha|victoria|karen|moira|tessa|serena|zira|aria|jenny|sonia|libby|emma|ava|allison|susan|fiona|kate/i;
+    return vs.find(v => /en-GB/i.test(v.lang) && female.test(v.name))
+      || vs.find(v => /^en/i.test(v.lang) && female.test(v.name))
       || vs.find(v => /en-GB/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null; } catch (e) { return null; }
 }
 async function speak(text) {
@@ -1242,7 +1391,7 @@ async function speak(text) {
       try { if (srcNode) srcNode.disconnect(); } catch (e) {}
     } else if ("speechSynthesis" in window) {
       await new Promise((res) => { const u = new SpeechSynthesisUtterance(text);
-        const v = pickVoice(); if (v) u.voice = v; u.rate = 1.04; u.pitch = 0.92;
+        const v = pickVoice(); if (v) u.voice = v; u.rate = 1.0; u.pitch = 0.9;
         u.onend = u.onerror = res; speechSynthesis.speak(u); });
     }
   } catch (e) {}
@@ -2118,7 +2267,7 @@ const liquid = (() => {
     ptr = [ptr[0] + (ptrTo[0] - ptr[0]) * dt * 2, ptr[1] + (ptrTo[1] - ptr[1]) * dt * 2];
     const h = HUE[STATE] || HUE.idle; hue = hue.map((v, i) => v + (h[i] / 255 - v) * Math.min(1, dt * 2));
     if (CORE && innerHeight) core = [(CORE[0] / innerWidth - 0.5) * innerWidth / innerHeight,
-      CORE[1] / innerHeight - 0.5, CORE[2] / innerHeight];
+      CORE[1] / innerHeight - 0.5, AVATAR.on ? 0 : CORE[2] / innerHeight];
     let m = 0; const held = now - since, hold = A.full ? SCENE_HOLD_MS : HOLD_MS;
     if (B && held > hold) { m = Math.min(1, (held - hold) / MELT_MS); m = m * m * (3 - 2 * m); }
     if (m >= 1) { A = B; at = (at + 1) % flow.length; since = now; m = 0; B = null; next(); }
@@ -2542,6 +2691,12 @@ function renderModels(p, d) {
       p.appendChild(out);
       if (r.reply_ok) { p.appendChild(el("div", null, "Approving is yours, typed in the terminal:")); cmd(p, r.next); }
       loadNodes(); });
+    else if (m.role !== "first") button(p, "Use " + m.model, async () => {
+      const r = await settle(await apiJson("/api/models/use", { model: m.model }));
+      if (r.error) { caption(r.error); return; }
+      caption("Thinking with " + m.model + " now.");
+      if (r.state) paintState(r.state);
+      loadNodes(); });
   }
   if (!d.active) {
     p.appendChild(el("div", null, "Turn one on yourself in the terminal: test it, then approve it. Approving stays a typed command on purpose: it's your signature, not a button."));
@@ -2613,19 +2768,25 @@ async function renderStudio(p) {
     wrap.appendChild(card);
   }
 }
-// God's Eye: public world data on a map (earthquakes, aircraft over named regions,
-// satellites). Every query is recorded with its purpose on the server; nothing here can
-// aim at a place or a person - aircraft come only for wide named regions.
+// God's Eye: public world data on a map (earthquakes, aircraft, satellites, wildfires,
+// weather, space weather, traffic and ships). Every query is recorded with its purpose on
+// the server; nothing here can aim at a place or a person - every layer uses wide regions.
 let WORLD = null, EYE = null;
 async function renderGodsEye(p) {
   const wrap = el("div"); p.appendChild(wrap);
   const row = (label, opts, val, layer, key) => {
     const box = el("div", "ep"); const sel = field(box, label, choice(opts, val));
     button(box, "Show on the map", () => showLayer({ layer, [key]: sel.value })); wrap.appendChild(box); };
+  const regions = ["florida", "usa-east", "usa-west", "new-york-area", "caribbean", "uk-ireland", "europe", "japan"];
   row("Earthquakes", ["all_hour", "all_day", "all_week", "significant_week"], "all_day", "earthquakes", "window");
-  row("Aircraft over", ["florida", "usa-east", "usa-west", "new-york-area", "caribbean", "uk-ireland", "europe", "japan"], "florida", "aircraft", "region");
+  row("Aircraft over", regions, "florida", "aircraft", "region");
   row("Satellites", ["stations", "visual", "weather", "gps-ops"], "stations", "satellites", "group");
-  wrap.appendChild(el("div", null, "Public sources only: USGS, OpenSky (non-commercial terms), CelesTrak. Never used to follow a person."));
+  row("Wildfires", ["world"].concat(regions), "world", "fires", "region");
+  row("Weather over", regions, "europe", "weather", "region");
+  row("Space weather", ["now"], "now", "space_weather", "group");
+  row("Traffic over", regions, "europe", "traffic", "region");
+  row("Ships over", regions, "europe", "ships", "region");
+  wrap.appendChild(el("div", null, "Public sources: USGS, OpenSky (non-commercial), CelesTrak, NASA FIRMS, Open-Meteo, NOAA SWPC, TomTom and AISStream (the last two need free keys). Never used to follow a person."));
 }
 async function showLayer(q) {
   caption("God's Eye is reading public " + q.layer + " data…");
@@ -2648,7 +2809,7 @@ function openEye(d) {
   const lg = el("div", "legend"); lg.appendChild(el("span", null, "Source: " + d.licence)); lg.appendChild(el("span", null, WORLD.credit || ""));
   if (d.note) lg.appendChild(el("span", null, d.note)); box.appendChild(lg);
   const items = d.points.length ? d.points.slice(0, 12).map(p => (p.mag != null ? "M" + p.mag + " · " : "") + p.label + (p.alt ? " · " + Math.round(p.alt) + " m" : ""))
-    : d.list.slice(0, 12).map(s => s.name + " · " + s.inclination + "° · " + s.orbits_per_day + " orbits a day");
+    : d.list.slice(0, 12).map(s => s.label || (s.name + " · " + s.inclination + "° · " + s.orbits_per_day + " orbits a day"));
   const ol = el("ol"); items.forEach(t => ol.appendChild(el("li", null, t))); box.appendChild(ol);
   EYE = { d, cv, t0: performance.now() }; x.focus();
   if (eyeRaf) cancelAnimationFrame(eyeRaf);      // one drawing loop, not one per click
@@ -2822,6 +2983,7 @@ async function loadTimeline(older) {
     r.appendChild(el("small", null, i.at.slice(0, 16).replace("T", " ") + " UTC · record #" + i.seq + " · " + i.hash)); h.appendChild(r); }
   if (t.items.length) { TL_OLDEST = t.items[t.items.length - 1].seq; const b = button(h, "Older", () => loadTimeline(true)); b.classList.add("more"); }
 }
+$("c-work").onclick = () => window.open("/workstation?k=" + encodeURIComponent(KEY), "_blank", "noopener");
 $("c-time").onclick = () => { document.body.classList.remove("showlog"); document.body.classList.toggle("showtime");
   if (document.body.classList.contains("showtime")) loadTimeline(); };
 

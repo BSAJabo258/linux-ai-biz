@@ -17,6 +17,8 @@ dependencies = ["PyYAML>=6.0"]
 dev = ["pytest>=7", "ruff>=0.4"]
 # Claude models through the official SDK (cloud provider adapter).
 claude = ["anthropic"]
+# Live AIS ships layer; the other God's Eye feeds use the standard library only.
+spatial = ["websocket-client>=1.7"]
 
 [project.scripts]
 bau = "bau.cli:main"

@@ -165,6 +165,26 @@ def test_models_panel_tests_a_model_but_never_approves_it(tmp_path, server, monk
     assert call(url, "/api/models/bench", {"model": "no-such"})[1]["error"]
 
 
+def test_models_panel_can_use_an_approved_model_without_approving_anything(
+        tmp_path, server, monkeypatch):
+    from bau.registry import CapabilityRegistry
+    from bau.runtime import seed_registry
+    seed_registry(tmp_path)
+    reg = CapabilityRegistry(tmp_path / "registry" / "capabilities.yaml")
+    reg.data["model"]["qwen3.5-4b"].update(status="APPROVED",
+                                           benchmark={"reply_ok": True})
+    reg.save()
+    monkeypatch.setattr("bau.runtime.provider_for",
+                        lambda mid, h: (ScriptedProvider(["ok"]),
+                                        {"deployment": "local", "id": mid}))
+    a = make(tmp_path)
+    url = server(a)
+    code, r = call(url, "/api/models/use", {"model": "qwen3.5-4b"})
+    assert code == 200 and r["model"] == "qwen3.5-4b" and r["changed"] is True
+    assert a.model["id"] == "qwen3.5-4b" and r["state"]["model"] == "qwen3.5-4b"
+    assert call(url, "/api/models/use", {"model": "no-such"})[1]["error"]
+
+
 def test_producer_panel_reads_and_edits_a_draft_and_editing_voids_the_check(
         tmp_path, server):
     a = make(tmp_path, ["Mon instagram sfw: latte by the window\n"])
@@ -260,3 +280,11 @@ def test_light_theme_zoom_and_phone_ring_exist():
     assert '[data-theme="light"]' in PAGE and "prefers-color-scheme" in PAGE
     assert "function setZoom" in PAGE and "pinch" in PAGE
     assert "function layoutRing" in PAGE and "swipe" in PAGE
+
+
+def test_jarvis_can_be_an_animated_avatar_instead_of_the_glass_core():
+    assert 'id="avatar"' in PAGE and 'class="av-eye"' in PAGE and 'class="av-mouth"' in PAGE
+    assert 'id="c-av"' in PAGE and "AVATAR ON" in PAGE
+    assert "function placeAvatar" in PAGE and "jarvis-avatar" in PAGE
+    assert "AVATAR.on ? 0 : CORE[2] / innerHeight" in PAGE       # the shader's glass core is off
+    assert "if (!AVATAR.on) { drawMind" in PAGE                  # the ball's mind is off too

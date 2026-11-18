@@ -176,13 +176,19 @@ class FakeScout:
 
     def __init__(self):
         self.inspected = []
+        self.found = {}
 
     def inspect(self, repo):
         self.inspected.append(repo)
         ok = repo == "good/video"
-        return {"full_name": repo, "license": {"declared": "MIT" if ok else "GPL-3.0"},
-                "security": {"status": "COMMERCIAL_OK" if ok else "COPYLEFT_REVIEW"},
-                "inspected": {"commit": "a" * 40, "install_hooks": [], "secrets": 0}}
+        rec = {"full_name": repo, "license": {"declared": "MIT" if ok else "GPL-3.0"},
+               "security": {"status": "COMMERCIAL_OK" if ok else "COPYLEFT_REVIEW"},
+               "inspected": {"commit": "a" * 40, "install_hooks": [], "secrets": 0}}
+        self.found[repo.lower()] = rec
+        return rec
+
+    def candidates(self):
+        return self.found
 
 
 def test_scan_queues_inspections_and_a_clean_one_goes_on_to_a_sandbox_test(home, monkeypatch):
@@ -200,7 +206,8 @@ def test_scan_queues_inspections_and_a_clean_one_goes_on_to_a_sandbox_test(home,
     tasks = A._load(home)["tasks"]
     tests = [t for t in tasks if t["kind"] == "sandbox_test"]
     assert [t["detail"]["repo"] for t in tests] == ["good/video"]
-    assert tests[0]["state"] == "blocked"          # its job comes next; nothing was faked
+    assert tests[0]["state"] == "failed"           # it ran; the fake left no quarantine copy
+    assert "quarantine" in tests[0]["note"]
 
 
 def test_seed_keeps_it_growing_once_a_week_per_category(home):
@@ -252,6 +259,64 @@ def test_the_briefing_says_what_the_autopilot_did(home):
     A.run(home, {"scan": lambda t: {"ok": True}})
     j = Assistant(home)
     assert "Autopilot" in j.plain_briefing(j.facts())
+
+
+# ------------------------------------------------------------------ learning and safe adoption
+def test_sandbox_test_writes_a_plan_and_never_runs_the_repository(home):
+    from bau import autopilot_jobs as J
+    q = home / "scout" / "quarantine" / "good__video"
+    q.mkdir(parents=True)
+    (q / "pyproject.toml").write_text("[project]\nname = 'good-video'\n")
+
+    class PlanScout(FakeScout):
+        def candidates(self):
+            return {"good/video": {
+                "full_name": "good/video", "security": {"status": "COMMERCIAL_OK"},
+                "inspected": {"commit": "a" * 40}}}
+
+    A.add(home, "sandbox_test", "good/video", {"repo": "good/video"})
+    A.run(home, J.handlers(home, PlanScout()), max_steps=1)
+    plan = home / "scout" / "test_plans" / "good__video.json"
+    import json
+    saved = json.loads(plan.read_text())
+    assert saved["approved"] is False and saved["test_command"] == [
+        "python3", "-m", "pytest", "-q"]
+    assert "--approved --execute" in saved["run_after_signed_approval"]
+    assert A._load(home)["tasks"][0]["state"] == "done"
+
+
+def test_add_tool_only_writes_a_proposal(home):
+    from bau import autopilot_jobs as J
+    A.add(home, "add_tool", "local video generation",
+          {"repo": "good/video", "tested": True, "security": "clean",
+           "licence": "MIT", "commit": "a" * 40})
+    A.run(home, J.handlers(home), max_steps=1)
+    proposal = home / "autopilot" / "proposals" / f"{A._load(home)['tasks'][0]['id']}.json"
+    assert proposal.is_file()
+    assert "nothing is installed" in proposal.read_text()
+    assert A._load(home)["tasks"][0]["state"] == "done"
+
+
+def test_learn_writes_a_lesson_from_recent_work(home):
+    from bau import autopilot_jobs as J
+    from bau.assistant import Assistant
+    from bau.memory import MemoryLane
+    A.add(home, "scan", "video tools")
+    A.run(home, {"scan": lambda t: {"ok": True, "evidence": "3 found"}})
+    A.add(home, "learn", "review what the autopilot did", {"since_days": 7})
+    A.run(home, J.handlers(home), max_steps=1)
+    hits = MemoryLane(home).search("autopilot video tools", kinds=["lesson"])
+    assert hits and "video tools" in hits[0][1].body
+    lessons = Assistant(home).tools["lessons"].fn()
+    assert lessons and "video tools" in lessons[0]["lesson"]
+
+
+def test_seed_queues_a_lesson_after_work(home):
+    from bau import autopilot_jobs as J
+    A.add(home, "scan", "video tools")
+    A.run(home, {"scan": lambda t: {"ok": True}})
+    J.seed(home)
+    assert any(t["kind"] == "learn" for t in A._load(home)["tasks"])
 
 
 # ------------------------------------------------------------------ the screen

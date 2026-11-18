@@ -242,7 +242,7 @@ def test_the_sound_layer_follows_the_voice_and_the_work():
     from pathlib import Path
     page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
     assert "an.getByteFrequencyData(fbuf)" in page  # the real voice
-    assert "drawSpectrum(X, Y, R, now);" in page and "drawShocks(dt);" in page
+    assert "drawSpectrum(X, Y, R, now, !AVATAR.on);" in page and "drawShocks(dt);" in page
     assert 'if (e.kind === "start") burst(CORE[0], CORE[1], nd.x, nd.y' in page   # work → sparks
     assert "REDUCED ? 4 : 18" in page and "if (!REDUCED) shock(" in page        # calm when asked
     assert "#caption:not(:empty){" in page                          # the caption always reads
