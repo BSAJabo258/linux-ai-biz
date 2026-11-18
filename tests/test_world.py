@@ -3,6 +3,7 @@ only from its latest real job. No job: Available. Nothing is made up for the scr
 
 import datetime as dt
 import json
+from pathlib import Path
 
 from bau.jobs import JobStore
 from bau.world import world
@@ -161,3 +162,37 @@ def test_the_page_gets_only_the_fixed_portraits(tmp_path):
         assert get("/world/portrait/%2e%2e%2fsecret.png")[0] == 404
     finally:
         srv.shutdown()
+
+
+# The owner, 2026-11-18: "I don't think Jarvis has a menu to see what the virtual agents are
+# doing". The world carries his picture's panels from records only: current tasks and status.
+def test_the_world_says_what_each_agent_is_doing_and_the_system_status(tmp_path, monkeypatch):
+    from bau import station
+    monkeypatch.setattr(station, "MARK", tmp_path / "hq")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    job(tmp_path, "researcher", "RUNNING")
+    job(tmp_path, "producer", "WAITING_FOR_APPROVAL")
+    job(tmp_path, "scout", "FAILED")
+    w = world(tmp_path, NOW)
+    assert {(t["agent"], t["state"]) for t in w["tasks"]} == {
+        ("researcher", "working"), ("producer", "waiting for you")}       # not the stopped one
+    assert all(t["task"] == "find mug suppliers" for t in w["tasks"])
+    assert w["system"] == {"headquarters": False, "stations_paired": 0,
+                           "autopilot": {"paused": False, "running": 0, "queued": 0,
+                                         "waiting_for_you": 0}}
+    (tmp_path / "hq").write_text("admin=owner\n")
+    (tmp_path / ".ssh").mkdir()
+    (tmp_path / ".ssh" / "authorized_keys").write_text(
+        station.key_line("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF5fqTjZQ8Kb2nqU7c9p0F5mD8qK0E3"
+                         "x4J9w1nZp3m2t laptop") + "\n")
+    s = world(tmp_path, NOW)["system"]
+    assert s["headquarters"] is True and s["stations_paired"] == 1
+
+
+def test_the_world_is_easy_to_find_and_shows_its_panels():
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html").read_text()
+    assert 'id="wake-world"' in page and "Open the operations world" in page   # on the wake screen
+    assert ">OPERATIONS WORLD</button>" in page and 'class="chip world"' in page
+    for panel in ('id="w-list"', 'id="w-tasks"', 'id="w-sys"'):
+        assert panel in page
+    assert "No agent is working right now" in page                     # never an empty floor alone
