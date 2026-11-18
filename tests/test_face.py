@@ -178,5 +178,6 @@ def test_the_training_script_never_follows_a_planted_link_as_root():
     text = (Path(__file__).resolve().parents[1] / "installer/bau-lora-train.sh").read_text()
     assert "BAU_HOME=/var/lib/bau " in text                   # not from the environment
     assert "iflag=nofollow" in text and "-type f" in text      # dataset read without links
+    assert "as_bau dd if=" in text and "\n  dd if=" not in text  # by bau, never by root
     assert "chown comfyui" not in text                         # no root writes in its folders
     assert 'as_comfy install -m 0644 "${out}"' in text         # the LoRA copied as comfyui

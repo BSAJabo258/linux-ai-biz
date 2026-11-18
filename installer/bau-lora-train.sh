@@ -37,6 +37,9 @@ say() { printf '%s\n' "$*"; }
 # Every file step below runs as comfyui, never as root, in folders comfyui or the bau group
 # can change: a planted link must not make root read or write a file it should not.
 as_comfy() { runuser -u comfyui -- "$@"; }
+# The dataset is the bau group's: the bau service user reads it, never root, so a link planted
+# anywhere on its path reaches nothing bau could not already read.
+as_bau() { runuser -u bau -- "$@"; }
 
 if [[ $(id -u) -ne 0 ]]; then
   say "Run it with sudo: sudo bash $0 CREATOR"; exit 1
@@ -50,19 +53,19 @@ if [[ ! -f ${MODELS}/diffusion_models/Chroma1-HD.safetensors ]] || ! id comfyui 
   say "  sudo bash bau-explicit-setup.sh"
   exit 1
 fi
-if [[ -L ${DATA} || ! -d ${DATA} ]]; then
+if ! as_bau test -d "${DATA}"; then
   say "No dataset folder at ${DATA}. Draw it first: bau creator face dataset"; exit 1
 fi
-count=$(find "${DATA}" -maxdepth 1 -type f -name '*.png' | wc -l)
+count=$(as_bau find "${DATA}" -maxdepth 1 -type f -name '*.png' | wc -l)
 if (( count < MIN_PICTURES )); then
   say "Only ${count} dataset picture(s) in ${DATA}; at least ${MIN_PICTURES} are needed."
   say "Draw them first: bau creator face dataset"
   exit 1
 fi
 while IFS= read -r -d '' png; do
-  [[ -f ${png%.png}.txt && ! -L ${png%.png}.txt ]] \
+  as_bau test -f "${png%.png}.txt" \
     || { say "No caption for ${png}; draw it again or delete it."; exit 1; }
-done < <(find "${DATA}" -maxdepth 1 -type f -name '*.png' -print0)
+done < <(as_bau find "${DATA}" -maxdepth 1 -type f -name '*.png' -print0)
 
 say "1/4 the trainer (sd-scripts ${SD_COMMIT:0:8})..."
 install -d -o comfyui -g comfyui "${APP}" "${WORK}"
@@ -94,12 +97,14 @@ fi
 
 say "3/4 her ${count} pictures..."
 as_comfy rm -rf "${WORK:?}/${CID}"
-as_comfy mkdir -p "${WORK}/${CID}/img" "${WORK}/${CID}/out"
-# The dataset is the bau group's (comfyui cannot read it): root reads each regular file with
-# O_NOFOLLOW (dd iflag=nofollow) and comfyui writes the copy.
+as_comfy mkdir -p -m 0700 "${WORK}/${CID}"
+as_comfy mkdir -p -m 0700 "${WORK}/${CID}/img" "${WORK}/${CID}/out"
+# comfyui cannot read the dataset: bau reads each regular file (no link followed at the end)
+# and comfyui writes the copy. Root reads none of it.
 while IFS= read -r -d '' f; do
-  dd if="${f}" iflag=nofollow status=none | as_comfy tee "${WORK}/${CID}/img/${f##*/}" >/dev/null
-done < <(find "${DATA}" -maxdepth 1 -type f \( -name '*.png' -o -name '*.txt' \) -print0)
+  as_bau dd if="${f}" iflag=nofollow status=none \
+    | as_comfy tee "${WORK}/${CID}/img/${f##*/}" >/dev/null
+done < <(as_bau find "${DATA}" -maxdepth 1 -type f \( -name '*.png' -o -name '*.txt' \) -print0)
 as_comfy tee "${WORK}/${CID}/dataset.toml" >/dev/null <<TOML
 [general]
 caption_extension = ".txt"
