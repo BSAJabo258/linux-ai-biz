@@ -105,6 +105,16 @@ def test_accept_opens_a_terminal_for_password_steps(box):
     assert "sudo bash" in box.opened[-1][1] and "bau-search-setup.sh" in box.opened[-1][1]
 
 
+def test_without_a_screen_the_card_says_do_it_at_the_desktop(box, monkeypatch):
+    """Jarvis for good is a service with no screen, and the laptop's tunnel key has no shell:
+    a password step is done at the desktop's own terminal."""
+    monkeypatch.delenv("DISPLAY", raising=False)
+    out = S.run("nvidia", box.home, probe=box.probe)
+    cmd = S._command("nvidia", box.home)
+    assert out["error"].endswith(f"Do this at the desktop, in a terminal: {cmd}")
+    assert "sudo bau-gpu-setup" in cmd and "laptop" not in out["error"]
+
+
 def test_the_shipped_setup_scripts_are_the_installers_own():
     root = Path(__file__).resolve().parents[1]
     for name in ("bau-pictures-setup.sh", "bau-search-setup.sh"):
@@ -332,3 +342,16 @@ def test_once_fanvue_and_autopost_are_on_the_automaton_card_starts_it(box, monke
                         "grow_at": "100"})
     assert out["done"] and "30 days" in out["said"]
     assert "automaton" not in ids(box) and "grow" not in ids(box)
+
+
+def test_on_the_laptop_station_only_updates_and_laws_can_wait(box, monkeypatch, tmp_path):
+    # The desktop does the work: search, autopilot, pictures and Fanvue cards are its jobs.
+    from bau import station
+    fanvue_done(box.home, monkeypatch, automaton=False)
+    assert len(ids(box)) > 2
+    mark = tmp_path / "station"
+    mark.write_text("on=x\n")
+    monkeypatch.setattr(station, "STATION_MARK", mark)
+    assert ids(box) == ["laws", "updates"]
+    box.facts["update"] = "auto"
+    assert ids(box) == ["laws"]

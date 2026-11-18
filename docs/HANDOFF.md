@@ -16,6 +16,15 @@ built BAU. Read `CLAUDE.md` for layout, commands and the rules that must not be 
 
 State: 632 tests pass (one skips when run as root); 49 regulations / 65 policies validate.
 
+The two machines (2026-11-18, the owner's design of 2026-11-15): the **desktop** (RTX 3060,
+installed from the 128 GB SanDisk stick, which stays the desktop's) is **headquarters**:
+Jarvis for good, the agents, the local models, the pictures, Fanvue, the API keys and the
+money machine. The **laptop** (Dell XPS 13 9380) is the **operations station**: installed
+from its own 64 GB stick onto the 1 TB WD USB disk, no models, no keys, no business; it
+only shows the desktop's Jarvis through an SSH tunnel (`docs/LAPTOP-STATION.md`). Both take
+nightly updates. Older notes below that put models, keys or the business on the laptop are
+history.
+
 Latest (2026-10-27): merged #97-#105: the stick's llama.cpp is b11747; desktop art fixed
 (Xfce's own picture no longer shows); seven live scenes; GPU work (`bau hw` card details,
 lab `--repeat`/`--tag`, `sudo bau-llm-cuda`, docs/GPU.md); speed settings (MTP files,
@@ -80,7 +89,8 @@ from the SanDisk via F12, Jarvis and Mission Control work offline) but it has no
 and no Wi-Fi yet (Killer 1435 / QCA6174, ath10k). `BAU-Pack-Make.cmd` fills a stick on
 Windows with the three pinned models and `BAU-KEYS.enc`; `sudo bau pack install` on the
 laptop copies, starts, benchmarks and (on yes) approves the boss, and writes a redacted
-`laptop-report.txt` to the stick.
+`laptop-report.txt` to the stick. (Since 2026-11-15 the pack goes to the desktop; the
+laptop is the station.)
 
 No Wi-Fi, found 2026-10-18: `auto/config` builds with `--apt-recommends false`, and
 network-manager only *recommends* `wpasupplicant`, so the image had no Wi-Fi login program
@@ -265,7 +275,7 @@ prompt make him look there before guessing; the Scout panel shows "Already known
 research because the owner's own transcript collection was lost with a codespace.
 
 The full stick (2026-10-12, tests first in `tests/test_full_stick.py`): the owner chose
-"both" on one 128 GB stick. `image/live-build/auto/config` now has `--debian-installer
+"both" on one 128 GB stick (since 2026-11-15 that stick is the desktop's). `image/live-build/auto/config` now has `--debian-installer
 live`. The installer copies the live squashfs (live-installer) and its answers are in
 `config/includes.installer/preseed.cfg`, repacked into its initrd:
 - partitioning, accounts, clock and grub match `installer/preseed/bau.preseed`, and a
@@ -411,7 +421,8 @@ the `capability_map` tool, and `bau toolbox validate` check the map too. The too
 - Browserable has had no commits for about 14 months.
 
 Owner decisions (2026-10-12):
-- USB is both: the same 128 GB stick runs Jarvis live and installs BAU on the laptop.
+- USB is both: the same 128 GB stick runs Jarvis live and installs BAU (since 2026-11-15
+  on the desktop; the laptop is installed from its own 64 GB stick).
   The installer is already one stick (#50, `bau-one-debian-*.iso`). The plan to combine
   it with the live image is lb_config `--debian-installer live` in the live image, so one
   direct-written image keeps the encrypted storage. Ventoy persistence uses a backend file; Debian and
@@ -579,7 +590,7 @@ This is the **first real VirtualBox run**. Watch for these and fix anything that
 - USB #2 automounting at `/media/$USER/BAU-PAYLOAD`.
 
 ### 2. Docker test drive (quicker alternative, also works on Apple-silicon Macs)
-`docker compose up -d --build`, then http://localhost:8765, then `docker compose run --rm --service-ports jarvis`. See `docker/README.md`. The first real GLM run happens here or on the laptop:
+`docker compose up -d --build`, then http://localhost:8765, then `docker compose run --rm --service-ports jarvis`. See `docker/README.md`. The first real GLM run happens here or on the desktop:
 
 ```bash
 docker compose --profile glm up -d llm
@@ -589,7 +600,7 @@ docker compose run --rm ui bau models bench glm-4.7-flash
 It needs about 24 GB RAM. Check `reply_ok` and `tool_calls` are true before approving.
 
 ### 3. Owner setup still to do
-- **Claude:** `ANTHROPIC_API_KEY` in `/etc/bau/models.env` (laptop) or `.env` (Docker), then `bau set-status model claude-opus-5-5 APPROVED`.
+- **Claude:** `ANTHROPIC_API_KEY` in `/etc/bau/models.env` (the desktop, headquarters) or `.env` (Docker), then `bau set-status model claude-opus-5-5 APPROVED`.
 - **TikTok:** app keys plus TikTok's app audit (INSTALL Phase 8).
 - **Automatic updates on the desktop** (owner's choice 2026-11-01, `docs/UPDATES.md`): once, `sudo bash bau-update-first.sh` (from `installer/`); not run on the desktop yet.
 - **ElevenLabs:** the owner's account was blocked ("unusual activity", free tier disabled). Voice falls back to the browser's, and nothing in code is needed.

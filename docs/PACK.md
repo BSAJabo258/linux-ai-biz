@@ -1,11 +1,12 @@
-# The BAU Pack: AI models and keys for the laptop, on one USB stick
+# The BAU Pack: AI models and keys for the desktop, on one USB stick
 
-The BAU laptop can run its AI on its own, with no internet, but the AI models (about
-6.5 GB for the laptop, 18 GB with the desktop's) have to get onto it first. The BAU Pack carries them over on a USB stick, together
-with your locked keys file if you made one (see [KEYS.md](KEYS.md)).
+The desktop is headquarters: it runs the AI on its own, with no internet, but the AI models
+(about 18 GB with the desktop's) have to get onto it first. The BAU Pack carries them over on a USB stick, together
+with your locked keys file if you made one (see [KEYS.md](KEYS.md)). The laptop is the
+operations station: it needs neither models nor keys ([LAPTOP-STATION.md](LAPTOP-STATION.md)).
 
 Two steps: fill the stick on a Windows computer that has internet, then run one command on
-the laptop.
+the desktop.
 
 ## What goes on the stick
 
@@ -28,7 +29,7 @@ It also carries:
   ([DESKTOP.md](DESKTOP.md) step 4).
 
 Each model and Wi-Fi file is checked against the SHA-256 fingerprint BAU has on record when
-it is downloaded, and again on the laptop. A file that does not match is deleted, never
+it is downloaded, and again on the desktop. A file that does not match is deleted, never
 used.
 
 ## 1. On the Windows computer: fill the stick
@@ -77,7 +78,7 @@ Wi-Fi. Once it is connected, bring BAU up to date from the stick:
 sudo /opt/bau/venv/bin/pip install --no-deps --upgrade /media/$USER/*/BAU-PACK/bau-main.zip
 ```
 
-## 3. On the laptop: install the pack
+## 3. On the desktop: install the pack
 
 Nothing on the stick runs by itself when you plug it in. That is on purpose: a stick
 anyone could have written to must never start anything on its own. You start it.
@@ -98,7 +99,7 @@ anyone could have written to must never start anything on its own. You start it.
    - **Install the Wi-Fi programs?** Only if they are not installed yet (step 2 does the
      same by hand).
    - **Use qwen3.5-4b as the local model?** Yes starts it.
-   - It measures the model on this laptop (does it answer, can it use a tool, how fast)
+   - It measures the model on this computer (does it answer, can it use a tool, how fast)
      and shows you the result. Only a model that answered properly can be approved.
    - **Approve it for Jarvis?** Yes approves it, in your name.
    - **Make it the team's boss?** Yes makes it the model that runs Jarvis and the agents
@@ -135,7 +136,7 @@ click **Shut down**, then start Linux and try again.
 
 The uncensored model is copied but not started or approved: it uses most of the memory
 next to the boss, so you start it only when you need it. It stays sealed: no tools, only on
-this laptop, never anything for children. [WORKSPACES.md](WORKSPACES.md) ("The uncensored
+this computer, never anything for children. [WORKSPACES.md](WORKSPACES.md) ("The uncensored
 model") has the commands to start, measure and approve it, then:
 
 ```bash

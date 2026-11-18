@@ -51,6 +51,16 @@ def no_real_platform_keys(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def not_a_station(tmp_path, monkeypatch):
+    """Tests never read this computer's station marker or ~/.config: on the owner's paired
+    laptop they would switch the autopilot, autopost and setup cards off (tests/test_station.py
+    tests the station itself)."""
+    from bau import station
+    monkeypatch.setattr(station, "STATION_MARK", tmp_path / "no-station-mark")
+    monkeypatch.setattr(station, "_home", lambda: tmp_path / "no-station-home")
+
+
+@pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):
     home = tmp_path / "bauhome"
     home.mkdir()

@@ -51,7 +51,8 @@ Build both on any Linux machine with `python3`, `xorriso`, `gpg`, `curl`. Stick 
 * **Test drive in the browser:** *Code > Codespaces > Create codespace* installs BAU in a
   private cloud machine and opens Mission Control. It is for trying and testing only:
   GitHub's terms forbid hosting production-facing applications in Codespaces, so the
-  business itself runs on the laptop.
+  business itself runs on the desktop (headquarters); the laptop is only the operations
+  station that shows the desktop's Jarvis (see [LAPTOP-STATION.md](LAPTOP-STATION.md)).
 
 ## Phase 0: Build the sticks (on your build machine)
 
@@ -214,7 +215,7 @@ The machine reports **not production-ready** until every spec §107 critical ite
 One-time setup:
 1. At developers.tiktok.com create an app, add **Login Kit** and the **Content Posting API**
    (Direct Post), and register the redirect URI `http://127.0.0.1:3455/callback/`.
-2. Put the app keys on the laptop (root-owned, never in the repo):
+2. Put the app keys on the desktop (headquarters; root-owned, never in the repo):
    ```bash
    sudo install -m 0640 -o root -g bau /dev/null /etc/bau/platforms.env
    sudoedit /etc/bau/platforms.env   # TIKTOK_CLIENT_KEY=...  TIKTOK_CLIENT_SECRET=...
@@ -251,8 +252,9 @@ bau jarvis config --call-me "boss" --model claude-opus-5-5 --voice-id <ElevenLab
 ```
 
 * **Brains:** an approved Claude model (`ANTHROPIC_API_KEY` in `/etc/bau/models.env`),
-  otherwise the free **GLM-4.7-Flash** running on the laptop itself, otherwise any other
-  approved local model. Content-lane models never run Jarvis. To use GLM on the laptop:
+  otherwise the free **GLM-4.7-Flash** running on the desktop (headquarters) itself, otherwise
+  any other approved local model. Content-lane models never run Jarvis. To use GLM on the
+  desktop:
   run llama.cpp's `llama-server -hf unsloth/GLM-4.7-Flash-GGUF:Q4_K_M --jinja --port 8080`
   (needs about 24 GB RAM), then `bau models bench glm-4.7-flash` and
   `bau set-status model glm-4.7-flash APPROVED`. BAU refuses to approve a local model that

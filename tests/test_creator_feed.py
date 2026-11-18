@@ -223,3 +223,12 @@ def test_gods_eye_sky_gives_the_days_first_post_a_timely_theme(home, monkeypatch
     timely = [t for t in drafts if t["detail"].get("timely")]
     assert len(timely) == 1 and "Perseid" in timely[0]["detail"]["theme"]   # one post, not all
     assert C._timely(home) == []                           # used today: not again
+
+
+def test_on_the_laptop_station_the_feed_draws_nothing(home, tmp_path, monkeypatch):
+    from bau import station
+    F.set_autopost(home, True, "human:owner", "subscribers", 3)
+    mark = tmp_path / "station"
+    mark.write_text("on=x\n")
+    monkeypatch.setattr(station, "STATION_MARK", mark)
+    assert C.fill(home) == 0 and A._load(home)["tasks"] == []

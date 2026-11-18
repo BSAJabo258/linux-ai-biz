@@ -93,8 +93,8 @@ def app_credentials(env_file: Path = Path("/etc/bau/platforms.env")) -> tuple[st
     env = {**_env_file(env_file), **os.environ}
     cid, secret = env.get("FANVUE_CLIENT_ID"), env.get("FANVUE_CLIENT_SECRET")
     if not cid or not secret:
-        raise FanvueError("set FANVUE_CLIENT_ID and FANVUE_CLIENT_SECRET (on the laptop: "
-                          "/etc/bau/platforms.env, via bau keys import)")
+        raise FanvueError("set FANVUE_CLIENT_ID and FANVUE_CLIENT_SECRET (on the desktop, "
+                          "headquarters: /etc/bau/platforms.env, via bau keys import)")
     return cid, secret
 
 
@@ -522,6 +522,9 @@ def autopost_tick(home: Path, client: FanvueClient | None = None,
                   now: dt.datetime | None = None) -> dict[str, Any]:
     """One post at most per run of the autopilot (every 30 min), within the owner's number a
     day. A failure today stops it until tomorrow, so a broken login does not burn the queue."""
+    from .station import is_station
+    if is_station():                      # the laptop: the desktop's money machine posts
+        return {"autopost": "off (this laptop is the station; the desktop posts)"}
     choice = autopost_choice(home)
     if not choice or not choice.get("on"):
         return {"autopost": "off"}

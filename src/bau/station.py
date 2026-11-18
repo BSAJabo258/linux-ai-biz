@@ -28,6 +28,7 @@ JARVIS_PORT = 8766
 SSHD_CONF = Path("/etc/ssh/sshd_config.d/10-bau-hq.conf")
 FIREWALL = Path("/etc/nftables.conf")
 MARK = Path("/etc/bau/hq")
+STATION_MARK = Path("/etc/bau/station")      # `sudo bau station role on`: readable by services
 UNIT = Path("/etc/systemd/system/bau-jarvis.service")
 KEY_LINE = re.compile(r"^(ssh-ed25519|ecdsa-sha2-nistp256|ssh-rsa) [A-Za-z0-9+/]{40,}={0,2}"
                       r"( [\w.@+-]{1,64})?$")
@@ -92,10 +93,28 @@ def stations(authorized_keys: Path) -> list[str]:
 
 
 # ------------------------------------------------------------------ the laptop
+def _home() -> Path:
+    return Path.home()
+
+
+def is_station(home_dir: Path | None = None, mark: Path | None = None) -> bool:
+    """This laptop is the operations station: the desktop does the work, so nothing here may
+    start a second Jarvis, autopilot or money machine. The system marker (`sudo bau station
+    role on`) is what services running as `bau` see; the paired login's own file counts too."""
+    def there(f) -> bool:
+        try:
+            return f().exists()
+        except (OSError, RuntimeError):      # an unreadable folder, or no home at all
+            return False
+    return (there(lambda: STATION_MARK if mark is None else mark)
+            or there(lambda: (_home() if home_dir is None else home_dir)
+                     / ".config" / "bau" / "station.yaml"))
+
+
 def link_unit(user: str, host: str, key: Path) -> str:
     """A user service that keeps the tunnel to the desktop's Jarvis up."""
     if not USER.match(user) or not HOST.match(host):
-        raise ValueError("give the desktop as NAME@ADDRESS, e.g. owner@192.168.1.20")
+        raise ValueError("give the desktop as NAME@ADDRESS, e.g. bauadmin@192.168.1.20")
     return f"""# BAU station: the tunnel to Jarvis on the desktop (bau station pair).
 [Unit]
 Description=BAU station: tunnel to Jarvis at {host}
@@ -117,7 +136,10 @@ WantedBy=default.target
 def launcher(bau: str) -> str:
     return ("[Desktop Entry]\nType=Application\nName=Jarvis HQ\n"
             "Comment=Jarvis and his world, on the desktop\n"
-            f"Exec={bau} station open\nIcon=applications-system\nTerminal=false\n")
+            # the terminal stays open on a failure so the reason can be read
+            f'Exec=sh -c "{bau} station open || '
+            '{ echo; echo Press Enter to close.; read -r _; }"\n'
+            "Icon=applications-system\nTerminal=true\n")
 
 
 def world_url(printed: str) -> str:

@@ -677,7 +677,7 @@ def cmd_money(a):
     from . import money
     print(money.report(bau_home()))
     s = money.summary(bau_home())
-    return EXIT_OK if s["ready"] == s["of"] else EXIT_BLOCKED
+    return EXIT_OK if s.get("station") or s["ready"] == s["of"] else EXIT_BLOCKED
 
 
 def cmd_world(a):
@@ -762,14 +762,37 @@ def cmd_hq(a):
     S.MARK.write_text(f"admin={admin}\non={S.stamp()}\n")
     AuditLog().append("hq.on", who, {"inbound": "ssh 22, home network, keys only",
                                      "jarvis": "127.0.0.1:8766"})
-    ips = _sh("hostname", "-I", check=False).stdout.split()
+    pair = _pair_next(admin, _sh("hostname", "-I", check=False).stdout)
     _out({"headquarters": "on",
           "jarvis": "running for good on 127.0.0.1:8766" if jarvis_state == "active"
                     else f"NOT running ({jarvis_state}{_taken_by(8766)}): "
                          f"{JARVIS_PORT_HINT}",
-          "ssh": "keys only, home network only",
-          "next": f"on the laptop: bau station pair {admin}@{ips[0] if ips else 'THIS-COMPUTER'}"})
+          "ssh": "keys only, home network only", **pair})
     return EXIT_OK if jarvis_state == "active" else EXIT_ERROR
+
+
+# The owner's desktop gets internet from a tablet by USB and may also have a cable to the
+# laptop (192.168.77.1 / .2), so the first address of `hostname -I` may be either one.
+PAIR_HINT = ("With a network cable use its 192.168.77.x address; an address from the tablet "
+             "changes when you replug it.")
+
+
+def _pair_next(admin: str, hostname_i: str) -> dict:
+    """Every address in `hostname -I` output (IPv4 first, IPv6 link-local dropped) and the
+    laptop's pairing line for each."""
+    import ipaddress
+    found = []
+    for word in hostname_i.split():
+        try:
+            ip = ipaddress.ip_address(word)
+        except ValueError:
+            continue
+        if not (ip.version == 6 and ip.is_link_local):
+            found.append(ip)
+    addrs = [str(ip) for ip in sorted(found, key=lambda ip: ip.version)] or ["THIS-COMPUTER"]
+    return {"addresses": addrs,
+            "next": [f"on the laptop: bau station pair {admin}@{a}" for a in addrs],
+            "hint": PAIR_HINT}
 
 
 # The owner's desktop, 2026-11-16: the menu's Jarvis held 8766, so the service restarted 626
@@ -821,6 +844,8 @@ def _hq_admin(mark: Path) -> str:
 def cmd_station(a):
     """The laptop as the operations station (docs/LAPTOP-STATION.md). Never needs sudo."""
     from . import station as S
+    if a.station_cmd == "role":
+        return _station_role(a.role)
     home = Path.home()
     key = home / ".ssh" / "bau_station_ed25519"
     cfg = home / ".config" / "bau" / "station.yaml"
@@ -848,8 +873,8 @@ def cmd_station(a):
         print("On the desktop, at a terminal, run this one line:\n")
         print(f"  sudo bau hq allow '{pub}'\n")
         print("Then open Jarvis HQ from the menu here, or: bau station open\n")
-        print("Jarvis's own work runs on the desktop; so it is not done twice, stop it here:\n"
-              "  sudo systemctl disable --now bau-autopilot.timer bau-scout-watch.timer")
+        print("Jarvis's own work runs on the desktop; so it is not done twice, make this laptop "
+              "the station:\n  sudo bau station role on")
         return EXIT_OK
     if not cfg.exists():
         print("bau station: not paired yet: bau station pair NAME@DESKTOP", file=sys.stderr)
@@ -863,23 +888,76 @@ def cmd_station(a):
               "~/.ssh/authorized_keys (`bau hq status` lists it)"})
         return EXIT_OK
     link = _sh("systemctl", "--user", "is-active", "bau-hq-link.service", check=False)
+    state = link.stdout.strip() or "unknown"
     if a.station_cmd == "status":
-        _out({"desktop": desktop, "tunnel": link.stdout.strip() or "unknown"})
-        return EXIT_OK if link.stdout.strip() == "active" else EXIT_BLOCKED
+        _out({"desktop": desktop, "tunnel": state,
+              "link": f"the link to the desktop {desktop} is "
+                      + ("up" if state == "active" else f"down ({state})")})
+        return EXIT_OK if state == "active" else EXIT_BLOCKED
+    causes = (f"Likely causes: the desktop {desktop} is off or asleep; the cable or hotspot "
+              "is not connected; or the desktop has not allowed this laptop's key yet "
+              "(on the desktop: sudo bau hq allow '<key>', the line `bau station pair` "
+              "printed).\nThen run: bau station status\n"
+              "  and: systemctl --user restart bau-hq-link.service")
+    if state != "active":
+        print(f"bau station: the link to the desktop is down ({state}).\n{causes}",
+              file=sys.stderr)
+        return EXIT_BLOCKED
     # open: the desktop prints Jarvis's address (the only command this key may run)
     got = _sh("ssh", "-T", "-i", str(key), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes",
               "-o", "ConnectTimeout=8", "-o", "ServerAliveInterval=5",
-              "-o", "ServerAliveCountMax=2", desktop, check=False, timeout=30)
+              "-o", "ServerAliveCountMax=2", "-o", "StrictHostKeyChecking=accept-new",
+              desktop, check=False, timeout=30)
     try:
         url = S.world_url(got.stdout)
     except ValueError as e:
-        print(f"bau station: {e}. Is the desktop on, and did it run `sudo bau hq allow`? "
-              f"({got.stderr.strip()[:200]})", file=sys.stderr)
+        last = (got.stderr or "").strip().splitlines()
+        said = f" ssh said: {last[-1][:200]}" if last else ""
+        print(f"bau station: {e}.{said}\n{causes}", file=sys.stderr)
         return EXIT_BLOCKED
     import webbrowser
     webbrowser.open(url)
     print("Jarvis is open in your browser (through the tunnel to the desktop).")
     return EXIT_OK
+
+
+STATION_TIMERS = ("bau-autopilot.timer", "bau-scout-watch.timer")
+
+
+def _station_role(role: str) -> int:
+    """`sudo bau station role on|off`: the marker every guard reads (services run as `bau` and
+    cannot read the owner's ~/.config), and the desktop's timers off here so nothing runs twice."""
+    from . import station as S
+    if os.geteuid() != 0:
+        print(f"bau station role: run it with sudo: sudo bau station role {role}",
+              file=sys.stderr)
+        return EXIT_BLOCKED
+    if role == "on" and S.MARK.exists():
+        print("bau station role: this computer is headquarters (bau hq on): the station is "
+              "the laptop. Nothing changed.", file=sys.stderr)
+        return EXIT_BLOCKED
+    who = _human()
+    if role == "on":
+        S.STATION_MARK.parent.mkdir(parents=True, exist_ok=True)
+        S.STATION_MARK.write_text(f"on={S.stamp()}\n")
+        r = _sh("systemctl", "disable", "--now", *STATION_TIMERS, check=False)
+        AuditLog().append("station.role_on", who, {"timers_off": list(STATION_TIMERS),
+                                                   "systemctl": r.returncode})
+        _out({"station": "on",
+              "timers": "autopilot and open-source watch off here" if not r.returncode
+                        else f"systemctl could not switch them off: {r.stderr.strip()[:200]}",
+              "work": "Jarvis, the agents and the money machine run on the desktop",
+              "next": "bau station pair bauadmin@DESKTOP-ADDRESS"})
+        return EXIT_OK if not r.returncode else EXIT_ERROR
+    S.STATION_MARK.unlink(missing_ok=True)
+    r = _sh("systemctl", "enable", "--now", *STATION_TIMERS, check=False)
+    AuditLog().append("station.role_off", who, {"timers_on": list(STATION_TIMERS),
+                                                "systemctl": r.returncode})
+    _out({"station": "off",
+          "timers": "autopilot and open-source watch on again here" if not r.returncode
+                    else f"systemctl could not switch them on: {r.stderr.strip()[:200]}",
+          "note": "a paired login's own file (bau station unpair removes it) still counts"})
+    return EXIT_OK if not r.returncode else EXIT_ERROR
 
 
 def shutil_which(name: str) -> str | None:
@@ -1053,6 +1131,10 @@ def cmd_autopilot(a):
     home = bau_home()
     c = a.ap_cmd or "status"
     if c == "run":
+        from .station import is_station
+        if is_station():
+            print("This laptop is a station: the desktop's autopilot does this work.")
+            return EXIT_OK
         from .assistant import load_env_file
         load_env_file()                   # an optional GITHUB_TOKEN raises GitHub's limit
         seeded = J.seed(home)
@@ -1649,7 +1731,9 @@ def cmd_jarvis(a):
             raise PermissionError("Jarvis runs as the owner's own login, not root or 'bau'")
         owner = f"human:{who}"
     else:
-        from .station import MARK
+        from .station import MARK, is_station
+        if is_station() and not a.text:     # the laptop: the desktop's Jarvis, never a second
+            return cmd_station(argparse.Namespace(station_cmd="open"))
         if MARK.exists() and not a.text:
             return _open_hq_jarvis(key_file, a.port, a.no_browser)
         owner = _human()
@@ -2269,10 +2353,13 @@ def register(sub: argparse._SubParsersAction) -> None:
     w = s.add_subparsers(dest="station_cmd", required=True)
     x = w.add_parser("pair", help="make this laptop's key and the tunnel to the desktop")
     x.add_argument("desktop", help="your login on the desktop and its address, e.g. "
-                   "owner@192.168.1.20")
+                   "bauadmin@192.168.1.20")
     w.add_parser("open", help="open Jarvis and his world from the desktop")
     w.add_parser("status", help="is the tunnel up")
     w.add_parser("unpair", help="stop the tunnel and forget the desktop")
+    x = w.add_parser("role", help="sudo: this laptop is the station (on): the desktop's "
+                     "autopilot, Jarvis and money machine are not started here")
+    x.add_argument("role", choices=["on", "off"])
     s.set_defaults(fn=cmd_station)
 
     s = sub.add_parser("catalog", help="every tool BAU knows, one record each, with its "
