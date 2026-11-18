@@ -50,6 +50,7 @@ bau selftest
 | 8 | **`bau selftest` fails in a fresh home** without podman, AppArmor tools, chrony or the audit key. On the stick they exist; elsewhere the message names each | `bau selftest` here |
 | 9 | **Unused code**: `APIConnector` in `src/bau/platforms.py` is never used and only raises | grep |
 | 10 | **About 290 old branches** on GitHub, most from merged work | `git branch -r` |
+| 11 | **The automaton guide says the portfolio question shows every mission**, but Jarvis's portfolio answer lists the first 10 | `docs/AUTOMATON.md`, `t_portfolio` in `src/bau/assistant.py` |
 
 ## P3
 
