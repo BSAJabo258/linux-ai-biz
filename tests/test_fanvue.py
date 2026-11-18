@@ -411,3 +411,40 @@ def test_login_times_out_as_a_fanvue_error(tmp_path):
     c = client(tmp_path, FakeFanvue(), token=False)
     with pytest.raises(F.FanvueError, match="timed out"):
         F.login(c, port=_free_port(), timeout=1, open_browser=lambda u: None)
+
+
+def test_login_prints_the_address_to_register_before_the_browser_opens(tmp_path, capsys):
+    seen = []
+    c = client(tmp_path, FakeFanvue(), token=False)
+    port = _free_port()
+    with pytest.raises(F.FanvueError):
+        F.login(c, port=port, timeout=1,
+                open_browser=lambda u: seen.append(capsys.readouterr().out))
+    assert f"http://127.0.0.1:{port}/callback" in seen[0]
+    assert "Authentication tab" in seen[0] and "Save" in seen[0]
+
+
+def test_a_timeout_says_which_address_to_register(tmp_path, monkeypatch):
+    def timed_out(*a, **k):
+        raise F.TikTokError("no answer from Fanvue (timed out)")
+    monkeypatch.setattr(F, "oauth_callback", timed_out)
+    c = client(tmp_path, FakeFanvue(), token=False)
+    for port in (3456, 4000):
+        with pytest.raises(F.FanvueError) as e:
+            F.login(c, port=port, timeout=1, open_browser=lambda u: None)
+        assert "timed out" in str(e.value)
+        assert (f"register exactly http://127.0.0.1:{port}/callback on your Fanvue app's "
+                "Authentication tab and press Save") in str(e.value)
+
+
+def test_invalid_request_says_which_address_to_register(tmp_path):
+    pages = []
+    c = client(tmp_path, FakeFanvue(), token=False)
+    port = _free_port()
+    with pytest.raises(F.FanvueError) as e:
+        F.login(c, port=port, timeout=10, open_browser=_browser(
+            lambda q: f"error=invalid_request&state={q['state']}", pages))
+    assert "Fanvue refused: invalid_request" in str(e.value)
+    assert f"register exactly http://127.0.0.1:{port}/callback" in str(e.value)
+    _wait(pages, 1)
+    assert f"http://127.0.0.1:{port}/callback" in pages[-1][1]
