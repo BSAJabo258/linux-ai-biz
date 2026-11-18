@@ -754,14 +754,37 @@ def cmd_hq(a):
     S.MARK.write_text(f"admin={admin}\non={S.stamp()}\n")
     AuditLog().append("hq.on", who, {"inbound": "ssh 22, home network, keys only",
                                      "jarvis": "127.0.0.1:8766"})
-    ips = _sh("hostname", "-I", check=False).stdout.split()
+    pair = _pair_next(admin, _sh("hostname", "-I", check=False).stdout)
     _out({"headquarters": "on",
           "jarvis": "running for good on 127.0.0.1:8766" if jarvis_state == "active"
                     else f"NOT running ({jarvis_state}{_taken_by(8766)}): "
                          f"{JARVIS_PORT_HINT}",
-          "ssh": "keys only, home network only",
-          "next": f"on the laptop: bau station pair {admin}@{ips[0] if ips else 'THIS-COMPUTER'}"})
+          "ssh": "keys only, home network only", **pair})
     return EXIT_OK if jarvis_state == "active" else EXIT_ERROR
+
+
+# The owner's desktop gets internet from a tablet by USB and may also have a cable to the
+# laptop (192.168.77.1 / .2), so the first address of `hostname -I` may be either one.
+PAIR_HINT = ("With a network cable use its 192.168.77.x address; an address from the tablet "
+             "changes when you replug it.")
+
+
+def _pair_next(admin: str, hostname_i: str) -> dict:
+    """Every address in `hostname -I` output (IPv4 first, IPv6 link-local dropped) and the
+    laptop's pairing line for each."""
+    import ipaddress
+    found = []
+    for word in hostname_i.split():
+        try:
+            ip = ipaddress.ip_address(word)
+        except ValueError:
+            continue
+        if not (ip.version == 6 and ip.is_link_local):
+            found.append(ip)
+    addrs = [str(ip) for ip in sorted(found, key=lambda ip: ip.version)] or ["THIS-COMPUTER"]
+    return {"addresses": addrs,
+            "next": [f"on the laptop: bau station pair {admin}@{a}" for a in addrs],
+            "hint": PAIR_HINT}
 
 
 # The owner's desktop, 2026-11-16: the menu's Jarvis held 8766, so the service restarted 626
