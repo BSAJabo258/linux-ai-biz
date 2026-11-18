@@ -114,3 +114,60 @@ def test_the_setup_script_ships_with_the_package():
     root = Path(__file__).resolve().parents[1]
     assert (root / "installer/bau-face-setup.sh").read_text() == \
         (root / "src/bau/data/setup/bau-face-setup.sh").read_text()
+
+
+def locked_home(tmp_path):
+    face.draw_candidates(tmp_path, PROF, 1, drawer=fake_draw([]))
+    face.pick(tmp_path, PROF, 1, "human:owner")
+    return tmp_path
+
+
+def test_the_dataset_needs_her_locked_face_and_captions_each_picture(tmp_path):
+    with pytest.raises(face.FaceError, match="lock her face"):
+        face.draw_dataset(tmp_path, PROF, 2, drawer=fake_draw([]))
+    home = locked_home(tmp_path)
+    calls = []
+    out = face.draw_dataset(home, PROF, 3, drawer=fake_draw(calls))
+    assert [o["result"] for o in out] == ["drawn"] * 3
+    assert all(kw["face"] == face.locked(home, PROF) for _, _, kw in calls)
+    d = face.dataset_dir(home, PROF)
+    assert sorted(p.name for p in d.glob("*.png")) == ["01.png", "02.png", "03.png"]
+    assert (d / "01.txt").read_text().startswith("photo of bauaria woman, ")
+    assert not list((home / "artifacts" / "media").glob("*.png"))   # never posted
+    assert face.draw_dataset(home, PROF, 1, drawer=fake_draw([]))[0]["number"] == 4
+
+
+def test_only_the_owner_locks_the_lora_and_a_changed_file_is_not_used(tmp_path):
+    home = locked_home(tmp_path)
+    lora = tmp_path / "bau-aria-chroma.safetensors"
+    with pytest.raises(face.FaceError, match="train it first"):
+        face.use_lora(home, PROF, "human:owner", path=lora)
+    lora.write_bytes(b"weights")
+    with pytest.raises(PermissionError):
+        face.use_lora(home, PROF, "agent:jarvis", path=lora)
+    face.use_lora(home, PROF, "human:owner", path=lora)
+    got = face.locked_lora(home, PROF, path=lora)
+    assert got["name"] == lora.name and got["trigger"] == "bauaria"
+    lora.write_bytes(b"other weights")
+    assert face.locked_lora(home, PROF, path=lora) is None
+
+
+def test_the_lora_sits_between_chroma_and_its_sampling_only_when_given():
+    plain = comfy.chroma_graph("p", 1)
+    assert "15" not in plain and plain["2"]["inputs"]["model"] == ["1", 0]
+    g = comfy.chroma_graph("p", 1, lora="bau-aria-chroma.safetensors")
+    assert g["15"]["class_type"] == "LoraLoaderModelOnly"
+    assert g["15"]["inputs"]["lora_name"] == "bau-aria-chroma.safetensors"
+    assert g["2"]["inputs"]["model"] == ["15", 0]
+
+
+def test_the_training_script_ships_and_names_the_lora_file_bau_reads():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    text = (root / "installer/bau-lora-train.sh").read_text()
+    assert text == (root / "src/bau/data/setup/bau-lora-train.sh").read_text()
+    assert 'bau-${CID}-chroma.safetensors' in text
+    assert face.lora_file(PROF).name == "bau-aria-chroma.safetensors"
+    for flag in ("--model_type=chroma", "--guidance_scale=0.0", "--apply_t5_attn_mask",
+                 "--fp8_base", "--blocks_to_swap=16"):
+        assert flag in text

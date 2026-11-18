@@ -105,8 +105,35 @@ face lock as one of its links.
 Not tested on your card yet: the face nodes were checked in their code, not run here. The first
 `bau creator face draw` and the first feed picture after it are the test.
 
+## Her face on levels 2 and 3: her LoRA (2026-11-18)
+
+Chroma has no face lock like the one above, so her face there is a LoRA: a small add-on file
+trained on pictures of her. Do it once, after her face is locked and Chroma is set up:
+
+```bash
+bau creator face dataset                        # 20 clothed pictures of her, from her face
+                                                # look at them: delete any that are not her
+                                                # (the .png and its .txt)
+sudo bash installer/bau-lora-train.sh aria      # installs the trainer once, then trains
+bau creator face use-lora                       # you lock the result
+```
+
+The dataset is drawn in `creators/faces/dataset/<id>` with a caption for each picture naming
+her trigger word (`bau` + her id, for Aria `bauaria`); it is never posted. The training uses
+kohya-ss/sd-scripts (Apache-2.0, pinned commit) with its own advice for a 12 GB card, about
+1,000 steps, a few hours. While it trains, the chat model and the picture maker are stopped
+(this computer's memory cannot hold all three) and started again at the end, also if it fails.
+The first run also downloads about 8 GB: the trainer's Python and PyTorch, and a plain text
+encoder (the picture maker's own is in a format the trainer cannot read).
+
+The LoRA learns her face from clothed pictures only. What a level 2 or 3 picture shows still
+comes from that level's prompt and your explicit limits, and every picture still gets the age
+check and your Accept. Each picture's record names the LoRA it used. If the LoRA file is
+changed, BAU stops using it until you lock it again.
+
+Not tested yet: the trainer has not run on this computer. sd-scripts is tested on Python
+3.10 to 3.12 and this computer has 3.13, so the first run is the test.
+
 ## Still to do
 
-- **Her face on levels 2 and 3.** The face lock works on the safe-for-work model only; there
-  is no IP-Adapter for Chroma. The next step is a LoRA trained on her locked pictures.
 - Showing the pictures themselves on the week's card.

@@ -172,9 +172,25 @@ def _sdxl(prompt: str, seed: int, width: int, height: int, steps: int, negative:
     }
 
 
+LORA_STRENGTH = 0.9
+
+
 def chroma_graph(prompt: str, seed: int, negative: str = NEGATIVE, width: int = 1152,
-                 height: int = 1152) -> dict[str, Any]:
-    """The Chroma1-HD model card's ComfyUI workflow, in ComfyUI's API format."""
+                 height: int = 1152, lora: str | None = None,
+                 lora_strength: float = LORA_STRENGTH) -> dict[str, Any]:
+    """The Chroma1-HD model card's ComfyUI workflow, in ComfyUI's API format. With ``lora``
+    (a file in ComfyUI's loras folder: the creator's face) ComfyUI's own LoraLoaderModelOnly
+    sits between the model and its sampling (nodes.py, read 2026-11-18 in ComfyUI 0.43.0)."""
+    g = _chroma(prompt, seed, negative, width, height)
+    if lora:
+        g["15"] = {"class_type": "LoraLoaderModelOnly",
+                   "inputs": {"model": ["1", 0], "lora_name": lora,
+                              "strength_model": float(lora_strength)}}
+        g["2"]["inputs"]["model"] = ["15", 0]
+    return g
+
+
+def _chroma(prompt: str, seed: int, negative: str, width: int, height: int) -> dict[str, Any]:
     return {
         "1": {"class_type": "UNETLoader",
               "inputs": {"unet_name": CHROMA, "weight_dtype": "fp8_e4m3fn"}},
@@ -236,7 +252,7 @@ def _call(opener: Any, url: str, body: dict[str, Any] | None = None, raw: bool =
 def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str = BASE,
          opener: Any = None, wait: float = 2.0, max_wait: float = 900.0,
          checker: Any = None, negative: str = NEGATIVE, lane: str = "sfw",
-         face: Path | None = None, **size: int) -> dict[str, Any]:
+         face: Path | None = None, lora: str | None = None, **size: int) -> dict[str, Any]:
     """Draw one picture into BAU_HOME/artifacts/media/NAME.png and record where it came from.
     ``face``: the creator's locked face picture, used on the safe-for-work lane."""
     if not LOCAL.match(base):
@@ -253,7 +269,7 @@ def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str 
     if face is not None and lane == "sfw":
         face_sha = hashlib.sha256(Path(face).read_bytes()).hexdigest()
         face_name = upload_face(opener, base, Path(face))
-    g = (chroma_graph(prompt, seed, negative=negative, **size) if lane == "explicit"
+    g = (chroma_graph(prompt, seed, negative=negative, lora=lora, **size) if lane == "explicit"
          else graph(prompt, seed, negative=negative,
                     face=face_name if face_sha else None, **size))
     job = _call(opener, base + "/prompt", {"prompt": g})
@@ -301,6 +317,8 @@ def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str 
             "seed": seed,
             "face_lock": ({"adapter": "ip-adapter-plus-face_sdxl_vit-h", "face_sha256": face_sha,
                            "weight": FACE_WEIGHT} if face_sha else None),
+            "lora": ({"file": lora, "strength": LORA_STRENGTH}
+                     if lora and lane == "explicit" else None),
             "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
             "file_sha256": hashlib.sha256(png).hexdigest(),
             "age_check": {"passed": True, "under_20": young, "max": MAX_UNDER_20,

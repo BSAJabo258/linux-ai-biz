@@ -555,10 +555,19 @@ def cmd_creator(a):
         if a.face_cmd == "pick":
             _out(face.pick(home, prof, a.number, _human(), AuditLog()))
             return EXIT_OK
+        if a.face_cmd == "use-lora":
+            _out(face.use_lora(home, prof, _human(), AuditLog()))
+            return EXIT_OK
         from .world import PICTURES_NOT_RUNNING, pictures_running
         if not pictures_running():
-            print(f"bau creator face draw: {PICTURES_NOT_RUNNING}", file=sys.stderr)
+            print(f"bau creator face {a.face_cmd}: {PICTURES_NOT_RUNNING}", file=sys.stderr)
             return EXIT_BLOCKED
+        if a.face_cmd == "dataset":
+            done = face.draw_dataset(home, prof, a.count)
+            _out({"pictures": done, "folder": str(face.dataset_dir(home, prof)),
+                  "next": "delete any that do not look like her (and its .txt), then: sudo "
+                          f"bash bau-lora-train.sh {prof.get('id')}"})
+            return EXIT_OK
         done = face.draw_candidates(home, prof, a.count)
         _out({"candidates": done, "folder": str(face.faces_dir(home) / "candidates"),
               "next": "look at them, then lock one: bau creator face pick N"})
@@ -2365,6 +2374,11 @@ def register(sub: argparse._SubParsersAction) -> None:
     y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
     y = f.add_parser("pick", help="you: lock candidate N as her face")
     y.add_argument("number", type=int)
+    y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
+    y = f.add_parser("dataset", help="draw her in clothed scenes from her face, for her LoRA")
+    y.add_argument("--count", type=int, default=20)
+    y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
+    y = f.add_parser("use-lora", help="you: lock her trained LoRA for levels 2 and 3")
     y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
     y = f.add_parser("show", help="is her face locked, and what is next")
     y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
