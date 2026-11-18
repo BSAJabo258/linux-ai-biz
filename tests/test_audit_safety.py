@@ -5,6 +5,7 @@ that allow kids; consequential actions wait on HOLD; tool results reach models a
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 from bau.factories import FactoryRun, FactoryRunner
 
@@ -90,3 +91,34 @@ def test_selftest_finds_admin_tools_outside_the_owners_path(tmp_path, monkeypatc
     cli.main(["selftest"])
     out = json.loads(capsys.readouterr().out)
     assert out["tool:nft"] == "ok" and out["tool:aa-status"] == "missing"
+
+
+def test_selftest_names_a_stale_bau_that_shadows_the_installed_one(tmp_path, monkeypatch,
+                                                                   capsys):
+    # The owner's desktop: ~/.local/bin/bau (an old copy, made 2026-11-14) came before
+    # /usr/local/bin/bau, so `bau` lacked world/hq/station while `sudo bau` had them.
+    from bau import cli
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    installed = tmp_path / "usr-local-bin" / "bau"
+    installed.parent.mkdir()
+    installed.write_text("#!/bin/sh\n")
+    stale = tmp_path / ".local" / "bin" / "bau"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("#!/bin/sh\n")
+    got = cli.bau_on_path(which=lambda n: str(stale), expected=str(installed))
+    assert got.startswith("FAIL") and str(stale) in got and str(installed) in got
+    assert f"rm {stale}" in got and "hash -r" in got
+    stale.unlink()
+    stale.symlink_to(installed)                               # a link to the same file is fine
+    assert cli.bau_on_path(which=lambda n: str(stale), expected=str(installed)) == "ok"
+    elsewhere = tmp_path.parent / "opt-bin-bau"               # not in a user folder: no rm
+    got = cli.bau_on_path(which=lambda n: str(elsewhere), expected=str(installed))
+    assert got.startswith("FAIL") and f"rm {elsewhere}" not in got and "hash -r" in got
+    # a dev checkout, CI or the test drive: no installed bau, nothing to compare
+    assert cli.bau_on_path(which=lambda n: str(stale), expected=str(tmp_path / "no")) == "ok"
+    monkeypatch.setattr(cli, "INSTALLED_BAU", str(installed))
+    monkeypatch.setattr("shutil.which", lambda n, path=None: str(tmp_path / ".local/bin/x/bau")
+                        if n == "bau" else None)
+    assert cli.main(["selftest"]) != 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["bau_on_path"].startswith("FAIL") and str(installed) in out["bau_on_path"]

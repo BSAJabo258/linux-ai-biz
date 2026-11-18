@@ -125,6 +125,31 @@ def test_station_commands(tmp_path, monkeypatch, capsys):
         assert main(["hq", "on"]) != 0                         # needs sudo
 
 
+def test_the_launcher_uses_the_installed_bau_not_a_stale_copy_on_path(tmp_path, monkeypatch):
+    # The owner's desktop: an old ~/.local/bin/bau (2026-11-14) came first on PATH; the
+    # launcher must not bake it in when /usr/local/bin/bau is installed.
+    from bau import cli, cli_ext
+    from bau.cli import main
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    installed = tmp_path / "usr-local-bin-bau"
+    installed.write_text("#!/bin/sh\n")
+    monkeypatch.setattr(cli, "INSTALLED_BAU", str(installed))
+    monkeypatch.setattr(cli_ext, "shutil_which", lambda n: "/home/x/.local/bin/bau")
+
+    def fake(*args, check=True, timeout=None):
+        if args[0] == "ssh-keygen":
+            Path(args[-1]).write_text("PRIVATE")
+            Path(args[-1]).with_suffix(".pub").write_text(KEY + "\n")
+        return subprocess.CompletedProcess(args, 0, "active", "")
+    monkeypatch.setattr(cli_ext, "_sh", fake)
+    desk = tmp_path / ".local/share/applications/bau-hq.desktop"
+    assert main(["station", "pair", "owner@192.168.1.20"]) == 0
+    assert str(installed) in desk.read_text() and ".local/bin/bau" not in desk.read_text()
+    installed.unlink()                                       # not installed: PATH's bau
+    assert main(["station", "pair", "owner@192.168.1.20"]) == 0
+    assert "/home/x/.local/bin/bau" in desk.read_text()
+
+
 # The owner's desktop, 2026-11-16: the menu's Jarvis held port 8766, so bau-jarvis.service
 # restarted 626 times ("Address already in use"). With headquarters on, `bau jarvis` opens
 # the one that runs for good instead of starting a second.
