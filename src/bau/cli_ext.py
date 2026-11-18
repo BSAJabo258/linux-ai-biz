@@ -2365,7 +2365,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("portraits", help="paint each AI assistant's portrait with this computer's "
                      "ComfyUI (the desktop)")
     x.add_argument("--look", help="only this one (jarvis, researcher, producer, engineer, "
-                   "coordinator, analyst, architect)")
+                   "coordinator, analyst, architect; avatar = Jarvis's photo face on her "
+                   "screen, drawn only when asked)")
     x.add_argument("--again", action="store_true", help="paint it again even if it exists")
     s.set_defaults(fn=cmd_world)
 

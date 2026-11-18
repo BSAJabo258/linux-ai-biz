@@ -63,6 +63,20 @@ PORTRAIT_STYLE = ("digital painting, glamorous adult woman in her late twenties,
 PORTRAIT_NEGATIVE = ("child, childlike, minor, teen, young-looking, school uniform, nudity, "
                      "nipples, explicit, character sheet, real person, celebrity, text, "
                      "watermark, logo")
+# Jarvis's face on her screen (the owner's ask, 2026-11-18: "a real life looking AI model
+# replacing the orb"): a photographic portrait of an ORIGINAL fictional adult woman with
+# Jarvis's look, drawn on this computer. Never a real person or a celebrity's likeness.
+AVATAR_LOOK = "avatar"
+AVATAR_PROMPT = ("professional studio portrait photograph of an original fictional adult woman "
+                 "in her early thirties, long straight black hair, warm tan skin, hazel eyes, "
+                 "natural makeup, black fitted blazer over a dark top with a thin glowing cyan "
+                 "accent, calm confident smile, looking at the camera, head and shoulders, "
+                 "dark navy background with soft cyan rim light, 85mm lens, shallow depth of "
+                 "field, natural skin texture, photorealistic, sharp focus")
+AVATAR_NEGATIVE = ("child, childlike, minor, teen, young-looking, school uniform, nudity, "
+                   "cleavage, explicit, celebrity, famous person, cartoon, anime, painting, "
+                   "illustration, 3d render, doll, plastic skin, deformed, extra fingers, text, "
+                   "watermark, logo")
 # Jarvis's autopilot jobs (autopilot.GO) and the room each is done in.
 JOB_ROOM = {"scan": "innovation", "inspect": "innovation", "blueprint": "innovation",
             "sandbox_test": "testing", "research": "research", "learn": "research",
@@ -207,7 +221,7 @@ def jarvis(home: Path, now: dt.datetime) -> dict[str, Any]:
 
 def portrait_file(home: Path, look: str) -> Path | None:
     """Her painted portrait, if one was drawn; only the fixed looks, never a path from a request."""
-    if look not in PORTRAIT_LOOKS:
+    if look not in PORTRAIT_LOOKS and look != AVATAR_LOOK:
         return None
     f = home / "world" / "portraits" / f"{look}.png"
     return f if f.is_file() else None
@@ -261,14 +275,15 @@ def draw_portraits(home: Path, looks: list[str] | None = None, again: bool = Fal
 
 def _draw_one(home: Path, look: str, again: bool, drawer: Any, comfy: Any, out_dir: Path,
               audit: Any) -> str:
-    if look not in PORTRAIT_LOOKS:
+    if look not in PORTRAIT_LOOKS and look != AVATAR_LOOK:
         return "unknown look"
     if portrait_file(home, look) and not again:
         return "already drawn"
     name = f"world-portrait-{look}"
+    prompt, negative = ((AVATAR_PROMPT, AVATAR_NEGATIVE) if look == AVATAR_LOOK else
+                        (PORTRAIT_STYLE.format(who=PORTRAIT_WHO[look]), PORTRAIT_NEGATIVE))
     try:
-        drawer(home, PORTRAIT_STYLE.format(who=PORTRAIT_WHO[look]), name,
-               negative=PORTRAIT_NEGATIVE, width=832, height=1216)
+        drawer(home, prompt, name, negative=negative, width=832, height=1216)
     except (comfy.ComfyError, OSError) as e:      # ComfyUI gone mid-way: say so, go on
         return f"not drawn: {e}"
     media = home / "artifacts" / "media"
