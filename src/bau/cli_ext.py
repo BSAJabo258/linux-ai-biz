@@ -855,18 +855,32 @@ def cmd_station(a):
               "~/.ssh/authorized_keys (`bau hq status` lists it)"})
         return EXIT_OK
     link = _sh("systemctl", "--user", "is-active", "bau-hq-link.service", check=False)
+    state = link.stdout.strip() or "unknown"
     if a.station_cmd == "status":
-        _out({"desktop": desktop, "tunnel": link.stdout.strip() or "unknown"})
-        return EXIT_OK if link.stdout.strip() == "active" else EXIT_BLOCKED
+        _out({"desktop": desktop, "tunnel": state,
+              "link": f"the link to the desktop {desktop} is "
+                      + ("up" if state == "active" else f"down ({state})")})
+        return EXIT_OK if state == "active" else EXIT_BLOCKED
+    causes = (f"Likely causes: the desktop {desktop} is off or asleep; the cable or hotspot "
+              "is not connected; or the desktop has not allowed this laptop's key yet "
+              "(on the desktop: sudo bau hq allow '<key>', the line `bau station pair` "
+              "printed).\nThen run: bau station status\n"
+              "  and: systemctl --user restart bau-hq-link.service")
+    if state != "active":
+        print(f"bau station: the link to the desktop is down ({state}).\n{causes}",
+              file=sys.stderr)
+        return EXIT_BLOCKED
     # open: the desktop prints Jarvis's address (the only command this key may run)
     got = _sh("ssh", "-T", "-i", str(key), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes",
               "-o", "ConnectTimeout=8", "-o", "ServerAliveInterval=5",
-              "-o", "ServerAliveCountMax=2", desktop, check=False, timeout=30)
+              "-o", "ServerAliveCountMax=2", "-o", "StrictHostKeyChecking=accept-new",
+              desktop, check=False, timeout=30)
     try:
         url = S.world_url(got.stdout)
     except ValueError as e:
-        print(f"bau station: {e}. Is the desktop on, and did it run `sudo bau hq allow`? "
-              f"({got.stderr.strip()[:200]})", file=sys.stderr)
+        last = (got.stderr or "").strip().splitlines()
+        said = f" ssh said: {last[-1][:200]}" if last else ""
+        print(f"bau station: {e}.{said}\n{causes}", file=sys.stderr)
         return EXIT_BLOCKED
     import webbrowser
     webbrowser.open(url)

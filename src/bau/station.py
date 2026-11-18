@@ -117,7 +117,7 @@ WantedBy=default.target
 def launcher(bau: str) -> str:
     return ("[Desktop Entry]\nType=Application\nName=Jarvis HQ\n"
             "Comment=Jarvis and his world, on the desktop\n"
-            f"Exec={bau} station open\nIcon=applications-system\nTerminal=false\n")
+            f"Exec={bau} station open\nIcon=applications-system\nTerminal=true\n")
 
 
 def world_url(printed: str) -> str:
