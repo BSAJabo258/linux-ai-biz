@@ -16,7 +16,7 @@
 set -euo pipefail
 
 CID="${1:-}"
-BAU_HOME="${BAU_HOME:-/var/lib/bau}"
+BAU_HOME=/var/lib/bau        # fixed: never taken from the caller's environment
 COMFY="/usr/local/comfyui/ComfyUI"
 MODELS="${COMFY}/models"
 APP=/usr/local/bau-lora
@@ -34,6 +34,9 @@ MIN_PICTURES=10
 STEPS=1000
 
 say() { printf '%s\n' "$*"; }
+# Every file step below runs as comfyui, never as root, in folders comfyui or the bau group
+# can change: a planted link must not make root read or write a file it should not.
+as_comfy() { runuser -u comfyui -- "$@"; }
 
 if [[ $(id -u) -ne 0 ]]; then
   say "Run it with sudo: sudo bash $0 CREATOR"; exit 1
@@ -47,15 +50,19 @@ if [[ ! -f ${MODELS}/diffusion_models/Chroma1-HD.safetensors ]] || ! id comfyui 
   say "  sudo bash bau-explicit-setup.sh"
   exit 1
 fi
-count=$(find "${DATA}" -maxdepth 1 -name '*.png' 2>/dev/null | wc -l)
+if [[ -L ${DATA} || ! -d ${DATA} ]]; then
+  say "No dataset folder at ${DATA}. Draw it first: bau creator face dataset"; exit 1
+fi
+count=$(find "${DATA}" -maxdepth 1 -type f -name '*.png' | wc -l)
 if (( count < MIN_PICTURES )); then
   say "Only ${count} dataset picture(s) in ${DATA}; at least ${MIN_PICTURES} are needed."
   say "Draw them first: bau creator face dataset"
   exit 1
 fi
-for png in "${DATA}"/*.png; do
-  [[ -f ${png%.png}.txt ]] || { say "No caption for ${png}; draw it again or delete it."; exit 1; }
-done
+while IFS= read -r -d '' png; do
+  [[ -f ${png%.png}.txt && ! -L ${png%.png}.txt ]] \
+    || { say "No caption for ${png}; draw it again or delete it."; exit 1; }
+done < <(find "${DATA}" -maxdepth 1 -type f -name '*.png' -print0)
 
 say "1/4 the trainer (sd-scripts ${SD_COMMIT:0:8})..."
 install -d -o comfyui -g comfyui "${APP}" "${WORK}"
@@ -78,18 +85,22 @@ runuser -u comfyui -- "${VENV}/bin/python" -c \
 
 say "2/4 the plain text encoder (checked against its pinned SHA-256)..."
 T5="${MODELS}/text_encoders/${T5_NAME}"
-if ! { [[ -f ${T5} ]] && echo "${T5_SUM}  ${T5}" | sha256sum -c --quiet 2>/dev/null; }; then
+if ! { [[ -f ${T5} ]] && echo "${T5_SUM}  ${T5}" | as_comfy sha256sum -c --quiet 2>/dev/null; }; then
   runuser -u comfyui -- curl -fL --retry 3 -C - -o "${T5}.part" "${T5_URL}"
-  echo "${T5_SUM}  ${T5}.part" | sha256sum -c --quiet \
-    || { rm -f "${T5}.part"; say "${T5_NAME} is not the pinned file: stopping"; exit 1; }
-  mv "${T5}.part" "${T5}"
+  echo "${T5_SUM}  ${T5}.part" | as_comfy sha256sum -c --quiet \
+    || { as_comfy rm -f "${T5}.part"; say "${T5_NAME} is not the pinned file: stopping"; exit 1; }
+  as_comfy mv "${T5}.part" "${T5}"
 fi
 
 say "3/4 her ${count} pictures..."
-rm -rf "${WORK:?}/${CID}"
-install -d -o comfyui -g comfyui "${WORK}/${CID}/img" "${WORK}/${CID}/out"
-install -o comfyui -g comfyui -m 0644 "${DATA}"/*.png "${DATA}"/*.txt "${WORK}/${CID}/img/"
-cat > "${WORK}/${CID}/dataset.toml" <<TOML
+as_comfy rm -rf "${WORK:?}/${CID}"
+as_comfy mkdir -p "${WORK}/${CID}/img" "${WORK}/${CID}/out"
+# The dataset is the bau group's (comfyui cannot read it): root reads each regular file with
+# O_NOFOLLOW (dd iflag=nofollow) and comfyui writes the copy.
+while IFS= read -r -d '' f; do
+  dd if="${f}" iflag=nofollow status=none | as_comfy tee "${WORK}/${CID}/img/${f##*/}" >/dev/null
+done < <(find "${DATA}" -maxdepth 1 -type f \( -name '*.png' -o -name '*.txt' \) -print0)
+as_comfy tee "${WORK}/${CID}/dataset.toml" >/dev/null <<TOML
 [general]
 caption_extension = ".txt"
 shuffle_caption = false
@@ -103,7 +114,6 @@ enable_bucket = true
   image_dir = "${WORK}/${CID}/img"
   num_repeats = 10
 TOML
-chown comfyui:comfyui "${WORK}/${CID}/dataset.toml"
 
 restart=()
 for unit in bau-llm.service bau-pictures.service; do
@@ -142,9 +152,9 @@ runuser -u comfyui -- env HOME="${WORK}" "${VENV}/bin/accelerate" launch \
   --seed=42
 
 out="${WORK}/${CID}/out/bau-${CID}-chroma.safetensors"
-[[ -f ${out} ]] || { say "Training ended without a LoRA file: nothing was changed."; exit 1; }
-install -d -o comfyui -g comfyui "${MODELS}/loras"
-install -o comfyui -g comfyui -m 0644 "${out}" "${MODELS}/loras/"
+[[ -f ${out} && ! -L ${out} ]] || { say "Training ended without a LoRA file: nothing was changed."; exit 1; }
+as_comfy mkdir -p "${MODELS}/loras"
+as_comfy install -m 0644 "${out}" "${MODELS}/loras/"
 say "Done: ${MODELS}/loras/bau-${CID}-chroma.safetensors"
 say "Next, at your terminal: look at a test picture of her, then lock it:"
 say "  bau creator face use-lora"

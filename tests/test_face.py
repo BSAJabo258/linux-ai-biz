@@ -171,3 +171,12 @@ def test_the_training_script_ships_and_names_the_lora_file_bau_reads():
     for flag in ("--model_type=chroma", "--guidance_scale=0.0", "--apply_t5_attn_mask",
                  "--fp8_base", "--blocks_to_swap=16"):
         assert flag in text
+
+
+def test_the_training_script_never_follows_a_planted_link_as_root():
+    from pathlib import Path
+    text = (Path(__file__).resolve().parents[1] / "installer/bau-lora-train.sh").read_text()
+    assert "BAU_HOME=/var/lib/bau " in text                   # not from the environment
+    assert "iflag=nofollow" in text and "-type f" in text      # dataset read without links
+    assert "chown comfyui" not in text                         # no root writes in its folders
+    assert 'as_comfy install -m 0644 "${out}"' in text         # the LoRA copied as comfyui
