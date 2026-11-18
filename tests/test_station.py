@@ -125,6 +125,77 @@ def test_station_commands(tmp_path, monkeypatch, capsys):
         assert main(["hq", "on"]) != 0                         # needs sudo
 
 
+def _paired_station(tmp_path, monkeypatch, link="active", ssh=None):
+    """A paired laptop with a fake _sh: `link` is what systemctl says, `ssh` what ssh gives."""
+    from bau import cli_ext
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    cfg = tmp_path / ".config/bau/station.yaml"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text("desktop: owner@192.168.1.20\n")
+    ran, opened = [], []
+
+    def fake(*args, check=True, timeout=None):
+        ran.append(args)
+        if args[0] == "ssh":
+            return ssh or subprocess.CompletedProcess(
+                args, 0, "then open:\n  http://127.0.0.1:8766/?k=" + "b" * 32, "")
+        return subprocess.CompletedProcess(args, 0 if link == "active" else 3, link + "\n", "")
+    monkeypatch.setattr(cli_ext, "_sh", fake)
+    monkeypatch.setattr("webbrowser.open", opened.append)
+    return ran, opened
+
+
+def test_open_with_the_link_down_says_why_and_never_tries_ssh(tmp_path, monkeypatch, capsys):
+    from bau.cli import main
+    ran, opened = _paired_station(tmp_path, monkeypatch, link="inactive")
+    assert main(["station", "open"]) != 0
+    err = capsys.readouterr().err
+    assert "link to the desktop is down (inactive)" in err
+    for cause in ("off or asleep", "cable or hotspot", "sudo bau hq allow",
+                  "bau station status", "systemctl --user restart bau-hq-link.service"):
+        assert cause in err
+    assert not any(a[0] == "ssh" for a in ran) and opened == []
+
+
+def test_open_accepts_a_new_desktop_key_and_opens_the_world(tmp_path, monkeypatch):
+    from bau.cli import main
+    ran, opened = _paired_station(tmp_path, monkeypatch)
+    assert main(["station", "open"]) == 0
+    ssh = next(a for a in ran if a[0] == "ssh")
+    assert "StrictHostKeyChecking=accept-new" in ssh and "BatchMode=yes" in ssh
+    assert opened == ["http://127.0.0.1:8766/?k=" + "b" * 32 + "#world"]
+
+
+def test_open_when_ssh_fails_shows_its_last_line_and_the_causes(tmp_path, monkeypatch, capsys):
+    from bau.cli import main
+    failed = subprocess.CompletedProcess(
+        ["ssh"], 255, "", "debug: trying\nssh: connect to host 192.168.1.20 port 22: "
+                         "Connection timed out\n")
+    ran, opened = _paired_station(tmp_path, monkeypatch, ssh=failed)
+    assert main(["station", "open"]) != 0
+    err = capsys.readouterr().err
+    assert "ssh said: ssh: connect to host 192.168.1.20 port 22: Connection timed out" in err
+    assert "debug: trying" not in err and "off or asleep" in err and opened == []
+
+
+def test_status_names_the_desktop_and_the_link_in_plain_words(tmp_path, monkeypatch, capsys):
+    import json
+
+    from bau.cli import main
+    _paired_station(tmp_path, monkeypatch, link="inactive")
+    assert main(["station", "status"]) != 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["desktop"] == "owner@192.168.1.20" and got["tunnel"] == "inactive"
+    assert got["link"] == "the link to the desktop owner@192.168.1.20 is down (inactive)"
+
+
+def test_the_launcher_keeps_its_errors_on_screen():
+    text = S.launcher("/usr/local/bin/bau")
+    assert "Terminal=true" in text and "Terminal=false" not in text
+    assert 'Exec=sh -c "/usr/local/bin/bau station open || ' in text and "read -r _" in text
+    assert "Name=Jarvis HQ" in text and "station open" in text
+
+
 def test_the_launcher_uses_the_installed_bau_not_a_stale_copy_on_path(tmp_path, monkeypatch):
     # The owner's desktop: an old ~/.local/bin/bau (2026-11-14) came first on PATH; the
     # launcher must not bake it in when /usr/local/bin/bau is installed.

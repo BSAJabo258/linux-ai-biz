@@ -136,7 +136,10 @@ WantedBy=default.target
 def launcher(bau: str) -> str:
     return ("[Desktop Entry]\nType=Application\nName=Jarvis HQ\n"
             "Comment=Jarvis and his world, on the desktop\n"
-            f"Exec={bau} station open\nIcon=applications-system\nTerminal=false\n")
+            # the terminal stays open on a failure so the reason can be read
+            f'Exec=sh -c "{bau} station open || '
+            '{ echo; echo Press Enter to close.; read -r _; }"\n'
+            "Icon=applications-system\nTerminal=true\n")
 
 
 def world_url(printed: str) -> str:
