@@ -215,9 +215,11 @@ def test_the_world_says_what_each_agent_is_doing_and_the_system_status(tmp_path,
     assert {(t["agent"], t["state"]) for t in w["tasks"]} == {
         ("researcher", "working"), ("producer", "waiting for you")}       # not the stopped one
     assert all(t["task"] == "find mug suppliers" for t in w["tasks"])
+    money = w["system"].pop("money")
     assert w["system"] == {"headquarters": False, "stations_paired": 0,
                            "autopilot": {"paused": False, "running": 0, "queued": 0,
                                          "waiting_for_you": 0}}
+    assert money["of"] == 9 and money["ready"] < 9 and money["next"] == "creator profile"
     (tmp_path / "hq").write_text("admin=owner\n")
     (tmp_path / ".ssh").mkdir()
     (tmp_path / ".ssh" / "authorized_keys").write_text(

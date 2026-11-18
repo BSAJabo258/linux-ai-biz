@@ -672,6 +672,14 @@ def _sh(*args: str, check: bool = True, timeout: float | None = None
         return subprocess.CompletedProcess(list(args), 124, "", f"no answer in {timeout:g} s")
 
 
+def cmd_money(a):
+    """Is the money machine running? Every link, read live (docs/MONEY.md). Only looks."""
+    from . import money
+    print(money.report(bau_home()))
+    s = money.summary(bau_home())
+    return EXIT_OK if s["ready"] == s["of"] else EXIT_BLOCKED
+
+
 def cmd_world(a):
     """The operations world: paint each AI assistant's portrait on this computer (docs/WORLD.md)."""
     from .world import PicturesNotRunning, draw_portraits
@@ -2231,6 +2239,10 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("map", help="Jarvis's abilities by layer: what BAU has, gaps, order")
     x.add_argument("--layer", help="one layer, e.g. web, computer-use, memory")
     s.set_defaults(fn=cmd_toolbox)
+
+    s = sub.add_parser("money", help="is the money machine running: every link from the "
+                       "creator to Fanvue earnings, read live, with the fix (docs/MONEY.md)")
+    s.set_defaults(fn=cmd_money)
 
     s = sub.add_parser("world", help="the operations world (docs/WORLD.md)")
     w = s.add_subparsers(dest="world_cmd", required=True)
