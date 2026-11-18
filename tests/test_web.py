@@ -198,11 +198,16 @@ def _local_server(body=b"<title>internal</title>SECRET-ON-LOOPBACK", drip=0.0):
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
-            for i in range(len(body)):
-                self.wfile.write(body[i:i + 1])
-                self.wfile.flush()
-                if drip:
-                    time.sleep(drip)
+            try:
+                for i in range(len(body)):
+                    self.wfile.write(body[i:i + 1])
+                    self.wfile.flush()
+                    if drip:
+                        time.sleep(drip)
+            except (BrokenPipeError, ConnectionResetError):
+                # the reader hung up on purpose (the drip test); a traceback from this
+                # thread would land in whatever test runs next (seen in CI, 2026-11-18)
+                return
 
         def log_message(self, *a):
             pass
