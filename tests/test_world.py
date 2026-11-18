@@ -134,6 +134,44 @@ def test_portraits_are_drawn_safely_and_never_left_for_fanvue(tmp_path):
     assert rows.count('"world.portrait"') == len(PORTRAIT_LOOKS) - 1
 
 
+def test_portraits_stop_at_once_when_the_picture_setup_is_not_running(tmp_path, monkeypatch,
+                                                                      capsys):
+    """On the owner's desktop `bau world portraits` printed nothing at all."""
+    from bau import cli
+    from bau import world as w
+    drawn = []
+    monkeypatch.setenv("BAU_HOME", str(tmp_path))
+    monkeypatch.setattr(w, "pictures_running", lambda: False)
+    monkeypatch.setattr("bau.media.comfy.draw", lambda *a, **k: drawn.append(a))
+    assert cli.main(["world", "portraits"]) == 3
+    err = capsys.readouterr().err
+    assert "not running on this computer" in err and "bau-pictures.service" in err
+    assert "Traceback" not in err and drawn == []
+    assert not (tmp_path / "world" / "portraits").exists()
+
+
+def test_each_portrait_is_said_as_it_goes_and_a_lost_connection_does_not_stop_the_rest(
+        tmp_path):
+    from bau.world import PORTRAIT_LOOKS, draw_portraits
+    said = []
+
+    def drawer(home, prompt, name, negative, **size):
+        if name.endswith("producer"):
+            raise ConnectionRefusedError(111, "Connection refused")    # ComfyUI went away
+        media = home / "artifacts" / "media"
+        media.mkdir(parents=True, exist_ok=True)
+        (media / f"{name}.png").write_bytes(b"\x89PNG portrait")
+    done = draw_portraits(tmp_path, drawer=drawer, ready=lambda: True, say=said.append)
+    results = {d["look"]: d["result"] for d in done}
+    assert results["producer"].startswith("not drawn: ") and "refused" in results["producer"]
+    assert all(r == "drawn" for k, r in results.items() if k != "producer")
+    n = len(PORTRAIT_LOOKS)
+    assert said[0] == f"painting {PORTRAIT_LOOKS[0]} (1/{n})..."
+    assert said[1] == f"  {PORTRAIT_LOOKS[0]}: drawn"
+    assert len(said) == 2 * n and said[-2] == f"painting {PORTRAIT_LOOKS[-1]} ({n}/{n})..."
+    assert f"  producer: {results['producer']}" in said
+
+
 def test_the_page_gets_only_the_fixed_portraits(tmp_path):
     import http.client
     import threading

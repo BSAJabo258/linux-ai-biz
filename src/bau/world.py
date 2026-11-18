@@ -11,6 +11,7 @@ owner's ``bau world portraits``) paints each look once on the desktop's ComfyUI.
 from __future__ import annotations
 
 import datetime as dt
+import sys
 import zlib
 from pathlib import Path
 from typing import Any
@@ -185,35 +186,68 @@ def portrait_file(home: Path, look: str) -> Path | None:
     return f if f.is_file() else None
 
 
+class PicturesNotRunning(RuntimeError):
+    """ComfyUI does not answer on this computer; nothing was drawn."""
+
+
+PICTURES_NOT_RUNNING = (
+    "the picture setup (ComfyUI) is not running on this computer: nothing answers on "
+    "127.0.0.1:8188. Start it with: sudo systemctl start bau-pictures.service (not set up "
+    "yet: sudo bash /opt/bau-payload/bau-pictures-setup.sh, docs/PICTURES.md). Nothing was drawn.")
+
+
+def pictures_running() -> bool:
+    """ComfyUI answers on this computer (the same check as the pictures setup card)."""
+    from .setup_steps import _answers
+    return _answers("http://127.0.0.1:8188/system_stats")
+
+
+def _say(line: str) -> None:
+    print(line, file=sys.stderr, flush=True)
+
+
 def draw_portraits(home: Path, looks: list[str] | None = None, again: bool = False,
-                   drawer: Any = None) -> list[dict[str, Any]]:
+                   drawer: Any = None, ready: Any = None,
+                   say: Any = _say) -> list[dict[str, Any]]:
     """Paint each look's portrait on this computer's ComfyUI (the owner's command). One that
-    exists is kept unless ``again``; a failed one is reported and the rest go on."""
+    exists is kept unless ``again``; a failed one is reported and the rest go on. With the
+    real drawer, ComfyUI must answer first (``ready``), else PicturesNotRunning, nothing drawn;
+    each portrait is said as it goes (on the owner's desktop it printed nothing)."""
     from .audit import AuditLog
     from .media import comfy
+    if ready is None and drawer is None:
+        ready = pictures_running
+    if ready is not None and not ready():
+        raise PicturesNotRunning(PICTURES_NOT_RUNNING)
     drawer = drawer or comfy.draw
     out_dir = home / "world" / "portraits"
     out_dir.mkdir(parents=True, exist_ok=True)
     done = []
-    for look in looks or list(PORTRAIT_LOOKS):
-        if look not in PORTRAIT_LOOKS:
-            done.append({"look": look, "result": "unknown look"})
-            continue
-        if portrait_file(home, look) and not again:
-            done.append({"look": look, "result": "already drawn"})
-            continue
-        name = f"world-portrait-{look}"
-        try:
-            drawer(home, PORTRAIT_STYLE.format(who=PORTRAIT_WHO[look]), name,
-                   negative=PORTRAIT_NEGATIVE, width=832, height=1216)
-        except comfy.ComfyError as e:
-            done.append({"look": look, "result": f"not drawn: {e}"})
-            continue
-        media = home / "artifacts" / "media"
-        (media / f"{name}.png").replace(out_dir / f"{look}.png")    # never left for Fanvue
-        prov = media / f"{name}.png.provenance.json"
-        if prov.exists():
-            prov.replace(out_dir / f"{look}.png.provenance.json")
-        AuditLog(home / "audit" / "chain.jsonl").append("world.portrait", "bau", {"look": look})
-        done.append({"look": look, "result": "drawn"})
+    todo = looks or list(PORTRAIT_LOOKS)
+    for i, look in enumerate(todo, 1):
+        say(f"painting {look} ({i}/{len(todo)})...")
+        result = _draw_one(home, look, again, drawer, comfy, out_dir, AuditLog)
+        say(f"  {look}: {result}")
+        done.append({"look": look, "result": result})
     return done
+
+
+def _draw_one(home: Path, look: str, again: bool, drawer: Any, comfy: Any, out_dir: Path,
+              audit: Any) -> str:
+    if look not in PORTRAIT_LOOKS:
+        return "unknown look"
+    if portrait_file(home, look) and not again:
+        return "already drawn"
+    name = f"world-portrait-{look}"
+    try:
+        drawer(home, PORTRAIT_STYLE.format(who=PORTRAIT_WHO[look]), name,
+               negative=PORTRAIT_NEGATIVE, width=832, height=1216)
+    except (comfy.ComfyError, OSError) as e:      # ComfyUI gone mid-way: say so, go on
+        return f"not drawn: {e}"
+    media = home / "artifacts" / "media"
+    (media / f"{name}.png").replace(out_dir / f"{look}.png")    # never left for Fanvue
+    prov = media / f"{name}.png.provenance.json"
+    if prov.exists():
+        prov.replace(out_dir / f"{look}.png.provenance.json")
+    audit(home / "audit" / "chain.jsonl").append("world.portrait", "bau", {"look": look})
+    return "drawn"

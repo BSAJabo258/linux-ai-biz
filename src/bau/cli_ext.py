@@ -673,8 +673,12 @@ def _sh(*args: str, check: bool = True, timeout: float | None = None
 
 def cmd_world(a):
     """The operations world: paint each AI assistant's portrait on this computer (docs/WORLD.md)."""
-    from .world import draw_portraits
-    done = draw_portraits(bau_home(), [a.look] if a.look else None, again=a.again)
+    from .world import PicturesNotRunning, draw_portraits
+    try:
+        done = draw_portraits(bau_home(), [a.look] if a.look else None, again=a.again)
+    except PicturesNotRunning as e:
+        print(f"bau world portraits: {e}", file=sys.stderr)
+        return EXIT_BLOCKED
     _out(done)
     return EXIT_OK if all(d["result"] in ("drawn", "already drawn") for d in done) else EXIT_ERROR
 
