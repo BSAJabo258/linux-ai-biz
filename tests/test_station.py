@@ -192,7 +192,8 @@ def test_status_names_the_desktop_and_the_link_in_plain_words(tmp_path, monkeypa
 def test_the_launcher_keeps_its_errors_on_screen():
     text = S.launcher("/usr/local/bin/bau")
     assert "Terminal=true" in text and "Terminal=false" not in text
-    assert "Name=Jarvis HQ" in text and "Exec=/usr/local/bin/bau station open" in text
+    assert 'Exec=sh -c "/usr/local/bin/bau station open || ' in text and "read -r _" in text
+    assert "Name=Jarvis HQ" in text and "station open" in text
 
 
 def test_the_launcher_uses_the_installed_bau_not_a_stale_copy_on_path(tmp_path, monkeypatch):
