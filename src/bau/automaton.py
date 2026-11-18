@@ -21,8 +21,10 @@ Its means (the owner's ask, 2026-11-10, after reading Conway-Research/automaton,
                  may help), low_compute (no money left: this computer's models only),
                  critical (7 days or fewer left to earn: said on the status page), dead.
   grow           once it has earned `grow_at_usd`, a card asks the owner to raise its posts a
-                 day (what works, more of it). It never copies itself, never holds a wallet
-                 and never edits its own code: the owner's rules (approvals are human).
+                 day (what works, more of it). It never copies itself and never holds a
+                 wallet. Its code changes go through the self lab (docs/SELF-MODIFICATION.md):
+                 Jarvis writes and tests a fix in a private copy, the owner applies and
+                 installs it, and the protected safety files are never his to change.
 
 What stays the same while it runs, because it is law or the platforms' terms, not a
 preference: every content check (21+, the AI label, nothing about minors, the owner's

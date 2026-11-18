@@ -46,6 +46,12 @@ def test_local_voice_speaks_and_listens_on_this_computer_only(tmp_path, monkeypa
     assert all("Xi-api-key" not in r.headers for r in sent)        # no key leaves the machine
 
 
+def test_the_default_local_voice_is_an_original_low_female_voice(tmp_path, monkeypatch):
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    save_config(tmp_path, speak="local", listen="local")
+    assert Voice(tmp_path).local_voice == "af_nicole"
+
+
 def test_local_voice_stopped_falls_back_to_the_browser(tmp_path, monkeypatch):
     monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
     save_config(tmp_path, speak="local", listen="local")

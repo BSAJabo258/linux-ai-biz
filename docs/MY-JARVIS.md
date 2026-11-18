@@ -120,6 +120,27 @@ What Jarvis does differently when its model runs on the laptop (a "local" model)
 A hosted model (Claude) keeps every tool in full. To force either way for a model, add
 `lean: true` or `lean: false` to its record in the registry.
 
+## Use any approved model, at will
+
+The owner can change the model for the conversation, without editing code or restarting:
+
+```text
+model                         # list the current model and every usable one
+model qwen3.5-4b              # switch from your next message
+use model claude-haiku-5-5    # same
+```
+
+The Models panel has a **Use** button on every approved model. A model can also ask
+another one a question in a single call (`models ask`, through its tool menu) without
+switching the conversation. The switch lasts for this conversation only: it does not
+rewrite `config/jarvis.yaml` and does not replace the global `bau models use` choice.
+
+Only models that are `APPROVED` (or `ACTIVE`) and have answered a real benchmark are
+usable. Content-lane models are never used for Jarvis or its tools, local-only mode still
+refuses hosted models, and approval itself remains the owner's typed `bau set-status`
+command. The saved order is unchanged: hosted models first, then the local model as their
+backup.
+
 ## Build order from here (spec §87)
 
 Each phase is one pull request with tests, and is boot-tested where it touches the image.

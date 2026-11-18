@@ -410,12 +410,22 @@ def cmd_media(a):
 
 
 def cmd_spatial(a):
-    from .spatial import GodsEye, create_scene, export_scene
+    from .spatial import WIDE_REGIONS, GodsEye, create_scene, export_scene
     ge = GodsEye()
     if a.sp_cmd == "earthquakes":
         data = ge.earthquakes(a.purpose, a.window)
     elif a.sp_cmd == "satellites":
         data = ge.satellites(a.purpose, a.group)
+    elif a.sp_cmd == "fires":
+        data = ge.fires(a.purpose, None if a.region == "world" else WIDE_REGIONS[a.region])
+    elif a.sp_cmd == "weather":
+        data = ge.weather(a.purpose, WIDE_REGIONS[a.region])
+    elif a.sp_cmd == "space-weather":
+        data = ge.space_weather(a.purpose)
+    elif a.sp_cmd == "traffic":
+        data = ge.traffic(a.purpose, WIDE_REGIONS[a.region])
+    elif a.sp_cmd == "ships":
+        data = ge.ships(a.purpose, WIDE_REGIONS[a.region], seconds=a.seconds)
     else:
         data = ge.aircraft(a.purpose, tuple(a.bbox))
     if a.out:
@@ -528,6 +538,30 @@ def cmd_creator(a):
         _out({"profile": str(a.profile), "prices_usd": prices,
               "you_keep_about": {k: round(v * 0.8, 2) for k, v in prices.items()},
               "note": "Fanvue keeps 20% (help.fanvue.com, read 2026-11-01); before tax"})
+        return EXIT_OK
+    if a.creator_cmd == "face":           # her locked face (docs/PICTURES.md)
+        from . import face
+        from .creator_feed import _profile
+        from .home import bau_home
+        home = bau_home()
+        found = (Path(a.profile), yaml.safe_load(Path(a.profile).read_text()) or {}) \
+            if a.profile else _profile(home)
+        if found is None:
+            raise ValueError("no creator profile (bau creator init)")
+        prof = found[1]
+        if a.face_cmd == "show":
+            _out(face.status(home, prof))
+            return EXIT_OK
+        if a.face_cmd == "pick":
+            _out(face.pick(home, prof, a.number, _human(), AuditLog()))
+            return EXIT_OK
+        from .world import PICTURES_NOT_RUNNING, pictures_running
+        if not pictures_running():
+            print(f"bau creator face draw: {PICTURES_NOT_RUNNING}", file=sys.stderr)
+            return EXIT_BLOCKED
+        done = face.draw_candidates(home, prof, a.count)
+        _out({"candidates": done, "folder": str(face.faces_dir(home) / "candidates"),
+              "next": "look at them, then lock one: bau creator face pick N"})
         return EXIT_OK
     creator = VirtualCreator(Path(a.profile))
     if a.creator_cmd == "draw":          # pictures on this computer (docs/PICTURES.md)
@@ -2201,6 +2235,28 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--bbox", type=float, nargs=4, required=True,
                    metavar=("LAMIN", "LOMIN", "LAMAX", "LOMAX"))
     x.add_argument("--out")
+    from .spatial import WIDE_REGIONS
+    regions = list(WIDE_REGIONS)
+    x = sp.add_parser("fires", help="NASA FIRMS active fire detections (no key for world)")
+    x.add_argument("--purpose", required=True)
+    x.add_argument("--region", choices=["world", *regions], default="world")
+    x.add_argument("--out")
+    x = sp.add_parser("weather", help="current conditions over a wide region")
+    x.add_argument("--purpose", required=True)
+    x.add_argument("--region", choices=regions, default="europe")
+    x.add_argument("--out")
+    x = sp.add_parser("space-weather", help="NOAA planetary K-index")
+    x.add_argument("--purpose", required=True)
+    x.add_argument("--out")
+    x = sp.add_parser("traffic", help="TomTom traffic incidents (needs TOMTOM_API_KEY)")
+    x.add_argument("--purpose", required=True)
+    x.add_argument("--region", choices=regions, default="europe")
+    x.add_argument("--out")
+    x = sp.add_parser("ships", help="AISStream live vessels (needs AISSTREAM_API_KEY)")
+    x.add_argument("--purpose", required=True)
+    x.add_argument("--region", choices=regions, default="europe")
+    x.add_argument("--seconds", type=float, default=8.0)
+    x.add_argument("--out")
     s.set_defaults(fn=cmd_spatial)
 
     s = sub.add_parser("ws", help="ICM workspaces: folder pipelines one agent walks, "
@@ -2302,6 +2358,16 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--level", type=int, choices=[0, 1, 2, 3],
                    help="paid level: 0 teaser, 1 subscriber, 2 nude, 3 xxx (sets the tier)")
     x.add_argument("--out", help="write Markdown to a file instead of stdout")
+    x = w.add_parser("face", help="her locked face: the same woman in every sfw picture")
+    f = x.add_subparsers(dest="face_cmd", required=True)
+    y = f.add_parser("draw", help="draw candidate faces on this computer")
+    y.add_argument("--count", type=int, default=4)
+    y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
+    y = f.add_parser("pick", help="you: lock candidate N as her face")
+    y.add_argument("number", type=int)
+    y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
+    y = f.add_parser("show", help="is her face locked, and what is next")
+    y.add_argument("--profile", help="profile path (default: the one in BAU_HOME/creators)")
     x = w.add_parser("prices", help="you: your Fanvue prices in US dollars")
     x.add_argument("profile")
     x.add_argument("--subscription", type=float, required=True, help="a month")
@@ -2333,7 +2399,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("portraits", help="paint each AI assistant's portrait with this computer's "
                      "ComfyUI (the desktop)")
     x.add_argument("--look", help="only this one (jarvis, researcher, producer, engineer, "
-                   "coordinator, analyst, architect)")
+                   "coordinator, analyst, architect; avatar = Jarvis's photo face on her "
+                   "screen, drawn only when asked)")
     x.add_argument("--again", action="store_true", help="paint it again even if it exists")
     s.set_defaults(fn=cmd_world)
 
@@ -2830,7 +2897,7 @@ def register(sub: argparse._SubParsersAction) -> None:
                    "the bau-voice service on 127.0.0.1:8767)")
     x.add_argument("--speak", choices=["elevenlabs", "local"],
                    help="who speaks Jarvis's replies (local: Kokoro on this computer)")
-    x.add_argument("--local-voice", help="Kokoro voice for --speak local (default bm_george)")
+    x.add_argument("--local-voice", help="Kokoro voice for --speak local (default af_nicole)")
     jv.add_parser("constitution", help="where your operating constitution lives and what "
                   "Jarvis loads from it")
     s.set_defaults(fn=cmd_jarvis)

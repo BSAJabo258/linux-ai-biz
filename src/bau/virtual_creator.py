@@ -213,6 +213,8 @@ class VirtualCreator:
                 ),
                 "caption_draft": (
                     f"Write a {p['voice']} caption for {p['name']} about {theme}. "
+                    f"Speak to {p.get('audience') or 'her adult audience'}; style: "
+                    f"{p.get('caption_style') or 'seductive, confident and never graphic'}. "
                     "Keep the fictional adult persona's voice consistent and include a clear "
                     "AI-generated persona disclosure. Do not claim a real human experience."
                 ),

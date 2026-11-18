@@ -1,9 +1,39 @@
 # Virtual creator channel
 
 BAU can draft repeatable social content for a fictional adult virtual creator. A profile
-stores the creator's stable visual traits, voice, niche, disclosure setting, boundaries, and
-owner-reviewed platform rules. Each batch carries the same identity lock into every image
-or video prompt, while varying the shot and creative angle.
+stores the creator's stable visual traits, voice, niche, audience, disclosure setting,
+boundaries, and owner-reviewed platform rules. Each batch carries the same identity lock into
+every image or video prompt, while varying the shot and creative angle.
+
+## The current character (2026-11-18)
+
+The installed profile is `/var/lib/bau/creators/adult-virtual-creator.yaml`: **Aria Vale**, a
+fictional adult woman of 25. She is an adult lifestyle and boudoir persona; the profile records
+`audience: women` and a caption style that is confident, playful, seductive and inviting to
+women without making the caption graphic.
+
+The paid ladder is:
+
+| Level | What the audience gets | Access |
+|---|---|---|
+| 0 teaser | safe-for-work, suggestive lifestyle image | free |
+| 1 subscriber | more revealing, no nudity | monthly subscription |
+| 2 nude | artistic nude image | each paid unlock |
+| 3 xxx | explicit image within `explicit_boundaries` | each paid unlock |
+
+The prices in the installed profile are the owner's own values. Change them only with
+`bau creator prices`; BAU never fills them in. The profile's `boundaries` keep public posts
+suggestive, while `explicit_boundaries` limits levels 2 and 3 to Fanvue.
+
+**What is not built yet:** a local XXX video generator. Fanvue's API accepts video media, but
+BAU's posting queue currently accepts only `.png`, `.jpg` and `.jpeg`; no video model is
+installed on this computer. The existing explicit images come from Chroma1-HD through
+ComfyUI. Live streaming is not built either: this is scheduled-post content, not a live show.
+
+**Consistency:** the identity lock repeats the same age, face and body traits in every prompt.
+That is text-level consistency. An exact same face across many images needs a character LoRA
+or reference-image conditioning, which is not installed yet; do not claim pixel-identical
+identity until that lane exists.
 
 ## Create a profile
 

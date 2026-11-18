@@ -286,6 +286,8 @@ How the *My Jarvis OS* spec maps onto this repository, and the build order:
 | [docs/REGULATORY_STATUS.md](docs/REGULATORY_STATUS.md) | What changed in the law through 2026-10-04, with sources |
 | [docs/SPEC_GAP_ANALYSIS.md](docs/SPEC_GAP_ANALYSIS.md) | Loose ends, contradictions and missing laws found in the master spec, and how each was resolved |
 | [docs/MY-JARVIS.md](docs/MY-JARVIS.md) | My Jarvis OS spec mapped onto this code, and the phase-by-phase build order |
+| [docs/SELF-MODIFICATION.md](docs/SELF-MODIFICATION.md) | Jarvis's self lab: he writes and tests a fix to his own code, you apply it; safety files are protected |
+| [docs/WORKSTATION.md](docs/WORKSTATION.md) | The AI workstation: workers' health, death and successors, and what the productivity manager may approve |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the spec maps onto the code; decision model; identities |
 | [docs/ARCHITECTURE_RFC.md](docs/ARCHITECTURE_RFC.md) | The executive controller prototype: one task, one adapter, one job |
 | [docs/VM-USB-PLAN.md](docs/VM-USB-PLAN.md) | Test gates and rehearsal plan for the full OS and USB install |

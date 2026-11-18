@@ -6,6 +6,12 @@ God's Eye shows public world data on a map in Jarvis:
 - **Aircraft** over a wide named region (Florida, US east or west, New York area,
   Caribbean, UK and Ireland, Europe, Japan), from the OpenSky Network.
 - **Satellites** from CelesTrak: space stations, visible satellites, weather and GPS.
+- **Wildfires** from NASA FIRMS: active fire detections worldwide or over a wide named region.
+- **Weather** from Open-Meteo: current conditions at the centre of a wide named region.
+- **Space weather** from NOAA SWPC: the latest planetary K-index readings.
+- **Traffic** from TomTom: incidents over a wide named region (needs a free TomTom key).
+- **Ships** from AISStream: live AIS positions over a wide named region (needs a free
+  AISStream key).
 
 ## Use it
 
@@ -37,7 +43,28 @@ its purpose.
 | USGS earthquakes | public domain |
 | OpenSky Network | free for non-commercial use; commercial use needs their licence |
 | CelesTrak | public orbital data |
+| NASA FIRMS | near-real-time fire detections; public data, attribution requested; not for safety-critical use |
+| Open-Meteo | free for non-commercial use; data CC BY 4.0 |
+| NOAA SWPC | US Government public domain |
+| TomTom Traffic | needs a free API key and TomTom's terms |
+| AISStream.io | needs a free API key and AISStream's terms |
 | World outline | Made with Natural Earth: public domain |
+
+## Keys for the live layers
+
+The earthquake, aircraft, satellite, wildfire (global), weather and space-weather layers work
+without a key. Traffic and ships need free accounts:
+
+```bash
+# Put these in the service environment, never in a chat or a git commit.
+TOMTOM_API_KEY=...
+AISSTREAM_API_KEY=...
+FIRMS_MAP_KEY=...          # optional: smaller area queries instead of the global 24-hour CSV
+```
+
+Ships need the optional `websocket-client` package. The global wildfire CSV is large; the
+screen keeps the 400 brightest detections for the map and the rest stay in the source result.
+
 
 ## The sky: timely post ideas (2026-11-10)
 

@@ -77,6 +77,19 @@ def test_a_caption_about_minors_is_refused_and_nothing_is_queued(home, monkeypat
     assert F.Queue(home).pending() == [] and F.Queue(home).review() == []
 
 
+def test_the_caption_brief_carries_the_women_audience_and_paid_level(home, monkeypatch):
+    from bau import team
+    monkeypatch.setattr(team, "show", lambda h: {"boss": "qwen3.5-9b"})
+    model = ScriptedProvider(["A little more of me, just for you."])
+    prof = {"name": "Aria", "niche": "boudoir", "voice": "warm and playful",
+            "audience": "women", "caption_style": "seductive and inviting to women"}
+    text = C.caption(home, prof, "slow morning in silk", factory=lambda m, h: (model, {}),
+                     level=2)
+    ask = model.calls[0]["messages"][0]["content"]
+    assert text.startswith("A little more") and "Audience: women" in ask
+    assert "paid nude unlock" in ask and "do not describe sex acts" in ask
+
+
 def test_without_a_local_model_the_caption_is_a_plain_line(home, monkeypatch):
     from bau import team
     monkeypatch.setattr(team, "show", lambda h: {"boss": None})
@@ -232,3 +245,26 @@ def test_on_the_laptop_station_the_feed_draws_nothing(home, tmp_path, monkeypatc
     mark.write_text("on=x\n")
     monkeypatch.setattr(station, "STATION_MARK", mark)
     assert C.fill(home) == 0 and A._load(home)["tasks"] == []
+
+
+def test_her_locked_face_is_used_on_sfw_posts_only(home, monkeypatch):
+    import yaml
+
+    from bau import face, team
+    from bau.media import comfy
+    monkeypatch.setattr(team, "show", lambda h: {"boss": None})
+    monkeypatch.setattr(comfy, "face_ready", lambda: True)
+    prof = yaml.safe_load((home / "creators" / "aria.yaml").read_text())
+    cand = home / "creators" / "faces" / "candidates"
+    cand.mkdir(parents=True)
+    (cand / f"{prof['id']}-1.png").write_bytes(b"face")
+    face.pick(home, prof, 1, "human:owner")
+    seen = []
+
+    def draw(home_, prompt, name, **kw):
+        seen.append(kw.get("face"))
+        return fake_draw([])(home_, prompt, name)
+    task = {"detail": {"job": "fanvue_post", "theme": "x", "level": 1, "shot": "medium",
+                       "parts": C.pick(1)}}
+    C.make_post(home, task, draw=draw)
+    assert seen[0] == face.locked(home, prof)

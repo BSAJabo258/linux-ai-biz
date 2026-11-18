@@ -81,6 +81,12 @@ def test_thinking_is_never_spoken_and_container_endpoint_override(monkeypatch):
     assert build(cloud).base_url == "http://k3:8080"          # only on-machine models move
 
 
+def test_local_model_defaults_to_the_machine_llama_cpp_endpoint(monkeypatch):
+    monkeypatch.delenv("BAU_LLM_ENDPOINT", raising=False)
+    rec = {"model_id": "local-jarvis", "adapter": "local_http", "deployment": "local"}
+    assert build(rec).base_url == "http://127.0.0.1:8080"
+
+
 def test_bind_address_is_local_unless_in_the_container(monkeypatch):
     from bau.ui.server import bind_address
     monkeypatch.delenv("BAU_IN_CONTAINER", raising=False)

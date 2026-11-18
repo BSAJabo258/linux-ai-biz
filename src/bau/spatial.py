@@ -1,21 +1,44 @@
 """God's Eye: BAU spatial intelligence over public data (spec §59).
 
 Only authorized, public sources: USGS earthquakes, OpenSky aircraft state
-vectors, CelesTrak satellite elements, and public webcams from an explicit
-allow-list. Queries that target a private person (names, phone numbers,
-emails, home addresses, tail numbers tied to individuals) are refused: no
-covert surveillance or stalking, ever.
+vectors, CelesTrak satellite elements, NASA FIRMS fire detections, Open-Meteo
+weather, NOAA space weather, TomTom traffic and AISStream ship positions (the
+last two need free API keys), and public webcams from an explicit allow-list.
+Queries that target a private person (names, phone numbers, emails, home
+addresses, tail numbers tied to individuals) are refused: no covert
+surveillance or stalking, ever.
 """
 
 from __future__ import annotations
 
+import csv
 import datetime as dt
+import io
 import json
+import os
 import re
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+# Wide named regions only: never a box drawn around one home, street or person.
+WIDE_REGIONS = {      # (lat min, lon min, lat max, lon max)
+    "usa-east": (24.0, -90.0, 47.0, -66.0), "usa-west": (31.0, -125.0, 49.0, -102.0),
+    "florida": (24.5, -87.6, 31.0, -80.0), "new-york-area": (39.5, -75.5, 42.0, -71.5),
+    "caribbean": (10.0, -90.0, 27.0, -59.0), "uk-ireland": (49.5, -11.0, 59.0, 2.0),
+    "europe": (35.0, -10.0, 60.0, 30.0), "japan": (30.0, 129.0, 46.0, 146.0),
+}
+
+FIRMS_GLOBAL = ("https://firms.modaps.eosdis.nasa.gov/data/active_fire/"
+                "noaa-20-viirs-c2/csv/J1_VIIRS_C2_Global_24h.csv")
+FIRMS_AREA = ("https://firms.modaps.eosdis.nasa.gov/api/area/csv/{key}/"
+              "VIIRS_SNPP_NRT/{bbox}/1")
+OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
+SWPC_KP = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"
+TOMTOM_INCIDENTS = "https://api.tomtom.com/traffic/services/5/incidentDetails"
+AISSTREAM = "wss://stream.aisstream.io/v0/stream"
 
 SOURCES = {
     "earthquakes": ("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/"
@@ -24,6 +47,13 @@ SOURCES = {
                  "OpenSky Network - non-commercial terms; commercial use needs a licence"),
     "satellites": ("https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=json",
                    "CelesTrak - public orbital elements"),
+    "fires": (FIRMS_GLOBAL, "NASA FIRMS near-real-time fire detections - public data, "
+              "attribution requested; not for safety-critical use"),
+    "weather": (OPEN_METEO, "Open-Meteo - free for non-commercial use, data CC BY 4.0"),
+    "space_weather": (SWPC_KP, "NOAA Space Weather Prediction Center - US Government "
+                      "public domain"),
+    "traffic": (TOMTOM_INCIDENTS, "TomTom Traffic - needs a free API key and TomTom terms"),
+    "ships": (AISSTREAM, "AISStream.io public AIS feed - needs a free API key and AIS terms"),
 }
 PERSON_TARGETING = re.compile(
     r"\b(home address|where does .* live|track (him|her|my (ex|wife|husband|partner))|"
@@ -36,10 +66,27 @@ class SpatialRefused(PermissionError):
     pass
 
 
+class SpatialUnavailable(RuntimeError):
+    """A public source exists but this computer has no key/library for it yet."""
+
+
 def _get_json(url: str, opener: Any = None, timeout: int = 30) -> Any:
     req = urllib.request.Request(url, headers={"User-Agent": "BAU-spatial/0.1"})
     with (opener or urllib.request.urlopen)(req, timeout=timeout) as r:
         return json.loads(r.read())
+
+
+def _get_text(url: str, opener: Any = None, timeout: int = 60) -> str:
+    req = urllib.request.Request(url, headers={"User-Agent": "BAU-spatial/0.1"})
+    with (opener or urllib.request.urlopen)(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", errors="replace")
+
+
+def _wide(bbox: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
+    lamin, lomin, lamax, lomax = bbox
+    if (lamax - lamin) * (lomax - lomin) < 0.01:
+        raise SpatialRefused("bounding box too small - looks like tracking one location")
+    return bbox
 
 
 def guard(purpose: str) -> None:
@@ -65,9 +112,7 @@ class GodsEye:
 
     def aircraft(self, purpose: str, bbox: tuple[float, float, float, float]) -> dict[str, Any]:
         guard(purpose)
-        lamin, lomin, lamax, lomax = bbox
-        if (lamax - lamin) * (lomax - lomin) < 0.01:
-            raise SpatialRefused("bounding box too small - looks like tracking one location")
+        lamin, lomin, lamax, lomax = _wide(bbox)
         url, lic = SOURCES["aircraft"]
         q = urllib.parse.urlencode({"lamin": lamin, "lomin": lomin, "lamax": lamax,
                                     "lomax": lomax})
@@ -95,6 +140,169 @@ class GodsEye:
                                                        "MEAN_MOTION")}} for d in data]
         return self._wrap("satellites", purpose, lic, feats)
 
+    def fires(self, purpose: str, bbox: tuple[float, float, float, float] | None = None
+              ) -> dict[str, Any]:
+        """Active fire detections from NASA FIRMS. The global 24-hour CSV needs no key;
+        an area query uses FIRMS_MAP_KEY when present (less data, kinder to the service)."""
+        guard(purpose)
+        if bbox is not None:
+            bbox = _wide(bbox)
+        key = os.environ.get("FIRMS_MAP_KEY", "").strip()
+        url, lic = SOURCES["fires"]
+        if bbox is not None and key:
+            w, s, e, n = bbox[1], bbox[0], bbox[3], bbox[2]
+            url = FIRMS_AREA.format(key=urllib.parse.quote(key, safe=""),
+                                    bbox=f"{w},{s},{e},{n}")
+        text = _get_text(url, self.opener)
+        feats = []
+        for row in csv.DictReader(io.StringIO(text)):
+            try:
+                lat, lon = float(row.get("latitude", "")), float(row.get("longitude", ""))
+            except (TypeError, ValueError):
+                continue
+            if bbox and not (bbox[0] <= lat <= bbox[2] and bbox[1] <= lon <= bbox[3]):
+                continue
+            conf = str(row.get("confidence", "")).strip().lower()
+            feats.append({"type": "Feature",
+                          "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                          "properties": {"brightness": row.get("bright_ti4"),
+                                         "frp": row.get("frp"),
+                                         "confidence": {"l": "low", "n": "nominal",
+                                                        "h": "high"}.get(conf, conf),
+                                         "acq_date": row.get("acq_date"),
+                                         "acq_time": row.get("acq_time"),
+                                         "daynight": row.get("daynight"),
+                                         "satellite": row.get("satellite")}})
+            if len(feats) >= 50_000:
+                break
+        return self._wrap("fires", purpose, lic, feats)
+
+    def weather(self, purpose: str, bbox: tuple[float, float, float, float]) -> dict[str, Any]:
+        """Current conditions at the centre of a wide named region (Open-Meteo, no key)."""
+        guard(purpose)
+        lamin, lomin, lamax, lomax = _wide(bbox)
+        lat, lon = (lamin + lamax) / 2, (lomin + lomax) / 2
+        q = urllib.parse.urlencode({
+            "latitude": f"{lat:.3f}", "longitude": f"{lon:.3f}", "timezone": "UTC",
+            "current": "temperature_2m,apparent_temperature,relative_humidity_2m,"
+                       "precipitation,weather_code,wind_speed_10m,wind_direction_10m"})
+        data = _get_json(f"{SOURCES['weather'][0]}?{q}", self.opener)
+        cur = data.get("current") or {}
+        props = {"region": None, "latitude": lat, "longitude": lon,
+                 "time": cur.get("time"), "temperature_c": cur.get("temperature_2m"),
+                 "feels_like_c": cur.get("apparent_temperature"),
+                 "humidity_pct": cur.get("relative_humidity_2m"),
+                 "precipitation_mm": cur.get("precipitation"),
+                 "weather_code": cur.get("weather_code"),
+                 "wind_ms": cur.get("wind_speed_10m"),
+                 "wind_direction_deg": cur.get("wind_direction_10m")}
+        feat = {"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                "properties": props}
+        return self._wrap("weather", purpose, SOURCES["weather"][1], [feat])
+
+    def space_weather(self, purpose: str) -> dict[str, Any]:
+        """Latest planetary K-index readings from NOAA SWPC (no key)."""
+        guard(purpose)
+        data = _get_json(SOURCES["space_weather"][0], self.opener)
+        rows = data if isinstance(data, list) else []
+        feats = []
+        for row in rows[-24:]:
+            if not isinstance(row, dict):
+                continue
+            try:
+                kp = float(row.get("Kp"))
+            except (TypeError, ValueError):
+                continue
+            feats.append({"type": "Feature", "geometry": None,
+                          "properties": {"time_tag": row.get("time_tag"), "kp": kp,
+                                         "storm": kp >= 5, "a_running": row.get("a_running"),
+                                         "station_count": row.get("station_count")}})
+        return self._wrap("space_weather", purpose, SOURCES["space_weather"][1], feats)
+
+    def traffic(self, purpose: str, bbox: tuple[float, float, float, float],
+                api_key: str | None = None) -> dict[str, Any]:
+        """Traffic incidents in a wide region (TomTom; TOMTOM_API_KEY or api_key)."""
+        guard(purpose)
+        lamin, lomin, lamax, lomax = _wide(bbox)
+        key = (api_key or os.environ.get("TOMTOM_API_KEY", "")).strip()
+        if not key:
+            raise SpatialUnavailable("traffic needs a free TomTom key: set TOMTOM_API_KEY")
+        q = urllib.parse.urlencode({
+            "key": key, "bbox": f"{lomin},{lamin},{lomax},{lamax}", "language": "en-GB",
+            "fields": "{incidents{type,geometry{type,coordinates},properties{id,"
+                      "iconCategory,magnitudeOfDelay,events{description,code},"
+                      "from,to,length,delay,roadNumbers}}"})
+        data = _get_json(f"{SOURCES['traffic'][0]}?{q}", self.opener)
+        feats = []
+        for inc in (data.get("incidents") or []) if isinstance(data, dict) else []:
+            props = inc.get("properties") or {}
+            pt = _point(inc.get("geometry") or {})
+            if pt is None:
+                continue
+            events = props.get("events") or []
+            label = next((e.get("description") for e in events if e.get("description")), "")
+            feats.append({"type": "Feature",
+                          "geometry": {"type": "Point", "coordinates": list(pt)},
+                          "properties": {"label": str(label)[:160],
+                                         "category": props.get("iconCategory"),
+                                         "delay_s": props.get("delay"),
+                                         "length_m": props.get("length"),
+                                         "roads": props.get("roadNumbers") or []}})
+        return self._wrap("traffic", purpose, SOURCES["traffic"][1], feats[:400])
+
+    def ships(self, purpose: str, bbox: tuple[float, float, float, float],
+              api_key: str | None = None, seconds: float = 8.0) -> dict[str, Any]:
+        """Live AIS positions in a wide region (AISStream; AISSTREAM_API_KEY or api_key).
+
+        Vessel names are deliberately not returned: an MMSI can point to a private owner,
+        so the map shows the public position and speed only.
+        """
+        guard(purpose)
+        lamin, lomin, lamax, lomax = _wide(bbox)
+        key = (api_key or os.environ.get("AISSTREAM_API_KEY", "")).strip()
+        if not key:
+            raise SpatialUnavailable("ships need a free AISStream key: set AISSTREAM_API_KEY")
+        try:
+            import websocket
+        except ImportError as e:
+            raise SpatialUnavailable("ships need the optional websocket-client package") from e
+        found: dict[str, dict[str, Any]] = {}
+        ws = websocket.create_connection(SOURCES["ships"][0], timeout=10)
+        try:
+            ws.send(json.dumps({"APIKey": key,
+                                "BoundingBoxes": [[[lamin, lomin], [lamax, lomax]]],
+                                "FilterMessageTypes": ["PositionReport"]}))
+            end = time.monotonic() + max(2.0, min(seconds, 20.0))
+            while time.monotonic() < end:
+                raw = ws.recv()
+                if not raw:
+                    break
+                msg = json.loads(raw)
+                meta = msg.get("MetaData") or {}
+                body = msg.get("Message", {}).get("PositionReport") or {}
+                try:
+                    lat, lon = float(meta["latitude"]), float(meta["longitude"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if not (lamin <= lat <= lamax and lomin <= lon <= lomax):
+                    continue
+                mmsi = str(meta.get("MMSI") or body.get("UserID") or "")
+                if not mmsi:
+                    continue
+                found[mmsi] = {"type": "Feature",
+                               "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                               "properties": {"mmsi": mmsi,
+                                              "speed_knots": body.get("Sog"),
+                                              "course_deg": body.get("Cog"),
+                                              "heading_deg": body.get("TrueHeading"),
+                                              "status": body.get("NavigationalStatus")}}
+        finally:
+            try:
+                ws.close()
+            except Exception:  # noqa: BLE001 - a closed socket is not an error here
+                pass
+        return self._wrap("ships", purpose, SOURCES["ships"][1], list(found.values()))
+
     def public_camera(self, purpose: str, name: str) -> dict[str, Any]:
         guard(purpose)
         if name not in self.cameras:
@@ -107,6 +315,25 @@ class GodsEye:
                 "bau": {"source": kind, "purpose": purpose, "licence": licence,
                         "retrieved_at": dt.datetime.now(dt.UTC).isoformat(),
                         "count": len(features)}}
+
+
+def _point(geometry: dict[str, Any]) -> tuple[float, float] | None:
+    """A point or the centre of a line/polygon, for plotting an incident on the world map."""
+    coords = geometry.get("coordinates")
+    flat: list[tuple[float, float]] = []
+
+    def walk(node: Any) -> None:
+        if (isinstance(node, (list, tuple)) and len(node) >= 2
+                and isinstance(node[0], (int, float)) and isinstance(node[1], (int, float))):
+            flat.append((float(node[0]), float(node[1])))
+        elif isinstance(node, (list, tuple)):
+            for child in node:
+                walk(child)
+
+    walk(coords)
+    if not flat:
+        return None
+    return (sum(p[0] for p in flat) / len(flat), sum(p[1] for p in flat) / len(flat))
 
 
 def create_scene(layers: list[dict[str, Any]], title: str) -> dict[str, Any]:

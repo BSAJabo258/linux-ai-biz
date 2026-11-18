@@ -75,6 +75,19 @@ CHROMA = "Chroma1-HD.safetensors"
 CHROMA_T5 = "t5xxl_fp8_e4m3fn_scaled.safetensors"
 CHROMA_VAE = "ae.safetensors"
 CHROMA_FILES = Path("/usr/local/comfyui/ComfyUI/models/diffusion_models") / CHROMA
+# The face lock (the owner's choice 2026-11-18; installed by bau-face-setup.sh): IP-Adapter
+# Plus Face for SDXL (h94/IP-Adapter, Apache-2.0, commit 018e4027) through the
+# ComfyUI_IPAdapter_plus nodes (GPL-3.0, commit a0f451a5, run by ComfyUI, not imported here).
+# Read in that commit 2026-11-18: IPAdapterUnifiedLoader(model, preset "PLUS FACE (portraits)")
+# -> MODEL, IPADAPTER, finding the files by name in models/ipadapter and models/clip_vision;
+# IPAdapterAdvanced(model, ipadapter, image, weight, weight_type, combine_embeds, start_at,
+# end_at, embeds_scaling) -> MODEL. The face picture goes to ComfyUI with POST /upload/image.
+# Only the safe-for-work lane: there is no IP-Adapter for Chroma (the explicit lane).
+COMFY_APP = Path("/usr/local/comfyui/ComfyUI")
+FACE_FILES = (COMFY_APP / "custom_nodes" / "ComfyUI_IPAdapter_plus" / "IPAdapterPlus.py",
+              COMFY_APP / "models" / "ipadapter" / "ip-adapter-plus-face_sdxl_vit-h.safetensors",
+              COMFY_APP / "models" / "clip_vision" / "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors")
+FACE_WEIGHT = 0.8
 LOCAL = re.compile(r"^http://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$")
 NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,80}$")
 AGE_MODEL = "dima806/fairface_age_image_detection"
@@ -118,9 +131,32 @@ def creator_prompt(profile: dict[str, Any], theme: str, shot: str) -> str:
     return ", ".join(p.strip() for p in parts if p and p.strip())
 
 
+def face_ready() -> bool:
+    """The face nodes and both face models are installed on this computer."""
+    return all(f.is_file() for f in FACE_FILES)
+
+
 def graph(prompt: str, seed: int, width: int = 1024, height: int = 1024, steps: int = 30,
-          negative: str = NEGATIVE, ckpt: str = MODEL) -> dict[str, Any]:
-    """The smallest text-to-picture job, in ComfyUI's API format (node id -> node)."""
+          negative: str = NEGATIVE, ckpt: str = MODEL, face: str | None = None,
+          face_weight: float = FACE_WEIGHT) -> dict[str, Any]:
+    """The smallest text-to-picture job, in ComfyUI's API format (node id -> node). With
+    ``face`` (a picture already uploaded to ComfyUI) the model is drawn from that face."""
+    g = _sdxl(prompt, seed, width, height, steps, negative, ckpt)
+    if face:
+        g["8"] = {"class_type": "LoadImage", "inputs": {"image": face}}
+        g["9"] = {"class_type": "IPAdapterUnifiedLoader",
+                  "inputs": {"model": ["1", 0], "preset": "PLUS FACE (portraits)"}}
+        g["10"] = {"class_type": "IPAdapterAdvanced",
+                   "inputs": {"model": ["9", 0], "ipadapter": ["9", 1], "image": ["8", 0],
+                              "weight": float(face_weight), "weight_type": "linear",
+                              "combine_embeds": "concat", "start_at": 0.0, "end_at": 1.0,
+                              "embeds_scaling": "V only"}}
+        g["5"]["inputs"]["model"] = ["10", 0]
+    return g
+
+
+def _sdxl(prompt: str, seed: int, width: int, height: int, steps: int, negative: str,
+          ckpt: str) -> dict[str, Any]:
     return {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
         "2": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["1", 1]}},
@@ -169,6 +205,24 @@ def chroma_ready() -> bool:
     return CHROMA_FILES.is_file()
 
 
+def upload_face(opener: Any, base: str, face: Path) -> str:
+    """Send the locked face picture to ComfyUI's input folder; returns the name it uses."""
+    data = face.read_bytes()
+    name = "bau-face-" + hashlib.sha256(data).hexdigest()[:16] + ".png"
+    boundary = "bau" + hashlib.sha256(data[:64] + name.encode()).hexdigest()[:24]
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\ntrue\r\n"
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"image\"; "
+            f"filename=\"{name}\"\r\nContent-Type: image/png\r\n\r\n").encode() + data + \
+        f"\r\n--{boundary}--\r\n".encode()
+    req = urllib.request.Request(base + "/upload/image", data=body, method="POST", headers={
+        "Content-Type": f"multipart/form-data; boundary={boundary}"})
+    with opener(req, timeout=60) as r:
+        got = json.loads(r.read() or b"{}")
+    if not got.get("name"):
+        raise ComfyError("ComfyUI did not take the face picture")
+    return got["name"] if not got.get("subfolder") else f"{got['subfolder']}/{got['name']}"
+
+
 def _call(opener: Any, url: str, body: dict[str, Any] | None = None, raw: bool = False,
           timeout: int = 60) -> Any:
     data = json.dumps(body).encode() if body is not None else None
@@ -182,8 +236,9 @@ def _call(opener: Any, url: str, body: dict[str, Any] | None = None, raw: bool =
 def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str = BASE,
          opener: Any = None, wait: float = 2.0, max_wait: float = 900.0,
          checker: Any = None, negative: str = NEGATIVE, lane: str = "sfw",
-         **size: int) -> dict[str, Any]:
-    """Draw one picture into BAU_HOME/artifacts/media/NAME.png and record where it came from."""
+         face: Path | None = None, **size: int) -> dict[str, Any]:
+    """Draw one picture into BAU_HOME/artifacts/media/NAME.png and record where it came from.
+    ``face``: the creator's locked face picture, used on the safe-for-work lane."""
     if not LOCAL.match(base):
         raise ComfyError("pictures are drawn only by a model server on this computer")
     if not NAME.match(name or ""):
@@ -194,8 +249,13 @@ def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str 
     seed = random.randrange(2**32) if seed is None else int(seed)
     if lane not in ("sfw", "explicit"):
         raise ComfyError("the lane is sfw or explicit")
+    face_sha = None
+    if face is not None and lane == "sfw":
+        face_sha = hashlib.sha256(Path(face).read_bytes()).hexdigest()
+        face_name = upload_face(opener, base, Path(face))
     g = (chroma_graph(prompt, seed, negative=negative, **size) if lane == "explicit"
-         else graph(prompt, seed, negative=negative, **size))
+         else graph(prompt, seed, negative=negative,
+                    face=face_name if face_sha else None, **size))
     job = _call(opener, base + "/prompt", {"prompt": g})
     if not job.get("prompt_id"):
         err = job.get("error")
@@ -239,6 +299,8 @@ def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str 
     model = CHROMA if lane == "explicit" else MODEL
     prov = {"ai_generated": True, "generator": "ComfyUI (local)", "model": model, "lane": lane,
             "seed": seed,
+            "face_lock": ({"adapter": "ip-adapter-plus-face_sdxl_vit-h", "face_sha256": face_sha,
+                           "weight": FACE_WEIGHT} if face_sha else None),
             "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
             "file_sha256": hashlib.sha256(png).hexdigest(),
             "age_check": {"passed": True, "under_20": young, "max": MAX_UNDER_20,

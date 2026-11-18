@@ -94,7 +94,7 @@ When findings are combined, the worst state wins. An empty evaluation is UNKNOWN
 | §52-53 network + endpoint trust | `network.py` |
 | §54 blast radius | `blast.py` (escalates approval requirements in the gateway) |
 | §56-58 media + music video | `media/gateway.py` (FFmpeg + HTTP adapters, provenance sidecars, C2PA when available), `media/music.py` (beat grid, sections, drops, edit decision list) |
-| §59 God's Eye | `spatial.py` (USGS, OpenSky, CelesTrak; person-targeting refused) |
+| §59 God's Eye | `spatial.py` (USGS, OpenSky, CelesTrak, NASA FIRMS, Open-Meteo, NOAA SWPC, TomTom, AISStream; wide regions only; person-targeting refused) |
 | §60-65 business factories | `factories.py`, `data/factories.yaml` (six factories, inactive by default), `bau factory-run` |
 | §61 Opportunity Miner | `opportunity.py` |
 | §66-67 IP + royalties | `commerce/ip.py` |

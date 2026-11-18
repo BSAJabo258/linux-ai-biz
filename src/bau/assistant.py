@@ -106,6 +106,9 @@ TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "
              "watch_video": "scout",
              "video_clips": "studio", "make_video": "studio",
              "usage_today": "usage",
+             "self_status": "producer", "self_read": "producer", "self_search": "producer",
+             "self_propose": "producer", "self_test": "producer", "self_diff": "producer",
+             "self_apply": "producer",
              "agents": "strategist", "ask_agent": "strategist", "ask_thinker": "strategist",
              "hold_everything": "watchdog", "release_hold": "watchdog"}
 TOOL_WORDS = {"draft_stage": "Drafting the next step", "find_tools": "Searching GitHub",
@@ -113,7 +116,10 @@ TOOL_WORDS = {"draft_stage": "Drafting the next step", "find_tools": "Searching 
               "plan_mission": "Planning a mission", "money": "Reading the ledgers",
               "deadlines": "Checking deadlines", "system_status": "Checking the system",
               "web_search": "Searching the web", "read_page": "Reading the page",
-              "watch_video": "Watching the video"}
+              "watch_video": "Watching the video",
+              "self_search": "Searching my own code", "self_propose": "Writing a code change",
+              "self_test": "Running my own tests", "self_diff": "Showing the code diff",
+              "self_apply": "Applying the code change"}
 CONVERSATION_WAITS = (3, 6, 12)    # seconds between retries of a busy hosted model
 CONVERSATION_TIMEOUT = 60          # seconds one hosted model call may take in conversation
 
@@ -133,6 +139,10 @@ def load_constitution(home: Path) -> str:
 # a one-line menu of the rest (tool_menu), run through use_tool - the same gateway.
 CORE_TOOLS = ("system_status", "recall", "remember", "toolbox", "usage_today",
               "hold_everything", "web_search", "creator_batch")
+# "model qwen3.5-9b" / "switch model to ..." from the owner: no model needs to understand it.
+MODEL_CMD = re.compile(r"^\W*(?:please\W+|jarvis\W+|hey jarvis\W+)*"
+                       r"(?:switch\s+model(?:\s+to)?|use\s+model|model\b)\W*(.*)$",
+                       re.I | re.S)
 LEAN_MAX_TOKENS = 400                         # spoken answers; a small model can loop
 # After Accept opens a terminal, that step's card stays down this long (the NVIDIA driver and
 # the pictures download take a while); a step still not done after it comes back.
@@ -356,6 +366,8 @@ class Assistant:
         self.audit = audit or AuditLog(self.home / "audit" / "chain.jsonl")
         self.history = JsonlStore(self.dir / "history.jsonl")
         self.clients = clients or {}         # platform -> API client (tests inject fakes)
+        from .selfmod import SelfLab
+        self.selflab = SelfLab(home=self.home, audit=self.audit)
         self.messages: list[dict[str, Any]] = []
         self.pending: dict[str, Pending] = {}
         self.tainted = False                  # this turn read outside content
@@ -363,6 +375,7 @@ class Assistant:
         self.setup_snoozed: dict[str, float] = {}     # step -> when the owner said Not now
         self.last_model = ""                  # the model that gave the last answer
         self._continuity: str | None = None   # earlier conversation, read once per session
+        self._pending_model: str | None = None  # a tool's switch, applied next turn
         self.tools = {t.name: t for t in self._tools()}
         self.gateway, self.caps = self._gateway(trust)
         from .activity import Activity
@@ -472,6 +485,11 @@ class Assistant:
                  "(automatic speech recognition, unverified). Use it when the owner asks "
                  "what those videos said or what to learn from them.",
                  _schema({"query": {"type": "string"}}), self.t_recall),
+            Tool("lessons", "What the autopilot learned from its own recent work: short "
+                 "reviews of what it finished, what failed or was blocked, and what to try "
+                 "next time. Read-only.",
+                 _schema({"limit": {"type": "integer", "description": "default 5"}}, []),
+                 self.t_lessons),
             Tool("plan_mission", "Plan a mission (nothing runs; compliance gates decide "
                  "whether it is READY). Types come from the mission catalogue.",
                  _schema({"mission_type": {"type": "string"}, "objective": {"type": "string"}}),
@@ -480,10 +498,11 @@ class Assistant:
                  "first, with licence, security and test status and what is still unknown. "
                  "Descriptions are the projects' own claims.", _schema(), self.t_scout_results),
             Tool("world_watch", "God's Eye: public world data - recent earthquakes "
-                 "(window all_hour, all_day, all_week, significant_week), aircraft over a "
-                 "named region (usa-east, usa-west, florida, new-york-area, caribbean, "
-                 "uk-ireland, europe, japan) or satellites (CelesTrak group). Say why; it "
-                 "is recorded. Never for following or locating a person.",
+                 "(window all_hour, all_day, all_week, significant_week), aircraft, "
+                 "wildfires, weather, traffic or ships over a wide named region (usa-east, "
+                 "usa-west, florida, new-york-area, caribbean, uk-ireland, europe, japan), "
+                 "satellites (CelesTrak group) or space weather. Say why; it is recorded. "
+                 "Never for following or locating a person.",
                  _schema({"layer": {"type": "string"}, "why": {"type": "string"},
                           "window": {"type": "string"}, "region": {"type": "string"},
                           "group": {"type": "string"}}, ["layer", "why"]), self.t_world_watch),
@@ -543,6 +562,48 @@ class Assistant:
             Tool("usage_today", "How much the AI models have been used: tokens and dollars "
                  "today and this week, for each model, busy replies, the owner's daily limits "
                  "and any rate-limit warnings (GitHub's too).", _schema(), self.t_usage),
+            Tool("models", "Every model the owner has approved. action=list shows them and "
+                 "which one you are using; action=use switches this conversation to another "
+                 "approved model from your next message; action=ask asks one approved model "
+                 "a question now without switching. Give the model id exactly.",
+                 _schema({"action": {"type": "string", "enum": ["list", "use", "ask"]},
+                          "model": {"type": "string"},
+                          "question": {"type": "string"}},
+                         ["action"]), self.t_models),
+            Tool("self_status", "My own code lab: the repository, branch, and any code changes "
+                 "I have proposed or tested. I cannot change my source without the owner.",
+                 _schema(), self.t_self_status),
+            Tool("self_read", "Read my own source, tests or docs from the repository. Give a "
+                 "path such as src/bau/assistant.py and optional line offset and limit.",
+                 _schema({"path": {"type": "string"},
+                          "offset": {"type": "integer"},
+                          "limit": {"type": "integer"}}, ["path"]), self.t_self_read),
+            Tool("self_search", "Search my own source, tests or docs with a regular expression. "
+                 "Use it to find the code behind a behaviour before proposing a change.",
+                 _schema({"query": {"type": "string"}, "path": {"type": "string"}},
+                         ["query"]), self.t_self_search),
+            Tool("self_propose", "Propose a change to my own code: give every changed file's "
+                 "full new text and why. This writes only in a private lab copy, never in the "
+                 "live repository. Run self_test next, then self_diff, then ask the owner to "
+                 "apply it. Never touch keys, secrets, .env, .git or system paths.",
+                 _schema({"files": {"type": "object"}, "reason": {"type": "string"},
+                          "proposal": {"type": "string"}}, ["files", "reason"]),
+                 self.t_self_propose, kind="act"),
+            Tool("self_test", "Run pytest for a proposed code change in the private lab copy. "
+                 "Optional tests are paths under tests/; default is the whole suite. A change "
+                 "cannot be applied unless its tests pass.",
+                 _schema({"proposal": {"type": "string"},
+                          "tests": {"type": "array", "items": {"type": "string"}}},
+                         ["proposal"]), self.t_self_test, kind="confirm",
+                 stage=self._stage_self_test),
+            Tool("self_diff", "Show the exact diff a proposed change would make, and whether "
+                 "its tests passed.", _schema({"proposal": {"type": "string"}}, ["proposal"]),
+                 self.t_self_diff),
+            Tool("self_apply", "Put one tested self-modification on the owner's screen to apply. "
+                 "Only the owner's Accept writes it into the working repository; it still needs "
+                 "an install and service restart to go live.",
+                 _schema({"proposal": {"type": "string"}}, ["proposal"]),
+                 self.t_self_apply, kind="confirm", stage=self._stage_self_apply),
             Tool("agents", "The owner's agents: each is a folder with instructions, skills, "
                  "allowed tools and a brain (small = free local model, strong = Claude). "
                  "Shows which are approved by the owner.", _schema(), self.t_agents),
@@ -923,6 +984,13 @@ class Assistant:
                  "status": r.status, "source": r.source}
                 for _, r in MemoryLane(self.home).search(query, k=5)]
 
+    def t_lessons(self, limit: int = 5) -> list[dict[str, Any]]:
+        from .memory import MemoryLane
+        n = max(1, min(int(limit or 5), 20))
+        return [{"title": r.title, "lesson": r.body[:2000], "saved": r.ts[:10],
+                 "source": r.source}
+                for r in MemoryLane(self.home).recent(100) if r.kind == "lesson"][:n]
+
     def t_plan_mission(self, mission_type: str, objective: str) -> dict[str, Any]:
         from .jarvis import Jarvis
         from .policy import PolicyEngine
@@ -955,6 +1023,145 @@ class Assistant:
                + ("" if s["limits"] else " No daily limits are set.")
                + (f" Warnings: {'; '.join(map(str, s['warnings']))}." if s["warnings"] else ""))
         return {"say": say, **s, "by_model": s["by_model"][:8]}
+
+    def _model_rows(self) -> list[dict[str, Any]]:
+        """Every registered model, with whether Jarvis may use it now and why not."""
+        import os
+
+        from .registry import CONTENT_LANE, ROUTABLE, CapabilityRegistry
+        reg = CapabilityRegistry(self.home / "registry" / "capabilities.yaml")
+        rows: list[dict[str, Any]] = []
+        for mid, rec in sorted(reg.data["model"].items()):
+            bench = rec.get("benchmark") or {}
+            key = rec.get("api_key_env")
+            why = ""
+            if rec.get("status") not in ROUTABLE:
+                why = f"status {rec.get('status')}: approve it first"
+            elif rec.get("lane") == CONTENT_LANE:
+                why = "content-lane model: text-only ideas, never Jarvis's tools"
+            elif rec.get("deployment") == "local" and not bench.get("reply_ok"):
+                why = "not tested on this computer: bau models bench " + mid
+            elif key and not os.environ.get(key):
+                why = f"no API key in {key}"
+            rows.append({"model": mid, "where": rec.get("deployment"),
+                         "status": rec.get("status"), "usable": not why, "why": why,
+                         "current": mid == self.model.get("id")})
+        return rows
+
+    def _model_row(self, model: str) -> dict[str, Any]:
+        rows = {r["model"]: r for r in self._model_rows()}
+        if model not in rows:
+            known = ", ".join(rows)
+            raise ValueError(f"unknown model {model!r}; known: {known}")
+        return rows[model]
+
+    def switch_model(self, model: str, by: str | None = None) -> dict[str, Any]:
+        """Use another approved model for this conversation. The owner may switch now; a
+        model's tool request waits until the owner's next message, because the old and new
+        model use different message formats mid-turn."""
+        from .automaton import free_only
+        from .registry import CapabilityRegistry
+        from .runtime import provider_for
+        row = self._model_row(model)
+        if not row["usable"]:
+            raise ValueError(f"{model} cannot be used: {row['why']}")
+        if row["current"]:
+            return {"model": model, "changed": False}
+        rec = CapabilityRegistry(self.home / "registry" / "capabilities.yaml").data[
+            "model"][model]
+        if free_only(self.home) and rec.get("deployment") != "local":
+            raise PermissionError(f"{model} runs off this computer and free-only is on")
+        provider, rec = provider_for(model, self.home)
+        self.provider = provider
+        self.model = {**rec, "id": model}
+        self.messages = []                    # tool formats differ between providers
+        self._continuity = None
+        self.last_model = ""
+        who = by or self.owner
+        self.audit.append("model.switched", who, {"to": model})
+        return {"model": model, "changed": True, "where": rec.get("deployment"),
+                "fallbacks": list(self.model.get("fallbacks") or [])}
+
+    def _ask_model(self, model: str, question: str) -> dict[str, Any]:
+        from .automaton import free_only
+        from .runtime import provider_for
+        from .usage import Metered, Usage
+        row = self._model_row(model)
+        if not row["usable"]:
+            raise ValueError(f"{model} cannot be used: {row['why']}")
+        if free_only(self.home) and row["where"] != "local":
+            raise PermissionError(f"{model} runs off this computer and free-only is on")
+        provider, rec = provider_for(model, self.home)
+        metered = Metered(provider, Usage(self.home, self.audit),
+                          lambda name: rec if name == model else self._price(name),
+                          model, f"jarvis:model:{model}")
+        resp = metered.complete(
+            "Answer the owner's question directly and briefly. You have no tools in this "
+            "call; say plainly if you cannot answer.",
+            [{"role": "user", "content": question[:4000]}], None, 1200)
+        answer = (resp.text or "").strip()
+        self.audit.append("model.asked", self.owner,
+                          {"model": model, "question": question[:200]})
+        return {"model": model, "answer": answer or "(no answer)"}
+
+    def t_models(self, action: str = "list", model: str = "",
+                 question: str = "") -> dict[str, Any]:
+        rows = self._model_rows()
+        current = self.model.get("id") or ""
+        if action == "list":
+            usable = [r["model"] for r in rows if r["usable"]]
+            return {"current": current, "usable": usable, "models": rows,
+                    "say": (f"I'm thinking with {current or 'no model'}. "
+                            f"I can use: {', '.join(usable) or 'none'}.")}
+        if action == "use":
+            if not model:
+                raise ValueError("say which model to use")
+            row = self._model_row(model)
+            if not row["usable"]:
+                raise ValueError(f"{model} cannot be used: {row['why']}")
+            if row["current"]:
+                return {"current": model, "changed": False,
+                        "note": "already thinking with this model"}
+            self._pending_model = model
+            return {"current": current, "next": model,
+                    "note": "I'll think with it from your next message."}
+        if action == "ask":
+            if not model or not question.strip():
+                raise ValueError("ask needs a model and a question")
+            return self._ask_model(model, question)
+        raise ValueError("action must be list, use or ask")
+
+    def t_self_status(self) -> dict[str, Any]:
+        return self.selflab.status()
+
+    def t_self_read(self, path: str, offset: int = 1, limit: int = 400) -> dict[str, Any]:
+        return self.selflab.read(path, offset, limit)
+
+    def t_self_search(self, query: str, path: str = "src/bau") -> dict[str, Any]:
+        return self.selflab.search(query, path)
+
+    def t_self_propose(self, files: dict[str, str], reason: str,
+                       proposal: str = "") -> dict[str, Any]:
+        return self.selflab.propose(files, reason, proposal)
+
+    def t_self_test(self, proposal: str, tests: list[str] | None = None) -> dict[str, Any]:
+        self.selflab.check_shown(proposal, "test")       # exactly what the owner's card showed
+        return self.selflab.test(proposal, tests)
+
+    def _stage_self_test(self, proposal: str, tests: list[str] | None = None) -> dict[str, Any]:
+        d = self.selflab.shown(proposal, "test")
+        return {"summary": f"Run the tests for {proposal}? This runs Jarvis's proposed code "
+                           "in the bubblewrap sandbox (no network, no home folder, no BAU "
+                           f"data, only the copy). {len(d['files'])} file(s):\n\n{d['diff']}"}
+
+    def t_self_diff(self, proposal: str) -> dict[str, Any]:
+        return self.selflab.diff(proposal)
+
+    def t_self_apply(self, proposal: str) -> dict[str, Any]:
+        return self.selflab.apply(proposal, self.owner)
+
+    def _stage_self_apply(self, proposal: str) -> dict[str, Any]:
+        return self.selflab.card(proposal)
 
     def t_agents(self) -> list[dict[str, Any]]:
         from . import agentfolders as AF
@@ -1570,12 +1777,40 @@ class Assistant:
             return False
         return True
 
+    def _model_cmd(self, target: str) -> Reply:
+        target = target.strip().strip("\"'").strip()
+        for lead in ("to ", "model "):
+            if target.lower().startswith(lead):
+                target = target[len(lead):].strip()
+        if target.lower() in ("", "list", "all", "models", "which", "current"):
+            out = self.t_models("list")
+            return Reply(out["say"], mode="plain" if self.provider is None else "model")
+        try:
+            out = self.switch_model(target, self.owner)
+        except (ValueError, PermissionError, KeyError) as e:
+            extra = self.t_models("list")["usable"]
+            return Reply(f"{e}. I can use: {', '.join(extra) or 'none'}.",
+                         mode="model" if self.provider else "plain")
+        if not out.get("changed"):
+            return Reply(f"I'm already thinking with {target}.", mode="model")
+        self._log("jarvis", f"Switched to {target}.")
+        return Reply(f"Switched to {target}. Ask me again and I'll use it.",
+                     mode="model")
+
     def ask(self, text: str) -> Reply:
         text = (text or "").strip()[:4000]
         if not text:
             return Reply("I didn't catch that.", mode="plain" if self.provider is None else "model")
         self.tainted = False                  # the owner's new message: a fresh turn
+        if self._pending_model:
+            pending, self._pending_model = self._pending_model, None
+            try:
+                self.switch_model(pending, "jarvis:model-tool")
+            except (ValueError, PermissionError, KeyError):
+                pass                       # the old model can still answer and explain
         self._log("owner", text)
+        if m := MODEL_CMD.match(text):
+            return self._model_cmd(m.group(1))
         if m := AUTOPILOT_CMD.match(text):
             return self._autopilot_cmd(m)
         if DO_ALL_CMD.match(text):
@@ -1934,7 +2169,7 @@ class Voice:
         self.listen_mode = cfg.get("listen", "elevenlabs")
         self.listen_enabled = self.listen_mode in ("elevenlabs", "local")
         self.local_speak = cfg.get("speak") == "local"
-        self.local_voice = cfg.get("local_voice") or "bm_george"
+        self.local_voice = cfg.get("local_voice") or "af_nicole"
         self.key = _env("ELEVENLABS_API_KEY")
         self.cache = self.home / "jarvis" / "tts"
         self.open = opener or urllib.request.urlopen
@@ -2048,12 +2283,20 @@ def pick_model(home: Path | None = None) -> tuple[Provider | None, dict[str, Any
 
     from . import network
     from .models.providers import FallbackProvider
+    from .registry import CONTENT_LANE, ROUTABLE, CapabilityRegistry
     from .runtime import provider_for
     home = home or bau_home()
     cfg = YamlStore(home / "config" / "jarvis.yaml").load() or {}
-    order = [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "glm-4.7-flash-zai",
+    known = [cfg.get("model"), "claude-opus-5-5", "glm-4.7-flash", "glm-4.7-flash-zai",
              "nemotron-3-super-nim", "qwen3.5-9b", "qwen3.5-4b", "lfm2.5-2.6b",
              "qwen2.5-1.5b-instruct", "local-llm"]
+    # Then every other approved model, so a newly approved one is usable at will instead of
+    # needing a code change to this order.
+    reg = CapabilityRegistry(home / "registry" / "capabilities.yaml")
+    known += sorted(mid for mid, rec in reg.data["model"].items()
+                    if rec.get("status") in ROUTABLE
+                    and rec.get("lane") != CONTENT_LANE and mid not in known)
+    order = list(dict.fromkeys(mid for mid in known if mid))
     try:
         online = bool(network.detect().online)
     except Exception:
