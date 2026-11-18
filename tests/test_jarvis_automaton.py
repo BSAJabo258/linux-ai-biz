@@ -49,6 +49,34 @@ def test_dead_it_says_why_and_that_only_the_owner_revives_it(tmp_path):
     out = lean(tmp_path, ["ok"]).t_automaton()
     assert "dead" in out["say"] and "no income in 30 days" in out["say"]
     assert "only you" in out["say"].lower()
+    # Its death set a HOLD and start needs the owner's audience and number: both said.
+    assert "bau governor release, then bau automaton start --audience" in out["say"]
+
+
+def test_stopped_it_gives_the_terminal_command_not_the_finished_card(tmp_path):
+    M.start(tmp_path, "human:owner", "subscribers", 2)
+    M.stop(tmp_path, "human:owner")
+    s = lean(tmp_path, ["ok"]).t_automaton()["say"]
+    assert "not running" in s and "bau automaton start --audience" in s and "card" not in s
+
+
+def test_on_but_held_it_says_nothing_posts(tmp_path):
+    from bau.governor import Governor
+    M.start(tmp_path, "human:owner", "subscribers", 2)
+    Governor(tmp_path).hold("checking a complaint", by="human:owner")
+    s = lean(tmp_path, ["ok"]).t_automaton()["say"]
+    assert "blocked by a HOLD" in s and "checking a complaint" in s and "running" not in s
+
+
+def test_an_unreadable_portfolio_keeps_the_status_and_never_says_zero(tmp_path, monkeypatch):
+    M.start(tmp_path, "human:owner", "subscribers", 2)
+
+    def broken(home, now=None):
+        raise OSError("missions.jsonl unreadable")
+    monkeypatch.setattr(J, "portfolio", broken)
+    out = lean(tmp_path, ["ok"]).t_automaton()
+    assert "running" in out["say"] and "could not be read" in out["say"]
+    assert out["portfolio"] == {"unavailable": True} and "0 active" not in out["say"]
 
 
 def test_jarvis_cannot_start_or_stop_it(tmp_path):
@@ -59,7 +87,12 @@ def test_jarvis_cannot_start_or_stop_it(tmp_path):
 
 
 def test_asked_about_the_automaton_the_small_model_sees_it(tmp_path):
-    for q in ("how is the automaton doing?", "show me the portfolio",
-              "what survival tier are we in?"):
+    for q in ("how is the automaton doing?", "what survival tier are we in?"):
         r = lean(tmp_path, ["It is not running."]).ask(q)
         assert any(c["tool"] == "automaton" for c in r.cards), q
+    # A portfolio question gets the whole portfolio (goal-met missions too), not the
+    # automaton's top three; "tier" alone (a free tier) is not the automaton.
+    r = lean(tmp_path, ["None yet."]).ask("which portfolio missions met their goal?")
+    assert [c["tool"] for c in r.cards][:1] == ["portfolio"]
+    r = lean(tmp_path, ["Yes."]).ask("do we have tools to stay on the free tier?")
+    assert not any(c["tool"] == "automaton" for c in r.cards)

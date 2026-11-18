@@ -207,7 +207,9 @@ GROUND = (
      "watch_video", lambda q: _video_args(q)),
     # The automaton reached Jarvis only through the briefing (2026-11-11): asked in
     # conversation, the small model had no tool for it. Its state and the portfolio first.
-    (re.compile(r"\b(automaton|portfolio|survival|tier)\b", re.I), "automaton", lambda q: {}),
+    # "tier" alone is not the automaton (a free tier, a price tier): only with "survival".
+    (re.compile(r"\b(automaton|survival)\b", re.I), "automaton", lambda q: {}),
+    (re.compile(r"\bportfolio\b", re.I), "portfolio", lambda q: {}),
     (re.compile(r"\b(cost|costs|spend|spent|usage|tokens|how much .{0,30}model)", re.I),
      "usage_today", lambda q: {}),
     (re.compile(r"\b(broken|status|waiting for me|attention|anything wrong|health|watchdog|"
@@ -745,14 +747,27 @@ class Assistant:
 
     def t_automaton(self) -> dict[str, Any]:
         from . import automaton
+        from .governor import hold_reason
         from .jarvis import portfolio
-        s, p = automaton.status(self.home), portfolio(self.home)
+        s = automaton.status(self.home)
+        try:
+            p: dict[str, Any] | None = portfolio(self.home)
+        except (OSError, ValueError, KeyError):       # the status is still worth telling
+            p = None
+        start = "bau automaton start --audience ... --per-day N"
+        held = hold_reason(self.home)
         if s.get("dead"):
+            # Its death set a HOLD: start alone would not post anything.
             say = (f"The automaton is dead: {s['dead']['why']}. Only you revive it, at a "
-                   "terminal: bau automaton start.")
+                   f"terminal: bau governor release, then {start}.")
         elif not s.get("on"):
-            say = ("The automaton is not running. Only you start it: the Automaton card, or "
-                   "bau automaton start --audience ... --per-day N at a terminal.")
+            # After `bau automaton stop` the Automaton card is done, so it is no way back.
+            say = ("The automaton is not running. Only you start it: " +
+                   (f"{start} at a terminal." if s.get("started_at") else
+                    f"the Automaton card, or {start} at a terminal."))
+        elif held:
+            say = (f"The automaton is on, but blocked by a HOLD ({held}): nothing posts "
+                   "until you check why and run bau governor release.")
         else:
             # Two numbers a small model mixed up on the real desktop (2026-11-11): money it may
             # still SPEND and DAYS it has left to earn. Each gets its own sentence.
@@ -760,17 +775,23 @@ class Assistant:
                    f"Money kept so far: ${s['income_usd']:.2f}; spent: ${s['spent_usd']:.2f}. "
                    f"Spending money left: ${s['money_left_usd']:.2f}. "
                    f"It stops if it earns nothing in the next {s['days_left_to_earn']:g} days.")
-        n = p["active"]
-        t = p["totals"]
-        say += (f" Missions: {n} active mission{'' if n == 1 else 's'}; all money kept "
-                f"${t['kept_usd']:.2f}, costs ${t['cost_usd']:.2f}, profit ${t['profit_usd']:.2f}.")
-        top = [{"mission_id": m["mission_id"], "objective": m["objective"][:80],
-                "status": m["status"], "priority": m["priority"],
-                "profit_usd": m["money"]["profit_usd"], "budget_left_usd": m["budget_left_usd"],
-                "goal_met": (m["goal"] or {}).get("met")}
-               for m in p["missions"] if m["active"]][:3]
-        return {"say": say, "automaton": s,
-                "portfolio": {"active": n, "totals": t, "top": top},
+        if p is None:                                 # never shown as zero missions or $0
+            say += " Missions: the portfolio could not be read right now."
+            port: dict[str, Any] = {"unavailable": True}
+        else:
+            n = p["active"]
+            t = p["totals"]
+            say += (f" Missions: {n} active mission{'' if n == 1 else 's'}; all money kept "
+                    f"${t['kept_usd']:.2f}, costs ${t['cost_usd']:.2f}, "
+                    f"profit ${t['profit_usd']:.2f}.")
+            top = [{"mission_id": m["mission_id"], "objective": m["objective"][:80],
+                    "status": m["status"], "priority": m["priority"],
+                    "profit_usd": m["money"]["profit_usd"],
+                    "budget_left_usd": m["budget_left_usd"],
+                    "goal_met": (m["goal"] or {}).get("met")}
+                   for m in p["missions"] if m["active"]][:3]
+            port = {"active": n, "totals": t, "top": top}
+        return {"say": say, "automaton": s, "portfolio": port,
                 "owner_only": "starting, stopping, reviving and growing it: the owner"}
 
     def t_portfolio(self) -> dict[str, Any]:
