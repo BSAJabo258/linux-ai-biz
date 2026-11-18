@@ -73,8 +73,13 @@ Fanvue gives out no API keys. Every app signs in through Fanvue's own Allow page
    Turn on these scopes: `read:self`, `read:media`, `write:media`, `write:creator`,
    `write:post`, `read:insights`.
 
-   Not known yet: Fanvue's pages do not say whether they accept a `127.0.0.1` address. If
-   the Authentication tab refuses it, tell me what it says.
+   Then press **Save** on that tab. Fanvue's developer docs allow `http://127.0.0.1`
+   redirect addresses; it must match exactly (read 2026-11-15): `http`, not `https`, port
+   `3456`, `/callback` with no `/` at the end. If you run `bau fanvue login --port 4000`,
+   register `http://127.0.0.1:4000/callback` instead. The login prints the address to
+   register before the browser opens. If Fanvue's page says `invalid_request` or
+   `redirect_uri`, the address is not registered exactly or was not saved: fix it, press
+   Save, and run the login again.
 2. Jarvis shows a **Make your Fanvue app** card: press Accept and a terminal asks for the
    app's Client ID and Client Secret (nothing shows as you paste). Or in a terminal:
    `sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET`. From another computer,

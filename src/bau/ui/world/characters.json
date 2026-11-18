@@ -1,0 +1,244 @@
+{
+ "anchor": [
+  48,
+  131
+ ],
+ "characters": {
+  "analyst": {
+   "animations": {
+    "blocked": {
+     "frames": 2,
+     "row": 40
+    },
+    "done": {
+     "frames": 2,
+     "row": 41
+    },
+    "idle": {
+     "frames": 2,
+     "row": 35
+    },
+    "wait": {
+     "frames": 2,
+     "row": 39
+    },
+    "walk_back": {
+     "frames": 4,
+     "row": 37
+    },
+    "walk_front": {
+     "frames": 4,
+     "row": 36
+    },
+    "work": {
+     "frames": 4,
+     "row": 38
+    }
+   },
+   "role": "big dark curls, gold glossy two-piece, a tablet"
+  },
+  "architect": {
+   "animations": {
+    "blocked": {
+     "frames": 2,
+     "row": 47
+    },
+    "done": {
+     "frames": 2,
+     "row": 48
+    },
+    "idle": {
+     "frames": 2,
+     "row": 42
+    },
+    "wait": {
+     "frames": 2,
+     "row": 46
+    },
+    "walk_back": {
+     "frames": 4,
+     "row": 44
+    },
+    "walk_front": {
+     "frames": 4,
+     "row": 43
+    },
+    "work": {
+     "frames": 4,
+     "row": 45
+    }
+   },
+   "role": "long platinum hair, white glossy two-piece, a tablet"
+  },
+  "coordinator": {
+   "animations": {
+    "blocked": {
+     "frames": 2,
+     "row": 33
+    },
+    "done": {
+     "frames": 2,
+     "row": 34
+    },
+    "idle": {
+     "frames": 2,
+     "row": 28
+    },
+    "wait": {
+     "frames": 2,
+     "row": 32
+    },
+    "walk_back": {
+     "frames": 4,
+     "row": 30
+    },
+    "walk_front": {
+     "frames": 4,
+     "row": 29
+    },
+    "work": {
+     "frames": 4,
+     "row": 31
+    }
+   },
+   "role": "long black hair, violet glossy two-piece and boots, a tablet"
+  },
+  "engineer": {
+   "animations": {
+    "blocked": {
+     "frames": 2,
+     "row": 26
+    },
+    "done": {
+     "frames": 2,
+     "row": 27
+    },
+    "idle": {
+     "frames": 2,
+     "row": 21
+    },
+    "wait": {
+     "frames": 2,
+     "row": 25
+    },
+    "walk_back": {
+     "frames": 4,
+     "row": 23
+    },
+    "walk_front": {
+     "frames": 4,
+     "row": 22
+    },
+    "work": {
+     "frames": 4,
+     "row": 24
+    }
+   },
+   "role": "long blonde hair, glasses, black and gold two-piece, a gold wrench"
+  },
+  "jarvis": {
+   "animations": {
+    "blocked": {
+     "frames": 2,
+     "row": 5
+    },
+    "done": {
+     "frames": 2,
+     "row": 6
+    },
+    "idle": {
+     "frames": 2,
+     "row": 0
+    },
+    "wait": {
+     "frames": 2,
+     "row": 4
+    },
+    "walk_back": {
+     "frames": 4,
+     "row": 2
+    },
+    "walk_front": {
+     "frames": 4,
+     "row": 1
+    },
+    "work": {
+     "frames": 4,
+     "row": 3
+    }
+   },
+   "role": "the lead: long black hair, black and cyan glossy two-piece, glowing choker, a tablet she plans on"
+  },
+  "producer": {
+   "animations": {
+    "blocked": {
+     "frames": 2,
+     "row": 19
+    },
+    "done": {
+     "frames": 2,
+     "row": 20
+    },
+    "idle": {
+     "frames": 2,
+     "row": 14
+    },
+    "wait": {
+     "frames": 2,
+     "row": 18
+    },
+    "walk_back": {
+     "frames": 4,
+     "row": 16
+    },
+    "walk_front": {
+     "frames": 4,
+     "row": 15
+    },
+    "work": {
+     "frames": 4,
+     "row": 17
+    }
+   },
+   "role": "long red hair, red glossy two-piece, films with a camera"
+  },
+  "researcher": {
+   "animations": {
+    "blocked": {
+     "frames": 2,
+     "row": 12
+    },
+    "done": {
+     "frames": 2,
+     "row": 13
+    },
+    "idle": {
+     "frames": 2,
+     "row": 7
+    },
+    "wait": {
+     "frames": 2,
+     "row": 11
+    },
+    "walk_back": {
+     "frames": 4,
+     "row": 9
+    },
+    "walk_front": {
+     "frames": 4,
+     "row": 8
+    },
+    "work": {
+     "frames": 4,
+     "row": 10
+    }
+   },
+   "role": "dark hair up in a bun, glasses, royal-blue two-piece, reads a book"
+  }
+ },
+ "frame": [
+  96,
+  132
+ ],
+ "scale": 1
+}

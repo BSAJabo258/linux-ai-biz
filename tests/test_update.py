@@ -303,3 +303,36 @@ def test_services_stop_before_pip_and_imports_are_checked_as_bau(box, monkeypatc
     imp = next(c for c in box.cmds if "-c" in c)
     assert imp[:4] == ["runuser", "-u", "bau", "--"]
     assert ["systemctl", "reset-failed", "bau-ui.service"] in box.cmds
+
+
+# The owner's desktop, 2026-11-15: bau-jarvis.service is not installed there before HQ, and
+# stopping it printed "Unit not loaded" in red. Only running units are stopped.
+def test_a_unit_that_is_not_running_is_not_stopped(box):
+    real = box.run
+
+    def run(cmd):
+        if cmd[:3] == ["systemctl", "is-active", "--quiet"] and cmd[3] == "bau-jarvis.service":
+            box.cmds.append(cmd)
+            return 3                          # systemctl: not active (or not loaded)
+        return real(cmd)
+    box.run = run
+    assert box.go()["result"] == "installed"
+    assert ["systemctl", "stop", "bau-jarvis.service"] not in box.cmds
+    assert ["systemctl", "stop", "bau-ui.service"] in box.cmds
+
+
+# The owner's desktop, 2026-11-18: after an update that installed 9ae6e0f, `bau update status`
+# as the owner said "the stick's own build": root wrote state.json under sudo's strict umask,
+# so the owner's login could not read it. It is written readable, like last.json.
+def test_the_installed_build_is_readable_by_the_owner(box, tmp_path):
+    import os
+    old = os.umask(0o077)                                     # sudo's strict umask
+    try:
+        assert box.go()["result"] == "installed"
+        assert (box.state / "state.json").stat().st_mode & 0o777 == 0o644
+        w = tmp_path / NAME
+        w.write_bytes(WHEEL)
+        U.keep(w, COMMIT, tmp_path / "u")
+        assert (tmp_path / "u" / "state.json").stat().st_mode & 0o777 == 0o644
+    finally:
+        os.umask(old)

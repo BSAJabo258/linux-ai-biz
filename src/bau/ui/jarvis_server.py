@@ -39,6 +39,10 @@ QUICK_REPLY = 15        # seconds a request waits for an answer before it become
 MAX_JOBS = 50
 
 
+# The only files under /world/: a fixed list, never a path from the request.
+WORLD_ART = {"/world/characters.png": "image/png", "/world/characters.json": "application/json"}
+
+
 def make_handler(assistant: Assistant, voice: Voice, key: str
                  ) -> type[BaseHTTPRequestHandler]:
     page = (resources.files("bau.ui") / "jarvis.html").read_bytes()
@@ -185,6 +189,22 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 else:
                     self._send(200, got[0].read_bytes(), got[1])
                 return
+            if path in WORLD_ART:                    # the world's sprite sheet (docs/WORLD.md)
+                if not self._guard(api=False):
+                    return
+                self._send(200, (resources.files("bau.ui") / "world" / path[7:]).read_bytes(),
+                           WORLD_ART[path])
+                return
+            if path.startswith("/world/portrait/") and path.endswith(".png"):
+                if not self._guard(api=False):       # a painted portrait (docs/WORLD.md)
+                    return
+                from ..world import portrait_file
+                got = portrait_file(assistant.home, path[16:-4])
+                if got is None:
+                    self._send(404, b"no portrait", "text/plain")
+                else:
+                    self._send(200, got.read_bytes(), "image/png")
+                return
             if not path.startswith("/api/"):
                 self._send(404, b"not found", "text/plain")
                 return
@@ -215,6 +235,9 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     shutil.copyfileobj(f, self.wfile, 1024 * 1024)
             elif path == "/api/state":
                 self._json(200, self._state())
+            elif path == "/api/world":               # the operations world (docs/WORLD.md)
+                from ..world import world
+                self._json(200, world(assistant.home))
             elif path == "/api/autopilot":           # the mind panel (docs/AUTOPILOT.md)
                 from .. import autopilot
                 self._json(200, autopilot.view(assistant.home))

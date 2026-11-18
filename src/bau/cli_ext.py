@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import errno
 import getpass
 import json
 import os
@@ -662,6 +663,230 @@ def cmd_mcp(a):
     return EXIT_OK
 
 
+def _sh(*args: str, check: bool = True, timeout: float | None = None
+        ) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(list(args), capture_output=True, text=True, check=check,
+                              timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(list(args), 124, "", f"no answer in {timeout:g} s")
+
+
+def cmd_money(a):
+    """Is the money machine running? Every link, read live (docs/MONEY.md). Only looks."""
+    from . import money
+    print(money.report(bau_home()))
+    s = money.summary(bau_home())
+    return EXIT_OK if s["ready"] == s["of"] else EXIT_BLOCKED
+
+
+def cmd_world(a):
+    """The operations world: paint each AI assistant's portrait on this computer (docs/WORLD.md)."""
+    from .world import PicturesNotRunning, draw_portraits
+    try:
+        done = draw_portraits(bau_home(), [a.look] if a.look else None, again=a.again)
+    except PicturesNotRunning as e:
+        print(f"bau world portraits: {e}", file=sys.stderr)
+        return EXIT_BLOCKED
+    _out(done)
+    return EXIT_OK if all(d["result"] in ("drawn", "already drawn") for d in done) else EXIT_ERROR
+
+
+def cmd_hq(a):
+    """The desktop as headquarters for the laptop station (docs/LAPTOP-STATION.md)."""
+    import pwd
+
+    from . import station as S
+    if a.hq_cmd == "status":
+        ak = Path(pwd.getpwnam(a.admin or _hq_admin(S.MARK)).pw_dir) / ".ssh" / "authorized_keys"
+        _out({"headquarters": S.MARK.read_text().strip() if S.MARK.exists() else "off",
+              "stations": S.stations(ak),
+              "jarvis_service": _sh("systemctl", "is-active", "bau-jarvis.service",
+                                    check=False).stdout.strip() or "unknown"})
+        return EXIT_OK
+    if os.geteuid() != 0:
+        print("bau hq: run it with sudo", file=sys.stderr)
+        return EXIT_BLOCKED
+    who = _human()
+    admin = os.environ.get("SUDO_USER", "")
+    if not admin or admin == "root":
+        print("bau hq: run it with sudo from your own login, not as root", file=sys.stderr)
+        return EXIT_BLOCKED
+    home = pwd.getpwnam(admin).pw_dir
+    ak = Path(home) / ".ssh" / "authorized_keys"
+    if a.hq_cmd == "allow":
+        line = S.allow(a.key, ak)
+        os.chown(ak, pwd.getpwnam(admin).pw_uid, pwd.getpwnam(admin).pw_gid)
+        os.chown(ak.parent, pwd.getpwnam(admin).pw_uid, pwd.getpwnam(admin).pw_gid)
+        AuditLog().append("hq.station_allowed", who, {"key": line.split()[-2][-16:]})
+        _out({"allowed": line.split()[-1], "can": "tunnel to Jarvis and print his address only"})
+        return EXIT_OK
+    if a.hq_cmd == "off":
+        for f in (S.SSHD_CONF, S.MARK):
+            f.unlink(missing_ok=True)
+        S.FIREWALL.write_text(S._data("nftables-default.conf"))
+        _sh("nft", "-f", str(S.FIREWALL))
+        _sh("systemctl", "reload", "ssh", check=False)
+        AuditLog().append("hq.off", who, {})
+        _out({"headquarters": "off", "firewall": "nothing comes in",
+              "jarvis_service": "still running on 127.0.0.1; `sudo systemctl disable --now "
+                                "bau-jarvis.service` stops it"})
+        return EXIT_OK
+    # on
+    if not Path("/usr/sbin/sshd").exists():
+        print("bau hq: no SSH server on this computer yet. Install it, then run this again:\n"
+              "  sudo apt install openssh-server", file=sys.stderr)
+        return EXIT_BLOCKED
+    before = S.SSHD_CONF.read_text() if S.SSHD_CONF.exists() else None
+    S.SSHD_CONF.write_text(S.sshd_conf(admin))
+    if _sh("sshd", "-t", check=False).returncode:
+        if before is None:
+            S.SSHD_CONF.unlink()
+        else:
+            S.SSHD_CONF.write_text(before)                 # put back what was there
+        print("bau hq: sshd refused the settings; nothing changed", file=sys.stderr)
+        return EXIT_ERROR
+    S.FIREWALL.write_text(S.firewall())
+    _sh("nft", "-c", "-f", str(S.FIREWALL))
+    _sh("nft", "-f", str(S.FIREWALL))
+    cfg = Path(home) / ".config" / "bau"
+    cfg.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chown(cfg, pwd.getpwnam(admin).pw_uid, pwd.getpwnam(admin).pw_gid)
+    S.UNIT.write_text(S.jarvis_unit(admin, home))
+    _sh("systemctl", "daemon-reload")
+    _sh("systemctl", "enable", "--now", "ssh")
+    _sh("systemctl", "reload", "ssh")
+    _sh("systemctl", "enable", "--now", "bau-jarvis.service")
+    jarvis_state = _jarvis_started()
+    S.MARK.parent.mkdir(parents=True, exist_ok=True)
+    S.MARK.write_text(f"admin={admin}\non={S.stamp()}\n")
+    AuditLog().append("hq.on", who, {"inbound": "ssh 22, home network, keys only",
+                                     "jarvis": "127.0.0.1:8766"})
+    ips = _sh("hostname", "-I", check=False).stdout.split()
+    _out({"headquarters": "on",
+          "jarvis": "running for good on 127.0.0.1:8766" if jarvis_state == "active"
+                    else f"NOT running ({jarvis_state}{_taken_by(8766)}): "
+                         f"{JARVIS_PORT_HINT}",
+          "ssh": "keys only, home network only",
+          "next": f"on the laptop: bau station pair {admin}@{ips[0] if ips else 'THIS-COMPUTER'}"})
+    return EXIT_OK if jarvis_state == "active" else EXIT_ERROR
+
+
+# The owner's desktop, 2026-11-16: the menu's Jarvis held 8766, so the service restarted 626
+# times with "Address already in use".
+JARVIS_PORT_HINT = ("close the Jarvis window (Ctrl+C), then "
+                    "`sudo systemctl restart bau-jarvis.service`")
+
+
+def _port_holder(port: int) -> str | None:
+    """Who listens on this port, from `ss`: "name (pid N)"; "another program" when ss is
+    missing, fails or does not show the process (other users' pids need root); None when ss
+    saw no listener. Never a guess."""
+    import re
+    try:
+        r = _sh("ss", "-ltnpH", f"sport = :{port}", check=False, timeout=3)
+    except OSError:
+        return "another program"
+    if r.returncode:
+        return "another program"
+    if not r.stdout.strip():
+        return None
+    m = re.search(r'users:\(\("([^"]+)",pid=(\d+)', r.stdout)
+    return f"{m.group(1)} (pid {m.group(2)})" if m else "another program"
+
+
+def _taken_by(port: int) -> str:
+    holder = _port_holder(port)
+    return f"; 127.0.0.1:{port} is taken by {holder}" if holder else ""
+
+
+def _jarvis_started(sleep=None) -> str:
+    """bau-jarvis.service's state a few seconds after start: a service that cannot open its
+    port reads "active" for a moment, then restarts."""
+    import time
+    (sleep or time.sleep)(4)
+    return _sh("systemctl", "is-active", "bau-jarvis.service",
+               check=False).stdout.strip() or "unknown"
+
+
+def _hq_admin(mark: Path) -> str:
+    """Whose login headquarters runs as: the marker's admin, else the sudo user, else me."""
+    if mark.exists():
+        for line in mark.read_text().splitlines():
+            if line.startswith("admin=") and line[6:]:
+                return line[6:]
+    return os.environ.get("SUDO_USER") or getpass.getuser()
+
+
+def cmd_station(a):
+    """The laptop as the operations station (docs/LAPTOP-STATION.md). Never needs sudo."""
+    from . import station as S
+    home = Path.home()
+    key = home / ".ssh" / "bau_station_ed25519"
+    cfg = home / ".config" / "bau" / "station.yaml"
+    unit = home / ".config" / "systemd" / "user" / "bau-hq-link.service"
+    desk = home / ".local" / "share" / "applications" / "bau-hq.desktop"
+    if a.station_cmd == "pair":
+        user, _, host = a.desktop.rpartition("@")
+        unit_text = S.link_unit(user, host, key)          # checks both names first
+        if not key.exists():
+            key.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            _sh("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "bau-station",
+                "-f", str(key))
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        cfg.write_text(yaml.safe_dump({"desktop": f"{user}@{host}", "paired": S.stamp()}))
+        unit.parent.mkdir(parents=True, exist_ok=True)
+        unit.write_text(unit_text)
+        desk.parent.mkdir(parents=True, exist_ok=True)
+        from .cli import INSTALLED_BAU  # never bake a stale copy on PATH into it
+        exe = INSTALLED_BAU if Path(INSTALLED_BAU).exists() else shutil_which("bau")
+        desk.write_text(S.launcher(exe or INSTALLED_BAU))
+        _sh("systemctl", "--user", "daemon-reload", check=False)
+        _sh("systemctl", "--user", "enable", "--now", "bau-hq-link.service", check=False)
+        _sh("systemctl", "--user", "restart", "bau-hq-link.service", check=False)  # a new desktop
+        pub = (key.with_suffix(".pub")).read_text().strip()
+        print("On the desktop, at a terminal, run this one line:\n")
+        print(f"  sudo bau hq allow '{pub}'\n")
+        print("Then open Jarvis HQ from the menu here, or: bau station open\n")
+        print("Jarvis's own work runs on the desktop; so it is not done twice, stop it here:\n"
+              "  sudo systemctl disable --now bau-autopilot.timer bau-scout-watch.timer")
+        return EXIT_OK
+    if not cfg.exists():
+        print("bau station: not paired yet: bau station pair NAME@DESKTOP", file=sys.stderr)
+        return EXIT_BLOCKED
+    desktop = yaml.safe_load(cfg.read_text())["desktop"]
+    if a.station_cmd == "unpair":
+        _sh("systemctl", "--user", "disable", "--now", "bau-hq-link.service", check=False)
+        for f in (unit, desk, cfg):
+            f.unlink(missing_ok=True)
+        _out({"station": "unpaired", "note": "on the desktop, remove the key from "
+              "~/.ssh/authorized_keys (`bau hq status` lists it)"})
+        return EXIT_OK
+    link = _sh("systemctl", "--user", "is-active", "bau-hq-link.service", check=False)
+    if a.station_cmd == "status":
+        _out({"desktop": desktop, "tunnel": link.stdout.strip() or "unknown"})
+        return EXIT_OK if link.stdout.strip() == "active" else EXIT_BLOCKED
+    # open: the desktop prints Jarvis's address (the only command this key may run)
+    got = _sh("ssh", "-T", "-i", str(key), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes",
+              "-o", "ConnectTimeout=8", "-o", "ServerAliveInterval=5",
+              "-o", "ServerAliveCountMax=2", desktop, check=False, timeout=30)
+    try:
+        url = S.world_url(got.stdout)
+    except ValueError as e:
+        print(f"bau station: {e}. Is the desktop on, and did it run `sudo bau hq allow`? "
+              f"({got.stderr.strip()[:200]})", file=sys.stderr)
+        return EXIT_BLOCKED
+    import webbrowser
+    webbrowser.open(url)
+    print("Jarvis is open in your browser (through the tunnel to the desktop).")
+    return EXIT_OK
+
+
+def shutil_which(name: str) -> str | None:
+    import shutil
+    return shutil.which(name)
+
+
 def cmd_usage(a):
     from .usage import Usage
     u = Usage(audit=AuditLog())
@@ -917,6 +1142,12 @@ def cmd_agents(a):
                   "next": f"edit {dest / 'AGENT.md'}, then: bau agents approve {a.name}"})
         elif a.agents_cmd == "add-skill":
             _out(AF.add_skill(Path(a.folder), None))
+        elif a.agents_cmd == "ready":
+            from .assistant import load_env_file, pick_model
+            load_env_file()
+            r = AF.readiness(a.name, None, a.needs or (), jarvis=pick_model())
+            _out(r)
+            return EXIT_OK if r["ready"] else EXIT_BLOCKED
         elif a.agents_cmd == "run":
             from dataclasses import asdict
 
@@ -1418,6 +1649,9 @@ def cmd_jarvis(a):
             raise PermissionError("Jarvis runs as the owner's own login, not root or 'bau'")
         owner = f"human:{who}"
     else:
+        from .station import MARK
+        if MARK.exists() and not a.text:
+            return _open_hq_jarvis(key_file, a.port, a.no_browser)
         owner = _human()
     load_env_file()
     jv = build_assistant(owner=owner)
@@ -1426,8 +1660,16 @@ def cmd_jarvis(a):
     if a.text:
         return _jarvis_terminal(jv)
     from .ui.jarvis_server import serve, service_key
-    srv, key = (serve(jv, Voice(), a.port, key=service_key(key_file)) if service
-                else serve(jv, Voice(), a.port))
+    try:
+        srv, key = (serve(jv, Voice(), a.port, key=service_key(key_file)) if service
+                    else serve(jv, Voice(), a.port))
+    except OSError as e:
+        if e.errno != errno.EADDRINUSE:
+            raise
+        print(f"Jarvis's address 127.0.0.1:{a.port} is already taken by "
+              f"{_port_holder(a.port) or 'another program'}. Fix: {JARVIS_PORT_HINT}",
+              file=sys.stderr)
+        return EXIT_BLOCKED
     url = f"http://127.0.0.1:{a.port}/?k={key}"
     if os.environ.get("CODESPACE_NAME"):      # GitHub Codespaces: the private forwarded port
         url = (f"https://{os.environ['CODESPACE_NAME']}-{a.port}."
@@ -1445,6 +1687,22 @@ def cmd_jarvis(a):
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
+    return EXIT_OK
+
+
+def _open_hq_jarvis(key_file: Path, port: int, no_browser: bool) -> int:
+    """Headquarters on: Jarvis already runs for good (bau-jarvis.service) on this port, so
+    open him instead of starting a second one that would take his port."""
+    from .ui.jarvis_server import service_key
+    state = _sh("systemctl", "is-active", "bau-jarvis.service", check=False).stdout.strip()
+    if state != "active":
+        print(f"Jarvis runs for good on this computer (headquarters on), but he is {state or 'off'}"
+              ".\nStart him: sudo systemctl restart bau-jarvis.service", file=sys.stderr)
+        return EXIT_ERROR
+    url = f"http://127.0.0.1:{port}/?k={service_key(key_file)}"
+    print(f"Jarvis runs for good on this computer. Open: {url}", file=sys.stderr)
+    if not no_browser:
+        _open_browser(url)
     return EXIT_OK
 
 
@@ -1982,6 +2240,41 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--layer", help="one layer, e.g. web, computer-use, memory")
     s.set_defaults(fn=cmd_toolbox)
 
+    s = sub.add_parser("money", help="is the money machine running: every link from the "
+                       "creator to Fanvue earnings, read live, with the fix (docs/MONEY.md)")
+    s.set_defaults(fn=cmd_money)
+
+    s = sub.add_parser("world", help="the operations world (docs/WORLD.md)")
+    w = s.add_subparsers(dest="world_cmd", required=True)
+    x = w.add_parser("portraits", help="paint each AI assistant's portrait with this computer's "
+                     "ComfyUI (the desktop)")
+    x.add_argument("--look", help="only this one (jarvis, researcher, producer, engineer, "
+                   "coordinator, analyst, architect)")
+    x.add_argument("--again", action="store_true", help="paint it again even if it exists")
+    s.set_defaults(fn=cmd_world)
+
+    s = sub.add_parser("hq", help="the desktop as headquarters for the laptop station "
+                       "(docs/LAPTOP-STATION.md)")
+    w = s.add_subparsers(dest="hq_cmd", required=True)
+    w.add_parser("on", help="sudo: Jarvis for good, SSH by key from the home network only")
+    x = w.add_parser("allow", help="sudo: let a station's key reach Jarvis (and nothing else)")
+    x.add_argument("key", help="the line `bau station pair` printed on the laptop")
+    w.add_parser("off", help="sudo: close SSH again; nothing comes in")
+    x = w.add_parser("status", help="on or off, which stations are allowed")
+    x.add_argument("--admin", help="whose login (default: you)")
+    s.set_defaults(fn=cmd_hq)
+
+    s = sub.add_parser("station", help="the laptop as Jarvis's operations station "
+                       "(docs/LAPTOP-STATION.md)")
+    w = s.add_subparsers(dest="station_cmd", required=True)
+    x = w.add_parser("pair", help="make this laptop's key and the tunnel to the desktop")
+    x.add_argument("desktop", help="your login on the desktop and its address, e.g. "
+                   "owner@192.168.1.20")
+    w.add_parser("open", help="open Jarvis and his world from the desktop")
+    w.add_parser("status", help="is the tunnel up")
+    w.add_parser("unpair", help="stop the tunnel and forget the desktop")
+    s.set_defaults(fn=cmd_station)
+
     s = sub.add_parser("catalog", help="every tool BAU knows, one record each, with its "
                        "state (discovered ... enabled, revoked) and the evidence")
     s.add_argument("query", nargs="?", help="words to look for, e.g. browser")
@@ -2025,6 +2318,11 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--from", dest="start_from", default="producer")
     x = w.add_parser("add-skill", help="bring in a downloaded skill folder (text only)")
     x.add_argument("folder")
+    x = w.add_parser("ready", help="is an agent equipped for a job before it starts: folder, "
+                     "approval, tools, the services they need, connectors, model, HOLD")
+    x.add_argument("name")
+    x.add_argument("--needs", action="append", metavar="TOOL",
+                   help="a tool the job cannot be done without (repeat)")
     s.set_defaults(fn=cmd_agents)
 
     s = sub.add_parser("keys", help="bring your API keys from another computer (names only shown)")

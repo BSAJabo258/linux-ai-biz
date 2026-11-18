@@ -248,6 +248,82 @@ def summary(a: Agent, home: Path | None) -> dict[str, Any]:
             "problems": problems(a), "folder": str(a.path)}
 
 
+# ---------------------------------------------------------------- ready before it starts
+def _search_up(home: Path) -> str | None:
+    """search.web needs the search service on this computer (docs/RESEARCH.md)."""
+    import os
+    import socket
+    from urllib.parse import urlsplit
+
+    from .web import DEFAULT_SEARCH
+    u = urlsplit(os.environ.get("BAU_SEARCH_URL") or DEFAULT_SEARCH)
+    try:
+        socket.create_connection((u.hostname or "127.0.0.1", u.port or 80), timeout=1).close()
+    except OSError:
+        return (f"the search service at {u.hostname}:{u.port} does not answer "
+                "(set up with installer/bau-search-setup.sh, or start it)")
+    return None
+
+
+# A tool that needs a service on this computer: how to tell it answers. Every other tool
+# runs inside BAU and needs nothing more.
+SERVICES: dict[str, Any] = {"search.web": _search_up}
+
+
+def readiness(name: str, home: Path | None, needs: list[str] | tuple[str, ...] = (),
+              jarvis: tuple[Any, dict[str, Any]] | None = None, factory: Any = None
+              ) -> dict[str, Any]:
+    """Is this agent equipped for a job before it starts, rather than finding out halfway?
+    ``needs`` are the tools the job cannot be done without. Every check that fails says what
+    is missing and how to fix it; nothing here installs, approves or grants anything."""
+    home = home or bau_home()
+    checks: list[dict[str, Any]] = []
+
+    def check(what: str, problem: str | None, fix: str = "") -> None:
+        checks.append({"check": what, "ok": problem is None, "problem": problem,
+                       "fix": fix if problem else ""})
+
+    try:
+        a = load(name, home)
+    except (AgentFolderError, FileNotFoundError, KeyError) as e:
+        check("agent folder", f"cannot load agent {name}: {e}", "bau agents list")
+        return {"agent": name, "ready": False, "checks": checks}
+    probs = problems(a)
+    check("agent folder", "; ".join(probs) or None, f"fix the folder {a.path}")
+    state = approval(a, home)
+    check("owner's approval", None if state == "approved" else f"the agent is {state}",
+          f"read the folder, then: bau agents approve {name}")
+    lacking = [t for t in needs if t not in a.tools]
+    check("tools for this job", f"needs {', '.join(lacking)}, which it does not have"
+          if lacking else None, f"add them to tools: in {a.path / 'AGENT.md'} and approve again")
+    for t in a.tools:
+        probe = SERVICES.get(t)
+        if probe:
+            check(f"service for {t}", probe(home))
+    if a.mcp:
+        from .registry import CapabilityRegistry
+        reg = CapabilityRegistry(home / "registry" / "capabilities.yaml").data["mcp"]
+        for sid in a.mcp:
+            rec = reg.get(sid)
+            why = (f"MCP server {sid} is not registered" if rec is None else
+                   f"MCP server {sid} is {rec.get('status')}"
+                   if rec.get("status") not in ("APPROVED", "ACTIVE") else
+                   f"MCP server {sid}'s tool list is not pinned"
+                   if not rec.get("schema_sha256") else None)
+            check(f"connector {sid}", why, f"bau mcp check {sid}, then bau mcp pin {sid}")
+    try:
+        from .brains import resolve
+        b = resolve(a.brain, home, a.path, jarvis or (None, {}), factory)
+        check("model", None if b.get("provider") is not None else "no model to run it")
+    except (KeyError, PermissionError, ImportError, ValueError) as e:
+        check("model", str(e), "bau models list, then bau team or bau ws brains")
+    from .governor import hold_reason
+    held = hold_reason(home)
+    check("not on HOLD", f"BAU is on HOLD: {held}" if held else None,
+          "bau governor release")
+    return {"agent": name, "ready": all(c["ok"] for c in checks), "checks": checks}
+
+
 # ---------------------------------------------------------------- running one
 def run(name: str, task: str, home: Path | None, audit: Any = None,
         jarvis: tuple[Any, dict[str, Any]] | None = None, factory: Any = None,

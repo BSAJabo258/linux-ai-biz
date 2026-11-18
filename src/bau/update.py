@@ -153,6 +153,7 @@ def keep(wheel: Path, commit: str, state_dir: Path = STATE) -> None:
     state_dir.chmod(0o755)
     shutil.copy2(wheel, cur / wheel.name)
     (state_dir / "state.json").write_text(json.dumps({"commit": commit, "wheel": wheel.name}))
+    (state_dir / "state.json").chmod(0o644)
 
 
 def _pip(runner: Callable[[list[str]], int], wheel: Path) -> bool:
@@ -249,8 +250,11 @@ def run(opener: Any = None, runner: Callable[[list[str]], int] | None = None,
     ui_was_up = runner(["systemctl", "is-active", "--quiet", "bau-ui.service"]) == 0
     # Stopped while pip swaps the files: on the owner's desktop (2026-11-01) Mission Control
     # restarted mid-install, found no bau.cli five times and systemd gave up on it.
+    # Only what runs: a unit this computer does not have (bau-jarvis.service before HQ) made
+    # systemctl print "Unit not loaded" in red on the owner's desktop (2026-11-15).
     for unit in SERVICES:
-        runner(["systemctl", "stop", unit])
+        if runner(["systemctl", "is-active", "--quiet", unit]) == 0:
+            runner(["systemctl", "stop", unit])
 
     why = None if _pip(runner, new) else "pip could not install it"
     why = why or _healthy(runner, ui_check, sleep, ui_was_up)
@@ -260,6 +264,7 @@ def run(opener: Any = None, runner: Callable[[list[str]], int] | None = None,
         incoming.rename(cur)
         (state_dir / "state.json").write_text(json.dumps({"commit": m["commit"],
                                                           "wheel": m["wheel"]}))
+        (state_dir / "state.json").chmod(0o644)             # bau update status, as the owner
         return done("update.installed", {"result": "installed", **rec})
     back = _pip(runner, previous) and _healthy(runner, ui_check, sleep, ui_was_up) is None
     shutil.rmtree(incoming, ignore_errors=True)
