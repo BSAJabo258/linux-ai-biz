@@ -74,3 +74,10 @@ bau automaton grow --per-day 5                           # you, once it has earn
 `--audience` and `--per-day` have no default: they are yours to choose. `--budget` is 0 and
 `--days` is 30 unless you say otherwise. After it has died, release the HOLD
 (`bau governor release`) and start it again.
+
+## Ask Jarvis
+
+With a model connected, ask "how is the automaton doing?" (or say survival). Jarvis reads its state
+and tells you: running or not, its day and tier, money kept and spent, spending money left,
+how many days it has left to earn, and how many missions are active (details for the top three). For every mission, including the ones that met their goal, ask "which portfolio missions met their goal?". He can only look: starting, stopping,
+reviving and growing it stay yours. Without a model (plain mode), run `bau automaton status`.

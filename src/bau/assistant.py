@@ -92,7 +92,7 @@ CONFIRMATION_NOTE = "PENDING_OWNER_CONFIRMATION"
 
 # Which node on the Jarvis screen lights up while a tool runs, and what it says.
 TOOL_NODE = {"system_status": "watchdog", "night_report": "chief", "missions": "strategist",
-             "portfolio": "strategist",
+             "portfolio": "strategist", "automaton": "strategist",
              "plan_mission": "strategist", "publish_queue": "publisher",
              "post_video": "publisher", "fanvue_queue": "publisher",
              "deadlines": "compliance", "money": "finance",
@@ -205,6 +205,11 @@ GROUND = (
     # it could not watch videos (2026-11-10). The video is watched first, the model tells it.
     (re.compile(r"https?://|\b(shorts?|youtube|video|watch)\b", re.I),
      "watch_video", lambda q: _video_args(q)),
+    # The automaton reached Jarvis only through the briefing (2026-11-11): asked in
+    # conversation, the small model had no tool for it. Its state and the portfolio first.
+    # "tier" alone is not the automaton (a free tier, a price tier): only with "survival".
+    (re.compile(r"\b(automaton|survival)\b", re.I), "automaton", lambda q: {}),
+    (re.compile(r"\bportfolio\b", re.I), "portfolio", lambda q: {}),
     (re.compile(r"\b(cost|costs|spend|spent|usage|tokens|how much .{0,30}model)", re.I),
      "usage_today", lambda q: {}),
     (re.compile(r"\b(broken|status|waiting for me|attention|anything wrong|health|watchdog|"
@@ -425,6 +430,10 @@ class Assistant:
                          []), self.t_night),
             Tool("missions", "Missions and their status and next action.", _schema(),
                  self.t_missions),
+            Tool("automaton", "The automaton (make money or die): running or not, its day, "
+                 "survival tier, money kept and spent, budget left, days left to earn, and the "
+                 "mission portfolio. Read only: only the owner starts, stops or revives it.",
+                 _schema(), self.t_automaton),
             Tool("portfolio", "Every business mission at once: the owner's priority, budget "
                  "left, the money it really made and spent (from the ledger), and whether its "
                  "goal is met. Finished work is not a met goal.", _schema(),
@@ -735,6 +744,72 @@ class Assistant:
                  "next_action": m.get("next_action", ""),
                  **({"how": "run_mission (the owner confirms on screen)"}
                     if m["status"] == "READY" else {})} for m in latest.values()][-10:]
+
+    def t_automaton(self) -> dict[str, Any]:
+        from . import automaton
+        from .fanvue import autopost_choice
+        from .governor import hold_reason
+        from .jarvis import portfolio
+        s = automaton.status(self.home)
+        try:
+            p: dict[str, Any] | None = portfolio(self.home)
+        except (OSError, ValueError, KeyError):       # the status is still worth telling
+            p = None
+        start = "bau automaton start --audience ... --per-day N"
+        held = hold_reason(self.home)
+        choice = autopost_choice(self.home)
+        # True / False from the owner's setting; None when it is missing or not a setting.
+        autopost_on = bool(choice.get("on")) if isinstance(choice, dict) else None
+        if s.get("dead"):
+            # Its death set a HOLD: start alone would not post anything.
+            say = (f"The automaton is dead: {s['dead']['why']}. Only you revive it, at a "
+                   f"terminal: bau governor release, then {start}.")
+        elif not s.get("on"):
+            # After `bau automaton stop` the Automaton card is done, so it is no way back.
+            say = ("The automaton is not running. Only you start it: " +
+                   (f"{start} at a terminal." if s.get("started_at") else
+                    f"the Automaton card, or {start} at a terminal."))
+            if held:                                 # starting it does not lift a HOLD
+                say += (f" BAU is also on HOLD ({held}): check why and run bau governor "
+                        "release before posts can go out.")
+        elif held or not autopost_on:
+            # Each blocker is named: releasing a HOLD alone does not switch autopost back on.
+            stops = []
+            if held:
+                stops.append(f"a HOLD ({held}): check why and run bau governor release")
+            if autopost_on is False:      # `bau fanvue autopost off`: on, but posts nothing
+                stops.append("Fanvue autopost is off: only you switch it on, bau fanvue "
+                             "autopost on --audience ... --per-day N")
+            elif autopost_on is None:
+                stops.append("the autopost setting is missing or unreadable (fanvue/autopost.json)")
+            say = "The automaton is on, but nothing posts. Blocked by " + "; and ".join(stops) + "."
+        else:
+            # Two numbers a small model mixed up on the real desktop (2026-11-11): money it may
+            # still SPEND and DAYS it has left to earn. Each gets its own sentence.
+            say = (f"The automaton is running, day {s['day']}, tier {s['tier']}. "
+                   f"Since this start, money kept: ${s['income_usd']:.2f}; "
+                   f"spent: ${s['spent_usd']:.2f}. "
+                   f"Spending money left: ${s['money_left_usd']:.2f}. "
+                   f"It stops if it earns nothing in the next {s['days_left_to_earn']:g} days.")
+        if p is None:                                 # never shown as zero missions or $0
+            say += " Missions: the portfolio could not be read right now."
+            port: dict[str, Any] = {"unavailable": True}
+        else:
+            n = p["active"]
+            t = p["totals"]
+            say += (f" Missions: {n} active mission{'' if n == 1 else 's'}. Across the whole "
+                    f"ledger, including money not tied to a mission: kept "
+                    f"${t['kept_usd']:.2f}, costs ${t['cost_usd']:.2f}, "
+                    f"profit ${t['profit_usd']:.2f}.")
+            top = [{"mission_id": m["mission_id"], "objective": m["objective"][:80],
+                    "status": m["status"], "priority": m["priority"],
+                    "profit_usd": m["money"]["profit_usd"],
+                    "budget_left_usd": m["budget_left_usd"],
+                    "goal_met": (m["goal"] or {}).get("met")}
+                   for m in p["missions"] if m["active"]][:3]
+            port = {"active": n, "totals": t, "top": top}
+        return {"say": say, "automaton": s, "portfolio": port,
+                "owner_only": "starting, stopping, reviving and growing it: the owner"}
 
     def t_portfolio(self) -> dict[str, Any]:
         from .jarvis import portfolio
@@ -1582,12 +1657,14 @@ class Assistant:
             said = [r["text"] for r in self.history if r["role"] == "jarvis"][-1:]
             asked_run = RUN_MISSIONS.search(user_text) or (
                 YES.match(user_text) and any(RUN_MISSIONS.search(t) for t in said))
+            # Only the owner's own words name a week: grounded facts (a stored mission
+            # objective, say) must never put a card up.
+            m = WEEK_CMD.search(user_text)
             user_text = self._ground(user_text, cards)
             if asked_run:
                 user_text += self._stage_ready_missions(staged)
             # Naming a week plan that exists puts its card up at once: the small model did not
             # find schedule_week in its menu (real run, 2026-11-01). Staging changes nothing.
-            m = WEEK_CMD.search(user_text)
             if m and (self.home / "weeks" / f"{m.group(1)}.yaml").is_file():
                 out, err = self._run_tool("schedule_week", {"week": m.group(1)})
                 if not err and out.get("pending_id"):
