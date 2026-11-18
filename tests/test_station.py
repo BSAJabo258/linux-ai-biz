@@ -162,3 +162,75 @@ def test_hq_on_checks_jarvis_really_started_and_status_reads_the_admin(tmp_path,
     assert cli_ext._hq_admin(mark) == "someone"
     mark.write_text("admin=bauadmin\non=x\n")
     assert cli_ext._hq_admin(mark) == "bauadmin"
+
+
+SS_LINE = 'LISTEN 0 5 127.0.0.1:8766 0.0.0.0:* users:(("python3",pid=1234,fd=3))\n'
+
+
+# The owner's desktop, 2026-11-16: the service hit "Address already in use" 626 times, each
+# a long traceback. Now one plain line names who holds the port, and systemd gives up.
+def test_who_holds_jarvis_port_comes_from_ss_never_a_guess(monkeypatch):
+    from bau import cli_ext
+    out = {"r": subprocess.CompletedProcess([], 0, SS_LINE, "")}
+    ran = []
+
+    def fake_sh(*a, check=True, timeout=None):
+        ran.append((a, timeout))
+        if isinstance(out["r"], Exception):
+            raise out["r"]
+        return out["r"]
+    monkeypatch.setattr(cli_ext, "_sh", fake_sh)
+    assert cli_ext._port_holder(8766) == "python3 (pid 1234)"
+    assert ran[0] == (("ss", "-ltnpH", "sport = :8766"), 3)
+    assert cli_ext._taken_by(8766) == "; 127.0.0.1:8766 is taken by python3 (pid 1234)"
+    out["r"] = subprocess.CompletedProcess([], 0, "LISTEN 0 5 127.0.0.1:8766 0.0.0.0:*\n", "")
+    assert cli_ext._port_holder(8766) == "another program"     # not root: no process shown
+    out["r"] = subprocess.CompletedProcess([], 1, "", "ss: failed")
+    assert cli_ext._port_holder(8766) == "another program"
+    out["r"] = FileNotFoundError("ss")
+    assert cli_ext._port_holder(8766) == "another program"
+    out["r"] = subprocess.CompletedProcess([], 0, "", "")
+    assert cli_ext._port_holder(8766) is None                  # nothing listens there
+    assert cli_ext._taken_by(8766) == ""
+
+
+def test_a_taken_port_gives_one_plain_line_not_a_traceback(tmp_path, monkeypatch, capsys):
+    import errno
+
+    from bau import cli_ext
+    from bau.cli import main
+
+    class FakeJarvis:
+        provider = None
+
+        def warm(self):
+            pass
+    monkeypatch.setattr(cli_ext.getpass, "getuser", lambda: "owner")
+    monkeypatch.setattr("bau.assistant.load_env_file", lambda *a, **k: None)
+    monkeypatch.setattr("bau.assistant.build_assistant", lambda **k: FakeJarvis())
+    out = {"r": subprocess.CompletedProcess([], 0, SS_LINE, "")}
+    monkeypatch.setattr(cli_ext, "_sh", lambda *a, check=True, timeout=None: out["r"])
+    err = {"e": OSError(errno.EADDRINUSE, "Address already in use")}
+
+    def fake_serve(*a, **k):
+        raise err["e"]
+    monkeypatch.setattr("bau.ui.jarvis_server.serve", fake_serve)
+    args = ["jarvis", "--service", "--port", "8766", "--key-file", str(tmp_path / "k")]
+    assert main(args) == cli_ext.EXIT_BLOCKED
+    said = capsys.readouterr().err
+    assert "Jarvis's address 127.0.0.1:8766 is already taken by python3 (pid 1234)." in said
+    assert "Ctrl+C" in said and "sudo systemctl restart bau-jarvis.service" in said
+    assert "Traceback" not in said and len(said.strip().splitlines()) == 1
+    out["r"] = subprocess.CompletedProcess([], 0, "", "")      # gone by the time ss looks
+    assert main(args) == cli_ext.EXIT_BLOCKED
+    assert "is already taken by another program." in capsys.readouterr().err
+    err["e"] = OSError(errno.EADDRNOTAVAIL, "Cannot assign requested address")
+    with pytest.raises(OSError):
+        main(args)                                             # other errors still raise
+
+
+def test_a_taken_port_does_not_restart_jarvis_forever():
+    unit = S._data("bau-jarvis.service")
+    head = unit.split("[Service]")[0]
+    assert "StartLimitIntervalSec=120" in head and "StartLimitBurst=5" in head
+    assert "Restart=on-failure" in unit
