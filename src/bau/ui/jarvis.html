@@ -68,6 +68,23 @@ body[data-state="thinking"] #art.on .spine{animation-duration:1.4s;opacity:1}
   transform:translate(-50%,-50%);z-index:2;pointer-events:none;opacity:0;transition:opacity .45s;
   filter:drop-shadow(0 18px 28px rgba(0,0,0,.55)) drop-shadow(0 0 24px rgba(63,214,255,.16))}
 #avatar.on{opacity:1}
+/* PHOTO: her photographic face (bau world portraits --look avatar), same place as the avatar.
+   A photo cannot blink or move its lips: she breathes, and her glow follows the real voice
+   level (--lvl, set every frame). */
+#avphoto{position:fixed;left:0;top:0;height:var(--av-h,520px);width:calc(var(--av-h,520px)*.684);
+  transform:translate(-50%,-50%) scale(calc(1 + var(--lvl,0)*.012));z-index:2;pointer-events:none;
+  opacity:0;transition:opacity .45s}
+#avphoto.on{opacity:1}
+#avphoto img{display:block;width:100%;height:100%;object-fit:cover;border-radius:46% 46% 18% 18%/30% 30% 12% 12%;
+  -webkit-mask-image:radial-gradient(ellipse 72% 80% at 50% 40%,#000 58%,transparent 100%);
+  mask-image:radial-gradient(ellipse 72% 80% at 50% 40%,#000 58%,transparent 100%);
+  animation:av-photo-breathe 5.6s ease-in-out infinite;transform-origin:50% 90%;
+  filter:drop-shadow(0 0 calc(18px + var(--lvl,0)*40px) rgba(63,214,255,calc(.18 + var(--lvl,0)*.5)))
+    brightness(calc(1 + var(--lvl,0)*.08))}
+body[data-state="listening"] #avphoto img{filter:drop-shadow(0 0 26px rgba(255,179,64,.42))}
+body[data-state="thinking"] #avphoto img{filter:drop-shadow(0 0 28px rgba(169,139,255,.48)) saturate(.92)}
+@keyframes av-photo-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.008) translateY(-1px)}}
+@media (prefers-reduced-motion: reduce){#avphoto img{animation:none}}
 body[data-state="listening"] #avatar{filter:drop-shadow(0 18px 28px rgba(0,0,0,.55)) drop-shadow(0 0 28px rgba(255,179,64,.34))}
 body[data-state="thinking"] #avatar{filter:drop-shadow(0 18px 28px rgba(0,0,0,.55)) drop-shadow(0 0 30px rgba(169,139,255,.42))}
 body[data-state="speaking"] #avatar{filter:drop-shadow(0 18px 28px rgba(0,0,0,.55)) drop-shadow(0 0 30px rgba(255,207,77,.38))}
@@ -309,6 +326,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 <canvas id="sacred" aria-hidden="true"></canvas>
 <canvas id="core" aria-hidden="true"></canvas>
 
+<div id="avphoto" aria-hidden="true"><img alt=""></div>
 <div id="avatar" aria-hidden="true">
 <svg viewBox="0 0 280 440" preserveAspectRatio="xMidYMax meet" role="presentation">
   <defs>
@@ -416,7 +434,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
     <button class="chip" id="c-mute" title="Mute voice">VOICE ON</button>
     <button class="chip" id="c-wake" title="Listen for the word 'Jarvis' in this tab only, until you leave the page">WAKE WORD OFF</button>
     <button class="chip" id="c-alerts" title="Notify me when something needs me and this page is in the background">ALERTS OFF</button>
-    <button class="chip" id="c-av" title="Jarvis as an animated avatar, or the glass core">AVATAR ON</button>
+    <button class="chip" id="c-av" title="Jarvis's face: her photo (once drawn), the anime avatar, or the glass core">AVATAR ON</button>
     <button class="chip" id="c-geo" title="The sacred-geometry tapestry behind Jarvis: on or off">TAPESTRY ON</button>
     <button class="chip" id="c-theme" title="Light or dark">THEME</button>
     <button class="chip" id="c-help" title="Keyboard keys" aria-label="Keyboard keys">?</button>
@@ -529,20 +547,35 @@ let analyser = null, actx = null, buf = null;
 let micAnalyser = null, micSrc = null;   // the mic gets its own analyser: never to the speakers
 const LABEL = { idle: "STANDBY", listening: "LISTENING", thinking: "PROCESSING", speaking: "SPEAKING" };
 const HUE = { idle: [63, 214, 255], listening: [255, 179, 64], thinking: [169, 139, 255], speaking: [63, 214, 255] };
-const AVATAR = { el: $("avatar"), on: true, h: 0 };
-try { AVATAR.on = localStorage.getItem("jarvis-avatar") !== "0"; } catch (e) {}
+// Three faces, one chip: PHOTO (her photographic portrait, once drawn), ANIME (the SVG
+// avatar), GLASS CORE (the orb). AVATAR.on means "a face, not the orb".
+const AVATAR = { el: $("avatar"), ph: $("avphoto"), on: true, mode: "photo", photo: false, h: 0 };
+try { const v = localStorage.getItem("jarvis-avatar");
+  if (v === "0") AVATAR.on = false; else if (v === "1" || v === "anime") AVATAR.mode = "anime"; } catch (e) {}
 function paintAvatar() {
-  AVATAR.el.classList.toggle("on", AVATAR.on);
-  const b = $("c-av"); b.textContent = AVATAR.on ? "AVATAR ON" : "GLASS CORE"; b.classList.toggle("on", AVATAR.on);
+  const photo = AVATAR.on && AVATAR.mode === "photo" && AVATAR.photo;
+  AVATAR.ph.classList.toggle("on", photo);
+  AVATAR.el.classList.toggle("on", AVATAR.on && !photo);
+  const b = $("c-av");
+  b.textContent = !AVATAR.on ? "GLASS CORE" : photo ? "PHOTO" : "ANIME"; b.classList.toggle("on", AVATAR.on);
 }
+{ const im = AVATAR.ph.querySelector("img");
+  im.onload = () => { AVATAR.photo = true; paintAvatar(); };
+  im.onerror = () => { AVATAR.photo = false; paintAvatar(); };
+  im.src = "/world/portrait/avatar.png"; }
 function placeAvatar(X, Y, R) {
   const h = Math.min(innerHeight * (W < 760 ? 0.52 : 0.64), R * (W < 760 ? 5.2 : 4.8));
   if (Math.abs(h - AVATAR.h) > 0.5) { AVATAR.h = h; AVATAR.el.style.setProperty("--av-h", h + "px"); }
   AVATAR.el.style.left = X + "px"; AVATAR.el.style.top = (Y + R * 0.05) + "px";
+  AVATAR.ph.style.left = X + "px"; AVATAR.ph.style.top = (Y + R * 0.05) + "px";
+  if (AVATAR.ph.classList.contains("on")) AVATAR.ph.style.setProperty("--lvl", Math.min(1, level).toFixed(2));
 }
 paintAvatar();
-$("c-av").onclick = () => { AVATAR.on = !AVATAR.on;
-  try { localStorage.setItem("jarvis-avatar", AVATAR.on ? "1" : "0"); } catch (e) {}
+$("c-av").onclick = () => {          // PHOTO -> ANIME -> GLASS CORE -> PHOTO (no photo: skipped)
+  if (!AVATAR.on) { AVATAR.on = true; AVATAR.mode = AVATAR.photo ? "photo" : "anime"; }
+  else if (AVATAR.mode === "photo" && AVATAR.photo) AVATAR.mode = "anime";
+  else AVATAR.on = false;
+  try { localStorage.setItem("jarvis-avatar", AVATAR.on ? AVATAR.mode : "0"); } catch (e) {}
   paintAvatar(); };
 function setState(s) { STATE = s; $("statelabel").textContent = LABEL[s];
   document.body.dataset.state = s;

@@ -236,3 +236,31 @@ def test_the_world_is_easy_to_find_and_shows_its_panels():
     for panel in ('id="w-list"', 'id="w-tasks"', 'id="w-sys"'):
         assert panel in page
     assert "No agent is working right now" in page                     # never an empty floor alone
+
+
+def test_the_photo_avatar_is_its_own_look_drawn_only_when_asked(tmp_path):
+    from bau import world as Wd
+    drawn = []
+
+    def drawer(home, prompt, name, negative, width, height):
+        drawn.append((prompt, negative))
+        media = home / "artifacts" / "media"
+        media.mkdir(parents=True, exist_ok=True)
+        (media / f"{name}.png").write_bytes(b"png")
+
+    Wd.draw_portraits(tmp_path, drawer=drawer, say=lambda line: None)
+    assert Wd.AVATAR_PROMPT not in [d[0] for d in drawn] and len(drawn) == len(Wd.PORTRAIT_LOOKS)
+    assert Wd.portrait_file(tmp_path, "avatar") is None
+    out = Wd.draw_portraits(tmp_path, ["avatar"], drawer=drawer, say=lambda line: None)
+    assert out == [{"look": "avatar", "result": "drawn"}]
+    prompt, negative = drawn[-1]
+    assert "photorealistic" in prompt and "original fictional adult" in prompt
+    assert "celebrity" in negative and "minor" in negative
+    assert Wd.portrait_file(tmp_path, "avatar").read_bytes() == b"png"
+
+
+def test_the_page_shows_the_photo_face_where_the_orb_was():
+    from importlib import resources
+    page = (resources.files("bau.ui") / "jarvis.html").read_text()
+    assert 'id="avphoto"' in page and "/world/portrait/avatar.png" in page
+    assert '"PHOTO"' in page and '"GLASS CORE"' in page
