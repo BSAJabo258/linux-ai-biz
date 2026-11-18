@@ -319,3 +319,20 @@ def test_a_unit_that_is_not_running_is_not_stopped(box):
     assert box.go()["result"] == "installed"
     assert ["systemctl", "stop", "bau-jarvis.service"] not in box.cmds
     assert ["systemctl", "stop", "bau-ui.service"] in box.cmds
+
+
+# The owner's desktop, 2026-11-18: after an update that installed 9ae6e0f, `bau update status`
+# as the owner said "the stick's own build": root wrote state.json under sudo's strict umask,
+# so the owner's login could not read it. It is written readable, like last.json.
+def test_the_installed_build_is_readable_by_the_owner(box, tmp_path):
+    import os
+    old = os.umask(0o077)                                     # sudo's strict umask
+    try:
+        assert box.go()["result"] == "installed"
+        assert (box.state / "state.json").stat().st_mode & 0o777 == 0o644
+        w = tmp_path / NAME
+        w.write_bytes(WHEEL)
+        U.keep(w, COMMIT, tmp_path / "u")
+        assert (tmp_path / "u" / "state.json").stat().st_mode & 0o777 == 0o644
+    finally:
+        os.umask(old)
