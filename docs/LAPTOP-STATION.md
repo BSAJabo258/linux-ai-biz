@@ -39,7 +39,8 @@ It prints the next line for the laptop, with your desktop's address in it.
 
 Close any Jarvis window you had open first (Ctrl+C in it): only one Jarvis can use his
 address. `sudo bau hq status` must then say `"jarvis_service": "active"`. If it says
-`activating`, run `sudo systemctl restart bau-jarvis.service`.
+`activating` or `failed` (it gives up after 5 tries when his address is taken), run
+`sudo systemctl restart bau-jarvis.service`.
 
 From now on the **BAU Jarvis** menu entry opens the Jarvis that runs for good. Or open him
 on the desktop itself with:

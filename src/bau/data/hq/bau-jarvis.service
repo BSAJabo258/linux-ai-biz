@@ -5,6 +5,9 @@
 Description=BAU Jarvis (http://127.0.0.1:8766, through your SSH tunnel)
 After=network-online.target bau-ui.service
 Wants=network-online.target
+# A taken port must not restart him forever (the owner's desktop, 2026-11-16: 626 times).
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Service]
 User=@ADMIN@

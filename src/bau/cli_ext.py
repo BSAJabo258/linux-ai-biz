@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import errno
 import getpass
 import json
 import os
@@ -756,7 +757,8 @@ def cmd_hq(a):
     ips = _sh("hostname", "-I", check=False).stdout.split()
     _out({"headquarters": "on",
           "jarvis": "running for good on 127.0.0.1:8766" if jarvis_state == "active"
-                    else f"NOT running ({jarvis_state}): {JARVIS_PORT_HINT}",
+                    else f"NOT running ({jarvis_state}{_taken_by(8766)}): "
+                         f"{JARVIS_PORT_HINT}",
           "ssh": "keys only, home network only",
           "next": f"on the laptop: bau station pair {admin}@{ips[0] if ips else 'THIS-COMPUTER'}"})
     return EXIT_OK if jarvis_state == "active" else EXIT_ERROR
@@ -766,6 +768,28 @@ def cmd_hq(a):
 # times with "Address already in use".
 JARVIS_PORT_HINT = ("close the Jarvis window (Ctrl+C), then "
                     "`sudo systemctl restart bau-jarvis.service`")
+
+
+def _port_holder(port: int) -> str | None:
+    """Who listens on this port, from `ss`: "name (pid N)"; "another program" when ss is
+    missing, fails or does not show the process (other users' pids need root); None when ss
+    saw no listener. Never a guess."""
+    import re
+    try:
+        r = _sh("ss", "-ltnpH", f"sport = :{port}", check=False, timeout=3)
+    except OSError:
+        return "another program"
+    if r.returncode:
+        return "another program"
+    if not r.stdout.strip():
+        return None
+    m = re.search(r'users:\(\("([^"]+)",pid=(\d+)', r.stdout)
+    return f"{m.group(1)} (pid {m.group(2)})" if m else "another program"
+
+
+def _taken_by(port: int) -> str:
+    holder = _port_holder(port)
+    return f"; 127.0.0.1:{port} is taken by {holder}" if holder else ""
 
 
 def _jarvis_started(sleep=None) -> str:
@@ -1626,8 +1650,16 @@ def cmd_jarvis(a):
     if a.text:
         return _jarvis_terminal(jv)
     from .ui.jarvis_server import serve, service_key
-    srv, key = (serve(jv, Voice(), a.port, key=service_key(key_file)) if service
-                else serve(jv, Voice(), a.port))
+    try:
+        srv, key = (serve(jv, Voice(), a.port, key=service_key(key_file)) if service
+                    else serve(jv, Voice(), a.port))
+    except OSError as e:
+        if e.errno != errno.EADDRINUSE:
+            raise
+        print(f"Jarvis's address 127.0.0.1:{a.port} is already taken by "
+              f"{_port_holder(a.port) or 'another program'}. Fix: {JARVIS_PORT_HINT}",
+              file=sys.stderr)
+        return EXIT_BLOCKED
     url = f"http://127.0.0.1:{a.port}/?k={key}"
     if os.environ.get("CODESPACE_NAME"):      # GitHub Codespaces: the private forwarded port
         url = (f"https://{os.environ['CODESPACE_NAME']}-{a.port}."
