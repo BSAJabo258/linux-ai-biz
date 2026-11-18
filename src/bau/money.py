@@ -118,7 +118,14 @@ def activity(home: Path) -> dict[str, Any]:
             "money_received_usd": round(sum(received_usd(r) for r in rows), 2)}
 
 
+STATION_TEXT = ("This laptop is the operations station. The money machine runs on the desktop "
+                "(headquarters): open Jarvis HQ, or run bau money on the desktop.")
+
+
 def summary(home: Path, probe: Probe | None = None) -> dict[str, Any]:
+    from .station import is_station
+    if is_station():
+        return {"station": True, "ready": None, "of": None, "next": None, "next_fix": None}
     ls = links(home, probe)
     missing = [link for link in ls if not link["ok"]]
     return {"ready": len(ls) - len(missing), "of": len(ls),
@@ -127,6 +134,9 @@ def summary(home: Path, probe: Probe | None = None) -> dict[str, Any]:
 
 
 def report(home: Path, probe: Probe | None = None) -> str:
+    from .station import is_station
+    if is_station():
+        return STATION_TEXT
     ls = links(home, probe)
     lines = ["The money machine, link by link (read live, nothing changed):", ""]
     for link in ls:

@@ -297,6 +297,20 @@ def test_autopost_still_runs_every_check_and_stops_for_the_day_on_a_failure(tmp_
     assert F.autopost_tick(tmp_path, client(tmp_path, FakeFanvue()))["autopost"] == "off"
 
 
+def test_on_the_laptop_station_autopost_never_posts(tmp_path, monkeypatch):
+    # One money machine, on the desktop: the laptop station posts nothing to Fanvue.
+    from bau import station
+    q = F.Queue(tmp_path)
+    q.add(picture(tmp_path), "Evening in", 1, "human:owner")
+    F.set_autopost(tmp_path, True, "human:owner", "subscribers", 5)
+    mark = tmp_path / "station"
+    mark.write_text("on=x\n")
+    monkeypatch.setattr(station, "STATION_MARK", mark)
+    out = F.autopost_tick(tmp_path, client(tmp_path, FakeFanvue()))
+    assert out["autopost"].startswith("off") and "station" in out["autopost"]
+    assert q.items()[0]["status"] == "QUEUED"
+
+
 def test_autopost_card_takes_his_audience_and_number(tmp_path, monkeypatch):
     from bau import setup_steps as S
     assert S._done("autopost", tmp_path, lambda w: None) is None      # not connected yet

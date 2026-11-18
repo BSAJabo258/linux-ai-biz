@@ -332,3 +332,16 @@ def test_once_fanvue_and_autopost_are_on_the_automaton_card_starts_it(box, monke
                         "grow_at": "100"})
     assert out["done"] and "30 days" in out["said"]
     assert "automaton" not in ids(box) and "grow" not in ids(box)
+
+
+def test_on_the_laptop_station_only_updates_and_laws_can_wait(box, monkeypatch, tmp_path):
+    # The desktop does the work: search, autopilot, pictures and Fanvue cards are its jobs.
+    from bau import station
+    fanvue_done(box.home, monkeypatch, automaton=False)
+    assert len(ids(box)) > 2
+    mark = tmp_path / "station"
+    mark.write_text("on=x\n")
+    monkeypatch.setattr(station, "STATION_MARK", mark)
+    assert ids(box) == ["laws", "updates"]
+    box.facts["update"] = "auto"
+    assert ids(box) == ["laws"]

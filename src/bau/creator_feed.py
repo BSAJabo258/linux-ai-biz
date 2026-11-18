@@ -52,6 +52,9 @@ def _profile(home: Path) -> tuple[Path, dict[str, Any]] | None:
 def fill(home: Path) -> int:
     """Queue enough draft jobs that tomorrow's posts exist; none while autopost is off."""
     from .fanvue import Queue, autopost_choice
+    from .station import is_station
+    if is_station():                      # the laptop station: the desktop's feed draws
+        return 0
     choice = autopost_choice(home)
     if not choice or not choice.get("on") or _profile(home) is None:
         return 0
