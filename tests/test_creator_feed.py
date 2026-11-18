@@ -77,6 +77,19 @@ def test_a_caption_about_minors_is_refused_and_nothing_is_queued(home, monkeypat
     assert F.Queue(home).pending() == [] and F.Queue(home).review() == []
 
 
+def test_the_caption_brief_carries_the_women_audience_and_paid_level(home, monkeypatch):
+    from bau import team
+    monkeypatch.setattr(team, "show", lambda h: {"boss": "qwen3.5-9b"})
+    model = ScriptedProvider(["A little more of me, just for you."])
+    prof = {"name": "Aria", "niche": "boudoir", "voice": "warm and playful",
+            "audience": "women", "caption_style": "seductive and inviting to women"}
+    text = C.caption(home, prof, "slow morning in silk", factory=lambda m, h: (model, {}),
+                     level=2)
+    ask = model.calls[0]["messages"][0]["content"]
+    assert text.startswith("A little more") and "Audience: women" in ask
+    assert "paid nude unlock" in ask and "do not describe sex acts" in ask
+
+
 def test_without_a_local_model_the_caption_is_a_plain_line(home, monkeypatch):
     from bau import team
     monkeypatch.setattr(team, "show", lambda h: {"boss": None})

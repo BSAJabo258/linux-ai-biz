@@ -19,7 +19,9 @@ Tested against a fake Fanvue only. It has **not run against your real Fanvue acc
 
 Levels 0 (free teaser) and 1 (subscribers, no nudity) are drawn by the safe-for-work picture
 model. Levels 2 (nude) and 3 (xxx) are paid unlocks drawn by Chroma (docs/PICTURES.md); each
-is posted with your unlock price from your profile (Fanvue's minimum is $3.00).
+is posted with your unlock price from your profile (Fanvue's minimum is $3.00). The queue
+currently accepts images only; Fanvue accepts video media, but BAU has no local explicit video
+generator or video upload path yet.
 
 ## Let Jarvis post on his own (your switch)
 

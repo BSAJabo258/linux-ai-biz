@@ -410,12 +410,22 @@ def cmd_media(a):
 
 
 def cmd_spatial(a):
-    from .spatial import GodsEye, create_scene, export_scene
+    from .spatial import WIDE_REGIONS, GodsEye, create_scene, export_scene
     ge = GodsEye()
     if a.sp_cmd == "earthquakes":
         data = ge.earthquakes(a.purpose, a.window)
     elif a.sp_cmd == "satellites":
         data = ge.satellites(a.purpose, a.group)
+    elif a.sp_cmd == "fires":
+        data = ge.fires(a.purpose, None if a.region == "world" else WIDE_REGIONS[a.region])
+    elif a.sp_cmd == "weather":
+        data = ge.weather(a.purpose, WIDE_REGIONS[a.region])
+    elif a.sp_cmd == "space-weather":
+        data = ge.space_weather(a.purpose)
+    elif a.sp_cmd == "traffic":
+        data = ge.traffic(a.purpose, WIDE_REGIONS[a.region])
+    elif a.sp_cmd == "ships":
+        data = ge.ships(a.purpose, WIDE_REGIONS[a.region], seconds=a.seconds)
     else:
         data = ge.aircraft(a.purpose, tuple(a.bbox))
     if a.out:
@@ -2201,6 +2211,28 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--bbox", type=float, nargs=4, required=True,
                    metavar=("LAMIN", "LOMIN", "LAMAX", "LOMAX"))
     x.add_argument("--out")
+    from .spatial import WIDE_REGIONS
+    regions = list(WIDE_REGIONS)
+    x = sp.add_parser("fires", help="NASA FIRMS active fire detections (no key for world)")
+    x.add_argument("--purpose", required=True)
+    x.add_argument("--region", choices=["world", *regions], default="world")
+    x.add_argument("--out")
+    x = sp.add_parser("weather", help="current conditions over a wide region")
+    x.add_argument("--purpose", required=True)
+    x.add_argument("--region", choices=regions, default="europe")
+    x.add_argument("--out")
+    x = sp.add_parser("space-weather", help="NOAA planetary K-index")
+    x.add_argument("--purpose", required=True)
+    x.add_argument("--out")
+    x = sp.add_parser("traffic", help="TomTom traffic incidents (needs TOMTOM_API_KEY)")
+    x.add_argument("--purpose", required=True)
+    x.add_argument("--region", choices=regions, default="europe")
+    x.add_argument("--out")
+    x = sp.add_parser("ships", help="AISStream live vessels (needs AISSTREAM_API_KEY)")
+    x.add_argument("--purpose", required=True)
+    x.add_argument("--region", choices=regions, default="europe")
+    x.add_argument("--seconds", type=float, default=8.0)
+    x.add_argument("--out")
     s.set_defaults(fn=cmd_spatial)
 
     s = sub.add_parser("ws", help="ICM workspaces: folder pipelines one agent walks, "
@@ -2830,7 +2862,7 @@ def register(sub: argparse._SubParsersAction) -> None:
                    "the bau-voice service on 127.0.0.1:8767)")
     x.add_argument("--speak", choices=["elevenlabs", "local"],
                    help="who speaks Jarvis's replies (local: Kokoro on this computer)")
-    x.add_argument("--local-voice", help="Kokoro voice for --speak local (default bm_george)")
+    x.add_argument("--local-voice", help="Kokoro voice for --speak local (default af_nicole)")
     jv.add_parser("constitution", help="where your operating constitution lives and what "
                   "Jarvis loads from it")
     s.set_defaults(fn=cmd_jarvis)

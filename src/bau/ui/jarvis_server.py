@@ -46,12 +46,14 @@ WORLD_ART = {"/world/characters.png": "image/png", "/world/characters.json": "ap
 def make_handler(assistant: Assistant, voice: Voice, key: str
                  ) -> type[BaseHTTPRequestHandler]:
     page = (resources.files("bau.ui") / "jarvis.html").read_bytes()
+    workstation_page = (resources.files("bau.ui") / "workstation.html").read_bytes()
     allowed_hosts = allowed_hosts_from_env()
     lock = threading.Lock()               # one conversation, one turn at a time
     # GitHub wants requests one at a time, so one search or inspection at a time; testing
     # a model has its own lane. Neither holds up the conversation.
     lanes = {"scout": threading.Lock(), "models": threading.Lock(),
-             "studio": threading.Lock(), "godseye": threading.Lock()}
+             "studio": threading.Lock(), "godseye": threading.Lock(),
+             "workstation": threading.Lock()}
     jobs: dict[str, dict[str, Any]] = {}  # slow answers the page is checking back on
     last_overview: dict[str, Any] = {}    # served while a model turn holds the lock
 
@@ -174,6 +176,16 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     return
                 self._send(200, page, "text/html; charset=utf-8")
                 return
+            if path in ("/workstation", "/workstation.html"):
+                if not self._guard(api=False):
+                    return
+                got = dict(p.partition("=")[::2] for p in query.split("&") if p)
+                if not hmac.compare_digest(got.get("k", ""), key):
+                    self._send(403, b"Open the workstation from Jarvis, or with its key.",
+                               "text/plain")
+                    return
+                self._send(200, workstation_page, "text/html; charset=utf-8")
+                return
             if path == "/icon.svg":                 # the tab icon
                 self._send(200, (resources.files("bau.ui") / "icon.svg").read_bytes(),
                            "image/svg+xml")
@@ -261,6 +273,8 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 except ValueError:
                     since = 0
                 self._json(200, assistant.activity.since(since))
+            elif path == "/api/workstation":
+                self._json(200, screen.workstation_view(assistant))
             elif path == "/api/godseye/world":
                 self._json(200, screen.godseye_world())
             elif path == "/api/toolbox":
@@ -397,6 +411,20 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
             elif self.path == "/api/models/bench":
                 model = str(data.get("model", ""))
                 self._json(*answer(lambda: screen.bench(assistant, model), lanes["models"]))
+            elif self.path == "/api/models/use":
+                model = str(data.get("model", ""))
+                self._json(*answer(lambda: {**screen.model_use(assistant, model),
+                                            "state": state()}, lanes["models"]))
+            elif self.path == "/api/workstation/shift":
+                try:
+                    n = max(1, min(int(data.get("max_tasks", 1)), 3))
+                except (TypeError, ValueError):
+                    n = 1
+                self._json(*answer(lambda: screen.workstation_shift(assistant, n),
+                                   lanes["workstation"]))
+            elif self.path == "/api/workstation/assign":
+                self._json(200, screen.workstation_assign(
+                    assistant, str(data.get("role", "")), str(data.get("objective", ""))))
             elif self.path == "/api/ws/stage":
                 with lock:
                     self._json(200, screen.stage_write(

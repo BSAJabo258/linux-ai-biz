@@ -137,3 +137,17 @@ and gave up. Now it writes the setting for every screen and workspace itself. Pr
 Debian 13 Xfce desktop (xfdesktop 4.20.1): before, Xfce's default; after, the dusk scene.
 It comes with a stick built after this fix; if the desktop still shows the mouse after
 logging in, run `bau-look-desktop` once in a terminal.
+
+
+## The avatar: an original anime woman
+
+The **AVATAR** chip in the header puts Jarvis on screen as an original anime woman drawn
+in SVG, standing where the glass core was. She is not a video and not a celebrity clone:
+her face, hair and clothes are drawn from simple shapes so she stays sharp and costs almost
+nothing. She breathes, blinks, sways her hair, tilts her head while thinking, and her mouth
+moves with the real voice level while speaking. The chip remembers the choice in the
+browser; **GLASS CORE** brings the old orb back.
+
+Her local voice is an original low, smoky female voice (Kokoro `af_nicole` by default, set
+with `bau jarvis config --local-voice ...`). BAU does not clone or imitate a real person's
+voice; choose a voice from the local Kokoro set, or use your own licensed recording.

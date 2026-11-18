@@ -27,6 +27,23 @@ STATES = {"states": [["abc123", "DAL123 ", "United States", 0, 0, -80.1, 25.8, 1
                       230, 0, 0, None, 10100, None, False, 0]] * 3}
 SATS = [{"OBJECT_NAME": "ISS (ZARYA)", "NORAD_CAT_ID": 25544, "EPOCH": "2026-10-10T00:00:00",
          "INCLINATION": 51.6, "MEAN_MOTION": 15.5}]
+FIRES = (b"latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,"
+         b"instrument,confidence,version,bright_ti5,frp,daynight\n"
+         b"27.1,-81.2,330.1,0.4,0.4,2026-11-18,1234,N,VIIRS,high,2.0NRT,290.2,1.1,N\n"
+         b"38.2,-122.3,310.0,0.4,0.4,2026-11-18,1235,N,VIIRS,nominal,2.0NRT,280.0,0.8,D\n"
+         b"51.5,-0.1,300.0,0.4,0.4,2026-11-18,1236,N,VIIRS,low,2.0NRT,270.0,0.2,D\n")
+WEATHER = {"current": {"time": "2026-11-18T12:00", "temperature_2m": 9.4,
+                       "apparent_temperature": 7.1, "relative_humidity_2m": 81,
+                       "precipitation": 0.0, "weather_code": 3, "wind_speed_10m": 3.2,
+                       "wind_direction_10m": 240}}
+KP = [{"time_tag": "2026-11-18T09:00:00", "Kp": 1.67, "a_running": 6, "station_count": 8},
+      {"time_tag": "2026-11-18T12:00:00", "Kp": 5.33, "a_running": 18,
+       "station_count": 8}]
+TRAFFIC = {"incidents": [{"geometry": {"type": "Point", "coordinates": [4.9, 52.3]},
+                          "properties": {"iconCategory": 6, "magnitudeOfDelay": 2,
+                                         "delay": 120, "length": 800,
+                                         "roadNumbers": ["A10"],
+                                         "events": [{"description": "roadworks"}]}}]}
 
 
 class Opener:
@@ -36,8 +53,21 @@ class Opener:
     def __call__(self, req, timeout=30):
         url = req.full_url
         self.urls.append(url)
-        body = QUAKES if "usgs" in url else STATES if "opensky" in url else SATS
-        return _Resp(json.dumps(body).encode())
+        if "usgs" in url:
+            body = json.dumps(QUAKES).encode()
+        elif "opensky" in url:
+            body = json.dumps(STATES).encode()
+        elif "firms" in url:
+            body = FIRES
+        elif "open-meteo" in url:
+            body = json.dumps(WEATHER).encode()
+        elif "swpc" in url:
+            body = json.dumps(KP).encode()
+        elif "tomtom" in url:
+            body = json.dumps(TRAFFIC).encode()
+        else:
+            body = json.dumps(SATS).encode()
+        return _Resp(body)
 
 
 class _Resp(io.BytesIO):
@@ -83,6 +113,33 @@ def test_satellites_are_listed_without_pretending_to_know_positions(asst):
     d = screen.godseye_layer(asst, {"layer": "satellites", "group": "stations"})
     assert d["points"] == [] and d["list"][0]["name"] == "ISS (ZARYA)"
     assert "positions are not computed" in d["note"]
+
+
+def test_fires_weather_and_space_weather_work_without_keys(asst):
+    d = screen.godseye_layer(asst, {"layer": "fires", "region": "world"})
+    assert d["count"] == 3 and d["points"][0]["label"].startswith("fire · high")
+    assert "NASA" in d["licence"]
+    d = screen.godseye_layer(asst, {"layer": "fires", "region": "florida"})
+    assert d["count"] == 1 and d["points"][0]["lat"] == 27.1
+    d = screen.godseye_layer(asst, {"layer": "weather", "region": "europe"})
+    assert d["count"] == 1 and d["points"][0]["temperature_c"] == 9.4
+    assert "overcast" in d["points"][0]["label"] and "centre" in d["note"]
+    d = screen.godseye_layer(asst, {"layer": "space_weather"})
+    assert d["points"] == [] and d["list"][-1]["kp"] == 5.33 and d["list"][-1]["storm"]
+    assert "Kp 5" in d["note"]
+
+
+def test_traffic_and_ships_say_which_key_they_need(asst, monkeypatch):
+    monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
+    monkeypatch.delenv("AISSTREAM_API_KEY", raising=False)
+    r = screen.godseye_screen(asst, {"layer": "traffic", "region": "europe"})
+    assert "TOMTOM_API_KEY" in r["error"]
+    r = screen.godseye_screen(asst, {"layer": "ships", "region": "europe"})
+    assert "AISSTREAM_API_KEY" in r["error"]
+    monkeypatch.setenv("TOMTOM_API_KEY", "test-key")
+    d = screen.godseye_layer(asst, {"layer": "traffic", "region": "europe"})
+    assert d["count"] == 1 and "roadworks" in d["points"][0]["label"]
+    assert "TomTom" in d["licence"]
 
 
 def test_results_are_cached_so_public_sources_are_not_hammered(asst):

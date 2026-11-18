@@ -12,10 +12,15 @@ Every 30 minutes the autopilot works through its queue, up to 20 jobs at a time:
    searches GitHub with Repo Scout for the newest open-source work.
 2. **Inspect.** The best finds are downloaded into quarantine and scanned. Nothing from them
    is installed or run.
-3. **Sandbox test.** A find that passes inspection is queued for a test in the locked
-   sandbox. That job is the next one to be built; until then, those tasks wait as
-   "waiting for a handler" (`blocked` in `bau autopilot status`) and nothing is faked.
-4. **Vote, then add.** Once tested, a tool goes to the vote.
+3. **Sandbox test plan.** A find that passes inspection gets a runnable test plan in
+   `scout/test_plans/`: the command, limits and the exact `bau sandbox ... --approved
+   --execute` line. Running untrusted code still needs your signed approval, so the
+   autopilot writes the plan and never executes it.
+4. **Vote, then propose.** Once tested, a tool goes to the vote. If it passes, the
+   autopilot writes an adoption proposal in `autopilot/proposals/`; a human decides how it
+   joins BAU. Nothing is copied, installed or enabled automatically.
+5. **Learn.** Once a week, a `learn` job reviews what actually finished, what failed or was
+   blocked, and writes a short lesson to Memory Lane. Jarvis can read it with `lessons`.
 
 Each finished job can add the next one, so the work keeps going by itself.
 
@@ -49,8 +54,8 @@ untrusted data, and it never appears on your card. Blueprints are saved in
 
 | Lane | What | How |
 |---|---|---|
-| **Go** | scan, inspect, read blueprints, research, sandbox tests, drafts | Just done. Logged, and in your summary |
-| **Vote** | adding or enabling an ability | Two of three voters must say yes, then it's done and reported |
+| **Go** | scan, inspect, read blueprints, research, sandbox test plans, lessons, drafts | Just done. Logged, and in your summary |
+| **Vote** | adding or enabling an ability | Two of three voters must say yes, then a proposal waits for you |
 | **Ask you** | money, posting, legal, deleting, keys, approvals, and anything new | One question card. That job waits; everything else keeps going |
 
 **The vote.** There are three voters:
@@ -132,8 +137,10 @@ terminal that opens.
 - The cloud computer used to build this could not read other people's repositories
   through GitHub's API, so blueprints of other projects first run on your desktop.
 
-**Not built yet:**
+**Still not automatic:**
 
-- The sandbox test job and the "add to Jarvis" job. Until they exist, those tasks show as
-  "waiting for a handler" (`blocked` in `bau autopilot status`).
+- Running the sandbox test. The plan is ready, but the owner's signed approval is required;
+  the autopilot never runs untrusted code by itself.
+- Installing or enabling a tool. A passed vote writes a proposal; joining BAU is a coding
+  task for a human.
 - A second AI model as the judge. Today the judge is the compass.

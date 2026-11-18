@@ -37,8 +37,11 @@ fighting chance, the safe way.
 - **Growing:** with `--grow-at 100`, once it has earned $100 a card asks you to raise its
   posts a day (then again at twice as much). Your Accept, never its own.
 
-What it does not do, unlike Conway's: hold its own crypto wallet, copy itself, or edit its
-own code. Your rules say money and changes are approved by a human.
+What it does not do, unlike Conway's: hold its own crypto wallet or copy itself. It does
+not rewrite itself on its own either: Jarvis may write a fix to his own code in the self lab
+and test it in a private copy, but you press Accept to apply it and you install it, and the
+safety files (approvals, the gateway, the audit, the content rules) are never his to change
+(docs/SELF-MODIFICATION.md). Your rules say money and changes are approved by a human.
 
 Dying puts BAU on HOLD (only read-only actions run), switches autopost off and shows
 "automaton died" in red with the reason. Only you revive it.

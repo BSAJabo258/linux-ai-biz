@@ -30,7 +30,8 @@ THEMES = ("morning coffee by a sunny window", "autumn city walk in a long coat",
           "cozy knitwear by the fireplace", "art gallery afternoon", "new outfit try-on")
 SHOTS = ("medium", "full body", "close-up portrait")
 CAPTION_SYSTEM = ("You write one short social media caption (under 300 characters) in the "
-                  "voice of a fictional adult creator. Plain text, at most two emojis, no "
+                  "voice of a fictional adult creator. Make it confident, warm and seductively "
+                  "inviting, teasing rather than graphic. Plain text, at most two emojis, no "
                   "hashtags about age. Never mention anyone young. Only the caption.")
 
 
@@ -106,15 +107,22 @@ def explicit_ready(prof: dict[str, Any]) -> bool:
                 and comfy.chroma_ready())
 
 
-def caption(home: Path, prof: dict[str, Any], theme: str, factory: Any = None) -> str:
+def caption(home: Path, prof: dict[str, Any], theme: str, factory: Any = None,
+            level: int = 0) -> str:
     """The boss model (the owner's local model) writes it; without one, a plain line."""
     from . import team
     boss = team.show(home)["boss"]
     if boss:
         from .runtime import provider_for
         provider, _ = (factory or provider_for)(boss, home)
+        audience = prof.get("audience") or "her adult audience"
+        style = prof.get("caption_style") or "seductive and confident, never graphic"
+        tier = {0: "free teaser", 1: "subscriber post", 2: "paid nude unlock",
+                3: "paid xxx unlock"}.get(level, "post")
         ask = (f"Creator: {prof.get('name', 'the creator')}, {prof.get('niche', '')}; voice: "
-               f"{prof.get('voice', '')}. Today's post: {theme}.")
+               f"{prof.get('voice', '')}. Audience: {audience}. Caption style: {style}. "
+               f"Today's {tier}: {theme}. Tease what is behind the post; do not describe sex "
+               "acts or use explicit body-part words.")
         text = (provider.complete(CAPTION_SYSTEM, [{"role": "user", "content": ask}], [],
                                   200).text or "").strip().strip('"')
         if text:
@@ -145,8 +153,8 @@ def make_post(home: Path, task: dict[str, Any], draw: Any = None,
                                negative=negative, lane="explicit" if level >= 2 else "sfw")
     from .automaton import running
     auto = running(home)                         # the automaton: no Accept card, it posts
-    item = Queue(home).add(pic["file"], caption(home, prof, d["theme"], factory), level,
-                           "autopilot", review=not auto, price_cents=price)
+    item = Queue(home).add(pic["file"], caption(home, prof, d["theme"], factory, level),
+                           level, "autopilot", review=not auto, price_cents=price)
     return {"ok": True, "evidence": ("queued for posting" if auto else "waiting for the owner")
             + f": {item['item_id']} ({pic['file']})"}
 

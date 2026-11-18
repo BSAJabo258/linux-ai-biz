@@ -13,6 +13,8 @@ import time
 import urllib.error
 from typing import Any
 
+from ..spatial import WIDE_REGIONS
+
 MAX_EDIT = 200_000           # characters in one stage file edited on screen
 MC_VIEWS = ("status", "regulations", "jobs", "missions", "legal-queue", "economics",
             "brain", "governor", "incidents")
@@ -102,6 +104,54 @@ def bench(asst: Any, model: str) -> dict[str, Any]:
     return {**res, "model": model,
             "next": f"bau set-status model {model} APPROVED" if res["reply_ok"] else
             "it did not answer properly: fix the model server and test again"}
+
+
+def model_use(asst: Any, model: str) -> dict[str, Any]:
+    """The owner picks another approved model on the Models panel. It lasts for this
+    conversation; the saved order in config/jarvis.yaml is unchanged."""
+    asst.activity.emit("models", "start", f"Switching to {model}")
+    try:
+        out = asst.switch_model(model, asst.owner)
+    except (KeyError, ValueError, PermissionError) as e:
+        msg = str(e).strip("'\"")[:300]
+        asst.activity.emit("models", "error", msg)
+        return {"error": msg}
+    asst.activity.emit("models", "done", f"Thinking with {model}")
+    return out
+
+
+def workstation_view(asst: Any) -> dict[str, Any]:
+    from .. import workstation as W
+    return W.view(asst.home)
+
+
+def workstation_assign(asst: Any, role: str, objective: str) -> dict[str, Any]:
+    from .. import workstation as W
+    asst.activity.emit("workstation", "start", f"Assigning work to {role}")
+    try:
+        t = W.assign(asst.home, role, objective, asst.owner)
+    except (KeyError, ValueError, PermissionError) as e:
+        msg = str(e).strip("'\"")[:300]
+        asst.activity.emit("workstation", "error", msg)
+        return {"error": msg}
+    asst.activity.emit("workstation", "done",
+                       f"{role}: {t['status']} by the productivity manager")
+    return t
+
+
+def workstation_shift(asst: Any, max_tasks: int = 1) -> dict[str, Any]:
+    from .. import workstation as W
+    asst.activity.emit("workstation", "start", "Productivity manager starting a shift")
+    try:
+        out = W.run_shift(asst.home, asst.audit, max_tasks=max_tasks, by=asst.owner)
+    except (KeyError, ValueError, PermissionError) as e:
+        msg = str(e).strip("'\"")[:300]
+        asst.activity.emit("workstation", "error", msg)
+        return {"error": msg}
+    ran = out.get("ran") or []
+    asst.activity.emit("workstation", "done",
+                       f"Shift finished: {len(ran)} task(s)")
+    return out
 
 
 def _stage(asst: Any, workspace: str, episode: str, stage: str) -> tuple[Any, Any, Any]:
@@ -231,15 +281,11 @@ def studio_clip(asst: Any, clip_id: str) -> Any:
 
 
 # ------------------------------------------------------------------ God's Eye
-# Aircraft are shown only for wide named regions (never a box around one place), and every
+# Layers are shown only for wide named regions (never a box around one place), and every
 # query is recorded with its purpose. Results are kept five minutes so the public sources
-# (USGS, OpenSky, CelesTrak) are asked at most once per view in that time.
-GODSEYE_REGIONS = {      # (lat min, lon min, lat max, lon max)
-    "usa-east": (24.0, -90.0, 47.0, -66.0), "usa-west": (31.0, -125.0, 49.0, -102.0),
-    "florida": (24.5, -87.6, 31.0, -80.0), "new-york-area": (39.5, -75.5, 42.0, -71.5),
-    "caribbean": (10.0, -90.0, 27.0, -59.0), "uk-ireland": (49.5, -11.0, 59.0, 2.0),
-    "europe": (35.0, -10.0, 60.0, 30.0), "japan": (30.0, 129.0, 46.0, 146.0),
-}
+# (USGS, OpenSky, CelesTrak, NASA FIRMS, Open-Meteo, NOAA SWPC, TomTom, AISStream) are
+# asked at most once per view in that time.
+GODSEYE_REGIONS = WIDE_REGIONS
 GODSEYE_TTL = 300
 MAX_POINTS = 400
 
@@ -248,12 +294,20 @@ def godseye_query(asst: Any, layer: str, purpose: str, window: str = "all_day",
                   region: str = "", group: str = "stations") -> dict[str, Any]:
     """One public layer, ready to plot. Raises ValueError / SpatialRefused on a bad ask."""
     from ..spatial import GodsEye
-    if layer not in ("earthquakes", "aircraft", "satellites"):
-        raise ValueError("layer must be earthquakes, aircraft or satellites")
+    layers = ("earthquakes", "aircraft", "satellites", "fires", "weather", "space_weather",
+              "ships", "traffic")
+    if layer not in layers:
+        raise ValueError("layer must be one of: " + ", ".join(layers))
     if layer == "aircraft" and region not in GODSEYE_REGIONS:
         raise ValueError(f"choose a region: {', '.join(GODSEYE_REGIONS)}")
-    key = (layer, window if layer == "earthquakes" else region if layer == "aircraft"
-           else group)
+    if layer == "fires" and region not in ("world", *GODSEYE_REGIONS):
+        raise ValueError(f"choose a region: world or {', '.join(GODSEYE_REGIONS)}")
+    if layer in ("weather", "ships", "traffic") and region not in GODSEYE_REGIONS:
+        raise ValueError(f"choose a region: {', '.join(GODSEYE_REGIONS)}")
+    option = (window if layer == "earthquakes" else region if layer in (
+        "aircraft", "fires", "weather", "ships", "traffic") else group if layer == "satellites"
+        else "now")
+    key = (layer, option)
     waits = asst.__dict__.setdefault("_godseye_wait", {})
     if waits.get(layer, 0) > time.time():
         until = dt.datetime.fromtimestamp(waits[layer], dt.UTC).strftime("%H:%M UTC")
@@ -279,7 +333,7 @@ def godseye_query(asst: Any, layer: str, purpose: str, window: str = "all_day",
                          f"{f['properties']['origin_country']}",
                 "alt": f["properties"]["altitude_m"]} for f in raw["features"]]
         out = {"points": pts[:MAX_POINTS], "list": [], "region": region, "total": len(pts)}
-    else:
+    elif layer == "satellites":
         raw = ge.satellites(purpose, group)
         out = {"points": [], "note": "orbital elements only: positions are not computed",
                "list": [{"name": f["properties"]["OBJECT_NAME"],
@@ -287,15 +341,99 @@ def godseye_query(asst: Any, layer: str, purpose: str, window: str = "all_day",
                          "inclination": f["properties"]["INCLINATION"],
                          "orbits_per_day": f["properties"]["MEAN_MOTION"]}
                         for f in raw["features"]][:MAX_POINTS], "total": len(raw["features"])}
+    elif layer == "fires":
+        bbox = None if region == "world" else GODSEYE_REGIONS[region]
+        raw = ge.fires(purpose, bbox)
+        pts = [{"lon": f["geometry"]["coordinates"][0],
+                "lat": f["geometry"]["coordinates"][1],
+                "label": f"fire · {f['properties']['confidence'] or 'detected'} · "
+                         f"{f['properties']['acq_date'] or ''} "
+                         f"{f['properties']['acq_time'] or ''}".strip(),
+                "confidence": f["properties"]["confidence"],
+                "brightness": _number(f["properties"].get("brightness")),
+                "frp": _number(f["properties"].get("frp"))} for f in raw["features"]]
+        pts.sort(key=lambda p: -(p["brightness"] or 0))
+        out = {"points": pts[:MAX_POINTS], "list": [], "region": region, "total": len(pts)}
+    elif layer == "weather":
+        raw = ge.weather(purpose, GODSEYE_REGIONS[region])
+        f = raw["features"][0]
+        p = f["properties"]
+        label = (f"{region} · {p['temperature_c']}°C · {_weather(p['weather_code'])} · "
+                 f"{p['wind_ms']} m/s")
+        out = {"points": [{"lon": f["geometry"]["coordinates"][0],
+                           "lat": f["geometry"]["coordinates"][1], "label": label,
+                           "temperature_c": p["temperature_c"]}], "list": [],
+               "region": region, "note": "conditions at the centre of a wide region",
+               "total": 1}
+    elif layer == "space_weather":
+        raw = ge.space_weather(purpose)
+        items = [{"label": f"Kp {p['kp']:.2f} · {p['time_tag']}",
+                  "kp": p["kp"], "storm": p["storm"],
+                  "time_tag": p["time_tag"]}
+                 for p in (f["properties"] for f in raw["features"])]
+        out = {"points": [], "list": items[-MAX_POINTS:],
+               "note": "planetary K-index; Kp 5 or more is a geomagnetic storm",
+               "total": len(items)}
+    elif layer == "traffic":
+        raw = ge.traffic(purpose, GODSEYE_REGIONS[region])
+        pts = [{"lon": f["geometry"]["coordinates"][0],
+                "lat": f["geometry"]["coordinates"][1],
+                "label": f"{f['properties']['label'] or 'traffic incident'}"
+                         + (f" · +{f['properties']['delay_s']} s"
+                            if f["properties"].get("delay_s") is not None else "")}
+               for f in raw["features"]]
+        out = {"points": pts[:MAX_POINTS], "list": [], "region": region,
+               "total": len(pts)}
+    else:
+        raw = ge.ships(purpose, GODSEYE_REGIONS[region])
+        pts = [{"lon": f["geometry"]["coordinates"][0],
+                "lat": f["geometry"]["coordinates"][1],
+                "label": f"vessel {f['properties']['mmsi']} · "
+                         f"{f['properties']['speed_knots']} kn",
+                "mmsi": f["properties"]["mmsi"]} for f in raw["features"]]
+        out = {"points": pts[:MAX_POINTS], "list": [], "region": region,
+               "note": "public AIS positions; vessel names are not shown",
+               "total": len(pts)}
     meta = raw["bau"]
     result = {"layer": layer, "count": out.pop("total"), "licence": meta["licence"],
               "retrieved_at": meta["retrieved_at"], **out}
-    asst.audit.append("godseye.query", asst.owner, {"layer": layer, "option": key[1],
+    asst.audit.append("godseye.query", asst.owner, {"layer": layer, "option": option,
                                                     "purpose": purpose[:200],
                                                     "count": result["count"]})
     asst.activity.emit("godseye", "done", f"{result['count']} {layer}")
     cache[key] = (time.monotonic(), result)
     return result
+
+def _number(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _weather(code: Any) -> str:
+    """A short plain-English label for a WMO weather code (Open-Meteo)."""
+    try:
+        code = int(code)
+    except (TypeError, ValueError):
+        return "weather"
+    if code == 0:
+        return "clear"
+    if code in (1, 2):
+        return "partly cloudy"
+    if code == 3:
+        return "overcast"
+    if code in (45, 48):
+        return "fog"
+    if code in (51, 53, 55, 56, 57):
+        return "drizzle"
+    if code in (61, 63, 65, 66, 67, 80, 81, 82):
+        return "rain"
+    if code in (71, 73, 75, 77, 85, 86):
+        return "snow"
+    if code in (95, 96, 99):
+        return "thunderstorm"
+    return "weather"
 
 
 def _flight(callsign: str) -> str:
@@ -316,10 +454,10 @@ def godseye_layer(asst: Any, data: dict[str, Any]) -> dict[str, Any]:
 
 
 def godseye_screen(asst: Any, data: dict[str, Any]) -> dict[str, Any]:
-    from ..spatial import SpatialRefused
+    from ..spatial import SpatialRefused, SpatialUnavailable
     try:
         return godseye_layer(asst, data)
-    except (ValueError, SpatialRefused) as e:
+    except (ValueError, SpatialRefused, SpatialUnavailable) as e:
         return {"error": str(e)}
     except urllib.error.HTTPError as e:
         if e.code == 429:                      # "slow down": honour it, like Repo Scout
