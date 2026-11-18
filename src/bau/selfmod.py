@@ -268,6 +268,9 @@ class SelfLab:
         old = {}
         if (pd / "proposal.json").exists():
             old = self._load(pd.name)
+            if old.get("cards"):
+                raise SelfModError(f"{pd.name} is already on the owner's screen and cannot "
+                                   "change; propose under a new id")
         pd.mkdir(parents=True, exist_ok=True)
         work = pd / "work"
         self._copy(work)
@@ -290,15 +293,47 @@ class SelfLab:
 
     # ---------------------------------------------------------------- tests and diff
     def _run(self, work: Path, cmd: list[str], timeout: int) -> subprocess.CompletedProcess:
-        # The proposed code runs here, so it gets nothing of Jarvis's: no keys, no tokens, no
-        # real BAU_HOME. Only a path to python and a throwaway home inside the proposal.
-        scratch = work.parent / "run-home"
-        scratch.mkdir(exist_ok=True)
-        env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8",
-               "HOME": str(scratch), "TMPDIR": str(scratch), "BAU_HOME": str(scratch / "bau"),
-               "PYTHONPATH": str(work / "src"), "PYTHONDONTWRITEBYTECODE": "1"}
-        return subprocess.run(cmd, cwd=work, capture_output=True, text=True,
-                              timeout=timeout, stdin=subprocess.DEVNULL, env=env)
+        """Jarvis's proposed code runs here, so it runs in bubblewrap: no network, no home
+        folder, no BAU data, no /etc/bau; only the copy (as /work) and a read-only Python."""
+        bwrap = shutil.which("bwrap")
+        if not bwrap:
+            return subprocess.CompletedProcess(cmd, 126, "", (
+                "not run: the tests need the bubblewrap sandbox. Install it once with "
+                "`sudo apt install bubblewrap`."))
+        prefix = Path(sys.prefix).resolve()
+        box = [bwrap, "--unshare-all", "--die-with-parent", "--new-session", "--clearenv",
+               "--setenv", "PATH", "/usr/local/bin:/usr/bin:/bin",
+               "--setenv", "LANG", "C.UTF-8", "--setenv", "HOME", "/tmp",
+               "--setenv", "TMPDIR", "/tmp", "--setenv", "BAU_HOME", "/tmp/bau",
+               "--setenv", "PYTHONPATH", "/work/src", "--setenv", "PYTHONDONTWRITEBYTECODE", "1",
+               "--ro-bind", "/usr", "/usr", "--symlink", "usr/bin", "/bin",
+               "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
+               "--ro-bind-try", "/etc/ld.so.cache", "/etc/ld.so.cache",
+               "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"]
+        if not str(prefix).startswith("/usr/"):
+            box += ["--ro-bind", str(prefix), str(prefix)]
+        box += ["--bind", str(work), "/work", "--chdir", "/work"]
+        return subprocess.run(box + cmd, capture_output=True, text=True, timeout=timeout,
+                              stdin=subprocess.DEVNULL)
+
+    def shown(self, proposal: str, kind: str) -> dict[str, Any]:
+        """A card for this proposal is going on the owner's screen: from now on its files
+        are frozen, and what runs or is applied is exactly what the card showed."""
+        rec = self._load(proposal)
+        d = self.diff(proposal)
+        if d["cut"]:
+            raise SelfModError("this change is too large to show in full on one card; split "
+                               "it into smaller proposals")
+        sha = _sha(json.dumps(rec["files"], sort_keys=True))
+        rec.setdefault("cards", {})[kind] = sha
+        atomic_write_json(self._proposal_dir(proposal) / "proposal.json", rec)
+        return d
+
+    def check_shown(self, proposal: str, kind: str) -> None:
+        rec = self._load(proposal)
+        if (rec.get("cards") or {}).get(kind) != _sha(json.dumps(rec["files"], sort_keys=True)):
+            raise SelfModError("the change is not the one on your card; ask Jarvis to show "
+                               "it again")
 
     def test(self, proposal: str, tests: list[str] | None = None) -> dict[str, Any]:
         rec = self._load(proposal)
@@ -343,12 +378,7 @@ class SelfLab:
         rec = self._load(proposal)
         if not rec.get("tested"):
             raise SelfModError("the tests have not passed yet; run self_test first")
-        d = self.diff(proposal)
-        if d["cut"]:
-            raise SelfModError("this change is too large to show in full on one card; split "
-                               "it into smaller proposals")
-        rec["shown_sha"] = _sha(json.dumps(rec["files"], sort_keys=True))
-        atomic_write_json(self._proposal_dir(proposal) / "proposal.json", rec)
+        d = self.shown(proposal, "apply")
         lines = sum(1 for ln in d["diff"].splitlines()
                     if ln.startswith(("+", "-")) and not ln.startswith(("+++", "---")))
         return {"summary": f"Apply {proposal} to my own code? {len(d['files'])} file(s), "
@@ -364,9 +394,7 @@ class SelfLab:
             raise SelfModError("the tests have not passed; nothing is applied")
         for rel in rec["files"]:      # the record on disk is re-checked, not trusted
             _changeable(rel)
-        if rec.get("shown_sha") != _sha(json.dumps(rec["files"], sort_keys=True)):
-            raise SelfModError("the change is not the one on your card; ask Jarvis to show "
-                               "it again")
+        self.check_shown(proposal, "apply")
         for rel, meta in rec["base"].items():
             src = self.root / rel
             now = src.read_text(encoding="utf-8", errors="replace") if src.exists() else None

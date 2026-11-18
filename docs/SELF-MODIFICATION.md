@@ -19,8 +19,10 @@ write the repository, install a package, restart a service or run a shell.
    that copy. The working repository is untouched.
 3. **Test.** `self_test` shows you a card with the change first, because running the tests
    runs Jarvis's proposed code on this computer. On Accept it runs a fixed
-   `python -m pytest -q` in the copy, with no keys, no tokens and no real BAU data (a bare
-   environment and a throwaway home; `.env`, key and secret files are not copied). Tests default to
+   `python -m pytest -q` in the copy inside the bubblewrap sandbox: no network, no home
+   folder, no BAU data, no `/etc/bau`, an empty environment; `.env`, key and secret files are
+   not even copied. Without bubblewrap the tests do not run (`sudo apt install bubblewrap`).
+   Once a card for a proposal is shown its files are frozen: a fix goes under a new id. Tests default to
    the whole `tests` directory; a shorter list must stay under `tests/`.
 4. **Diff.** `self_diff` shows the exact unified diff, whether the tests passed, and any
    output that was cut.

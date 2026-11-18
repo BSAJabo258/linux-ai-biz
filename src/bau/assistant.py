@@ -1145,14 +1145,14 @@ class Assistant:
         return self.selflab.propose(files, reason, proposal)
 
     def t_self_test(self, proposal: str, tests: list[str] | None = None) -> dict[str, Any]:
+        self.selflab.check_shown(proposal, "test")       # exactly what the owner's card showed
         return self.selflab.test(proposal, tests)
 
     def _stage_self_test(self, proposal: str, tests: list[str] | None = None) -> dict[str, Any]:
-        d = self.selflab.diff(proposal)
+        d = self.selflab.shown(proposal, "test")
         return {"summary": f"Run the tests for {proposal}? This runs Jarvis's proposed code "
-                           "on this computer, in a copy with no keys and no BAU data. "
-                           f"{len(d['files'])} file(s):\n\n{d['diff'][:6000]}"
-                           + ("\n... more in self_diff ..." if len(d["diff"]) > 6000 else "")}
+                           "in the bubblewrap sandbox (no network, no home folder, no BAU "
+                           f"data, only the copy). {len(d['files'])} file(s):\n\n{d['diff']}"}
 
     def t_self_diff(self, proposal: str) -> dict[str, Any]:
         return self.selflab.diff(proposal)

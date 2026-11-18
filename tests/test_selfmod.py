@@ -7,6 +7,7 @@ by every model-callable tool, and the live service is untouched even after the o
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 
 import pytest
@@ -14,6 +15,8 @@ import pytest
 from bau.assistant import Assistant
 from bau.audit import AuditLog
 from bau.selfmod import SelfLab, SelfModError
+
+needs_bwrap = pytest.mark.skipif(not shutil.which("bwrap"), reason="no bubblewrap here")
 
 
 @pytest.fixture
@@ -130,6 +133,7 @@ def test_jarvis_stages_apply_and_needs_the_owner_to_confirm(repo, tmp_path):
     assert (repo / "src" / "bau" / "thing.py").read_text() == "VALUE = 2\n"
 
 
+@needs_bwrap
 def test_real_pytest_runs_against_the_private_copy(repo, tmp_path):
     s = SelfLab(root=repo, home=tmp_path / "home",
                 audit=AuditLog(tmp_path / "home" / "audit" / "chain.jsonl"))
@@ -175,9 +179,13 @@ def test_apply_is_bound_to_the_change_on_the_card(repo, tmp_path):
     with pytest.raises(SelfModError, match="card"):       # never shown: never applied
         s.apply(pid, "human:owner")
     s.card(pid)
-    s.propose({"src/bau/thing.py": "VALUE = 9\n"}, "swap after the card", pid)
-    s.test(pid)
-    with pytest.raises(SelfModError, match="card"):       # swapped after the card
+    with pytest.raises(SelfModError, match="cannot change"):   # frozen once shown
+        s.propose({"src/bau/thing.py": "VALUE = 9\n"}, "swap after the card", pid)
+    rec_path = tmp_path / "home" / "selflab" / pid / "proposal.json"
+    rec = json.loads(rec_path.read_text())
+    rec["files"]["src/bau/thing.py"] = "VALUE = 9\n"           # edited on disk instead
+    rec_path.write_text(json.dumps(rec))
+    with pytest.raises(SelfModError, match="card"):
         s.apply(pid, "human:owner")
     assert (repo / "src" / "bau" / "thing.py").read_text() == "VALUE = 1\n"
 
@@ -191,11 +199,36 @@ def test_a_diff_too_long_for_the_card_is_refused(repo, tmp_path):
         s.card(pid)
 
 
+def test_the_test_card_is_bound_to_what_it_showed(repo, tmp_path):
+    a = Assistant(tmp_path / "home", None, {}, "human:owner",
+                  AuditLog(tmp_path / "home" / "audit" / "chain.jsonl", key=b""))
+    a.selflab = lab(repo, tmp_path / "home")
+    pid = a.selflab.propose({"src/bau/thing.py": "VALUE = 2\n"}, "two")["proposal"]
+    with pytest.raises(SelfModError, match="card"):       # no card, no run
+        a.t_self_test(pid)
+    assert a._run_tool("self_test", {"proposal": pid})[0]["pending_id"]
+    out = a._run_tool("self_propose", {"files": {"src/bau/thing.py": "import os\n"},
+                                       "reason": "swap", "proposal": pid})[0]
+    assert "cannot change" in out["error"]
+
+
+@needs_bwrap
 def test_proposed_code_runs_without_jarvis_keys(repo, tmp_path, monkeypatch):
     monkeypatch.setenv("FANVUE_CLIENT_SECRET", "real-secret")
     s = SelfLab(root=repo, home=tmp_path / "home", audit=AuditLog(tmp_path / "a.jsonl"))
     pid = s.propose({"tests/test_env.py": "import os\n\ndef test_env():\n"
                      "    assert 'FANVUE_CLIENT_SECRET' not in os.environ\n"
-                     "    assert os.environ['BAU_HOME'].endswith('run-home/bau')\n"},
+                     "    assert os.environ['BAU_HOME'] == '/tmp/bau'\n"
+                     "    assert not os.path.exists('/var/lib/bau')\n"
+                     "    assert not os.path.exists(os.path.expanduser('~bauadmin/.ssh'))\n"},
                     "env check")["proposal"]
     assert s.test(pid, ["tests/test_env.py"])["passed"]
+
+
+def test_without_bubblewrap_the_proposed_code_does_not_run(repo, tmp_path, monkeypatch):
+    from bau import selfmod
+    monkeypatch.setattr(selfmod.shutil, "which", lambda name: None)
+    s = SelfLab(root=repo, home=tmp_path / "home", audit=AuditLog(tmp_path / "a.jsonl"))
+    pid = s.propose({"src/bau/thing.py": "VALUE = 2\n"}, "two")["proposal"]
+    r = s.test(pid)
+    assert not r["passed"] and "bubblewrap" in r["output"]
