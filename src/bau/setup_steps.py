@@ -420,6 +420,7 @@ def connect_in_jarvis(platform: str, home: Path, owner: str,
     import threading
 
     from .audit import AuditLog
+    pre: dict[str, object] | None = None
     if login is None:
         if platform != "fanvue":
             raise ValueError(f"no in-Jarvis sign-in for {platform!r} yet")
@@ -430,8 +431,28 @@ def connect_in_jarvis(platform: str, home: Path, owner: str,
         except fanvue.FanvueError as e:
             return {"error": str(e)}
 
+        from . import integrations as ig
+        pre = ig.preflight("fanvue", home)        # before the browser: the 2026-11 failure
+        rec = ig.Recorder("fanvue", home, via="jarvis")
+        rec.stage("preflight", pre["ready"], checks=pre["checks"], next=pre["next"])
+        if not pre["ready"]:
+            return {"error": f"Not opening Fanvue yet. Do this first: {pre['next']}. "
+                             "Details: bau connect doctor fanvue"}
+
         def login(open_browser: Callable[[str], None]) -> object:
-            return fanvue.login(client, open_browser=open_browser)
+            tok = fanvue.login(client, port=pre["port"], open_browser=open_browser,
+                               rec=rec)
+            try:                                  # consent is not proof: ask Fanvue
+                me = client.me()
+            except (fanvue.FanvueError, OSError) as e:
+                ig.record_api_check("fanvue", home, False, error=str(e),
+                                    http_status=ig.http_status_of(e), rec=rec)
+                raise
+            ig.record_api_check("fanvue", home, True, account=me.get("handle"), rec=rec)
+            ig.save_known_good("fanvue", home, pre["redirect"], pre["port"],
+                               tok.get("scope", ""), me.get("handle"), "jarvis")
+            return tok
+    port = pre["port"] if pre else {"fanvue": 3456, "tiktok": 3455}.get(platform, 0)
     links: queue.Queue[object] = queue.Queue()
     audit = AuditLog(home / "audit" / "chain.jsonl")
 
@@ -449,7 +470,7 @@ def connect_in_jarvis(platform: str, home: Path, owner: str,
         return {"error": f"{platform} did not give a sign-in link in time; try again"}
     if isinstance(got, Exception):
         return {"error": str(got)}
-    return {"started": True, "open": got,
+    return {"started": True, "open": got, "listener": f"http://127.0.0.1:{port}/",
             "said": (f"{platform.capitalize()} opened in a new tab: sign in and press Allow. "
                      "Do it in this computer's own browser - the answer comes back here. "
                      f"Check with: bau {platform} status")}
