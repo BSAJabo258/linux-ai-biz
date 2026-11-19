@@ -2061,10 +2061,10 @@ def cmd_fanvue(a):
             print(f"Signed in, but Fanvue's API refused it: {e}\n"
                   "Full report: bau connect report fanvue", file=sys.stderr)
             return EXIT_BLOCKED
-        ig.record_api_check("fanvue", None, True, account=me.get("handle"), rec=rec)
         tok = client.tokens.load() or {}
         ig.save_known_good("fanvue", None, ig.redirect_for("fanvue", a.port), a.port,
                            tok.get("scope", ""), me.get("handle"), "terminal")
+        ig.record_api_check("fanvue", None, True, account=me.get("handle"), rec=rec)
         AuditLog().append("fanvue.connected", who, {})
         _out({"connected": me.get("handle"), "creator": me.get("isCreator"),
               "ai_creator": me.get("isAiCreator"), "saved_in": str(client.tokens.path)})

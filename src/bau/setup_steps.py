@@ -448,9 +448,10 @@ def connect_in_jarvis(platform: str, home: Path, owner: str,
                 ig.record_api_check("fanvue", home, False, error=str(e),
                                     http_status=ig.http_status_of(e), rec=rec)
                 raise
-            ig.record_api_check("fanvue", home, True, account=me.get("handle"), rec=rec)
+            # the procedure first: once API_VERIFIED shows, what worked is already saved
             ig.save_known_good("fanvue", home, pre["redirect"], pre["port"],
                                tok.get("scope", ""), me.get("handle"), "jarvis")
+            ig.record_api_check("fanvue", home, True, account=me.get("handle"), rec=rec)
             return tok
     port = pre["port"] if pre else {"fanvue": 3456, "tiktok": 3455}.get(platform, 0)
     links: queue.Queue[object] = queue.Queue()
