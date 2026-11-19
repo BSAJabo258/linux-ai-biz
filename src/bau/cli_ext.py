@@ -2033,16 +2033,38 @@ def cmd_tiktok(a):
 def cmd_fanvue(a):
     from . import fanvue
     if a.fv_cmd == "login":
+        from . import integrations as ig
         who = _human()
+        rec = ig.Recorder("fanvue", via="terminal")
+        if not a.no_check:            # everything checkable before the browser opens
+            pre = ig.preflight("fanvue", port=a.port)
+            rec.stage("preflight", pre["ready"], checks=pre["checks"], next=pre["next"])
+            if not pre["ready"]:
+                print(ig.report("fanvue", pre=pre), file=sys.stderr)
+                print(f"\nNot opening Fanvue yet. Do this first: {pre['next']}",
+                      file=sys.stderr)
+                return EXIT_BLOCKED
         client = fanvue.FanvueClient()
         try:
-            fanvue.login(client, port=a.port, open_browser=lambda u: (
+            fanvue.login(client, port=a.port, rec=rec, open_browser=lambda u: (
                 print(f"Opening Fanvue to connect. If nothing opens, open this link:\n{u}"),
                 _open_browser(u)))
+        except (fanvue.FanvueError, OSError) as e:
+            print(f"Fanvue is NOT connected: {e}\nFull report: bau connect report fanvue",
+                  file=sys.stderr)
+            return EXIT_BLOCKED
+        try:
             me = client.me()          # proves the saved login really works
         except (fanvue.FanvueError, OSError) as e:
-            print(f"Fanvue is NOT connected: {e}", file=sys.stderr)
+            ig.record_api_check("fanvue", None, False, error=str(e),
+                                http_status=ig.http_status_of(e), rec=rec)
+            print(f"Signed in, but Fanvue's API refused it: {e}\n"
+                  "Full report: bau connect report fanvue", file=sys.stderr)
             return EXIT_BLOCKED
+        tok = client.tokens.load() or {}
+        ig.save_known_good("fanvue", None, ig.redirect_for("fanvue", a.port), a.port,
+                           tok.get("scope", ""), me.get("handle"), "terminal")
+        ig.record_api_check("fanvue", None, True, account=me.get("handle"), rec=rec)
         AuditLog().append("fanvue.connected", who, {})
         _out({"connected": me.get("handle"), "creator": me.get("isCreator"),
               "ai_creator": me.get("isAiCreator"), "saved_in": str(client.tokens.path)})
@@ -2051,6 +2073,12 @@ def cmd_fanvue(a):
         _out({"connected": None})
     elif a.fv_cmd == "status":
         st = fanvue.status(check=a.check)
+        if a.check and st.get("sign_in") == "present":
+            from . import integrations as ig
+            ig.record_api_check("fanvue", None, "account" in st, account=st.get("account"),
+                                error=st.get("check_failed", ""),
+                                http_status=ig.http_status_of(
+                                    Exception(st.get("check_failed", ""))))
         _out(st)
         return EXIT_OK if st["connected"] else EXIT_BLOCKED
     elif a.fv_cmd == "add":
@@ -2072,6 +2100,23 @@ def cmd_fanvue(a):
             return EXIT_BLOCKED
     elif a.fv_cmd == "sync":
         _out(fanvue.sync_earnings(bau_home(), fanvue.FanvueClient(), days=a.days))
+    return EXIT_OK
+
+
+def cmd_connect(a):
+    from . import integrations as ig
+    if a.cn_cmd == "status":
+        _out([ig.state(p) for p in ig.REGISTRY])
+        return EXIT_OK
+    if a.provider not in ig.REGISTRY:
+        print(f"no connection doctor for {a.provider!r}; known: {', '.join(ig.REGISTRY)}",
+              file=sys.stderr)
+        return EXIT_BLOCKED
+    if a.cn_cmd == "doctor":
+        pre = ig.preflight(a.provider, port=a.port, probe=not a.no_probe)
+        print(ig.report(a.provider, pre=pre))
+        return EXIT_OK if pre["ready"] else EXIT_BLOCKED
+    print(ig.report(a.provider))
     return EXIT_OK
 
 
@@ -2855,6 +2900,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     fv = s.add_subparsers(dest="fv_cmd", required=True)
     x = fv.add_parser("login", help="connect your Fanvue account (opens Fanvue)")
     x.add_argument("--port", type=int, default=3456)
+    x.add_argument("--no-check", action="store_true",
+                   help="skip the pre-flight check (bau connect doctor fanvue)")
     fv.add_parser("logout")
     x = fv.add_parser("status", help="is Fanvue connected, for this account (no secrets "
                       "shown); --check asks Fanvue which account it is")
@@ -2873,6 +2920,19 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = fv.add_parser("sync", help="bring Fanvue's earnings into the ledger now")
     x.add_argument("--days", type=int, default=30)
     s.set_defaults(fn=cmd_fanvue)
+
+    s = sub.add_parser("connect", help="platform connections: state, pre-flight doctor, "
+                       "copyable report (docs/INTEGRATIONS.md)")
+    cs = s.add_subparsers(dest="cn_cmd", required=True)
+    x = cs.add_parser("status", help="every platform's connection state")
+    x = cs.add_parser("doctor", help="check everything before signing in (no secrets shown)")
+    x.add_argument("provider")
+    x.add_argument("--port", type=int)
+    x.add_argument("--no-probe", action="store_true",
+                   help="do not ask the platform whether it accepts the address")
+    x = cs.add_parser("report", help="the last attempt, stage by stage, to paste anywhere")
+    x.add_argument("provider")
+    s.set_defaults(fn=cmd_connect)
 
     s = sub.add_parser("gateway", help="list gateway capabilities")
     s.set_defaults(fn=cmd_gateway)

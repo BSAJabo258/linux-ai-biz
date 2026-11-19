@@ -105,6 +105,8 @@ Fanvue gives out no API keys. Every app signs in through Fanvue's own Allow page
    ```bash
    bau fanvue status            # app keys, signed in or not, how long the access lasts
    bau fanvue status --check    # also asks Fanvue which account it is
+   bau connect doctor fanvue    # before signing in: keys, port, and does Fanvue accept the address
+   bau connect report fanvue    # the last attempt stage by stage, safe to paste (docs/INTEGRATIONS.md)
    ```
 
 ## One sign-in for everything

@@ -284,7 +284,14 @@ def status(home: Path | None = None, client: FanvueClient | None = None,
     sign_in = tokens.store.state()
     out: dict[str, Any] = {"app_keys": keys, "sign_in": sign_in, "store": str(tokens.path),
                            "connected": sign_in == "present"}
-    if sign_in == "present":
+    if check and sign_in == "present":
+        try:
+            me = (client or FanvueClient(home)).me()
+            out["account"] = me.get("handle")
+        except (FanvueError, OSError) as e:
+            out["connected"] = False
+            out["check_failed"] = str(e)[:300]
+    if sign_in == "present":          # after the check: it may just have renewed the access
         tok = tokens.load() or {}
         left = float(tok.get("access_expires_at", 0)) - time.time()
         out["access"] = (f"valid for {int(left // 60)} more minutes" if left > 0 else
@@ -295,13 +302,6 @@ def status(home: Path | None = None, client: FanvueClient | None = None,
     else:
         out["fix"] = ("sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET, then "
                       "bau fanvue login") if keys == "missing" else "bau fanvue login"
-    if check and sign_in == "present":
-        try:
-            me = (client or FanvueClient(home)).me()
-            out["account"] = me.get("handle")
-        except (FanvueError, OSError) as e:
-            out["connected"] = False
-            out["check_failed"] = str(e)[:300]
     return out
 
 
@@ -312,7 +312,7 @@ def redirect_hint(redirect: str) -> str:
 
 
 def login(client: FanvueClient, port: int = PORT, open_browser: Any = None,
-          timeout: int = 300) -> dict[str, Any]:
+          timeout: int = 300, rec: Any = None) -> dict[str, Any]:
     """A callback server on 127.0.0.1. Register http://127.0.0.1:<port>/callback as a
     redirect URI on the Fanvue app's Authentication tab. The browser says "connected" only
     once the token is saved on this computer (oauth_callback). The address is printed before
@@ -320,9 +320,16 @@ def login(client: FanvueClient, port: int = PORT, open_browser: Any = None,
     redirect = f"http://127.0.0.1:{port}/callback"
     verifier, challenge = pkce_pair()
     state = secrets.token_hex(32)
+    from .integrations import Recorder
+    rec = rec or Recorder("fanvue", client.tokens.path.parent.parent)
+    stage = rec.stage
 
     def finish(got: dict[str, str]) -> dict[str, Any]:
-        if not secrets.compare_digest(got.get("state", ""), state):
+        state_ok = secrets.compare_digest(got.get("state", ""), state)
+        stage("callback", state_ok and "code" in got, state_valid=state_ok,
+              code_received="code" in got, provider_error=got.get("error"),
+              provider_error_description=got.get("error_description"))
+        if not state_ok:
             raise FanvueError("state mismatch - login aborted")
         if "code" not in got:
             raise FanvueError("Fanvue refused: "
@@ -330,23 +337,39 @@ def login(client: FanvueClient, port: int = PORT, open_browser: Any = None,
                               + redirect_hint(redirect))
         try:
             tok = client.exchange(got["code"], redirect, verifier)
+        except FanvueError as e:      # the callback was fine: the token exchange failed
+            stage("token_exchange", False, error=str(e)[:300], redirect=redirect,
+                  next="invalid_grant = code used/expired or PKCE mismatch: sign in again; "
+                       "invalid_client = check FANVUE_CLIENT_SECRET")
+            raise
         except OSError as e:          # the token could not be written in BAU_HOME/secrets
+            stage("stored", False, error=str(e)[:300])
             raise FanvueError(f"Fanvue answered, but the login could not be saved in "
                               f"{client.tokens.path}: {e}") from e
+        stage("token_exchange", True, granted_scopes=tok.get("scope", ""))
         if client.tokens.load() is None:
+            stage("stored", False, error="not saved")
             raise FanvueError(f"the login was not saved in {client.tokens.path}")
+        stage("stored", True, store=str(client.tokens.path))
         return tok
 
     url = client.authorize_url(redirect, state, challenge)
     print(f"Fanvue sends you back to {redirect}\nRegister exactly that address on your "
           "Fanvue app's Authentication tab and press Save.")
+    stage("authorize_url", True, redirect=redirect, port=port, scopes=SCOPES)
     try:
         return oauth_callback("Fanvue", port, "/callback", url,
                               open_browser or (lambda u: print(f"Open this link to connect "
                                                                f"Fanvue:\n{u}")),
                               timeout, finish)
     except TikTokError as e:          # the shared helper's timeout
+        stage("callback", False, error=str(e), redirect=redirect,
+              next=redirect_hint(redirect) + " Or the browser was not on this computer.")
         raise FanvueError(f"{e}\n{redirect_hint(redirect)}") from None
+    except OSError as e:              # the listener could not start
+        stage("listener", False, error=str(e)[:200], port=port,
+              next=f"port {port} busy: ss -ltnp 'sport = :{port}'")
+        raise
 
 
 # ------------------------------------------------------------------ the queue
