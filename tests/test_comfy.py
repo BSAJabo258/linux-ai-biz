@@ -196,3 +196,10 @@ def test_pictures_setup_brings_cuda_and_stops_a_crash_loop():
     assert "apt-get install -y libcuda1" in text
     assert "torch.cuda.is_available()" in text
     assert "StartLimitBurst=5" in text and "RestartSec=30" in text
+
+
+def test_the_age_check_runs_on_the_processor_never_the_full_graphics_card():
+    from pathlib import Path
+    text = (Path(__file__).resolve().parents[1] / "src/bau/media/agecheck_run.py").read_text()
+    assert 'os.environ["CUDA_VISIBLE_DEVICES"] = ""' in text and 'device="cpu"' in text
+    assert text.index("CUDA_VISIBLE_DEVICES") < text.index("from transformers import")
