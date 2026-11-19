@@ -268,3 +268,35 @@ def test_her_locked_face_is_used_on_sfw_posts_only(home, monkeypatch):
                        "parts": C.pick(1)}}
     C.make_post(home, task, draw=draw)
     assert seen[0] == face.locked(home, prof)
+
+
+def test_paid_levels_use_her_locked_lora_and_trigger_word(home, monkeypatch):
+    import yaml
+
+    from bau import face, team
+    from bau.media import comfy
+    monkeypatch.setattr(team, "show", lambda h: {"boss": None})
+    monkeypatch.setattr(C, "explicit_ready", lambda p: True)
+    path = home / "creators" / "aria.yaml"
+    prof = yaml.safe_load(path.read_text())
+    prof["prices"] = {"subscription": 3.99, "nude": 7.99, "xxx": 12.99}
+    prof["explicit_boundaries"] = ["one adult alone"]
+    path.write_text(yaml.safe_dump(prof))
+    monkeypatch.setattr(face, "locked_lora",
+                        lambda h, p: {"name": "bau-x-chroma.safetensors", "trigger": "baux",
+                                      "sha256": "0"})
+    seen = []
+
+    def draw(home_, prompt, name, **kw):
+        seen.append((prompt, kw))
+        out = fake_draw([])(home_, prompt, name)
+        prov = home_ / "artifacts" / "media" / f"{name}.png.provenance.json"
+        prov.write_text(json.dumps({**json.loads(prov.read_text()), "lane": kw["lane"]}))
+        return out
+    task = {"detail": {"job": "fanvue_post", "theme": "x", "level": 2, "shot": "medium",
+                       "parts": C.pick(1)}}
+    C.make_post(home, task, draw=draw)
+    prompt, kw = seen[0]
+    assert kw["lora"] == "bau-x-chroma.safetensors" and kw["lane"] == "explicit"
+    assert prompt.startswith("photo of baux woman, ") and "face" not in kw
+    assert comfy.NEGATIVE in kw["negative"]
