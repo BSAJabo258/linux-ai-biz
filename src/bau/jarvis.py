@@ -193,13 +193,68 @@ AGENT_FOR = {"research": "researcher"}
 NEEDS = {"research": ("search.web",)}
 
 
+def check_result(res: Any, objective: str) -> dict[str, Any]:
+    """The one check every agent result goes through (missions and the workstation alike).
+    Verified only when it completed with an answer and every fact in that answer (links,
+    quotes, amounts, numbers) appears in what its tools returned."""
+    from .supervisor import facts, unchecked
+    loose = unchecked(res.final_text, [objective, *res.evidence])
+    # At least one fact the tools backed: on the real model (2026-11-10) an answer of only
+    # questions back to the owner had nothing false in it, and counted as done.
+    # Backed by what the TOOLS returned: on the real model a quoted mission title counted
+    # as found, because the task's own words were in the pool (2026-11-10).
+    def norm(t: str) -> str:
+        return "".join(t.split()).rstrip(".,;:").lower()
+    found, asked = norm(" ".join(res.evidence)), norm(objective)
+    backed = [f for f in facts(res.final_text) if norm(f) in found and norm(f) not in asked]
+    answered = bool((res.final_text or "").strip())
+    verified = res.status == "COMPLETED" and answered and bool(backed) and not loose
+    return {"verified": verified, "unbacked_facts": loose[:10],
+            "why_not_verified": None if verified else (
+                f"the agent ended {res.status}" if res.status != "COMPLETED" else
+                "no answer" if not answered else
+                f"{len(loose)} fact(s) no tool result backs: {', '.join(loose[:5])}"
+                if loose else "no fact in the answer is backed by what the tools found "
+                "(it may be asking you questions: answer them, or plan the mission again "
+                "more precisely)")}
+
+
+def run_checked(home: Path, name: str, objective: str, mission_id: str,
+                run_one: Any) -> dict[str, Any]:
+    """One agent run through the executive controller (one job, HOLD and the owner's cancel
+    honoured), then the check, recorded on the job: COMPLETED says the agent finished,
+    ``verification`` says whether the result passed. Used by missions and the workstation."""
+    from .adapters.agent_folder import AgentFolderAdapter
+    from .executive import ExecutiveController, TaskContract
+    from .governor import hold_reason
+    from .jobs import JobStore
+    store = JobStore(home)
+    ctl = ExecutiveController(store, hold=lambda: hold_reason(home))
+    ctl.register(AgentFolderAdapter(store, run_one))
+    job_id = ctl.create_task(TaskContract(mission_id, objective, agent=name))
+    out = ctl.dispatch(job_id, "agent_folder")
+    res = out.evidence.get("run")
+    if res is None:                 # the agent itself crashed: the job says why
+        raise RuntimeError("; ".join(out.errors) or "the agent did not run")
+    check = check_result(res, objective)
+    tools = [c.get("capability") for c in res.tool_calls if c.get("ok")]
+    job = store.load(job_id)
+    job.tools = sorted({t for t in tools if t})
+    if job.status == "COMPLETED":
+        job.verification = "VERIFIED" if check["verified"] else "FAILED"
+        job.next_action = ("delivered and checked" if check["verified"] else
+                           "the owner reviews it: " + check["why_not_verified"])
+    store.checkpoint(job)
+    return {"agent": name, "job_id": job_id, "status": res.status,
+            "report": (res.final_text or "")[:4000], "cost_usd": res.cost_usd,
+            "tools_used": tools, **check}
+
+
 def agent_executor(home: Path, audit: Any, jarvis: Any = None, factory: Any = None,
                    run_agent: Any = None) -> Any:
     """The executor for a mission an agent can do: the agent folder works the objective (every
-    tool through the gateway). Verified only when it completed with an answer and every fact in
-    that answer (links, quotes, amounts, numbers) appears in what its tools returned; anything
-    else ends PAUSED for the owner's review, never COMPLETED on the agent's word."""
-    from .supervisor import facts, unchecked
+    tool through the gateway). Verified only when it passes ``check_result``; anything else
+    ends PAUSED for the owner's review, never COMPLETED on the agent's word."""
 
     def run_one(name: str, objective: str, mission_id: str, job: Any) -> Any:
         if run_agent is not None:
@@ -225,42 +280,7 @@ def agent_executor(home: Path, audit: Any, jarvis: Any = None, factory: Any = No
                             for c in gaps)}
         # Through the executive controller (Phase 1, docs/JARVIS_IMPLEMENTATION_MAP.md): one
         # job per mission run, kept in the jobs folder, honouring HOLD and the owner's cancel.
-        from .adapters.agent_folder import AgentFolderAdapter
-        from .executive import ExecutiveController, TaskContract
-        from .governor import hold_reason
-        from .jobs import JobStore
-        store = JobStore(home)
-        ctl = ExecutiveController(store, hold=lambda: hold_reason(home))
-        ctl.register(AgentFolderAdapter(store, run_one))
-        job_id = ctl.create_task(TaskContract(m.mission_id, m.objective, agent=name))
-        out = ctl.dispatch(job_id, "agent_folder")
-        res = out.evidence.get("run")
-        if res is None:                 # the agent itself crashed: the job says why
-            raise RuntimeError("; ".join(out.errors) or "the agent did not run")
-        loose = unchecked(res.final_text, [m.objective, *res.evidence])
-        # At least one fact the tools backed: on the real model (2026-11-10) an answer of only
-        # questions back to the owner had nothing false in it, and counted as done.
-        # Backed by what the TOOLS returned: on the real model a quoted mission title counted
-        # as found, because the task's own words were in the pool (2026-11-10).
-        def norm(t: str) -> str:
-            return "".join(t.split()).rstrip(".,;:").lower()
-        found, asked = norm(" ".join(res.evidence)), norm(m.objective)
-        backed = [f for f in facts(res.final_text)
-                  if norm(f) in found and norm(f) not in asked]
-        answered = bool((res.final_text or "").strip())
-        verified = res.status == "COMPLETED" and answered and bool(backed) and not loose
-        return {"agent": name, "job_id": job_id, "status": res.status,
-                "report": (res.final_text or "")[:4000],
-                "unbacked_facts": loose[:10], "verified": verified,
-                "cost_usd": res.cost_usd,
-                "tools_used": [c.get("capability") for c in res.tool_calls if c.get("ok")],
-                "why_not_verified": None if verified else (
-                    f"the agent ended {res.status}" if res.status != "COMPLETED" else
-                    "no answer" if not answered else
-                    f"{len(loose)} fact(s) no tool result backs: {', '.join(loose[:5])}"
-                    if loose else "no fact in the answer is backed by what the tools found "
-                    "(it may be asking you questions: answer them, or plan the mission again "
-                    "more precisely)")}
+        return run_checked(home, name, m.objective, m.mission_id, run_one)
     return execute
 
 
