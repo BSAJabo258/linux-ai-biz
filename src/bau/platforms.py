@@ -90,3 +90,83 @@ class APIConnector:
                                f"(set {self.credentials_env} via the secret store)")
         raise NotImplementedError(f"{self.name} API upload must be implemented against the "
                                   "platform's current API terms before use")
+
+
+# ------------------------------------------------------------------ connections
+# The one table of what BAU is connected to (the owner's checklist, 2026-11-18: "Do not claim a
+# platform is connected merely because its API credentials exist"). Each row is read live from
+# the shared credential store (credentials.py) and the policy record above; a platform is
+# LIVE-VERIFIED only after a real call to it answered in this run (``check``).
+
+# What BAU's own code can do on each platform, from the facts in each module's docstring.
+CAPABILITIES = {
+    "fanvue": ["sign-in", "upload pictures", "post (your Accept, or autopost)", "earnings"],
+    "tiktok": ["sign-in", "upload video", "post (your Accept)", "video stats",
+               "private posts only until TikTok audits the app"],
+}
+# Planned, not built: listed so nobody mistakes them for connected.
+PLANNED = ("youtube", "instagram", "facebook", "x", "threads")
+
+
+def _fanvue_row(home: Path, check: bool) -> dict[str, Any]:
+    from . import fanvue
+    st = fanvue.status(home, check=check)
+    row = {"app_keys": st["app_keys"], "sign_in": st["sign_in"]}
+    if st.get("account"):
+        row["account"] = st["account"]
+    if st.get("check_failed"):
+        row["error"] = st["check_failed"]
+    try:
+        seen = json.loads((home / "economics" / "fanvue_seen.json").read_text())
+        row["last_sync"] = seen.get("synced_at")
+    except (OSError, ValueError):
+        row["last_sync"] = None
+    return row | {"fix": st.get("fix")}
+
+
+def _tiktok_row(home: Path, check: bool) -> dict[str, Any]:
+    from . import tiktok
+    try:
+        tiktok.app_credentials()
+        keys = "on this computer"
+    except tiktok.TikTokError:
+        keys = "missing"
+    store = tiktok.TokenStore(home).store
+    row: dict[str, Any] = {"app_keys": keys, "sign_in": store.state()}
+    if check and row["sign_in"] == "present":
+        try:
+            info = tiktok.TikTokClient(home).creator_info()
+            row["account"] = (info.get("data") or info).get("creator_username")
+        except (tiktok.TikTokError, OSError) as e:
+            row["error"] = str(e)[:300]
+    row["fix"] = (None if row["sign_in"] == "present" else
+                  "sudo bau keys set TIKTOK_CLIENT_KEY TIKTOK_CLIENT_SECRET, then bau tiktok login"
+                  if keys == "missing" else "bau tiktok login")
+    return row
+
+
+def connections(home: Path | None = None, check: bool = False) -> list[dict[str, Any]]:
+    """Every platform, its true connection state, what BAU can do there, and what the owner
+    still has to do. Nothing secret in it."""
+    home = home or bau_home()
+    rows = []
+    for name, read in (("fanvue", _fanvue_row), ("tiktok", _tiktok_row)):
+        row = {"platform": name, **read(home, check)}
+        policy = PlatformRegistry(home).facts(name)
+        row["policy_record"] = ("current" if policy["platform_policy_current"] else
+                                policy.get("reason") or "older than 90 days")
+        if row["sign_in"] == "unreadable":
+            row["status"] = "BLOCKED"
+        elif row["sign_in"] != "present":
+            row["status"] = "OWNER-ACTION-REQUIRED"
+        elif row.get("account"):
+            row["status"] = "LIVE-VERIFIED"           # the platform answered, just now
+        elif row.get("error"):
+            row["status"] = "BLOCKED"
+        else:
+            row["status"] = "CONNECTED"               # signed in; not asked this time
+        row["capabilities"] = CAPABILITIES[name]
+        rows.append(row)
+    rows += [{"platform": p, "status": "NOT IMPLEMENTED", "capabilities": [],
+              "fix": "planned: no adapter yet"} for p in PLANNED]
+    return rows
