@@ -284,7 +284,14 @@ def status(home: Path | None = None, client: FanvueClient | None = None,
     sign_in = tokens.store.state()
     out: dict[str, Any] = {"app_keys": keys, "sign_in": sign_in, "store": str(tokens.path),
                            "connected": sign_in == "present"}
-    if sign_in == "present":
+    if check and sign_in == "present":
+        try:
+            me = (client or FanvueClient(home)).me()
+            out["account"] = me.get("handle")
+        except (FanvueError, OSError) as e:
+            out["connected"] = False
+            out["check_failed"] = str(e)[:300]
+    if sign_in == "present":          # after the check: it may just have renewed the access
         tok = tokens.load() or {}
         left = float(tok.get("access_expires_at", 0)) - time.time()
         out["access"] = (f"valid for {int(left // 60)} more minutes" if left > 0 else
@@ -295,13 +302,6 @@ def status(home: Path | None = None, client: FanvueClient | None = None,
     else:
         out["fix"] = ("sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET, then "
                       "bau fanvue login") if keys == "missing" else "bau fanvue login"
-    if check and sign_in == "present":
-        try:
-            me = (client or FanvueClient(home)).me()
-            out["account"] = me.get("handle")
-        except (FanvueError, OSError) as e:
-            out["connected"] = False
-            out["check_failed"] = str(e)[:300]
     return out
 
 
