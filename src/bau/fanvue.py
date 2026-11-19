@@ -52,13 +52,13 @@ import json
 import math
 import os
 import secrets
-import stat
 import time
 import urllib.parse
 from pathlib import Path
 from typing import Any
 
 from .audit import AuditLog
+from .credentials import CredentialError, Store, fix_command
 from .home import atomic_write_json, bau_home
 from .tiktok import Http, TikTokError, _env_file, oauth_callback
 
@@ -99,29 +99,30 @@ def app_credentials(env_file: Path = Path("/etc/bau/platforms.env")) -> tuple[st
 
 
 class TokenStore:
-    """BAU_HOME/secrets/fanvue.json, mode 0600. Never logged."""
+    """BAU_HOME/secrets/fanvue.json in the one shared credential store (credentials.py): the
+    owner's login, Jarvis and the autopilot read the same sign-in. Never logged."""
 
     def __init__(self, home: Path | None = None):
-        self.path = (home or bau_home()) / "secrets" / "fanvue.json"
+        self.store = Store("fanvue", home)
+        self.path = self.store.path
 
     def load(self) -> dict[str, Any] | None:
-        return json.loads(self.path.read_text()) if self.path.exists() else None
+        return self.store.load()
 
     def save(self, tok: dict[str, Any]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.path.parent, stat.S_IRWXU)
-        old = self.load() or {}
-        atomic_write_json(self.path, {
+        try:
+            old = self.load() or {}
+        except CredentialError:
+            old = {}
+        self.store.save({
             "access_token": tok["access_token"],
             # rotating, single-use: the new one replaces the old one every time
             "refresh_token": tok.get("refresh_token") or old.get("refresh_token", ""),
             "scope": tok.get("scope", old.get("scope", "")),
             "access_expires_at": time.time() + int(tok.get("expires_in") or 0) - 60})
-        os.chmod(self.path, stat.S_IRUSR | stat.S_IWUSR)
 
     def clear(self) -> None:
-        if self.path.exists():
-            self.path.unlink()
+        self.store.clear()
 
 
 class FanvueClient:
@@ -163,16 +164,28 @@ class FanvueClient:
                             "redirect_uri": redirect_uri, "code_verifier": verifier})
 
     def connected(self) -> bool:
-        return self.tokens.load() is not None
+        return self.tokens.store.state() == "present"
 
-    def access_token(self) -> str:
-        tok = self.tokens.load()
+    def _load(self) -> dict[str, Any]:
+        try:
+            tok = self.tokens.load()
+        except CredentialError as e:
+            raise FanvueError(str(e)) from None
         if tok is None:
             raise FanvueError("Fanvue is not connected: bau fanvue login")
+        return tok
+
+    def access_token(self) -> str:
+        tok = self._load()
         if time.time() < tok["access_expires_at"]:
             return tok["access_token"]
-        return self._token({"grant_type": "refresh_token",
-                            "refresh_token": tok["refresh_token"]})["access_token"]
+        # The refresh token works once: Jarvis and the autopilot must not both spend it.
+        with self.tokens.store.refresh_lock():
+            tok = self._load()                    # another process may have just refreshed
+            if time.time() < tok["access_expires_at"]:
+                return tok["access_token"]
+            return self._token({"grant_type": "refresh_token",
+                                "refresh_token": tok["refresh_token"]})["access_token"]
 
     # -------------------------------------------------------- API
     def call(self, method: str, path: str, payload: dict[str, Any] | None = None
@@ -254,6 +267,42 @@ class FanvueHttp(Http):
                 return r.status, r.headers.get("ETag", "")
         except urllib.error.HTTPError as e:
             return e.code, ""
+
+
+def status(home: Path | None = None, client: FanvueClient | None = None,
+           check: bool = False) -> dict[str, Any]:
+    """The one answer to "is Fanvue connected", the same for the terminal, Jarvis, bau money
+    and the autopilot, because all of them read the one shared store. Nothing secret: no
+    token, code or key is ever in it. ``check`` asks Fanvue who the account is (a real call)."""
+    home = home or bau_home()
+    try:
+        app_credentials()
+        keys = "on this computer"
+    except FanvueError:
+        keys = "missing"
+    tokens = TokenStore(home)
+    sign_in = tokens.store.state()
+    out: dict[str, Any] = {"app_keys": keys, "sign_in": sign_in, "store": str(tokens.path),
+                           "connected": sign_in == "present"}
+    if sign_in == "present":
+        tok = tokens.load() or {}
+        left = float(tok.get("access_expires_at", 0)) - time.time()
+        out["access"] = (f"valid for {int(left // 60)} more minutes" if left > 0 else
+                         "expired: renewed on its next use" if tok.get("refresh_token") else
+                         "expired and cannot be renewed: bau fanvue login")
+    elif sign_in == "unreadable":
+        out["fix"] = fix_command(tokens.path)
+    else:
+        out["fix"] = ("sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET, then "
+                      "bau fanvue login") if keys == "missing" else "bau fanvue login"
+    if check and sign_in == "present":
+        try:
+            me = (client or FanvueClient(home)).me()
+            out["account"] = me.get("handle")
+        except (FanvueError, OSError) as e:
+            out["connected"] = False
+            out["check_failed"] = str(e)[:300]
+    return out
 
 
 def redirect_hint(redirect: str) -> str:

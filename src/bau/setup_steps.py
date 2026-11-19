@@ -216,7 +216,7 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         return None                       # keys are here: the Connect Fanvue card takes over
     if step in ("automaton", "grow"):     # after Fanvue is connected and autopost is chosen
         from . import automaton, fanvue
-        if (fanvue.TokenStore(home).load() is None
+        if (fanvue.TokenStore(home).store.state() != "present"
                 or not (fanvue.autopost_choice(home) or {}).get("on")):
             return None
         if step == "automaton":
@@ -228,10 +228,10 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
             fanvue.app_credentials()
         except fanvue.FanvueError:
             return None
-        return fanvue.TokenStore(home).load() is not None
+        return fanvue.TokenStore(home).store.state() == "present"
     if step == "autopost":                # once Fanvue is connected, until he chooses
         from . import fanvue
-        if fanvue.TokenStore(home).load() is None:
+        if fanvue.TokenStore(home).store.state() != "present":
             return None
         return fanvue.autopost_choice(home) is not None
     if step == "explicit":                # after pictures and the owner's explicit limits
@@ -407,6 +407,54 @@ def approve_keys(home: Path, owner: str) -> tuple[list[str], dict[str, str]]:
     return done, refused
 
 
+def connect_in_jarvis(platform: str, home: Path, owner: str,
+                      login: Callable[[Callable[[str], None]], object] | None = None,
+                      wait: float = 15) -> dict[str, object]:
+    """Connect a platform from Jarvis's own card with the SAME sign-in code the terminal runs
+    (``bau fanvue login``), saving into the same shared store (credentials.py). Found
+    2026-11-18: under the desktop's always-on Jarvis there is no screen for a terminal, so the
+    card could only say "do it at the desktop". The sign-in waits in the background for
+    Fanvue's answer; the page opens Fanvue's link. The answer comes back to this computer's
+    127.0.0.1, so it is done in the desktop's own browser."""
+    import queue
+    import threading
+
+    from .audit import AuditLog
+    if login is None:
+        if platform != "fanvue":
+            raise ValueError(f"no in-Jarvis sign-in for {platform!r} yet")
+        from . import fanvue
+        try:
+            client = fanvue.FanvueClient(home)
+            fanvue.app_credentials()              # the app's keys first, with their fix
+        except fanvue.FanvueError as e:
+            return {"error": str(e)}
+
+        def login(open_browser: Callable[[str], None]) -> object:
+            return fanvue.login(client, open_browser=open_browser)
+    links: queue.Queue[object] = queue.Queue()
+    audit = AuditLog(home / "audit" / "chain.jsonl")
+
+    def run_login() -> None:
+        try:
+            login(links.put)
+            audit.append(f"{platform}.connected", owner, {"via": "jarvis card"})
+        except Exception as e:  # noqa: BLE001 - said on the card or in the audit, never lost
+            links.put(e)
+            audit.append(f"{platform}.connect_failed", owner, {"why": str(e)[:300]})
+    threading.Thread(target=run_login, daemon=True, name=f"connect-{platform}").start()
+    try:
+        got = links.get(timeout=wait)
+    except queue.Empty:
+        return {"error": f"{platform} did not give a sign-in link in time; try again"}
+    if isinstance(got, Exception):
+        return {"error": str(got)}
+    return {"started": True, "open": got,
+            "said": (f"{platform.capitalize()} opened in a new tab: sign in and press Allow. "
+                     "Do it in this computer's own browser - the answer comes back here. "
+                     f"Check with: bau {platform} status")}
+
+
 def run(step: str, home: Path, probe: Probe | None = None,
         terminal: Terminal | None = None, owner: str = "",
         values: dict[str, object] | None = None) -> dict[str, object]:
@@ -462,6 +510,8 @@ def run(step: str, home: Path, probe: Probe | None = None,
         except (KeyError, ValueError, TypeError, V.CreatorError) as e:
             return {"error": str(e)}
         return {"done": True, "said": "Saved in your creator profile."}
+    if step == "fanvue":                  # the terminal's own sign-in, run from the card
+        return connect_in_jarvis("fanvue", home, owner)
     cmd = _command(step, home)
     if not (terminal or _terminal)(f"BAU setup: {BY_ID[step].title}", cmd):
         return {"error": ("No screen here to open a terminal on. Do this at the desktop, "

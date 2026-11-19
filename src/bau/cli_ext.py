@@ -2049,6 +2049,10 @@ def cmd_fanvue(a):
     elif a.fv_cmd == "logout":
         fanvue.TokenStore().clear()
         _out({"connected": None})
+    elif a.fv_cmd == "status":
+        st = fanvue.status(check=a.check)
+        _out(st)
+        return EXIT_OK if st["connected"] else EXIT_BLOCKED
     elif a.fv_cmd == "add":
         try:
             item = fanvue.Queue().add(a.picture, a.caption, a.level, _human())
@@ -2852,6 +2856,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = fv.add_parser("login", help="connect your Fanvue account (opens Fanvue)")
     x.add_argument("--port", type=int, default=3456)
     fv.add_parser("logout")
+    x = fv.add_parser("status", help="is Fanvue connected, for this account (no secrets "
+                      "shown); --check asks Fanvue which account it is")
+    x.add_argument("--check", action="store_true")
     x = fv.add_parser("add", help="queue a picture from artifacts/media with its caption")
     x.add_argument("picture", help="file name in $BAU_HOME/artifacts/media")
     x.add_argument("--caption", required=True)

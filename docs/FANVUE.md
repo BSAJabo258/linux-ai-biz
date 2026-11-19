@@ -86,8 +86,10 @@ Fanvue gives out no API keys. Every app signs in through Fanvue's own Allow page
    app's Client ID and Client Secret (nothing shows as you paste). Or in a terminal:
    `sudo bau keys set FANVUE_CLIENT_ID FANVUE_CLIENT_SECRET`. From another computer,
    `bau keys import` works too (docs/KEYS.md). Never paste them into a chat.
-3. Jarvis then shows a **Connect Fanvue** card. Press Accept: a terminal opens, then Fanvue
-   opens in the browser. Sign in and press **Allow**. Or, in a terminal:
+3. Jarvis then shows a **Connect Fanvue** card. Press Accept: Jarvis runs the same sign-in as
+   the terminal and Fanvue opens in a new tab. Sign in and press **Allow**. Do it in the
+   desktop's own browser: Fanvue sends you back to this computer's `127.0.0.1`, so a browser
+   on the laptop would not reach it. Or, in a terminal:
 
    ```bash
    bau fanvue login
@@ -98,6 +100,24 @@ Fanvue gives out no API keys. Every app signs in through Fanvue's own Allow page
    **NOT connected**, the reason is on the page and in the terminal: most often the redirect
    address on the app's Authentication tab is not exactly the one above, or a scope is off.
    Fix it on Fanvue and run `bau fanvue login` again.
+4. Check it, from a terminal or anywhere else - every part of BAU gives the same answer:
+
+   ```bash
+   bau fanvue status            # app keys, signed in or not, how long the access lasts
+   bau fanvue status --check    # also asks Fanvue which account it is
+   ```
+
+## One sign-in for everything
+
+The terminal, Jarvis and the autopilot (which posts and brings in the earnings) all use the
+same saved sign-in: `BAU_HOME/secrets/fanvue.json` (`/var/lib/bau/secrets` on the desktop).
+Your login and the `bau` account share it through the `bau` group; nobody else can read it.
+Sign in once, from the card or the terminal, and all of them are connected.
+
+Before 2026-11-18 the sign-in was readable only by the login that made it, so the autopilot
+could not use it, and two parts renewing it at the same moment could cancel each other out
+("connect again"). Both are fixed. If `bau fanvue status` says the sign-in is **unreadable**,
+it prints the one command that fixes it.
 
 ## By hand
 
@@ -116,7 +136,8 @@ Posting itself is always the card in Jarvis and your Accept.
 - It never picks the audience for you.
 - It never posts while BAU is on HOLD, or a picture that changed after it was queued.
 - It never posts a picture that has no age check or no provenance record.
-- It keeps the Fanvue login in `BAU_HOME/secrets/fanvue.json`, readable only by you.
+- It keeps the Fanvue login in `BAU_HOME/secrets/fanvue.json`, readable only by you and the
+  autopilot (the `bau` group), and never prints a token.
 
 ## Fanvue facts used (read 2026-11-03 on api.fanvue.com/docs)
 

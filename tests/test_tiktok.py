@@ -170,7 +170,7 @@ def test_token_refresh_and_secret_file_mode(tmp_path):
                         "refresh_expires_in": 31536000})
     assert client.access_token() == "new-at"
     assert client.tokens.load()["refresh_token"] == "new-rt"        # rotated token kept
-    assert oct(client.tokens.path.stat().st_mode & 0o777) == "0o600"
+    assert oct(client.tokens.path.stat().st_mode & 0o777) == "0o660"     # shared store, no world
     form = client.http.calls[0][3].decode()
     assert "grant_type=refresh_token" in form
     rec = client.tokens.load()

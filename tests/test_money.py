@@ -41,8 +41,8 @@ def ready_home(home):
 
 def test_a_ready_machine_says_so(tmp_path, monkeypatch):
     from bau import fanvue
-    monkeypatch.setattr(fanvue.TokenStore, "load", lambda self: {"access_token": "x"})
     home = ready_home(tmp_path)
+    fanvue.TokenStore(home).save({"access_token": "x", "expires_in": 3600})   # the real store
     ls = money.links(home, probe())
     assert [link["ok"] for link in ls] == [True] * len(ls), ls
     s = money.summary(home, probe())
@@ -51,8 +51,6 @@ def test_a_ready_machine_says_so(tmp_path, monkeypatch):
 
 
 def test_each_broken_link_is_named_with_its_fix(tmp_path, monkeypatch):
-    from bau import fanvue
-    monkeypatch.setattr(fanvue.TokenStore, "load", lambda self: None)
     home = tmp_path
     ls = {link["link"]: link for link in money.links(home, probe(
         pictures_running=False, pictures_installed=True, autopilot_timer=False,
@@ -62,7 +60,7 @@ def test_each_broken_link_is_named_with_its_fix(tmp_path, monkeypatch):
     pic = ls["pictures (ComfyUI on this computer)"]
     assert pic["found"] == "installed, not running"
     assert pic["fix"] == "sudo systemctl start bau-pictures.service"
-    assert ls["Fanvue connected"]["fix"] == "bau fanvue login"
+    assert ls["Fanvue connected"]["fix"].startswith("bau fanvue status")
     assert "autopost on" in ls["autopost (Fanvue posts by themselves)"]["fix"]
     assert ls["no HOLD"]["ok"] is True
     s = money.summary(home, probe(fanvue_keys=False))
@@ -72,8 +70,8 @@ def test_each_broken_link_is_named_with_its_fix(tmp_path, monkeypatch):
 def test_a_paused_autopilot_and_a_hold_are_not_ready(tmp_path, monkeypatch):
     from bau import autopilot, fanvue
     from bau.governor import Governor
-    monkeypatch.setattr(fanvue.TokenStore, "load", lambda self: {"access_token": "x"})
     home = ready_home(tmp_path)
+    fanvue.TokenStore(home).save({"access_token": "x", "expires_in": 3600})   # the real store
     monkeypatch.setattr(autopilot, "status", lambda h: {"paused": True})
     ap = next(link for link in money.links(home, probe()) if link["link"].startswith("autopilot"))
     assert not ap["ok"] and ap["found"] == "paused by you" and ap["fix"] == "bau autopilot resume"
