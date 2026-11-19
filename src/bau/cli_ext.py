@@ -1587,6 +1587,9 @@ def cmd_platform(a):
     p = PlatformRegistry()
     if a.pl_cmd == "add":
         _out(p.upsert(_load(a.file)))
+    elif a.pl_cmd == "status":
+        from .platforms import connections
+        _out(connections(check=a.check))
     else:
         _out(p.facts(a.platform))
     return EXIT_OK
@@ -2733,6 +2736,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("file")
     x = ps.add_parser("check")
     x.add_argument("platform")
+    x = ps.add_parser("status", help="every platform: connected or not, what BAU can do there, "
+                      "what is still yours to do (no secrets); --check asks each platform")
+    x.add_argument("--check", action="store_true")
     s.set_defaults(fn=cmd_platform)
 
     s = sub.add_parser("network", help="network trust")
