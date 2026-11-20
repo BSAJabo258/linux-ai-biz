@@ -101,7 +101,9 @@ def place(name: str, job: Any, now: dt.datetime) -> tuple[str, str]:
     fresh = at is not None and now - at < RECENT
     if job.status in WORKING:
         return DESK.get(name, "forge"), "working"
-    if job.status == "WAITING_FOR_APPROVAL":
+    # Finished but its result failed the check: the owner reviews it, it is not delivered.
+    if job.status == "WAITING_FOR_APPROVAL" or (
+            job.status == "COMPLETED" and getattr(job, "verification", "") == "FAILED"):
         return "approvals", "waiting for you"
     if job.status in STOPPED:
         return "repair", job.status.lower().replace("_", " ")

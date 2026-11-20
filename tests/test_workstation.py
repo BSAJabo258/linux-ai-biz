@@ -13,10 +13,12 @@ def home(tmp_path, role="producer", approved=True):
     return tmp_path
 
 
-def job(home, status="COMPLETED", objective="draft a caption", role="producer"):
+def job(home, status="COMPLETED", objective="draft a caption", role="producer",
+        verification="VERIFIED"):
     store = JobStore(home)
     j = store.create("m1", objective, f"folder:{role}", ["step-1"])
     j.status = status
+    j.verification = verification if status == "COMPLETED" else "UNCHECKED"
     j.remaining_steps = ["step-1"] if status != "COMPLETED" else []
     store.checkpoint(j)
     return j
@@ -75,11 +77,14 @@ def test_a_shift_runs_approved_work_with_no_confirm_card(tmp_path):
     t = W.assign(h, "producer", "review the latest log", "human:owner")
     seen = []
 
-    class Result:
+    class Result:                       # answers with a fact its tool really returned
         status = "COMPLETED"
-        final_text = "reviewed"
+        final_text = 'Reviewed: "error 504 at 10:42" in the latest log'
+        steps, cost_usd, injection_flags = 1, 0.0, 0
+        tool_calls = [{"capability": "memory.brain", "ok": True}]
+        evidence = ["latest log: error 504 at 10:42"]
 
-    out = W.run_shift(h, runner=lambda role, objective, home, audit: (
+    out = W.run_shift(h, runner=lambda role, objective, mission_id, job: (
         seen.append((role, objective)) or Result()), max_tasks=1)
     assert seen == [("producer", "review the latest log")]
     assert out["ran"][0]["status"] == "done"

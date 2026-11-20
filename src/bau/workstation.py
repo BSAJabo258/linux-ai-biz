@@ -41,7 +41,9 @@ LOW_RISK = {"research", "draft", "review", "retry", "continue", "organise", "org
 EXTERNAL = re.compile(
     r"\b(post|publish|upload|send|email|sms|pay|spend|buy|purchase|trade|delete|remove|"
     r"deploy|install|sign|approve|money|transfer|password|api.?key)\b", re.I)
-OPEN = {"queued", "approved", "waiting_owner", "running"}
+# "review": finished, but its result did not pass the check; it waits for the owner and is
+# never run again by itself.
+OPEN = {"queued", "approved", "waiting_owner", "running", "review"}
 NAMES = ("Nova", "Iris", "Juno", "Vera", "Sable", "Lark", "Rune", "Mica", "Echo",
          "Onyx", "Tess", "Wren", "Kite", "Marlow", "Indigo", "Remy")
 
@@ -209,6 +211,22 @@ def process_jobs(st: dict[str, Any], home: Path, now: str) -> None:
     for job in sorted(store.all(), key=lambda j: j.updated_at or ""):
         role = _role(job.agent)
         if _living(st, role) is None:
+            continue
+        if job.status == "COMPLETED" and getattr(job, "verification", "") != "VERIFIED":
+            # Finished, not checked or failed the check: never rewarded as delivered work.
+            if job.job_id in seen:
+                continue
+            seen.add(job.job_id)
+            if job.verification == "FAILED":
+                worker = _living(st, role)
+                worker["health"] = max(0, int(worker["health"]) - 12)
+                worker["stats"]["streak"] = 0
+                worker["last_job"] = job.job_id
+                for t in st["tasks"]:
+                    if t.get("source_job") == job.job_id and t["status"] in OPEN:
+                        t.update(status="review", finished=now, result=job.next_action or "")
+                _event(st, "stalled", worker, f"waits for your review: {job.objective[:120]}",
+                       job=job.job_id)
             continue
         if job.status == "COMPLETED":
             if job.job_id in seen:
@@ -384,19 +402,25 @@ def run_shift(home: Path | None = None, audit: Any = None, runner: Callable[...,
         worker["status"] = "working"
         _save(home, st)
         try:
+            # The same path as a mission: one job through the executive controller, every
+            # tool through the gateway, then the same check (jarvis.run_checked). A result
+            # that does not pass waits for the owner's review; only a checked one is done.
+            from .jarvis import run_checked
             if runner is None:
                 from . import agentfolders as AF
-                result = AF.run(task["role"], task["objective"], home, audit)
-            else:
-                result = runner(task["role"], task["objective"], home, audit)
-            status = getattr(result, "status", "COMPLETED")
-            text = getattr(result, "final_text", str(result))
-            ok = status == "COMPLETED"
-            task.update(status="done" if ok else "failed",
-                        finished=_now(), result=text[:600])
-            linked = next((j for j in reversed(JobStore(home).all())
-                           if j.agent == f"folder:{task['role']}"
-                           and j.objective == task["objective"]), None)
+
+                def runner(name: str, objective: str, mission_id: str, job: Any) -> Any:
+                    return AF.run(name, objective, home, audit, mission_id=mission_id, job=job)
+            checked = run_checked(home, task["role"], task["objective"],
+                                  f"workstation:{task['id']}", runner)
+            status, text = checked["status"], checked["report"] or ""
+            ok = checked["verified"]
+            task.update(status="done" if ok else
+                        "review" if status == "COMPLETED" else "failed",
+                        finished=_now(), source_job=checked["job_id"],
+                        result=(text if ok else checked["why_not_verified"] or text)[:600])
+            linked = next((j for j in JobStore(home).all()
+                           if j.job_id == checked["job_id"]), None)
             if linked is not None:
                 # The real agent made a job: its log drives health and the drop-off walk.
                 process_jobs(st, home, _now())

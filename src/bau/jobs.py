@@ -19,6 +19,11 @@ from typing import Any
 from .home import atomic_write_json, bau_home
 
 TERMINAL = {"COMPLETED", "FAILED", "CANCELLED", "ROLLED_BACK"}
+# COMPLETED says the agent finished; whether its result passed the checks is kept apart
+# (found 2026-11-18: a job read COMPLETED while its mission's fact check had failed, and the
+# world and the workstation counted it as delivered). The owner's authorisation is the third,
+# separate thing: ``approvals``.
+VERIFICATION = {"UNCHECKED", "VERIFIED", "FAILED"}
 STATES = {"PENDING", "RUNNING", "PAUSED", "WAITING_FOR_APPROVAL", "WAITING_FOR_NETWORK",
           "INTERRUPTED"} | TERMINAL
 
@@ -45,6 +50,7 @@ class Job:
     compliance_status: str = "UNKNOWN"
     rollback_state: str | None = None
     next_action: str | None = None
+    verification: str = "UNCHECKED"
     updated_at: str = ""
 
 
@@ -63,6 +69,8 @@ class JobStore:
     def checkpoint(self, job: Job) -> None:
         if job.status not in STATES:
             raise ValueError(f"bad job status {job.status}")
+        if job.verification not in VERIFICATION:
+            raise ValueError(f"bad job verification {job.verification}")
         job.updated_at = dt.datetime.now(dt.UTC).isoformat()
         atomic_write_json(self.dir / f"{job.job_id}.json", asdict(job))
 

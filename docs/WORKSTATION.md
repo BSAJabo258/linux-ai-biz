@@ -11,7 +11,8 @@ with what really happened in BAU's job logs and shifts.
 
 | What happened | Health |
 |---|---|
-| A job or shift delivered | +8 (up to 100) |
+| A job or shift delivered **and checked** | +8 (up to 100) |
+| Finished, but its result failed the check (it waits for your review) | −12 |
 | A job stalled (paused, waiting) | −12 |
 | A job failed or was cancelled | −25 (a failed shift −20) |
 | A day without work | −4 |
@@ -39,6 +40,21 @@ Anything else waits for you, exactly as before. A failed job comes back as a ret
 interrupted one as "continue"; a job you cancelled, or one waiting for your approval, never
 comes back by itself. A task that waited only because the folder was
 not approved yet goes on by itself once you approve it.
+
+## Finished is not the same as checked
+
+A shift runs exactly like a mission: one job through the executive controller, every tool
+through the gateway, then the mission's fact check (every link, quote, amount or number in
+the answer must be in what the tools returned). Each job keeps three things apart:
+
+- **COMPLETED**: the agent finished.
+- **VERIFIED**: its result passed the check (the job's `verification`: VERIFIED, FAILED or
+  UNCHECKED for anything that never went through it).
+- **APPROVED**: you authorised it (the job's approvals).
+
+Only checked work counts as delivered, here and in the operations world. A result that
+failed the check shows as **review**: it waits for you and is never run again by itself.
+Work that finished without the check earns nothing.
 
 Only you or the autopilot can assign work or run a shift; Jarvis's model cannot. The autopilot
 runs one approved task per shift (`workstation` job, Go lane).
