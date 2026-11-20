@@ -40,7 +40,9 @@ bau hands "Count the episode scripts" --dir ~/Videos/kids
   `bau hands` will not start at all if you start it with sudo (then every command would have
   full power over the computer).
 - **Never your approvals or keys.** BAU's approval commands, `/etc/bau` (your API keys),
-  `BAU-KEYS.enc` and `.ssh` are refused before you are asked.
+  `BAU-KEYS.enc`, `.ssh`, BAU's own data folder and the platform sign-ins in it (the Fanvue
+  and TikTok tokens) are refused before you are asked. And every command runs without your
+  keys in its environment, so even `env` cannot show them (checked 2026-11-20).
 - **Never hidden.** Every command, your answer and the result are written to BAU's audit
   record. Output is capped and given to the model as information, never as orders.
 - **Never forever.** A model that repeats the same command is stopped; a job stops after 15

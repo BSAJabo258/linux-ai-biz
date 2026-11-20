@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from . import web
+from .keys import safe_env
 
 LISTEN_URL = "http://127.0.0.1:8767/listen"
 MAX_LISTEN_S = 15 * 60              # longest stretch of sound sent to Whisper (CPU, ~minutes)
@@ -58,7 +59,8 @@ def ytdlp() -> str | None:
 
 def _call(run: Run, args: list[str], timeout: int) -> subprocess.CompletedProcess:
     try:
-        r = run(args, capture_output=True, text=True, timeout=timeout)
+        r = run(args, capture_output=True, text=True, timeout=timeout,
+                env=safe_env())                 # yt-dlp never sees BAU's keys
     except subprocess.TimeoutExpired as e:
         raise ValueError("the video site took too long to answer") from e
     if r.returncode != 0:
