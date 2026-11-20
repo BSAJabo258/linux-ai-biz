@@ -11,7 +11,7 @@ model and not the Governor can post on their own.
 API facts verified 2026-10-05 against developers.tiktok.com:
   OAuth  https://www.tiktok.com/v2/auth/authorize/ (desktop: PKCE, hex SHA-256,
          redirect on localhost/127.0.0.1), token https://open.tiktokapis.com/v2/oauth/token/
-         (access 24h, refresh 365d, refresh token may rotate)
+         (re-read 2026-11-18: access 2 h, refresh 180 days, rotates)
   Post   /v2/post/publish/creator_info/query/, /v2/post/publish/video/init/ (video.publish),
          /v2/post/publish/inbox/video/init/ (video.upload, draft), /v2/post/publish/status/fetch/
   Upload PUT upload_url, Content-Range, chunks 5-64 MB (last up to 128 MB), files under
@@ -310,26 +310,48 @@ def oauth_callback(name: str, port: int, path: str, url: str, open_browser: Any,
 
 
 def login(client: TikTokClient, port: int = 3455, open_browser: Any = None,
-          timeout: int = 300) -> dict[str, Any]:
+          timeout: int = 300, rec: Any = None) -> dict[str, Any]:
     """Desktop OAuth: a callback server on 127.0.0.1. Register
     http://127.0.0.1:<port>/callback/ as a redirect URI in the TikTok developer portal."""
     redirect = f"http://127.0.0.1:{port}/callback/"
     verifier, challenge = pkce_pair()
     state = secrets.token_urlsafe(24)
+    from .integrations import Recorder
+    rec = rec or Recorder("tiktok", client.tokens.path.parent.parent)
+    stage = rec.stage
 
     def finish(got: dict[str, str]) -> dict[str, Any]:
-        if not secrets.compare_digest(got.get("state", ""), state):
+        state_ok = secrets.compare_digest(got.get("state", ""), state)
+        stage("callback", state_ok and "code" in got, state_valid=state_ok,
+              code_received="code" in got, provider_error=got.get("error"),
+              provider_error_description=got.get("error_description"))
+        if not state_ok:
             raise TikTokError("state mismatch - login aborted")
         if "code" not in got:
             raise TikTokError("TikTok refused: "
                               f"{got.get('error_description') or got.get('error')}")
-        return client.exchange(got["code"], redirect, verifier)
+        try:
+            tok = client.exchange(got["code"], redirect, verifier)
+        except TikTokError as e:
+            stage("token_exchange", False, error=str(e)[:300], redirect=redirect)
+            raise
+        stage("token_exchange", True, granted_scopes=tok.get("scope", ""))
+        stage("stored", True, store=str(client.tokens.path))
+        return tok
 
     url = client.authorize_url(redirect, state, challenge)
-    return oauth_callback("TikTok", port, "/callback/", url,
-                          open_browser or (lambda u: print(f"Open this link to connect "
-                                                           f"TikTok:\n{u}")),
-                          timeout, finish)
+    stage("authorize_url", True, redirect=redirect, port=port, scopes=SCOPES)
+    try:
+        return oauth_callback("TikTok", port, "/callback/", url,
+                              open_browser or (lambda u: print(f"Open this link to connect "
+                                                               f"TikTok:\n{u}")),
+                              timeout, finish)
+    except TikTokError as e:
+        if "timed out" in str(e):
+            stage("callback", False, error=str(e), redirect=redirect,
+                  next=f"register exactly {redirect} in the TikTok portal (Login Kit, "
+                       "Desktop), and use this computer's browser")
+        raise
 
 
 # ------------------------------------------------------------------ queue
