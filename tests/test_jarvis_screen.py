@@ -392,8 +392,8 @@ def test_the_workstation_shows_every_waiting_card_with_accept_and_not_now():
     page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "workstation.html"
             ).read_text(encoding="utf-8")
     assert 'id="waiting"' in page and 'apiJson("/api/state")' in page
-    assert 'apiJson("/api/confirm", { id: p.id, approve, choices: {} })' in page
-    assert "ANSWER IN JARVIS" in page                                # choices: in Jarvis
+    assert 'apiJson("/api/confirm", { id: p.id, approve, choices: choices || {} })' in page
+    assert "ANSWER IN JARVIS" not in page                            # choices: answered here
     assert "performance.now() - (shownCards[p.id] || 0) < SETTLE_MS" in page
 
 
@@ -432,3 +432,19 @@ def test_she_is_an_apparition_and_the_geometry_curves():
     assert "[[0.5, 3, GOLD], [0.79, 6, col], [1.1, 9," in body          # 3, 6 and 9 of them
     assert "quadraticCurveTo" in body                                   # arcs, not chords
     assert "cx.lineTo(X, Y + R * 2.6)" not in body                      # no straight axis
+
+
+
+def test_the_workstation_pops_up_every_confirm_runs_any_task_and_fills_the_screen():
+    # The owner, 2026-11-20: "missing popups for all confirms", "the ai workstation needs a
+    # full screen mode and popup to be able to run all tasks from there".
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "workstation.html"
+            ).read_text(encoding="utf-8")
+    assert 'id="pop" role="dialog" aria-modal="true"' in page
+    assert "if (popping) popQ.push(p); else openPop(p);" in page            # every new card
+    assert "popPicked[f.name]" in page and "{ ...popPicked }" in page       # choices too
+    assert "if (approve && performance.now() - (shownCards[p.id] || 0) < SETTLE_MS)" in page
+    assert 'apiJson("/api/ask", { text })' in page                          # Tell Jarvis
+    assert "requestFullscreen()" in page and 'id="full"' in page
+    assert "res.open" in page                                              # sign-in cards
