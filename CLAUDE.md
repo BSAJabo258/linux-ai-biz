@@ -103,7 +103,9 @@ These are the product's safety model, not style preferences:
   key login only, rate-limited: the owner's cloud server (`install.sh --cloud`), and the
   desktop as headquarters (`sudo bau hq on`, the owner's ask 2026-11-15), home-network
   addresses only, where a laptop station's key may only tunnel to Jarvis and print his
-  address (`src/bau/station.py`).
+  address (`src/bau/station.py`). A third, also the owner's choice (2026-11-20): remote
+  desktop from his iPhone (`sudo bau remote-desktop on`), xrdp on 3389 from home-network
+  addresses only, TLS only, his login only, rate-limited (`docs/REMOTE-DESKTOP.md`).
 - **Untrusted data stays data.** Tool results go to models wrapped by `agents.untrusted()`;
   Jarvis never reads `<untrusted_data>` blocks aloud. A run that has read outside content (web, MCP, browser) may only
   read until the owner approves (`gateway` step `untrusted_read`, roadmap step 1, 2026-11-04).

@@ -736,6 +736,76 @@ def cmd_world(a):
     return EXIT_OK if all(d["result"] in ("drawn", "already drawn") for d in done) else EXIT_ERROR
 
 
+def cmd_remote_desktop(a):
+    """Remote desktop from the owner's iPhone on the home Wi-Fi (docs/REMOTE-DESKTOP.md)."""
+    import grp
+
+    from . import station as S
+    c = a.rd_cmd or "status"
+    if c == "status":
+        _out({"remote_desktop": "on" if S.RDP_MARK.exists() else "off",
+              "xrdp": _sh("systemctl", "is-active", "xrdp", check=False).stdout.strip()
+              or "not installed",
+              "firewall": "home network only, port 3389" if S.RDP_MARK.exists()
+              else "nothing comes in for it",
+              "connect_to": _sh("hostname", "-I", check=False).stdout.split()[:2]})
+        return EXIT_OK
+    if os.geteuid() != 0:
+        print("bau remote-desktop: run it with sudo", file=sys.stderr)
+        return EXIT_BLOCKED
+    who, admin = _human(), os.environ.get("SUDO_USER", "")
+    if not admin or admin == "root":
+        print("bau remote-desktop: run it with sudo from your own login", file=sys.stderr)
+        return EXIT_BLOCKED
+    if c == "off":
+        _sh("systemctl", "disable", "--now", "xrdp", "xrdp-sesman", check=False)
+        S.RDP_MARK.unlink(missing_ok=True)
+        S.FIREWALL.write_text(S.without_remote_desktop(S.FIREWALL.read_text()))
+        _sh("nft", "-f", str(S.FIREWALL))
+        AuditLog().append("remote_desktop.off", who, {})
+        _out({"remote_desktop": "off", "firewall": "port 3389 closed again"})
+        return EXIT_OK
+    print("Installing Debian's xrdp (remote desktop) ...", file=sys.stderr)
+    got = _sh("apt-get", "install", "-y", "xrdp", "xorgxrdp", check=False, timeout=900)
+    if got.returncode or not S.XRDP_INI.exists():
+        print("bau remote-desktop: xrdp did not install:\n" + (got.stderr or "")[-600:],
+              file=sys.stderr)
+        return EXIT_ERROR
+    try:
+        S.XRDP_INI.write_text(S.xrdp_ini(S.XRDP_INI.read_text()))
+        S.SESMAN_INI.write_text(S.sesman_ini(S.SESMAN_INI.read_text()))
+    except ValueError as e:
+        print(f"bau remote-desktop: {e}; nothing opened", file=sys.stderr)
+        return EXIT_ERROR
+    _sh("usermod", "-aG", "ssl-cert", "xrdp")          # its TLS key (xrdp.ini's own note)
+    try:
+        grp.getgrnam(S.RDP_GROUP)
+    except KeyError:
+        _sh("groupadd", "--system", S.RDP_GROUP)
+    _sh("usermod", "-aG", S.RDP_GROUP, admin)
+    new = S.with_remote_desktop(S.FIREWALL.read_text())
+    before = S.FIREWALL.read_text()
+    S.FIREWALL.write_text(new)
+    if _sh("nft", "-c", "-f", str(S.FIREWALL), check=False).returncode:
+        S.FIREWALL.write_text(before)
+        print("bau remote-desktop: the firewall refused the rule; nothing opened",
+              file=sys.stderr)
+        return EXIT_ERROR
+    _sh("nft", "-f", str(S.FIREWALL))
+    S.RDP_MARK.parent.mkdir(parents=True, exist_ok=True)
+    S.RDP_MARK.write_text(f"admin={admin}\non={S.stamp()}\n")
+    _sh("systemctl", "enable", "xrdp", check=False)
+    _sh("systemctl", "restart", "xrdp", check=False)
+    AuditLog().append("remote_desktop.on", who, {"inbound": "xrdp 3389, home network, TLS",
+                                                 "users": admin})
+    _out({"remote_desktop": "on",
+          "xrdp": _sh("systemctl", "is-active", "xrdp", check=False).stdout.strip(),
+          "connect_to": _sh("hostname", "-I", check=False).stdout.split()[:2],
+          "login": f"{admin} and your computer password",
+          "iphone": "App Store: Windows App (Microsoft, free). Add PC, the address above."})
+    return EXIT_OK
+
+
 def cmd_hq(a):
     """The desktop as headquarters for the laptop station (docs/LAPTOP-STATION.md)."""
     import pwd
@@ -768,7 +838,8 @@ def cmd_hq(a):
     if a.hq_cmd == "off":
         for f in (S.SSHD_CONF, S.MARK):
             f.unlink(missing_ok=True)
-        S.FIREWALL.write_text(S._data("nftables-default.conf"))
+        base = S._data("nftables-default.conf")
+        S.FIREWALL.write_text(S.with_remote_desktop(base) if S.RDP_MARK.exists() else base)
         _sh("nft", "-f", str(S.FIREWALL))
         _sh("systemctl", "reload", "ssh", check=False)
         AuditLog().append("hq.off", who, {})
@@ -790,7 +861,7 @@ def cmd_hq(a):
             S.SSHD_CONF.write_text(before)                 # put back what was there
         print("bau hq: sshd refused the settings; nothing changed", file=sys.stderr)
         return EXIT_ERROR
-    S.FIREWALL.write_text(S.firewall())
+    S.FIREWALL.write_text(S.firewall(S.RDP_MARK.exists()))
     _sh("nft", "-c", "-f", str(S.FIREWALL))
     _sh("nft", "-f", str(S.FIREWALL))
     cfg = Path(home) / ".config" / "bau"
@@ -2566,6 +2637,14 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("status", help="on or off, which stations are allowed")
     x.add_argument("--admin", help="whose login (default: you)")
     s.set_defaults(fn=cmd_hq)
+
+    s = sub.add_parser("remote-desktop", help="your iPhone on the home Wi-Fi sees and uses this "
+                       "desktop (docs/REMOTE-DESKTOP.md)")
+    w = s.add_subparsers(dest="rd_cmd")
+    w.add_parser("on", help="sudo: install xrdp, home network only, TLS, your login only")
+    w.add_parser("off", help="sudo: stop it and close its port again")
+    w.add_parser("status", help="on or off, and the address to type on the iPhone")
+    s.set_defaults(fn=cmd_remote_desktop)
 
     s = sub.add_parser("station", help="the laptop as Jarvis's operations station "
                        "(docs/LAPTOP-STATION.md)")

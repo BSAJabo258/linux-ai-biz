@@ -453,3 +453,57 @@ def test_install_keeps_the_work_timers_off_on_a_station():
     enable = sh[sh.index("systemctl enable bau-recover.service"):]
     enable = enable[:enable.index("bau-ui.service")]
     assert "bau-autopilot.timer" not in enable and "bau-scout-watch.timer" not in enable
+
+
+# ------------------------------------------------------------------ remote desktop
+XRDP = ROOT / "tests" / "data" / "xrdp"      # Debian 13's xrdp 0.10.1-3.1+deb13u2, as shipped
+
+
+def test_remote_desktop_opens_3389_to_the_home_network_only_and_closes_again():
+    rules = S._data("nftables-remote-desktop.rules")
+    assert rules == (ROOT / "installer/payload/hardening/nftables-remote-desktop.rules").read_text()
+    for base in (S._data("nftables-hq.conf"), S._data("nftables-default.conf")):
+        on = S.with_remote_desktop(base)
+        added = [ln.strip() for ln in on.splitlines() if ln.strip() and
+                 not ln.strip().startswith("#") and ln not in base.splitlines()]
+        assert len(added) == 2 and all("tcp dport 3389" in ln and "limit rate" in ln
+                                       for ln in added)
+        assert "0.0.0.0/0" not in on and "::/0" not in on
+        assert on.index("tcp dport 3389") < on.index('counter comment "dropped inbound"')
+        assert S.with_remote_desktop(on) == on                       # added once
+        assert S.without_remote_desktop(on) == base                  # and taken away
+    assert "tcp dport 3389" not in S.firewall() and "tcp dport 3389" in S.firewall(True)
+    nft = shutil.which("nft")
+    if nft:
+        r = subprocess.run([nft, "-c", "-f", "-"], input=S.firewall(True), capture_output=True,
+                           text=True)
+        if "not permitted" in r.stderr.lower():
+            pytest.skip("nft -c needs privileges here")
+        assert r.returncode == 0, r.stderr
+
+
+def test_xrdp_takes_tls_only_and_only_the_owner():
+    ini = S.xrdp_ini((XRDP / "xrdp.ini").read_text())
+    assert "\nsecurity_layer=tls\n" in ini and "security_layer=negotiate" not in ini
+    ses = S.sesman_ini((XRDP / "sesman.ini").read_text())
+    for line in ("AllowRootLogin=false", f"TerminalServerUsers={S.RDP_GROUP}",
+                 "AlwaysGroupCheck=true"):
+        assert f"\n{line}\n" in ses
+    with pytest.raises(ValueError):                                  # a different xrdp
+        S.xrdp_ini("[Globals]\nport=3389\n")
+
+
+def test_the_installer_keeps_the_remote_desktop_rule_like_bau_does(tmp_path):
+    sh = (ROOT / "installer/payload/install.sh").read_text()
+    assert "[[ -f /etc/bau/remote-desktop ]]" in sh and "nftables-remote-desktop.rules" in sh
+    awk = shutil.which("awk")
+    if not awk:
+        pytest.skip("no awk")
+    rules = tmp_path / "r.rules"
+    rules.write_text(S._data("nftables-remote-desktop.rules"))
+    prog = ('/counter comment "dropped inbound"/ { while ((getline l < f) > 0) print l } '
+            '{ print }')
+    assert prog in sh.replace("\\\n    ", "")
+    out = subprocess.run([awk, "-v", f"f={rules}", prog], input=S._data("nftables-hq.conf"),
+                         capture_output=True, text=True).stdout
+    assert out == S.firewall(True)

@@ -53,9 +53,56 @@ def sshd_conf(admin: str) -> str:
             "AllowTcpForwarding local\nAllowStreamLocalForwarding no\n")
 
 
-def firewall() -> str:
-    """The shipped default firewall plus SSH from home-network addresses only."""
-    return _data("nftables-hq.conf")
+def firewall(remote_desktop: bool = False) -> str:
+    """The shipped default firewall plus SSH from home-network addresses only (and the remote
+    desktop's rule when the owner switched it on)."""
+    conf = _data("nftables-hq.conf")
+    return with_remote_desktop(conf) if remote_desktop else conf
+
+
+# ------------------------------------------------------------------ remote desktop
+# The owner's choice (2026-11-20): reach the desktop from his iPhone on the home Wi-Fi.
+# Debian 13's xrdp (Apache-2.0; settings read in xrdp_0.10.1-3.1+deb13u2's own xrdp.ini and
+# sesman.ini, 2026-11-20); iPhone: Microsoft's free Windows App. docs/REMOTE-DESKTOP.md.
+RDP_MARK = Path("/etc/bau/remote-desktop")
+RDP_GROUP = "bau-remote"
+XRDP_INI = Path("/etc/xrdp/xrdp.ini")
+SESMAN_INI = Path("/etc/xrdp/sesman.ini")
+DROPPED = '    counter comment "dropped inbound"'
+
+
+def with_remote_desktop(conf: str) -> str:
+    """The firewall with the remote desktop's home-network rule added once, before the drop."""
+    if "tcp dport 3389" in conf:
+        return conf
+    if DROPPED not in conf:
+        raise ValueError("the firewall has no 'dropped inbound' line to add the rule before")
+    return conf.replace(DROPPED, _data("nftables-remote-desktop.rules") + DROPPED, 1)
+
+
+def without_remote_desktop(conf: str) -> str:
+    rules = _data("nftables-remote-desktop.rules")
+    return conf.replace(rules, "", 1)
+
+
+def _set(text: str, key: str, value: str) -> str:
+    pat = re.compile(rf"^{re.escape(key)}=.*$", re.M)
+    if not pat.search(text):
+        raise ValueError(f"{key}= not found: this xrdp is not the version BAU checked")
+    return pat.sub(f"{key}={value}", text, count=1)
+
+
+def xrdp_ini(text: str) -> str:
+    """TLS only: no unencrypted classic RDP."""
+    return _set(text, "security_layer", "tls")
+
+
+def sesman_ini(text: str) -> str:
+    """No root; only members of RDP_GROUP (the owner) may open a session."""
+    for k, v in (("AllowRootLogin", "false"), ("TerminalServerUsers", RDP_GROUP),
+                 ("AlwaysGroupCheck", "true")):
+        text = _set(text, k, v)
+    return text
 
 
 def jarvis_unit(admin: str, home: str) -> str:

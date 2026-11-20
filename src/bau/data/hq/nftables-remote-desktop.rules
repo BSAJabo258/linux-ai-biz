@@ -1,0 +1,4 @@
+    # Remote desktop (sudo bau remote-desktop on, docs/REMOTE-DESKTOP.md, the owner's choice
+    # 2026-11-20): xrdp from the home network only, TLS, the owner's login only. Rate-limited.
+    ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } tcp dport 3389 ct state new limit rate 15/minute accept comment "BAU remote desktop: home network only"
+    ip6 saddr { fe80::/10, fc00::/7 } tcp dport 3389 ct state new limit rate 15/minute accept comment "BAU remote desktop: home network only"
