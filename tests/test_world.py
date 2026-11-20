@@ -264,7 +264,7 @@ def test_the_photo_avatar_is_its_own_look_drawn_only_when_asked(tmp_path):
 def test_the_page_shows_the_photo_face_where_the_orb_was():
     from importlib import resources
     page = (resources.files("bau.ui") / "jarvis.html").read_text()
-    assert 'id="avphoto"' in page and "/world/portrait/avatar.png" in page
+    assert 'id="avphoto"' in page and '"/world/portrait/" + AV_PORTRAITS[0]' in page
     assert '"PHOTO"' in page and '"GLASS CORE"' in page
 
 
