@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from .agents import LOOP_LIMIT, untrusted
+from .keys import safe_env
 from .models.providers import Provider, ToolSpec
 
 MAX_OUTPUT = 8000
@@ -57,6 +58,8 @@ FORBIDDEN = re.compile(
     r"|(^|[\s;&|(`$/])bau(\s|$)|-m\s*bau\b|\bbau\.cli\b"
     r"|\bssh-keygen\b.*\s-Y\s+sign"
     r"|/etc/bau/|\.ssh/|\.config/bau\b|\bjarvis\.key\b|\bBAU-KEYS\.enc\b"
+    # the shared sign-ins (Fanvue, TikTok tokens) in BAU_HOME/secrets (2026-11-20)
+    r"|(^|[\s/'\"=])secrets(/|\s|$)|\b(fanvue|tiktok)\.json\b|/var/lib/bau\b|\.bau(/|\s|$)"
     r"|approval[_-]?key", re.I)
 
 Ask = Callable[[str, str], bool]
@@ -67,7 +70,8 @@ def run_shell(command: str, cwd: Path, timeout: int = TIMEOUT) -> tuple[int, str
     """Run one command as the owner, in cwd; stdout and stderr together, capped."""
     try:
         p = subprocess.run(["bash", "-c", command], cwd=cwd, capture_output=True,
-                           text=True, timeout=timeout, stdin=subprocess.DEVNULL)
+                           text=True, timeout=timeout, stdin=subprocess.DEVNULL,
+                           env=safe_env())      # the model's command never sees the keys
     except subprocess.TimeoutExpired:
         return 124, f"stopped: the command ran past its time limit ({timeout} s)"
     return p.returncode, ((p.stdout or "") + (p.stderr or ""))

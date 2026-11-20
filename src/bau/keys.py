@@ -34,6 +34,21 @@ class KeyFileError(ValueError):
     pass
 
 
+def secret_name(name: str) -> bool:
+    """A variable that may hold a key, token or password (audit 2026-11-20)."""
+    u = name.upper()
+    return bool(NAME_RE.match(u)) or any(w in u for w in ("API_KEY", "SECRET", "TOKEN",
+                                                          "PASSWORD", "PASSPHRASE"))
+
+
+def safe_env(env: dict[str, str] | None = None) -> dict[str, str]:
+    """This process's environment without its keys, for a program BAU starts on a model's
+    or an outside page's behalf (a terminal command in `bau hands`, yt-dlp): such a program
+    never sees the API keys `load_env_file` brought into this process."""
+    return {k: v for k, v in (os.environ if env is None else env).items()
+            if not secret_name(k)}
+
+
 def decrypt(path: Path, passphrase: str) -> str:
     if not shutil.which("openssl"):
         raise KeyFileError("openssl is needed to open the key file (sudo apt install openssl)")
