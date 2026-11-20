@@ -308,10 +308,16 @@ class Pending:
     created_at: str
     form: dict[str, Any] | None = None       # choices only the owner may make
     preview: str | None = None               # local file shown on the card (not sent to models)
+    click_only: bool = False                 # explicit pictures: never answered by voice
+
+    def voice(self) -> bool:
+        """May the owner answer this card by voice (the owner's choice, 2026-11-20)? Not an
+        explicit picture, not a card with choices to make."""
+        return not self.click_only and not (self.form and self.form.get("fields"))
 
     def public(self) -> dict[str, Any]:
         return {"id": self.id, "tool": self.tool, "summary": self.summary, "form": self.form,
-                "preview": bool(self.preview)}
+                "preview": bool(self.preview), "voice": self.voice()}
 
 
 @dataclass
@@ -1476,7 +1482,7 @@ class Assistant:
                        if item.get("price_cents") else "")
                     + f".\n{item['caption']}\n\n"
                     "Accept: it joins the posting queue. Not now: it is dropped.",
-                    _now(), preview=str(q.picture(item)))
+                    _now(), preview=str(q.picture(item)), click_only=item["level"] >= 2)
         return [p.public() for p in self.pending.values()
                 if p.tool in ("setup_step", "autopilot_answer", "fanvue_review")]
 
@@ -1596,14 +1602,21 @@ class Assistant:
         return out, False
 
     def confirm(self, pending_id: str, approve: bool, by: str,
-                choices: dict[str, Any] | None = None) -> dict[str, Any]:
+                choices: dict[str, Any] | None = None, via: str = "click") -> dict[str, Any]:
         """The owner's answer to a staged action. Only a human identity may confirm, and
-        form choices (e.g. TikTok privacy) come only from here - never from the model."""
+        form choices (e.g. TikTok privacy) come only from here - never from the model.
+        `via="voice"`: the owner said the fixed phrase while holding the mic; refused for
+        explicit pictures and cards with choices, which need a click."""
         if not by.startswith("human:"):
             raise PermissionError("only the owner can confirm an action")
-        p = self.pending.pop(pending_id, None)
+        p = self.pending.get(pending_id)
         if p is None:
             return {"error": "nothing waiting with that id (already answered?)"}
+        if via == "voice" and not p.voice():
+            return {"error": "this card needs a click: press Accept or Not now on it",
+                    "retry": True}
+        self.pending.pop(pending_id)
+        how = {"via": "voice"} if via == "voice" else {}
         if approve and p.form:
             picked = {}
             for f in p.form["fields"]:
@@ -1622,7 +1635,7 @@ class Assistant:
             from . import autopilot
             autopilot.answer(self.home, p.args["task"], "no", by)
         if not approve:
-            self.audit.append("jarvis.declined", by, {"tool": p.tool, "pending": p.id})
+            self.audit.append("jarvis.declined", by, {"tool": p.tool, "pending": p.id, **how})
             note = f"[The owner declined: {p.tool}. Nothing was done.]"
             self._log("system", note)
             self.messages.append({"role": "user", "content": note})
@@ -1635,7 +1648,8 @@ class Assistant:
             ok = not (isinstance(out, dict) and out.get("error"))
         except Exception as e:
             out, ok = {"error": f"{type(e).__name__}: {e}"[:400]}, False
-        self.audit.append("jarvis.confirmed", by, {"tool": p.tool, "pending": p.id, "ok": ok})
+        self.audit.append("jarvis.confirmed", by,
+                          {"tool": p.tool, "pending": p.id, "ok": ok, **how})
         note = (f"[The owner confirmed {p.tool}. Result: "
                 f"{json.dumps(out, default=str)[:800]}]")
         self._log("system", note)

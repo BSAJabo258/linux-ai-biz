@@ -7,6 +7,14 @@ walks to the outbox and drops the work off; when it fails, its health drops.
 Nothing on the page is invented: every worker is a real agent folder, and its health moves only
 with what really happened in BAU's job logs and shifts.
 
+## Waiting for you
+
+At the top of the workstation, **Waiting for you** shows every card Jarvis holds for you, all
+at once: setup steps, Jarvis's questions and new Fanvue pictures (with the picture). Each has
+**Accept** and **Not now**, exactly like the card in Jarvis, and does the same thing. A card
+with choices to make (prices, limits, an audience) says **Answer in Jarvis** and opens Jarvis.
+Not now on a picture drops it, as in Jarvis. The list refreshes every 15 seconds.
+
 ## Health, death and the successor
 
 | What happened | Health |
