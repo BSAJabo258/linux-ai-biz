@@ -289,9 +289,10 @@ button.chip.world{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px
 .hq-stage{position:relative;aspect-ratio:16/9;max-height:calc(100vh - 110px);margin:0 auto;container-type:inline-size;overflow:hidden;
   border-radius:10px;border:1px solid rgba(169,139,255,.7);box-shadow:0 0 22px rgba(169,139,255,.45);background:#05030d url(/art/hq) center/cover;color:#e8f4ff}
 .hq-stage>*{position:absolute}
-.hq-title{left:2%;top:2.5%;width:34%;font-family:"URW Gothic","Century Gothic",ui-sans-serif,sans-serif;line-height:1.05}
+.hq-title{left:2%;top:2.5%;width:40%;font-family:"URW Gothic","Century Gothic",ui-sans-serif,sans-serif;line-height:1.05}
 .hq-title b{display:block;font-size:4.2cqw;font-weight:800;letter-spacing:.04em;color:#bff3ff;text-shadow:0 0 .4cqw #3fd6ff,0 0 1.4cqw #3fd6ff}
 .hq-title span{display:block;font-size:1.7cqw;letter-spacing:.12em;text-transform:uppercase;color:#ffd27a;text-shadow:0 0 .6cqw #ff9a3c}
+.hq-title em{display:block;margin-top:.7cqw;white-space:nowrap;font:italic 600 1.15cqw/1.25 ui-sans-serif,system-ui,sans-serif;color:#f4ecff;text-shadow:0 0 .5cqw #a98bff}
 .hq-script{font-family:Z003,"URW Chancery L","Segoe Script","Brush Script MT",cursive;color:#ff8ae0;text-shadow:0 0 .3cqw #ff4fd1,0 0 1.2cqw #b04dff;line-height:1.15}
 .hq-top{right:2%;top:2%;width:33%;text-align:right;font-size:2.7cqw}
 .hq-bottom{right:2.5%;bottom:10%;width:25%;text-align:right;font-size:2.3cqw}
@@ -303,7 +304,7 @@ button.chip.world{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px
 .hq-panel ul{list-style:none;margin:0;padding:0;font-size:.95cqw;line-height:1.35}
 .hq-panel li{display:flex;gap:.5cqw;align-items:baseline;margin:0 0 .35cqw;overflow-wrap:anywhere}
 .hq-panel li i{font-style:normal;color:#9fb6d0;flex:1 1 auto;min-width:0}.hq-panel li b{flex:none;font-weight:600;text-transform:capitalize}
-.hq-agents{left:1.5%;top:21%;width:21%}.hq-status{right:1.5%;top:22%;width:21%}
+.hq-agents{left:1.5%;top:22.5%;width:21%}.hq-status{right:1.5%;top:22%;width:21%}
 .hq-tasks{right:1.5%;top:44%;width:21%;max-height:34%}.hq-rooms{left:1.5%;bottom:7.5%;width:27%}
 .hq-dot{flex:none;width:.85cqw;height:.85cqw;border-radius:50%;background:#55606e;align-self:center}
 .hq-dot.working,.hq-dot.done,.hq-dot.ok{background:#46f2a4;box-shadow:0 0 .5cqw #46f2a4}.hq-dot.waiting{background:#ffb340;box-shadow:0 0 .5cqw #ffb340}
@@ -528,7 +529,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <button class="act" id="w-to-hq" title="The neon headquarters" style="float:right">HQ</button>
   <h2>Operations world</h2>
   <div id="hqview" aria-label="The neon headquarters: every panel shows only real records"><div class="hq-stage">
-    <div class="hq-title"><b>BAUBSA JARVIS</b><span>Virtual Operations World</span></div>
+    <div class="hq-title"><b>BAUBSA JARVIS</b><span>Virtual Operations World</span><em id="hq-day"></em></div>
     <div class="hq-script hq-top">The Grind Continues…<br>What We Doing Now?<div id="hq-now"></div></div>
     <section class="hq-panel hq-agents"><h3>Jarvis agents</h3><ul id="hq-agents"></ul></section>
     <section class="hq-panel hq-status"><h3>System status</h3><ul id="hq-status"></ul></section>
@@ -2264,9 +2265,14 @@ vec3 hq(vec2 P, float ca, float t) {
   col *= 0.88;                                                                    // seen through glass
   if (post < 0.012) col = vec3(0.02, 0.02, 0.05);
   col += mix(vec3(0.25, 0.85, 1.0), vec3(0.75, 0.35, 1.0), step(0.0, fx)) * smoothstep(0.003, 0.0, abs(post - 0.012)) * 0.9 * br * step(sill, P.y);
-  if (P.y > 0.9) col = vec3(0.025, 0.02, 0.06) + vec3(0.1, 0.05, 0.2) * (P.y - 0.9) * 4.0;
-  col += vec3(1.0, 0.3, 0.75) * smoothstep(0.004, 0.0, abs(P.y - 0.9)) * br;
-  col += vec3(0.25, 0.85, 1.0) * smoothstep(0.003, 0.0, abs(P.y - 0.935)) * 0.6 * br;
+  float u = (P.x - cx) / (0.5 * ca), arch = 0.95 - 0.13 * u * u;               // the arched top
+  if (P.y > arch) col = vec3(0.025, 0.02, 0.06) + vec3(0.1, 0.05, 0.2) * (P.y - arch) * 4.0;
+  col += vec3(1.0, 0.3, 0.75) * smoothstep(0.004, 0.0, abs(P.y - arch)) * br;
+  col += vec3(0.25, 0.85, 1.0) * smoothstep(0.003, 0.0, abs(P.y - arch - 0.03)) * 0.6 * br;
+  for (int k = 0; k < 9; k++) {                                                   // ceiling lights
+    float lx = cx + (float(k) - 4.0) * 0.2, ly = 0.95 - 0.13 * pow((lx - cx) / (0.5 * ca), 2.0) + 0.015;
+    col += vec3(0.7, 0.9, 1.0) * smoothstep(0.012, 0.0, length((P - vec2(lx, ly)) * vec2(0.5, 2.0))) * 0.8;
+  }
   // the holographic globe: land from noise, a grid of meridians, a glowing rim, see-through
   vec2 C = vec2(cx, 0.64); float R = 0.2; vec2 d = (P - C) / R; float r2 = dot(d, d);
   col += vec3(0.2, 0.55, 1.0) * exp(-max(sqrt(r2) - 1.0, 0.0) * 6.0) * 0.35 * br;
@@ -2301,11 +2307,24 @@ vec3 hq(vec2 P, float ca, float t) {
       if (sc < 0.0) col = vec3(0.03, 0.05, 0.1);
       col += vec3(0.3, 0.6, 1.0) * smoothstep(0.003, 0.0, abs(sc)) * 0.6;
       if (sdBox(P - vec2(m.x, top + 0.012), vec2(0.006, 0.014)) < 0.0) col = vec3(0.04, 0.04, 0.08);
+      col += vec3(0.25, 0.85, 1.0) * smoothstep(0.004, 0.0, abs(sdBox(P - vec2(m.x, top - 0.006), vec2(0.045, 0.004)))) * 0.5;   // a keyboard's edge
+    }
+    vec2 ch = vec2(x0 - s * 0.05, top - 0.07);                                    // a chair in front
+    float back = sdBox(P - ch - vec2(0.0, 0.03), vec2(0.045, 0.06)) - 0.02;
+    if (back < 0.0) col = vec3(0.03, 0.02, 0.06) + vec3(0.06, 0.03, 0.1) * (P.y - ch.y) * 6.0;
+    col += vec3(0.6, 0.35, 1.0) * smoothstep(0.003, 0.0, abs(back)) * 0.7;
+    vec2 pot = vec2(x0 + s * 0.27, top - 0.09);                                   // a plant beside it
+    if (sdBox(P - pot, vec2(0.025 - (pot.y - P.y) * 0.15, 0.03)) < 0.0) col = vec3(0.05, 0.03, 0.09);
+    for (int l = 0; l < 7; l++) {
+      float a = 0.35 + float(l) * 0.4, ln = 0.06 + 0.03 * hash1(float(l) + s);
+      vec2 dir = vec2(cos(a), sin(a)), rel = P - pot - vec2(0.0, 0.03);
+      float al = dot(rel, dir), ac = abs(dot(rel, vec2(-dir.y, dir.x)) - al * al * 1.5 * sign(dir.x));
+      if (al > 0.0 && al < ln && ac < 0.009 * sin(3.1416 * al / ln)) col = mix(vec3(0.05, 0.25, 0.15), vec3(0.4, 0.3, 0.9), al / ln * 0.6);
     }
   }
   // the front desk across the bottom, and pink neon down the far walls
   float fd = 0.1 + 0.02 * (P.x - cx) * (P.x - cx);
-  if (P.y < fd) col = mix(vec3(0.02, 0.015, 0.05), vec3(0.06, 0.03, 0.12), P.y / fd);
+  if (P.y < fd) col = mix(vec3(0.02, 0.015, 0.05), vec3(0.06, 0.03, 0.12), P.y / fd) + vec3(0.25, 0.4, 0.8) * smoothstep(0.03, 0.0, fd - P.y) * 0.25;
   col += vec3(0.25, 0.85, 1.0) * smoothstep(0.004, 0.0, abs(P.y - fd)) * br;
   col += vec3(1.0, 0.3, 0.75) * smoothstep(0.006, 0.0, min(abs(P.x - 0.02), abs(P.x - ca + 0.02))) * step(sill, P.y) * br;
   return col * (1.0 - 0.35 * pow(length((P - vec2(cx, 0.5)) / vec2(ca, 1.0)) * 1.3, 2.0));
@@ -3537,7 +3556,11 @@ function hqFigure(a, lead) { const b = el("button", "hq-who" + (lead ? " lead" :
   const tag = el("span", "hq-tag", a.name); tag.appendChild(el("small", null, a.state)); b.appendChild(tag);
   b.onclick = () => { showFloor(); W_SEL = a; worldInfo(a); loadList(); if (REDUCED) drawWorld(0); };
   return b; }
+// The picture's "Tackling Tough Tasks Tuesday" is true one day a week: today's own line instead.
+const HQ_DAYS = ["Systems Check Sunday", "Mission Monday", "Tackling Tough Tasks Tuesday", "Work Hard Wednesday",
+  "Thinking Big Thursday", "Finish Strong Friday", "Side Hustle Saturday"];
 function renderHQ() { if (!OPS) return; const S = OPS.system;
+  $("hq-day").textContent = `“${HQ_DAYS[new Date().getDay()]}” on the BAU BSA Coffee Grind`;
   const now = $("hq-now"); now.textContent = OPS.now ? `Jarvis: ${OPS.now.task}` + (OPS.now.state === "working" ? "" : " (waiting for you)") : "Jarvis: nothing right now";
   const ag = $("hq-agents"); ag.textContent = ""; OPS.roster.forEach(r => hqRow(ag, r.light, r.name, r.state));
   const st = $("hq-status"); st.textContent = "";

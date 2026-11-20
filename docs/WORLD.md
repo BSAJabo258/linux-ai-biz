@@ -40,6 +40,8 @@ never the data: every line is a real record, the same ones the floor reads.
 - **Current tasks:** every agent with a job, with its real state: working first, then waiting
   for you, stopped, done.
 - **What We Doing Now?:** under the words, Jarvis's real task right now, or "nothing right now".
+- **Under the title:** a line for today ("Tackling Tough Tasks Tuesday" only on Tuesdays,
+  "Finish Strong Friday" on Fridays, and so on), from this computer's date.
 - **Our virtual world:** your eight rooms, each a picture of that room from the floor with how
   many agents are in it. Click one to open it on the floor, zoomed in.
 - **The women:** each character stands in her pose for her real job: working, waiting for you,

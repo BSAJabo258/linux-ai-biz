@@ -371,3 +371,6 @@ def test_the_page_lays_out_the_neon_headquarters_from_records():
     assert "All systems healthy" in page and "nothing right now" in page
     assert "Online" not in page.split('id="hqview"')[1].split("</div></div></div>")[0]
     assert "openRoom(" in page                               # a tile opens its room on the floor
+    days = page.split("const HQ_DAYS = [")[1].split("];")[0]
+    assert days.count('"') == 14 and "Tuesday" in days.split(",")[2]   # today's line, Sunday first
+    assert "new Date().getDay()" in page
