@@ -222,7 +222,10 @@ def test_connect_card_shows_only_with_the_apps_keys_and_goes_once_connected(tmp_
     monkeypatch.setattr(F, "app_credentials", lambda: ("cid", "secret"))
     assert S._done("fanvue", tmp_path, lambda w: None) is False
     assert S._command("fanvue", tmp_path) == "bau fanvue login"
-    client(tmp_path, FakeFanvue())
+    c = client(tmp_path, FakeFanvue())
+    assert S._done("fanvue", tmp_path, lambda w: None) is False     # no chat permissions yet
+    c.tokens.save({"access_token": "at0", "refresh_token": "rt0", "expires_in": 3600,
+                   "scope": F.SCOPES})
     assert S._done("fanvue", tmp_path, lambda w: None) is True
 
 
