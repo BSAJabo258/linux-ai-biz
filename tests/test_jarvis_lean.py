@@ -23,6 +23,9 @@ LOCAL = {"id": "qwen-local", "context": 16384, "deployment": "local"}
 
 
 def lean(home, script, **clients):
+    from bau import agentfolders as AF       # approved once, as the owner does (2026-11-20)
+    for name in AF.names(home):
+        AF.approve(name, "human:owner", home)
     return Assistant(home, ScriptedProvider(list(script)), LOCAL, "human:owner",
                      AuditLog(home / "audit" / "chain.jsonl", key=b""), clients=clients)
 

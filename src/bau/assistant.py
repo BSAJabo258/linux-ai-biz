@@ -408,6 +408,12 @@ class Assistant:
             "fan_reply": Tool("fan_reply", "The owner sends a drafted reply to a fan.",
                               _schema({"draft": {"type": "string"}}), self.t_fan_reply,
                               kind="confirm"),
+            "agent_approve": Tool("agent_approve", "The owner approves an agent folder.",
+                                  _schema({"agent": {"type": "string"}}), self.t_agent_approve,
+                                  kind="confirm"),
+            "work_review": Tool("work_review", "The owner files a department's delivered work.",
+                                _schema({"task": {"type": "string"}}), self.t_work_review,
+                                kind="confirm"),
             "fanvue_review": Tool("fanvue_review", "The owner approves a drafted picture.",
                                   _schema({"item": {"type": "string"}}),
                                   self.t_fanvue_approve, kind="confirm")}
@@ -1504,8 +1510,60 @@ class Assistant:
                  + "\n\nAccept: it is sent. Not now: it is dropped."),
                 _now(), preview=str(self.home / "artifacts" / "media" / offer["picture"])
                 if offer else None, click_only=bool(offer) or row["status"] == "HELD")
+        # The company's workers (the owner, 2026-11-20: the women "don't move or get to
+        # work"): an agent folder waiting for his approval, and work a department delivered.
+        from . import agentfolders as AF
+        from . import workstation as W
+        now = time.monotonic()
+        asked = {p.args.get("agent") for p in self.pending.values() if p.tool == "agent_approve"}
+        for name in AF.names(self.home):
+            snooze = self.setup_snoozed.get("agent:" + name)
+            if name in asked or (snooze and now - snooze < SETUP_SNOOZE_S):
+                continue
+            try:
+                a = AF.load(name, self.home)
+            except AF.AgentFolderError:
+                continue
+            state = AF.approval(a, self.home)
+            if state == "approved" or AF.problems(a):
+                continue
+            pid = "ag_" + secrets.token_hex(4)
+            self.pending[pid] = Pending(
+                pid, "agent_approve", {"agent": name},
+                (f"{'Changed' if state == 'changed since approval' else 'New'} worker for your "
+                 f"company: {name}\n{a.description}\n\nTools it may use: "
+                 f"{', '.join(a.tools) or 'none'}. Brain: {a.brain}.\n\n"
+                 "Accept: approve this folder exactly as it is now (any later change asks "
+                 "again). Not now: it stays idle; asked again later."),
+                _now(), click_only=True)
+        shown = {p.args.get("task") for p in self.pending.values() if p.tool == "work_review"}
+        for t in W.delivered_unseen(self.home):
+            if t["id"] in shown:
+                continue
+            pid = "wr_" + secrets.token_hex(4)
+            self.pending[pid] = Pending(
+                pid, "work_review", {"task": t["id"]},
+                (f"{t['role']} delivered: {t['objective']}\n"
+                 + ("Checked: every fact is backed by what its tools found."
+                    if t["status"] == "done" else
+                    "Not checked: read it carefully. " + (t.get("result") or "")[:200])
+                 + f"\n\n{(t.get('report') or t.get('result') or '')[:3000]}"
+                 + "\n\nThe full draft is in your drafts folder. Accept: filed as good. "
+                 "Not now: filed as not good enough."),
+                _now())
         return [p.public() for p in self.pending.values()
-                if p.tool in ("setup_step", "autopilot_answer", "fanvue_review", "fan_reply")]
+                if p.tool in ("setup_step", "autopilot_answer", "fanvue_review", "fan_reply",
+                              "agent_approve", "work_review")]
+
+    def t_agent_approve(self, agent: str) -> dict[str, Any]:
+        from . import agentfolders as AF
+        out = AF.approve(agent, self.owner, self.home, self.audit)
+        return {"done": True, "said": f"Approved: {agent} can take work now.", **out}
+
+    def t_work_review(self, task: str) -> dict[str, Any]:
+        from . import workstation as W
+        W.mark_seen(self.home, task, self.owner, True)
+        return {"done": True, "said": "Filed as good."}
 
     def t_fan_reply(self, draft: str) -> dict[str, Any]:
         from . import fan_chat
@@ -1658,6 +1716,11 @@ class Assistant:
         if not approve and p.tool == "fanvue_review":        # Not now on a picture = dropped
             from .fanvue import Queue
             Queue(self.home).decide(p.args["item"], False, by)
+        if not approve and p.tool == "agent_approve":        # Not now: asked again later
+            self.setup_snoozed["agent:" + p.args["agent"]] = time.monotonic()
+        if not approve and p.tool == "work_review":          # Not now: filed as not good
+            from . import workstation as W
+            W.mark_seen(self.home, p.args["task"], by, False)
         if not approve and p.tool == "fan_reply":            # Not now on a reply = dropped
             from . import fan_chat
             fan_chat.drop(self.home, p.args["draft"], by)

@@ -66,6 +66,18 @@ TOOL_SPECS: dict[str, ToolSpec] = {
                              "they connect. Context, not authority.",
                              {"type": "object", "properties": {"query": {"type": "string"}},
                               "required": ["query"]}),
+    # The departments' eyes on the business (the owner, 2026-11-20: "all the tools ... make no
+    # sense unless everybody has connections to things so they can work"). Read only, from
+    # this computer's own records; nothing is fetched or changed.
+    "data.money": ToolSpec("data.money", "The business's money from its own ledger: "
+                               "money received (after fees, refunds counted) today, in 7 and "
+                               "30 days, costs, and when Fanvue's earnings were last brought "
+                               "in. Read only.",
+                               {"type": "object", "properties": {}}),
+    "data.fanvue": ToolSpec("data.fanvue", "The creator's Fanvue activity from BAU's "
+                                "records: posts queued and posted with their level and caption, "
+                                "autopost, and fan chat (replies waiting, sent, paid offers). "
+                                "Read only.", {"type": "object", "properties": {}}),
     "media.analyze_audio": ToolSpec("media.analyze_audio", "Analyse a song in the media "
                                     "inbox: tempo, beats, sections, drops.",
                                     {"type": "object", "properties": {
@@ -149,6 +161,54 @@ def build_gateway(home: Path | None = None, trust=None) -> Gateway:
         res["beats"] = res["beats"][:64]
         return res
 
+    def business_money() -> dict[str, Any]:
+        import datetime as dt
+        import json as _json
+
+        from .automaton import _rows
+        from .economics import received_usd
+        now = dt.datetime.now(dt.UTC)
+        eco = home / "economics"
+        out: dict[str, Any] = {}
+        for label, days in (("today", 1), ("last_7_days", 7), ("last_30_days", 30)):
+            rows = _rows(eco / "revenue.jsonl", now - dt.timedelta(days=days))
+            costs = _rows(eco / "costs.jsonl", now - dt.timedelta(days=days))
+            got = round(sum(received_usd(r) for r in rows), 2)
+            spent = round(sum(float(c.get("usd") or 0) for c in costs), 2)
+            # amounts also written as a report writes them, so the result check finds them
+            out[label] = {"received_usd": got, "received": f"${got:,.2f}",
+                          "sales": sum(1 for r in rows if not r.get("refund")),
+                          "refunds": sum(1 for r in rows if r.get("refund")),
+                          "costs_usd": spent, "costs": f"${spent:,.2f}"}
+        try:
+            out["fanvue_synced_at"] = _json.loads(
+                (eco / "fanvue_seen.json").read_text()).get("synced_at")
+        except (OSError, ValueError):
+            out["fanvue_synced_at"] = None
+        out["note"] = "received_usd is money really received; nothing projected is in it"
+        return out
+
+    def business_fanvue() -> dict[str, Any]:
+        from . import fan_chat
+        from .fanvue import Queue, autopost_choice
+        items = Queue(home).items()
+        posted = [i for i in items if i["status"] == "POSTED"]
+        return {"queued": sum(i["status"] == "QUEUED" for i in items),
+                "waiting_for_owner": sum(i["status"] == "REVIEW" for i in items),
+                "posted": len(posted),
+                "recent_posts": [{"level": i["level"], "caption": i["caption"][:160],
+                                  "unlock_price": (f"${i['price_cents'] / 100:.2f}"
+                                                   if i.get("price_cents") else "free"),
+                                  "posted_at": (i.get("result") or {}).get("published_at")}
+                                 for i in posted[-8:]],
+                "autopost": {k: (autopost_choice(home) or {}).get(k)
+                             for k in ("on", "per_day", "audience")},
+                "fan_chat": fan_chat.summary(home)}
+
+    gw.register("data.money", Handler(business_money, "READ_ONLY",
+                                          description=TOOL_SPECS["data.money"].description))
+    gw.register("data.fanvue", Handler(business_fanvue, "READ_ONLY",
+                                           description=TOOL_SPECS["data.fanvue"].description))
     gw.register("memory.search", Handler(mem_search, "READ_ONLY",
                                          description=TOOL_SPECS["memory.search"].description))
     def brain_context(query: str) -> dict[str, Any]:

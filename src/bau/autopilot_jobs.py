@@ -235,13 +235,16 @@ def seed(home: Path, days: int = 7) -> int:
             home, "learn", "review what the autopilot did",
             {"since_days": days}, source="autopilot (weekly)"):
         n += 1
+    from . import departments
     from . import workstation as W
-    recent_shift = any(
-        t["kind"] == "workstation" and
-        (t["state"] in ("queued", "running") or (t.get("finished") or "") >= since)
-        for t in tasks)
-    if not recent_shift and W.queued(home):
-        if A.add(home, "workstation", "run the workstation shift", {"max_tasks": 1},
+    try:
+        departments.due(home)              # each department's daily standing work
+    except Exception:  # noqa: BLE001 - the rest of the autopilot's work goes on
+        pass
+    # A shift whenever work waits (it was at most one a week, one task each: the departments
+    # stood still, 2026-11-20). A.add never queues a second open shift.
+    if W.queued(home):
+        if A.add(home, "workstation", "run the workstation shift", {"max_tasks": 3},
                  source="autopilot (workstation)"):
             n += 1
     from .creator_feed import fill

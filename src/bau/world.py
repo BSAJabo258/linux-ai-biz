@@ -28,13 +28,14 @@ ROOMS = (("hq", "Headquarters", "Jarvis's core; agents with nothing to do wait i
          ("testing", "Testing lab", "Jarvis when her autopilot tests a tool in the sandbox"),
          ("innovation", "Innovation Workshop", "Jarvis when she scans or inspects a project"),
          ("studio", "Creative Studio", "the producer, and Jarvis when she drafts"),
-         ("finance", "Finance Office", "no agent works here yet"),
-         ("market", "Market", "no agent works here yet"),
+         ("finance", "Finance Office", "the finance agent: the daily earnings report"),
+         ("market", "Market", "the marketing agent: the week's promotion plan"),
          ("approvals", "Review: waiting for you", "an agent whose job waits for your approval"),
          ("repair", "Stopped", "an agent whose job failed, was interrupted or paused"),
          ("delivery", "Delivered", "an agent whose job finished in the last 24 hours"))
 # Where an agent works while its job runs; any other agent works in the Forge.
-DESK = {"researcher": "research", "producer": "studio"}
+DESK = {"researcher": "research", "producer": "studio", "finance": "finance",
+        "marketer": "market"}
 LOOK = {"researcher": "researcher", "producer": "producer", "jarvis": "jarvis"}
 # Any other agent gets one of these looks, always the same one for the same name.
 OTHER_LOOKS = ("engineer", "coordinator", "analyst", "architect")
