@@ -76,3 +76,15 @@ def test_handles_fit_each_platform():
         hs = AC.handles("Aria Vale", platform)
         assert hs and all(len(h) <= cap for h in hs)
         assert dots or not any("." in h for h in hs)
+
+
+def test_a_program_reading_the_output_never_gets_a_password(home, monkeypatch, capsys):
+    # The security review, 2026-11-20: the password command printed to any caller.
+    from bau.cli import main
+    monkeypatch.setenv("BAU_HOME", str(home))
+    AC.prepare(home, "x", "human:owner")
+    pw = AC.read_env(home)["X_PASSWORD"]
+    assert main(["accounts", "password", "x"]) != 0                 # pytest: not a terminal
+    assert main(["accounts", "prepare", "x"]) != 0
+    out = capsys.readouterr()
+    assert pw not in out.out and pw not in out.err

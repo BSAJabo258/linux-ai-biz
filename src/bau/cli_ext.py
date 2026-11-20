@@ -810,6 +810,10 @@ def cmd_accounts(a):
     """Her social accounts (docs/ACCOUNTS.md): prepared by Jarvis, created by the owner."""
     from . import accounts as AC
     home, c = bau_home(), a.ac_cmd or "list"
+    # A password is shown only to a person at a terminal: never to a program that runs this
+    # command and reads its output (the security review, 2026-11-20).
+    at_terminal = sys.stdin.isatty() and sys.stdout.isatty()
+    hidden = "(shown only at a terminal: bau accounts password PLATFORM)"
     try:
         if c == "prepare":
             link = ""
@@ -824,7 +828,7 @@ def cmd_accounts(a):
             except Exception:  # noqa: BLE001 - offline: the record says where to find it
                 pass
             rec = AC.prepare(home, a.platform, _human(), a.email, link)
-            pw = AC.read_env(home)[AC._key(a.platform, "password")]
+            pw = AC.read_env(home)[AC._key(a.platform, "password")] if at_terminal else hidden
             print(f"{rec['platform']}: everything is ready. Sign up here: {rec['signup']}\n"
                   f"  Display name: {rec['display_name']}\n"
                   f"  Handle (first free one): {', '.join(rec['handles'])}\n"
@@ -836,6 +840,11 @@ def cmd_accounts(a):
         elif c == "created":
             _out(AC.created(home, a.platform, a.handle, _human()))
         elif c == "password":
+            _human()
+            if not at_terminal:
+                print("bau accounts password: only at a terminal, typed by you",
+                      file=sys.stderr)
+                return EXIT_BLOCKED
             print(AC.read_env(home).get(AC._key(a.platform, "password"),
                                         "not prepared yet: bau accounts prepare " + a.platform))
         else:
