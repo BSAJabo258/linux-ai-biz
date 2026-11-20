@@ -628,24 +628,26 @@ const LABEL = { idle: "STANDBY", listening: "LISTENING", thinking: "PROCESSING",
 const HUE = { idle: [63, 214, 255], listening: [255, 179, 64], thinking: [169, 139, 255], speaking: [63, 214, 255] };
 // Three faces, one chip: PHOTO (her photographic portrait, once drawn), ANIME (the SVG
 // avatar), GLASS CORE (the orb). AVATAR.on means "a face, not the orb".
-const AVATAR = { el: $("avatar"), ph: $("avphoto"), on: true, mode: "photo", photo: false, h: 0 };
-try { const v = localStorage.getItem("jarvis-avatar");
-  if (v === "0") AVATAR.on = false; else if (v === "1" || v === "anime") AVATAR.mode = "anime"; } catch (e) {}
-function paintAvatar() {
-  const photo = AVATAR.on && AVATAR.mode === "photo" && AVATAR.photo;
-  AVATAR.ph.classList.toggle("on", photo);
-  AVATAR.el.classList.toggle("on", AVATAR.on && !photo);
-  const b = $("c-av");
-  b.textContent = !AVATAR.on ? "GLASS CORE" : photo ? "PHOTO" : "ANIME"; b.classList.toggle("on", AVATAR.on);
-}
 // Her face: the photo portrait if the owner painted one, else her neon HQ portrait, else her
 // desk portrait (the owner, 2026-11-20: "a sexy, attractive model like the models ... for
-// Jarvis's home screen"). Each is drawn on this computer and passed the age check.
+// Jarvis's home screen"). Each is drawn on this computer and passed the age check. The anime
+// drawing is never shown (the owner, 2026-11-20: it "still pops up at the beginning ... weird
+// and creepy"): while her portrait loads only the geometry shows; with no portrait at all,
+// the glass core.
+const AVATAR = { el: $("avatar"), ph: $("avphoto"), on: true, mode: "photo", photo: false, h: 0 };
+try { if (localStorage.getItem("jarvis-avatar") === "0") AVATAR.on = false; } catch (e) {}
+function paintAvatar() {
+  const photo = AVATAR.on && AVATAR.photo;
+  AVATAR.ph.classList.toggle("on", photo);
+  AVATAR.el.classList.remove("on");
+  const b = $("c-av");
+  b.textContent = photo ? "PHOTO" : "GLASS CORE"; b.classList.toggle("on", photo);
+}
 const AV_PORTRAITS = ["avatar", "neon-jarvis-idle", "jarvis"];
 { const im = AVATAR.ph.querySelector("img"); let i = 0;
   im.onload = () => { AVATAR.photo = true; paintAvatar(); };
   im.onerror = () => { if (++i < AV_PORTRAITS.length) im.src = "/world/portrait/" + AV_PORTRAITS[i] + ".png";
-    else { AVATAR.photo = false; paintAvatar(); } };
+    else { AVATAR.photo = false; AVATAR.on = false; paintAvatar(); } };
   im.src = "/world/portrait/" + AV_PORTRAITS[0] + ".png"; }
 function placeAvatar(X, Y, R) {
   const h = Math.min(innerHeight * (W < 760 ? 0.52 : 0.64), R * (W < 760 ? 5.2 : 4.8));
@@ -655,11 +657,9 @@ function placeAvatar(X, Y, R) {
   if (AVATAR.ph.classList.contains("on")) AVATAR.ph.style.setProperty("--lvl", Math.min(1, level).toFixed(2));
 }
 paintAvatar();
-$("c-av").onclick = () => {          // PHOTO -> ANIME -> GLASS CORE -> PHOTO (no photo: skipped)
-  if (!AVATAR.on) { AVATAR.on = true; AVATAR.mode = AVATAR.photo ? "photo" : "anime"; }
-  else if (AVATAR.mode === "photo" && AVATAR.photo) AVATAR.mode = "anime";
-  else AVATAR.on = false;
-  try { localStorage.setItem("jarvis-avatar", AVATAR.on ? AVATAR.mode : "0"); } catch (e) {}
+$("c-av").onclick = () => {          // PHOTO <-> GLASS CORE (no portrait: glass core only)
+  AVATAR.on = !AVATAR.on && AVATAR.photo;
+  try { localStorage.setItem("jarvis-avatar", AVATAR.on ? "photo" : "0"); } catch (e) {}
   paintAvatar(); };
 function setState(s) { STATE = s; $("statelabel").textContent = LABEL[s];
   document.body.dataset.state = s;
