@@ -99,6 +99,12 @@ def links(home: Path, probe: Probe | None = None) -> list[dict[str, Any]]:
         {"present": "connected", "missing": "not connected",
          "unreadable": "signed in, but this account cannot read the sign-in"}[sign_in],
         "bau fanvue status (it names the exact fix), then bau fanvue login if asked")
+    if sign_in == "present":          # chat needs the permissions added 2026-11-20
+        granted = set(str((fanvue.TokenStore(home).load() or {}).get("scope", "")).split())
+        missing = [x for x in fanvue.CHAT_SCOPES if x not in granted]
+        add("fan chat (sign-in allows chat)", not missing,
+            "allowed" if not missing else "signed in before fan chat existed",
+            "bau fanvue login (once more, so Fanvue lets her answer fans)")
     prices = prof.get("prices") or {}
     add("prices", bool(prices), ", ".join(f"{k} ${v}" for k, v in prices.items()) or "not set",
         "press Accept on the 'Set your Fanvue prices' card in Jarvis")
@@ -128,9 +134,11 @@ def activity(home: Path) -> dict[str, Any]:
     q = fanvue.Queue(home)
     items = q.items()
     rows = _rows(home / "economics" / "revenue.jsonl", dt.datetime(1970, 1, 1, tzinfo=dt.UTC))
+    from . import fan_chat
     return {"waiting_for_you": len(q.review()), "queued": len(q.pending()),
             "posted": sum(i["status"] == "POSTED" for i in items),
-            "money_received_usd": round(sum(received_usd(r) for r in rows), 2)}
+            "money_received_usd": round(sum(received_usd(r) for r in rows), 2),
+            "chat": fan_chat.summary(home)}
 
 
 STATION_TEXT = ("This laptop is the operations station. The money machine runs on the desktop "
@@ -164,7 +172,10 @@ def report(home: Path, probe: Probe | None = None) -> str:
     lines += ["", f"{ready} of {len(ls)} links ready.",
               f"What happened: {a['waiting_for_you']} picture(s) waiting for your Accept, "
               f"{a['queued']} queued, {a['posted']} posted, ${a['money_received_usd']:.2f} "
-              "received."]
+              "received.",
+              f"Fan chat: {a['chat']['waiting']} repl(ies) waiting for you, "
+              f"{a['chat']['sent_today']} sent today, {a['chat']['offers_sent']} paid offer(s) "
+              f"sent in all; auto-send {'on' if a['chat']['auto_send'] else 'off'}."]
     if ready == len(ls):
         lines.append("Everything is ready: Jarvis draws, captions and posts by himself.")
     else:

@@ -29,7 +29,18 @@ api_policy: >-
   max 1.5 GiB. Earnings GET /v1/insights/earnings (read:insights) in USD cents. 200
   requests per 60 s per client per user, 6 in flight. No API field for an AI label.
   BAU's adapter: src/bau/fanvue.py, docs/FANVUE.md.
-automation_policy: not read yet
+automation_policy: >-
+  Read 2026-11-20. API chat (api.fanvue.com/docs/v1/api-reference): GET /v1/chats and
+  /v1/chats/{userUuid}/messages (read:chat), POST /v1/chats/{userUuid}/message (write:chat;
+  text 1-5000, price in cents >= 300 needs media), tracking links (read/write:tracking_links),
+  automated welcome messages (read/write:creator); the API cannot unlock a paid message.
+  Fanvue sells its own AI messaging "designed for NSFW creators"
+  (help.fanvue.com/en/articles/16237836). Rules: asked "Are you AI?" / "Are you real?", answer
+  yes clearly (help.fanvue.com/en/articles/17637130-ai-labels-and-disclosure); keep payments
+  and contact on Fanvue; no solicitation (community guidelines C.8.1), no misleading users
+  (B.1.3), no spam (B.1.4), no codewords (acceptable use policy 2.4.2), no faked live
+  interactions (AUP 2.3.3). AUP 5.6 bans "bots ... automated scripts" without saying whether
+  Fanvue's own API is meant. BAU's adapter: src/bau/fan_chat.py, docs/FAN-CHAT.md.
 account_limits: The human behind a fully AI account completes Fanvue's ID verification (KYC).
 appeal_process: not read yet
 requires_ai_label: true

@@ -233,7 +233,7 @@ function card(p) {
     const open = el("a", "chip", "ANSWER IN JARVIS"); open.href = "/?k=" + encodeURIComponent(KEY); open.target = "_blank"; open.rel = "noopener";
     btns.appendChild(open); btns.appendChild(el("span", "why", "This one has choices to make."));
   } else {
-    const yes = el("button", "chip yes", /^(setup_step|autopilot_answer|fanvue_review)$/.test(p.tool) ? "ACCEPT" : "CONFIRM");
+    const yes = el("button", "chip yes", /^(setup_step|autopilot_answer|fanvue_review|fan_reply)$/.test(p.tool) ? "ACCEPT" : "CONFIRM");
     const no = el("button", "chip", "NOT NOW");
     yes.onclick = () => decide(p, true, c); no.onclick = () => decide(p, false, c);
     btns.appendChild(yes); btns.appendChild(no);

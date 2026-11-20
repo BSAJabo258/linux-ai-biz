@@ -67,7 +67,11 @@ AUTH_URL = "https://auth.fanvue.com/oauth2/auth"
 TOKEN_URL = "https://auth.fanvue.com/oauth2/token"
 VERSION = "2025-06-26"
 SCOPES = ("openid offline_access offline read:self read:media write:media write:creator "
-          "write:post read:insights")
+          "write:post read:insights read:chat write:chat read:fan read:creator "
+          "read:tracking_links write:tracking_links")
+# Added 2026-11-20 for fan chat (src/bau/fan_chat.py); a sign-in from before lacks them.
+CHAT_SCOPES = ("read:chat", "write:chat", "read:fan", "read:creator", "read:tracking_links",
+               "write:tracking_links")
 PORT = 3456
 AUDIENCES = {"subscribers": "Subscribers only",
              "followers-and-subscribers": "Followers and subscribers"}
@@ -244,6 +248,52 @@ class FanvueClient:
             body["price"] = int(price)
         return self.call("POST", "/v1/posts", body)
 
+    # -------------------------------------------------------- chat (fan_chat.py)
+    def chats(self, unread: bool = True, size: int = 20) -> list[dict[str, Any]]:
+        q = {"size": size, **({"filter": "unread"} if unread else {})}
+        return self.call("GET", "/v1/chats?" + urllib.parse.urlencode(q)).get("data") or []
+
+    def messages(self, fan: str, limit: int = 12) -> list[dict[str, Any]]:
+        """The latest messages, newest first (Fanvue's order)."""
+        page = self.call("GET", f"/v1/chats/{fan}/messages?limit={int(limit)}")
+        return page.get("data") or page.get("messages") or []
+
+    def send_message(self, fan: str, text: str, media: list[str] | None = None,
+                     price: int | None = None) -> dict[str, Any]:
+        body: dict[str, Any] = {"text": text}
+        if media:
+            body["mediaUuids"] = media
+        if price is not None:                     # locked: USD cents, >= 300, needs media
+            body["price"] = int(price)
+        return self.call("POST", f"/v1/chats/{fan}/message", body)
+
+    def mark_read(self, fan: str) -> None:
+        self.call("PATCH", f"/v1/chats/{fan}", {"isRead": True})
+
+    def fan_insights(self, fan: str) -> dict[str, Any]:
+        return self.call("GET", f"/v1/insights/fans/{fan}")
+
+    def tracking_links(self) -> list[dict[str, Any]]:
+        rows, cursor = [], None
+        while True:
+            q = {"limit": 50, **({"cursor": cursor} if cursor else {})}
+            page = self.call("GET", "/v1/tracking-links?" + urllib.parse.urlencode(q))
+            rows += page.get("data") or []
+            cursor = page.get("nextCursor")
+            if not cursor:
+                return rows
+
+    def add_tracking_link(self, name: str, platform: str) -> dict[str, Any]:
+        return self.call("POST", "/v1/tracking-links",
+                         {"name": name, "externalSocialPlatform": platform})
+
+    def automated_messages(self) -> list[dict[str, Any]]:
+        return self.call("GET", "/v1/chats/automated-messages").get("data") or []
+
+    def set_automated_message(self, trigger: str, text: str) -> dict[str, Any]:
+        return self.call("PUT", f"/v1/chats/automated-messages/{trigger}",
+                         {"text": text, "price": 0})
+
     def earnings(self, start: str, end: str) -> list[dict[str, Any]]:
         rows, cursor = [], None
         while True:
@@ -293,6 +343,11 @@ def status(home: Path | None = None, client: FanvueClient | None = None,
             out["check_failed"] = str(e)[:300]
     if sign_in == "present":          # after the check: it may just have renewed the access
         tok = tokens.load() or {}
+        granted = set(str(tok.get("scope", "")).split())
+        missing = [x for x in CHAT_SCOPES if x not in granted]
+        if missing:                   # signed in before fan chat: chat needs a new sign-in
+            out["missing_scopes"] = missing
+            out["fix"] = "sign in again for fan chat: bau fanvue login"
         left = float(tok.get("access_expires_at", 0)) - time.time()
         out["access"] = (f"valid for {int(left // 60)} more minutes" if left > 0 else
                          "expired: renewed on its next use" if tok.get("refresh_token") else
