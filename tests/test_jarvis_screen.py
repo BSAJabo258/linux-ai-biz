@@ -395,3 +395,26 @@ def test_the_workstation_shows_every_waiting_card_with_accept_and_not_now():
     assert 'apiJson("/api/confirm", { id: p.id, approve, choices: {} })' in page
     assert "ANSWER IN JARVIS" in page                                # choices: in Jarvis
     assert "performance.now() - (shownCards[p.id] || 0) < SETTLE_MS" in page
+
+
+def test_her_face_falls_back_to_her_painted_portraits():
+    # The owner, 2026-11-20: a sexy, attractive model on the front screen. The photo portrait
+    # was never painted, so the cartoon showed; her neon and desk portraits exist.
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert 'const AV_PORTRAITS = ["avatar", "neon-jarvis-idle", "jarvis"];' in page
+    from bau.world import NEON_NAMES, PORTRAIT_LOOKS
+    assert "neon-jarvis-idle" in NEON_NAMES and "jarvis" in PORTRAIT_LOOKS   # served
+
+
+def test_the_vortex_is_driven_by_real_state_and_never_takes_clicks():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    body = page.split("function drawVortex(", 1)[1].split("\nfunction frame(", 1)[0]
+    assert "Object.keys(BUSY).length" in body and "level" in body          # real data only
+    assert "Math.random" not in body                                     # no invented activity
+    assert "canvas#vfront{position:fixed;inset:0;width:100%;height:100%;display:block;" \
+           "pointer-events:none" in page
+    assert "drawVortex(X, Y, R, now, dt);" in page

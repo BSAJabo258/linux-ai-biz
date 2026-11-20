@@ -184,3 +184,16 @@ bau world portraits --look avatar             # --again to draw a new one
 
 The header chip then cycles **PHOTO → ANIME → GLASS CORE**. A photo cannot blink or move its
 lips: she breathes, and her glow follows the real voice level while she speaks.
+
+Without that photo, she now wears her neon headquarters portrait (`bau world portraits --style
+neon --look jarvis`), else her desk portrait (`bau world portraits --look jarvis`), instead of
+the anime drawing (your ask, 2026-11-20). Both are already painted on your desktop.
+
+## The 3-6-9 vortex (2026-11-20)
+
+Round her, a torus of light: it rises through the middle and falls round the outside (the two
+circulations, above and below) while the whole field turns, and its near half passes in front
+of her. Around it, the nine-point circle with the doubling path 1-2-4-8-7-5 flowing, the 3-6-9
+triangle pulsing, and three rings with 3, 6 and 9 lobes that move with her real voice. It is
+driven only by real things: her state's colour, her voice, and how many agents are working
+right now (more agents, faster and brighter). Nothing in it is random activity.

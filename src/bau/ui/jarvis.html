@@ -23,6 +23,8 @@ body{background:var(--sky)}
 :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 canvas#core{position:fixed;inset:0;width:100%;height:100%;display:block}
+/* the vortex's near half, drawn over her portrait so the field wraps round her */
+canvas#vfront{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:3}
 /* The tapestry: sacred geometry under the core; it never takes a click. */
 canvas#fifth{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
 canvas#sacred{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
@@ -373,6 +375,7 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
 <canvas id="fifth" aria-hidden="true"></canvas>
 <canvas id="sacred" aria-hidden="true"></canvas>
 <canvas id="core" aria-hidden="true"></canvas>
+<canvas id="vfront" aria-hidden="true"></canvas>
 
 <div id="avphoto" aria-hidden="true"><img alt=""></div>
 <div id="avatar" aria-hidden="true">
@@ -625,10 +628,15 @@ function paintAvatar() {
   const b = $("c-av");
   b.textContent = !AVATAR.on ? "GLASS CORE" : photo ? "PHOTO" : "ANIME"; b.classList.toggle("on", AVATAR.on);
 }
-{ const im = AVATAR.ph.querySelector("img");
+// Her face: the photo portrait if the owner painted one, else her neon HQ portrait, else her
+// desk portrait (the owner, 2026-11-20: "a sexy, attractive model like the models ... for
+// Jarvis's home screen"). Each is drawn on this computer and passed the age check.
+const AV_PORTRAITS = ["avatar", "neon-jarvis-idle", "jarvis"];
+{ const im = AVATAR.ph.querySelector("img"); let i = 0;
   im.onload = () => { AVATAR.photo = true; paintAvatar(); };
-  im.onerror = () => { AVATAR.photo = false; paintAvatar(); };
-  im.src = "/world/portrait/avatar.png"; }
+  im.onerror = () => { if (++i < AV_PORTRAITS.length) im.src = "/world/portrait/" + AV_PORTRAITS[i] + ".png";
+    else { AVATAR.photo = false; paintAvatar(); } };
+  im.src = "/world/portrait/" + AV_PORTRAITS[0] + ".png"; }
 function placeAvatar(X, Y, R) {
   const h = Math.min(innerHeight * (W < 760 ? 0.52 : 0.64), R * (W < 760 ? 5.2 : 4.8));
   if (Math.abs(h - AVATAR.h) > 0.5) { AVATAR.h = h; AVATAR.el.style.setProperty("--av-h", h + "px"); }
@@ -650,7 +658,9 @@ function setState(s) { STATE = s; $("statelabel").textContent = LABEL[s];
 const cv = $("core"), cx = cv.getContext("2d");
 let W = 0, H = 0, DPR = 1, col = [63, 214, 255];
 function resize() { DPR = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
-  cv.width = W * DPR; cv.height = H * DPR; cx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  cv.width = W * DPR; cv.height = H * DPR; cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const f = document.getElementById("vfront");
+  if (f) { f.width = W * DPR; f.height = H * DPR; f.getContext("2d").setTransform(DPR, 0, 0, DPR, 0, 0); } }
 addEventListener("resize", resize); resize();
 const REDUCED = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
 const SPEED = REDUCED ? 0.15 : 1;            // calm, not frozen, for reduced-motion users
@@ -825,6 +835,81 @@ function drawShocks(dt) {
     cx.fillStyle = rgba(p.c, 1 - p.t * 0.6); cx.beginPath(); cx.arc(x, y, 2.4, 0, 6.283); cx.fill(); }
   cx.restore();
 }
+// ---------------------------------------------------------------- the 3-6-9 vortex
+// The owner's ask (2026-11-20): the 3, 6 and 9, above and below, the two circulations. A torus
+// field round her: light rises through the centre and falls round the outside (poloidal) while
+// the whole field turns (toroidal); the nine-point circle with the doubling path 1-2-4-8-7-5
+// and the 3-6-9 triangle; three rings with 3, 6 and 9 lobes moved by the real voice level.
+// Real data only drives it: Jarvis's state colour, his voice, and how many agents really work
+// (BUSY) speed and brighten the flow. Additive light, about 900 points a frame.
+const VORTEX = { pts: [], n: REDUCED ? 360 : 900 };
+for (let i = 0; i < VORTEX.n; i++) VORTEX.pts.push({ u: Math.random() * 6.283, v: Math.random() * 6.283,
+  s: 0.6 + Math.random() * 0.8, k: Math.random() < 0.5 ? 1 : 0.62 });
+const RODIN = [1, 2, 4, 8, 7, 5];                       // doubling, reduced to one digit
+function ninePoint(i, X, Y, r) { const a = -Math.PI / 2 + (i % 9) * 6.283 / 9; return [X + Math.cos(a) * r, Y + Math.sin(a) * r]; }
+function drawVortex(X, Y, R, now, dt) {
+  const busy = Object.keys(BUSY).length, flow = (0.7 + busy * 0.35 + level * 1.6) * SPEED;
+  const tilt = 0.34 + Math.sin(now / 9000) * 0.04, ct = Math.cos(tilt), st = Math.sin(tilt);   // seen a little from above
+  const wrap = AVATAR.on ? 1.25 : 0.8, A = R * 1.75 * wrap, B = R * 0.72 * wrap, F = R * 16, spinU = now * 0.00012 * SPEED;
+  const fr = document.getElementById("vfront"), fx = fr && fr.getContext("2d");
+  if (fx) { fx.clearRect(0, 0, W, H); fx.save(); fx.globalCompositeOperation = "lighter"; }
+  cx.save(); cx.globalCompositeOperation = "lighter";
+  const proj = (u, v) => { const rr = A + B * Math.cos(v), x = rr * Math.cos(u), y0 = B * Math.sin(v), z0 = rr * Math.sin(u);
+    const y = y0 * ct - z0 * st, z = y0 * st + z0 * ct, sc = F / (F + z); return [X + x * sc, Y + y * sc, z]; };
+  // the form: 24 field lines, each a little circle round the ring, turning with it
+  for (let k = 0; k < 24; k++) { const u = spinU + k * 6.283 / 24;
+    for (let half = 0; half < 2; half++) {
+      const to = fx && AVATAR.on && half ? fx : cx;
+      to.strokeStyle = rgba(k % 3 ? col : GOLD, (k % 3 ? 0.1 : 0.2) + level * 0.18 + busy * 0.02); to.lineWidth = k % 3 ? 0.8 : 1.3;
+      to.beginPath(); let started = false;
+      for (let i = 0; i <= 48; i++) { const [px, py, z] = proj(u, i / 48 * 6.283);
+        if ((z < 0) !== !!half) { started = false; continue; }
+        if (started) to.lineTo(px, py); else { to.moveTo(px, py); started = true; } }
+      to.stroke(); } }
+  // the field: each point flows round its little circle (v) and the big one (u)
+  for (const p of VORTEX.pts) {
+    p.v += dt * 0.0011 * flow * p.s; p.u += dt * 0.00018 * flow * p.s;
+    const u = p.u + spinU, rr = (A * p.k + B * Math.cos(p.v));
+    const x = rr * Math.cos(u), y0 = B * Math.sin(p.v), z0 = rr * Math.sin(u);
+    const y = y0 * ct - z0 * st, z = y0 * st + z0 * ct, sc = F / (F + z);
+    const inner = Math.cos(p.v) < -0.2;                  // the column through the middle: gold
+    const c = inner ? GOLD : col, a = (0.18 + 0.5 * sc - 0.35) * (0.55 + busy * 0.08 + level * 0.6);
+    if (a <= 0.01) { p.px = null; continue; }
+    const to = fx && AVATAR.on && z < 0 ? fx : cx;      // in front of her, or behind
+    const px = X + x * sc, py = Y + y * sc;
+    if (p.px != null && Math.abs(px - p.px) + Math.abs(py - p.py) < R) {   // a streak along its path
+      to.strokeStyle = rgba(c, Math.min(1, a * 1.8)); to.lineWidth = 1.6 * sc;
+      to.beginPath(); to.moveTo(p.px, p.py); to.lineTo(px, py); to.stroke(); }
+    to.fillStyle = rgba(c, Math.min(1, a * 2));
+    to.fillRect(px - sc, py - sc, 2.2 * sc, 2.2 * sc);
+    p.px = px; p.py = py;
+  }
+  if (fx) fx.restore();
+  // above and below: the axis the field turns on
+  const g = cx.createLinearGradient(X, Y - R * 2.6, X, Y + R * 2.6);
+  g.addColorStop(0, rgba(GOLD, 0)); g.addColorStop(0.5, rgba(GOLD, 0.16 + level * 0.3)); g.addColorStop(1, rgba(GOLD, 0));
+  cx.strokeStyle = g; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(X, Y - R * 2.6); cx.lineTo(X, Y + R * 2.6); cx.stroke();
+  // the three rings: 3, 6 and 9 lobes, moved by the voice
+  [[3, 1.95, 0.0007], [6, 2.08, -0.0011], [9, 2.21, 0.0016]].forEach(([n, f, w], j) => {
+    cx.strokeStyle = rgba(j === 2 ? GOLD : col, 0.2 + level * 0.35); cx.lineWidth = 1.2; cx.beginPath();
+    for (let i = 0; i <= 180; i++) { const a = i / 180 * 6.283, r = R * f + Math.sin(a * n + now * w * SPEED) * (3 + level * 14 + busy * 1.5);
+      const px = X + Math.cos(a) * r, py = Y + Math.sin(a) * r; i ? cx.lineTo(px, py) : cx.moveTo(px, py); }
+    cx.stroke(); });
+  // the nine-point circle: the doubling path flows, the 3-6-9 triangle pulses
+  const r9 = R * 2.42;
+  cx.strokeStyle = rgba(col, 0.12); cx.lineWidth = 1; cx.beginPath(); cx.arc(X, Y, r9, 0, 6.283); cx.stroke();
+  cx.setLineDash([6, 10]); cx.lineDashOffset = -now * 0.02 * flow; cx.strokeStyle = rgba(col, 0.38); cx.lineWidth = 1.3; cx.beginPath();
+  RODIN.concat(1).forEach((d, i) => { const [px, py] = ninePoint(d, X, Y, r9); i ? cx.lineTo(px, py) : cx.moveTo(px, py); });
+  cx.stroke(); cx.setLineDash([]);
+  const pulse = 0.25 + 0.25 * (1 + Math.sin(now * 0.003 * SPEED)) / 2 + level * 0.3;
+  cx.strokeStyle = rgba(GOLD, pulse); cx.lineWidth = 1.6; cx.beginPath();
+  [3, 6, 9, 3].forEach((d, i) => { const [px, py] = ninePoint(d, X, Y, r9); i ? cx.lineTo(px, py) : cx.moveTo(px, py); });
+  cx.stroke();
+  cx.font = "600 " + Math.max(10, R * 0.16) + "px ui-monospace,monospace"; cx.textAlign = "center"; cx.textBaseline = "middle";
+  for (let d = 1; d <= 9; d++) { const [px, py] = ninePoint(d, X, Y, r9 + R * 0.2), key = d % 3 === 0;
+    cx.fillStyle = rgba(key ? GOLD : col, key ? 0.55 + pulse * 0.4 : 0.42); cx.fillText(String(d), px, py); }
+  cx.restore();
+}
 function frame(now) {
   try {
     const dt = Math.min(64, now - t0); t0 = now;
@@ -853,6 +938,7 @@ function frame(now) {
     placeAvatar(X, Y, R);
     const spin = STATE === "thinking" ? 3.2 : STATE === "listening" ? 1.6 : 1;
     spinA += dt * 0.00035 * spin * SPEED;
+    drawVortex(X, Y, R, now, dt);
     drawStreams(X, Y, R, now);
     drawTraces(now);
     drawLinks(X, Y, R, now);
