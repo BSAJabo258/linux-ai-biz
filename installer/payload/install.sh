@@ -156,6 +156,13 @@ if ((CLOUD)); then
   log "cloud server: SSH (port 22, key login only) stays open; nothing else does"
 fi
 install -m 0644 "${fw}" /etc/nftables.conf
+# The owner's remote desktop (sudo bau remote-desktop on, docs/REMOTE-DESKTOP.md): a re-run
+# keeps its home-network rule.
+if [[ -f /etc/bau/remote-desktop ]] && ! grep -q 'tcp dport 3389' /etc/nftables.conf; then
+  rules="${HERE}/hardening/nftables-remote-desktop.rules"
+  awk -v f="${rules}" '/counter comment "dropped inbound"/ { while ((getline l < f) > 0) print l } { print }' \
+    /etc/nftables.conf > /etc/nftables.conf.new && mv /etc/nftables.conf.new /etc/nftables.conf
+fi
 systemctl enable --now nftables >/dev/null
 nft -c -f /etc/nftables.conf || die "firewall rules invalid"
 install -m 0644 "${HERE}/hardening/99-bau-sysctl.conf" /etc/sysctl.d/99-bau.conf
