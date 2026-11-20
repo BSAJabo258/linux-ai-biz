@@ -27,7 +27,8 @@ tall windows and glass panels with neon edges. It is the style of the HQ view
 
 One building, seen from above at an isometric angle, cut open so every room shows. It is
 night outside (dark sky with a few stars); inside, every department has its own light. The
-owner names the departments (2026-11-15): the Forge, Research, Testing, Innovation, Studio,
+owner names the departments (2026-11-15, renamed in prompt 2 on 2026-11-20): Development Forge,
+Research, Testing, Innovation Workshop, Creative Studio,
 Finance, Market, around Jarvis's headquarters.
 
 ## Camera and perspective
@@ -44,13 +45,13 @@ Finance, Market, around Jarvis's headquarters.
 |---|---|---|
 | Headquarters | 120, 160, 255 | calm blue, the core violet (169, 139, 255) |
 | Research library | 63, 214, 255 | cool cyan, warm lamps |
-| The Forge | 255, 140, 40 | orange, workshop |
+| Development Forge | 255, 140, 40 | orange, workshop |
 | Testing lab | 70, 242, 164 | green, instruments |
-| Innovation lab | 169, 139, 255 | violet, prototypes |
-| Studio | 255, 110, 200 | magenta, stage light |
-| Finance | 255, 207, 77 | gold |
+| Innovation Workshop | 169, 139, 255 | violet, prototypes |
+| Creative Studio | 255, 110, 200 | magenta, stage light |
+| Finance Office | 255, 207, 77 | gold |
 | Market | 80, 220, 200 | teal |
-| Waiting for you | 255, 179, 64 | amber, the owner's attention |
+| Review: waiting for you | 255, 179, 64 | amber, the owner's attention |
 | Stopped | 255, 77, 94 | red |
 | Delivered | 140, 200, 90 | green, finished |
 
@@ -94,17 +95,8 @@ Every work department has two workstations: a desk, a chair, and the department'
 equipment. Each screen stays dark until an agent is working at it, and then shows that
 department's colour.
 
-- **Research library**: bookcases full of coloured spines, reading lamps, a book on each desk.
-- **The Forge**: two monitors per desk, a server rack, a tool wall, a 3D printer with an orange bed.
-- **Testing lab**: a test-results wall (green bars, one red), a meter on each desk, a cabinet.
-- **Innovation lab**: a whiteboard with notes, a wireframe prototype on a pedestal.
-- **Studio**: a mixing console with lit faders, a camera on a tripod, a ring light.
-- **Finance**: receipts on the desks, filing cabinets, a safe.
-- **Market**: stalls with goods, a sales wall.
-- **Headquarters**: Jarvis's glass core with turning rings, his console, the lounge (sofas,
-  a table, plants) where agents with no work wait, cabinets, a wall display.
-- **Waiting for you**: two counters with a bell. **Stopped**: red repair benches with tools.
-  **Delivered**: shelves of finished boxes and a conveyor.
+Every room's furniture, its live pieces and the art rules (tile, heights, layer order, light)
+are listed in [WORLD-ENVIRONMENT-QA.md](WORLD-ENVIRONMENT-QA.md) (prompt 2, 2026-11-20).
 
 Doors are gaps in the middle of every four tiles of an inside wall; characters walk through
 them only.

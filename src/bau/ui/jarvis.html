@@ -3250,7 +3250,7 @@ $("c-mind").onclick = () => { document.body.classList.toggle("showmind");
 // character stands where its latest real job puts it and walks there through the doors only
 // when that job changes; nothing moves for show, and nothing at all with reduced motion.
 const W_ROOMS = { research: [0, 0, 4, 4], forge: [4, 0, 4, 4], testing: [8, 0, 4, 4], innovation: [12, 0, 4, 4],
-  approvals: [0, 4, 4, 4], hq: [4, 4, 8, 4], repair: [12, 4, 4, 4],
+  repair: [0, 4, 4, 4], hq: [4, 4, 8, 4], approvals: [12, 4, 4, 4],
   studio: [0, 8, 4, 4], finance: [4, 8, 4, 4], market: [8, 8, 4, 4], delivery: [12, 8, 4, 4] };
 const W_TINT = { research: [63, 214, 255], forge: [255, 140, 40], testing: [70, 242, 164], innovation: [169, 139, 255],
   approvals: [255, 179, 64], hq: [120, 160, 255], repair: [255, 77, 94], studio: [255, 110, 200],
@@ -3270,6 +3270,7 @@ function shade(hex, k) { const n = parseInt(hex.slice(1), 16); const c = [n >> 1
   return "#" + c.map(v => v.toString(16).padStart(2, "0")).join(""); }
 function box(x, tx, ty, sw, sd, h, top, z = 0) { // a block on tile (tx, ty): the three faces you see
   const g = (a, b, zz) => iso(a, b, zz), A = g(tx, ty, z + h), B = g(tx + sw, ty, z + h), C = g(tx + sw, ty + sd, z + h), D = g(tx, ty + sd, z + h);
+  if (!z && h > 8) poly(x, [g(tx + 0.06, ty + 0.06, 0), g(tx + sw + 0.12, ty + 0.06, 0), g(tx + sw + 0.12, ty + sd + 0.12, 0), g(tx + 0.06, ty + sd + 0.12, 0)], "rgba(0,0,0,.2)");   // its shadow, light from the back left
   poly(x, [g(tx, ty + sd, z), g(tx + sw, ty + sd, z), C, D], shade(top, 0.62));
   poly(x, [g(tx + sw, ty + sd, z), g(tx + sw, ty, z), B, C], shade(top, 0.8));
   poly(x, [A, B, C, D], top, shade(top, 1.25), 1); return { A, B, C, D }; }
@@ -3297,60 +3298,134 @@ function rack(x, tx, ty, light) { box(x, tx, ty, 0.3, 0.7, 112, light ? "#9fb2bf
 function cabinet(x, tx, ty, light, col) { box(x, tx, ty, 0.6, 0.4, 54, col || (light ? "#b8c4cc" : "#2a3a48")); const p = face(x, tx, ty + 0.4, 0.6, 2, 52, null);
   for (let r = 0; r < 3; r++) { lineOn(x, p, 0.05, 0.33 * r + 0.02, 0.95, 0.33 * r + 0.02, "rgba(0,0,0,.35)", 1.5); lineOn(x, p, 0.42, 0.33 * r + 0.18, 0.58, 0.33 * r + 0.18, "#c9d6df", 2); } }
 // A workstation: desk, chair, and the department's own equipment. The screen is dark until a
-// working agent sits at it (drawn live in wScreens).
-function workstation(x, id, tx, ty, light) {
+// working agent sits at it (drawn live in wScreens). k is the desk's place in its room.
+function workstation(x, id, tx, ty, light, k) {
   const top = light ? "#d8e3ea" : "#2b4458";
   box(x, tx + 0.3, ty + 0.62, 0.36, 0.3, 20, light ? "#5d7383" : "#203447");                       // chair
   box(x, tx + 0.3, ty + 0.62, 0.36, 0.08, 40, light ? "#5d7383" : "#203447", 0);
-  if (id === "studio") { box(x, tx, ty, 1.0, 0.5, 30, light ? "#3d4a58" : "#1a2230");              // a mixing console
-    for (let k = 0; k < 8; k++) { const [a, b] = iso(tx + 0.1 + k * 0.1, ty + 0.25, 31); x.fillStyle = ["#ff6ec8", "#3fd6ff", "#ffcf4d"][k % 3]; x.fillRect(a - 2, b - 3 - (k * 7 % 5), 3, 5); } }
+  if (id === "studio" && k === 1) { box(x, tx, ty, 1.0, 0.5, 30, light ? "#3d4a58" : "#1a2230");   // a mixing console
+    for (let n = 0; n < 8; n++) { const [a, b] = iso(tx + 0.1 + n * 0.1, ty + 0.25, 31); x.fillStyle = ["#ff6ec8", "#3fd6ff", "#ffcf4d"][n % 3]; x.fillRect(a - 2, b - 3 - (n * 7 % 5), 3, 5); } }
   else box(x, tx, ty, 1.0, 0.5, 32, top);
-  const screens = id === "forge" ? [[0.05, 0.45], [0.52, 0.45]] : [[0.18, 0.66]];                  // the Forge has two monitors
+  const screens = id === "forge" ? [[0.05, 0.45], [0.52, 0.45]] : [[0.18, 0.66]];                  // the Forge's coders have two monitors
   for (const [u, w] of screens) { box(x, tx + u + w * 0.4, ty + 0.12, 0.1, 0.08, 8, light ? "#3d5262" : "#0d1b27", 32);
     face(x, tx + u, ty + 0.14, w, 40, 72, light ? "#2c3e4c" : "#0a1520", light ? "#516a7c" : "#2a4458"); }
+  const kb = iso(tx + 0.5, ty + 0.36, 33); x.fillStyle = light ? "#9fb2bf" : "#3a5468"; x.fillRect(kb[0] - 14, kb[1] - 2, 28, 4); // keyboard
   if (id === "research") { box(x, tx + 0.72, ty + 0.1, 0.22, 0.22, 4, "#f2ead8", 32); const [a, b] = iso(tx + 0.83, ty + 0.2, 56); // a lamp and a book
-    x.fillStyle = "#ffe48a"; x.beginPath(); x.arc(a, b, 7, 0, 6.283); x.fill(); }
-  if (id === "testing") box(x, tx + 0.74, ty + 0.12, 0.2, 0.22, 16, "#46f2a4", 32);                // a meter
+    x.fillStyle = "#ffe48a"; x.beginPath(); x.arc(a, b, 7, 0, 6.283); x.fill(); glowAt(x, a, b, [255, 228, 138], 40, 0.25); }
+  if (id === "testing") { box(x, tx + 0.74, ty + 0.12, 0.2, 0.22, 16, "#46f2a4", 32); led(tx + 0.84, ty + 0.12, 46, [70, 242, 164], 1.3); }
   if (id === "finance") { box(x, tx + 0.74, ty + 0.15, 0.2, 0.2, 5, "#e8e0c8", 32); box(x, tx + 0.74, ty + 0.15, 0.2, 0.2, 5, "#d8d0b8", 37); }
-  if (id === "innovation") { const [a, b] = iso(tx + 0.85, ty + 0.25, 50); x.strokeStyle = "rgba(169,139,255,.9)"; x.lineWidth = 2; x.strokeRect(a - 7, b - 7, 14, 14); }
+  if (id === "innovation" && k === 0) { const [a, b] = iso(tx + 0.85, ty + 0.25, 50); x.strokeStyle = "rgba(169,139,255,.9)"; x.lineWidth = 2; x.strokeRect(a - 7, b - 7, 14, 14); }
+  if (id === "innovation" && k === 1) { const [a, b] = iso(tx + 0.84, ty + 0.25, 32); x.strokeStyle = light ? "#5d7383" : "#9fb2bf"; x.lineWidth = 4;   // a test arm holding a part
+    x.beginPath(); x.moveTo(a, b); x.lineTo(a - 4, b - 22); x.lineTo(a + 10, b - 32); x.stroke(); x.fillStyle = "#a98bff"; x.fillRect(a + 7, b - 38, 8, 8); }
+  if (id === "forge") { const [a, b] = iso(tx + 0.9, ty + 0.36, 33); x.fillStyle = light ? "#3d5262" : "#0d1b27"; x.fillRect(a - 8, b - 6, 14, 6); led(tx + 0.9, ty + 0.36, 37, [255, 140, 40], 0.9); }
+  if (id === "market") { const [a, b] = iso(tx + 0.86, ty + 0.25, 34); x.strokeStyle = light ? "#3d4a58" : "#c9d6df"; x.lineWidth = 3;   // an outreach headset
+    x.beginPath(); x.arc(a, b, 7, Math.PI, 0); x.stroke(); x.fillStyle = "#50dcc8"; x.fillRect(a - 9, b - 2, 4, 5); x.fillRect(a + 5, b - 2, 4, 5); }
+  if (id === "studio" && k === 0) { box(x, tx + 0.05, ty + 0.3, 0.4, 0.16, 2, light ? "#3d4a58" : "#111a26", 32);   // a drawing tablet with a stroke on it
+    const [a, b] = iso(tx + 0.25, ty + 0.38, 35); x.strokeStyle = "#ff6ec8"; x.lineWidth = 2; x.beginPath(); x.moveTo(a - 10, b); x.quadraticCurveTo(a, b - 8, a + 10, b); x.stroke(); }
   return screens.map(([u, w]) => [tx + u, ty + 0.14, w]); }
+// Small lights that blink by themselves (status LEDs, floor guides): the room is alive even when
+// no agent is, and none of it says anything about work. Off with reduced motion.
+let W_AMB = [];
+function led(tx, ty, z, col, rate) { W_AMB.push({ p: iso(tx, ty, z), col, rate: rate || 1, ph: (tx * 7.3 + ty * 3.1) % 6.283, r: 2 }); }
+function glowAt(x, a, b, col, r, al) { const g = x.createRadialGradient(a, b, 1, a, b, r); g.addColorStop(0, rgba(col, al)); g.addColorStop(1, rgba(col, 0)); x.fillStyle = g; x.fillRect(a - r, b - r, 2 * r, 2 * r); }
+let W_LABELS = [];   // floor and desk labels, drawn after all the furniture so none is hidden
+function label(x, tx, ty, z, text, col, light) { W_LABELS.push([tx, ty, z, text, col, light]); }
+function drawLabel(x, tx, ty, z, text, col, light) { const [a, b] = iso(tx, ty, z); x.font = "800 13px ui-monospace,Consolas,monospace"; x.textAlign = "center";
+  const w = x.measureText(text).width + 10; x.fillStyle = light ? "rgba(255,255,255,.85)" : "rgba(2,6,11,.7)"; x.fillRect(a - w / 2, b - 12, w, 17); x.fillStyle = rgba(col, 1); x.fillText(text, a, b); }
+// A screen or board on a wall: back wall (along x at ty) or left wall (along y at tx).
+function wallBoard(x, tx, ty, len, z0, z1, kind, tint, light, alongY) {
+  const fill = kind === "white" ? (light ? "#f4f4f4" : "#dfe7ec") : (light ? "#13263a" : "#061220");
+  const p = alongY ? faceY(x, tx, ty, len, z0, z1, fill, rgba(tint, 0.85)) : face(x, tx, ty, len, z0, z1, fill, rgba(tint, 0.85));
+  const col = rgba(tint, 1), soft = rgba(tint, 0.55), q = (u, v, w, h, c) => poly(x, [onFace(p, u, v), onFace(p, u + w, v), onFace(p, u + w, v + h), onFace(p, u, v + h)], c);
+  if (kind === "code") for (let r = 0; r < 7; r++) { const ind = [0, 1, 2, 2, 1, 2, 0][r] * 0.07; lineOn(x, p, 0.06 + ind, 0.86 - r * 0.115, 0.06 + ind + 0.18 + ((r * 37) % 9) / 20, 0.86 - r * 0.115, ["#ff8c28", "#3fd6ff", "#c9d6df", "#46f2a4"][r % 4], 2); }
+  if (kind === "bars") for (let k = 0; k < 8; k++) q(0.07 + k * 0.11, 0.1, 0.07, 0.12 + 0.09 * (1 + (k * 7) % 8), k === 6 ? "#ffcf4d" : col);
+  if (kind === "trend") { x.strokeStyle = col; x.lineWidth = 3; x.beginPath(); [0.08, 0.25, 0.4, 0.55, 0.7, 0.88].forEach((u, k) => x[k ? "lineTo" : "moveTo"](...onFace(p, u, 0.2 + [0, 0.15, 0.1, 0.32, 0.38, 0.7][k]))); x.stroke();
+    q(0.82, 0.62, 0.08, 0.14, "#ffcf4d"); for (let k = 1; k < 4; k++) lineOn(x, p, 0.05, k * 0.25, 0.95, k * 0.25, rgba(tint, 0.2), 1); }
+  if (kind === "pins") { const cards = [[0.08, 0.55], [0.38, 0.62], [0.7, 0.5], [0.2, 0.15], [0.55, 0.18]];
+    x.strokeStyle = "#ff4d5e"; x.lineWidth = 1.5; x.beginPath(); cards.forEach(([u, v], k) => x[k ? "lineTo" : "moveTo"](...onFace(p, u + 0.08, v + 0.15))); x.stroke();
+    cards.forEach(([u, v], k) => { q(u, v, 0.18, 0.28, ["#f2ead8", "#ffe48a", "#cfefff", "#f2ead8", "#ffcf4d"][k]); const [a, b] = onFace(p, u + 0.09, v + 0.26); x.fillStyle = "#ff4d5e"; x.fillRect(a - 2, b - 2, 4, 4); }); }
+  if (kind === "kanban") for (let c = 0; c < 3; c++) { lineOn(x, p, 0.04 + c * 0.32, 0.9, 0.3 + c * 0.32, 0.9, soft, 3);
+    for (let r = 0; r < 3 - c % 2; r++) q(0.06 + c * 0.32, 0.62 - r * 0.25, 0.22, 0.18, ["#ffcf4d", "#3fd6ff", "#46f2a4"][c]); }
+  if (kind === "thumbs") for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) { q(0.06 + c * 0.31, 0.1 + r * 0.45, 0.26, 0.36, ["#ff6ec8", "#a98bff", "#3fd6ff", "#ffcf4d", "#ff8c28", "#46f2a4"][r * 3 + c]);
+    q(0.09 + c * 0.31, 0.14 + r * 0.45, 0.2, 0.12, "rgba(255,255,255,.35)"); }
+  if (kind === "ledger") for (let r = 0; r < 6; r++) { lineOn(x, p, 0.06, 0.86 - r * 0.14, 0.5, 0.86 - r * 0.14, "#c9d6df", 2); lineOn(x, p, 0.62, 0.86 - r * 0.14, 0.62 + 0.08 + ((r * 5) % 4) * 0.06, 0.86 - r * 0.14, r === 5 ? "#ffcf4d" : col, 4); }
+  if (kind === "white") [["#ffcf4d", 0.1, 0.6], ["#ff6ec8", 0.35, 0.65], ["#3fd6ff", 0.6, 0.55], ["#46f2a4", 0.2, 0.25], ["#ffcf4d", 0.55, 0.2]].forEach(([c, u, v]) => q(u, v, 0.14, 0.25, c));
+  if (kind === "peg") for (let k = 0; k < 6; k++) { lineOn(x, p, 0.1 + k * 0.15, 0.25, 0.1 + k * 0.15, 0.75, "#aab7c2", 3); lineOn(x, p, 0.06 + k * 0.15, 0.68, 0.14 + k * 0.15, 0.75, "#aab7c2", 3); }
+  if (kind !== "white" && kind !== "peg") { const [a, b] = onFace(p, 0.5, 0.5); glowAt(x, a, b, tint, 70, light ? 0.06 : 0.12); led(...(alongY ? [tx, ty + len - 0.08] : [tx + len - 0.08, ty]), z1 - 6, tint, 1.7); }
+  return p; }
+function standBoard(x, tx, ty, len, kind, tint, light) { // a board on legs, facing you
+  [0.05, len - 0.1].forEach(u => box(x, tx + u, ty - 0.04, 0.05, 0.05, 30, light ? "#7f8a94" : "#3a4652")); return wallBoard(x, tx, ty, len, 30, 74, kind, tint, light); }
+const HQ_BOARD = [3.1, 2.8], HQ_PAD = [7.0, 0.6];   // the status board along HQ's back wall (clear of its doors), the automaton's pad
+function table(x, tx, ty, w, d, light, col) { [[0.05, 0.05], [w - 0.12, 0.05], [0.05, d - 0.12], [w - 0.12, d - 0.12]].forEach(([a, b]) => box(x, tx + a, ty + b, 0.07, 0.07, 26, light ? "#7f8a94" : "#3a4652"));
+  box(x, tx, ty, w, d, 4, col || (light ? "#c9a27a" : "#5a4636"), 26); }
+function papers(x, tx, ty, z, n) { for (let k = 0; k < n; k++) box(x, tx + k * 0.12, ty + (k % 2) * 0.08, 0.16, 0.12, 2, ["#f2ead8", "#e8e0c8", "#cfefff"][k % 3], z); }
+function lamp(x, tx, ty, light, col) { box(x, tx, ty, 0.12, 0.12, 70, light ? "#7f8a94" : "#3a4652"); const [a, b] = iso(tx + 0.06, ty + 0.06, 78);
+  x.fillStyle = rgba(col, 0.95); x.beginPath(); x.arc(a, b, 9, Math.PI, 0); x.fill(); glowAt(x, a, b + 30, col, 90, light ? 0.1 : 0.2); }
+function crate(x, tx, ty, light) { box(x, tx, ty, 0.36, 0.36, 26, light ? "#c9a27a" : "#6a4d30"); const p = face(x, tx, ty + 0.36, 0.36, 2, 24, null); lineOn(x, p, 0, 0, 1, 1, "rgba(0,0,0,.35)", 2); lineOn(x, p, 0, 1, 1, 0, "rgba(0,0,0,.35)", 2); }
 function roomProps(x, id, rx, ry, light) { // what makes each department itself; back to front
-  const L = (a, b) => [rx + a, ry + b];
-  if (id === "research") { shelf(x, ...L(0.05, 0.25), light); shelf(x, ...L(0.05, 2.95), light); plant(x, ...L(3.6, 3.55), light, true); }
-  if (id === "forge") { rack(x, ...L(0.05, 3.1), light); const p = face(x, rx + 1.4, ry + 0.02, 1.2, 30, 76, light ? "#c9d6df" : "#16232f", rgba(W_TINT.forge, 0.7)); // tool wall
-    for (let k = 0; k < 5; k++) { lineOn(x, p, 0.1 + k * 0.19, 0.2, 0.1 + k * 0.19, 0.8, "#aab7c2", 3); lineOn(x, p, 0.06 + k * 0.19, 0.72, 0.14 + k * 0.19, 0.8, "#aab7c2", 3); }
-    box(x, ...L(3.3, 3.2), 0.5, 0.5, 44, light ? "#c9d6df" : "#3a2a1a"); box(x, ...L(3.38, 3.28), 0.34, 0.34, 6, "#ff8c28", 44); } // a 3D printer
-  if (id === "testing") { cabinet(x, ...L(0.05, 3.2), light, light ? "#c9e8d8" : "#1e3a30"); const p = face(x, rx + 1.4, ry + 0.02, 1.2, 34, 78, "#071a12", rgba(W_TINT.testing, 0.8));
-    for (let k = 0; k < 6; k++) lineOn(x, p, 0.1, 0.12 + k * 0.14, 0.1 + 0.15 * (1 + (k * 5) % 5), 0.12 + k * 0.14, k === 4 ? "#ff4d5e" : "#46f2a4", 3); }
+  const L = (a, b) => [rx + a, ry + b], T = W_TINT[id];
+  if (id === "research") { wallBoard(x, rx + 1.3, ry + 0.02, 1.5, 32, 82, "pins", T, light); shelf(x, ...L(0.05, 0.25), light); shelf(x, ...L(0.05, 1.3), light); shelf(x, ...L(0.05, 2.95), light);
+    table(x, ...L(1.7, 2.0), 0.75, 0.5, light); papers(x, rx + 1.78, ry + 2.08, 30, 3); const [a, b] = iso(rx + 2.25, ry + 2.25, 34); x.fillStyle = "#3fd6ff"; x.fillRect(a - 7, b - 9, 14, 9);   // analysis table, open laptop
+    box(x, ...L(1.8, 3.4), 0.55, 0.38, 34, light ? "#a07850" : "#4a3020"); for (let k = 0; k < 3; k++) { const [c, d] = iso(rx + 1.9 + k * 0.17, ry + 3.78, 22); x.fillStyle = "#e8d8a8"; x.fillRect(c - 4, d - 2, 8, 3); }  // card catalogue
+    plant(x, ...L(3.6, 3.55), light, true); lamp(x, ...L(3.75, 2.2), light, [255, 228, 138]); }
+  if (id === "forge") { wallBoard(x, rx + 0.02, ry + 0.2, 1.6, 34, 82, "code", T, light, true); standBoard(x, rx + 1.75, ry + 3.45, 0.8, "kanban", T, light);
+    rack(x, ...L(0.05, 3.1), light); for (let k = 0; k < 6; k++) led(rx + 0.35, ry + 3.15 + k * 0.1, 40 + (k % 3) * 25, k % 2 ? [255, 140, 40] : [70, 242, 164], 2 + k * 0.3);
+    box(x, ...L(3.3, 3.2), 0.5, 0.5, 44, light ? "#c9d6df" : "#3a2a1a"); box(x, ...L(3.38, 3.28), 0.34, 0.34, 6, "#ff8c28", 44); led(rx + 3.55, ry + 3.2, 40, [255, 140, 40], 0.7);   // a 3D printer
+    crate(x, ...L(0.6, 3.55), light); crate(x, ...L(0.98, 3.6), light); }
+  if (id === "testing") { cabinet(x, ...L(0.05, 3.2), light, light ? "#c9e8d8" : "#1e3a30"); const p = wallBoard(x, rx + 1.4, ry + 0.02, 1.2, 34, 78, "code", T, light);
+    for (let k = 0; k < 6; k++) lineOn(x, p, 0.6, 0.12 + k * 0.14, 0.95, 0.12 + k * 0.14, k === 4 ? "#ff4d5e" : "#46f2a4", 3); wallBoard(x, rx + 0.02, ry + 0.15, 1.6, 34, 80, "trend", T, light, true); }
   if (id === "innovation") { box(x, ...L(3.15, 3.1), 0.55, 0.55, 26, light ? "#c9d6df" : "#1e2a40"); const [a, b] = iso(rx + 3.42, ry + 3.37, 70); // a prototype on a pedestal
     x.strokeStyle = "rgba(169,139,255,.95)"; x.lineWidth = 2; x.strokeRect(a - 16, b - 16, 32, 32); x.strokeRect(a - 8, b - 24, 32, 32);
     [[-16, -16, -8, -24], [16, -16, 24, -24], [-16, 16, -8, 8], [16, 16, 24, 8]].forEach(([p1, q1, p2, q2]) => { x.beginPath(); x.moveTo(a + p1, b + q1); x.lineTo(a + p2, b + q2); x.stroke(); });
-    const p = face(x, rx + 1.4, ry + 0.02, 1.2, 30, 78, light ? "#f4f4f4" : "#e8eef2", rgba(W_TINT.innovation, 0.8)); // a whiteboard with notes
-    [["#ffcf4d", 0.1, 0.6], ["#ff6ec8", 0.35, 0.65], ["#3fd6ff", 0.6, 0.55], ["#46f2a4", 0.2, 0.25], ["#ffcf4d", 0.55, 0.2]].forEach(([c, u, v]) =>
-      poly(x, [onFace(p, u, v), onFace(p, u + 0.14, v), onFace(p, u + 0.14, v + 0.25), onFace(p, u, v + 0.25)], c)); }
-  if (id === "studio") { const [a, b] = iso(rx + 3.4, ry + 3.2, 0); x.strokeStyle = light ? "#3d4a58" : "#8aa0b2"; x.lineWidth = 3; // a camera on a tripod
+    wallBoard(x, rx + 1.4, ry + 0.02, 1.2, 30, 78, "white", T, light); wallBoard(x, rx + 0.02, ry + 0.2, 1.5, 30, 80, "peg", T, light, true);
+    box(x, ...L(0.2, 3.1), 0.8, 0.45, 30, light ? "#c9d6df" : "#22304a"); [0, 1, 2].forEach(k => { const [c, d] = iso(rx + 0.35 + k * 0.25, ry + 3.3, 31);   // flasks on the bench
+      x.fillStyle = ["#46f2a4", "#a98bff", "#3fd6ff"][k]; x.beginPath(); x.moveTo(c - 6, d); x.lineTo(c + 6, d); x.lineTo(c + 2, d - 14); x.lineTo(c - 2, d - 14); x.closePath(); x.fill(); led(rx + 0.35 + k * 0.25, ry + 3.3, 38, [169, 139, 255], 0.6 + k * 0.4); });
+    const [s, t2] = iso(rx + 2.0, ry + 3.4, 0); x.strokeStyle = rgba(T, 0.8); x.lineWidth = 1.5;                                   // the sandbox: a closed glass box
+    poly(x, [iso(rx + 1.7, ry + 3.1, 2), iso(rx + 2.3, ry + 3.1, 2), iso(rx + 2.3, ry + 3.7, 2), iso(rx + 1.7, ry + 3.7, 2)], rgba(T, 0.12), rgba(T, 0.8), 1.5);
+    poly(x, [iso(rx + 1.7, ry + 3.1, 44), iso(rx + 2.3, ry + 3.1, 44), iso(rx + 2.3, ry + 3.7, 44), iso(rx + 1.7, ry + 3.7, 44)], rgba(T, 0.08), rgba(T, 0.8), 1.5);
+    [[1.7, 3.7], [2.3, 3.7], [2.3, 3.1]].forEach(([u, v]) => { const [c, d] = iso(rx + u, ry + v, 2); x.beginPath(); x.moveTo(c, d); x.lineTo(c, d - 42); x.stroke(); });
+    x.fillStyle = rgba(T, 0.9); x.fillRect(s - 5, t2 - 26, 10, 10); led(rx + 2.0, ry + 3.4, 20, T, 1.1); }
+  if (id === "studio") { wallBoard(x, rx + 0.02, ry + 1.2, 1.4, 34, 84, "thumbs", T, light, true);
+    const [a, b] = iso(rx + 3.4, ry + 3.2, 0); x.strokeStyle = light ? "#3d4a58" : "#8aa0b2"; x.lineWidth = 3;     // a camera on a tripod
     [[-14, 0], [14, 0], [0, 10]].forEach(([dx, dy]) => { x.beginPath(); x.moveTo(a, b - 50); x.lineTo(a + dx, b + dy); x.stroke(); });
-    x.fillStyle = "#222"; x.fillRect(a - 14, b - 66, 24, 16); x.fillStyle = "#3fd6ff"; x.fillRect(a + 8, b - 62, 8, 8);
+    x.fillStyle = "#222"; x.fillRect(a - 14, b - 66, 24, 16); x.fillStyle = "#3fd6ff"; x.fillRect(a + 8, b - 62, 8, 8); led(rx + 3.4, ry + 3.2, 60, [255, 77, 94], 0.8);
     const [c, d] = iso(rx + 0.4, ry + 3.4, 0); x.beginPath(); x.moveTo(c, d); x.lineTo(c, d - 70); x.stroke();                  // a ring light
-    x.strokeStyle = light ? "#8aa0b2" : "#3a4a5a"; x.lineWidth = 5; x.beginPath(); x.arc(c, d - 86, 16, 0, 6.283); x.stroke(); }     // lit live, only while someone films
-  if (id === "finance") { cabinet(x, ...L(0.05, 3.2), light); box(x, ...L(3.3, 3.25), 0.5, 0.5, 46, light ? "#7f8a94" : "#3a4048");      // files and a safe
-    const [a, b] = iso(rx + 3.55, ry + 3.75, 24); x.strokeStyle = "#ffcf4d"; x.lineWidth = 3; x.beginPath(); x.arc(a, b, 7, 0, 6.283); x.stroke(); }
+    x.strokeStyle = light ? "#8aa0b2" : "#3a4a5a"; x.lineWidth = 5; x.beginPath(); x.arc(c, d - 86, 16, 0, 6.283); x.stroke();      // lit live, only while someone films
+    const [e, f] = iso(rx + 1.9, ry + 3.5, 0); x.strokeStyle = light ? "#8a6d3b" : "#a5844b"; x.lineWidth = 3;   // an easel with a canvas
+    x.beginPath(); x.moveTo(e - 12, f); x.lineTo(e, f - 76); x.lineTo(e + 12, f); x.stroke(); x.fillStyle = "#f6f0ff"; x.fillRect(e - 20, f - 70, 40, 34);
+    x.fillStyle = "#ff6ec8"; x.fillRect(e - 14, f - 60, 14, 10); x.fillStyle = "#3fd6ff"; x.fillRect(e + 2, f - 52, 12, 10); }
+  if (id === "finance") { wallBoard(x, rx + 0.02, ry + 0.15, 1.7, 34, 84, "ledger", T, light, true); wallBoard(x, rx + 1.22, ry + 0.02, 0.72, 34, 84, "bars", T, light);
+    cabinet(x, ...L(0.05, 3.2), light); cabinet(x, ...L(0.75, 3.35), light); box(x, ...L(3.3, 3.25), 0.5, 0.5, 46, light ? "#7f8a94" : "#3a4048");      // records and a safe
+    const [a, b] = iso(rx + 3.55, ry + 3.75, 24); x.strokeStyle = "#ffcf4d"; x.lineWidth = 3; x.beginPath(); x.arc(a, b, 7, 0, 6.283); x.stroke(); lamp(x, ...L(2.3, 3.6), light, [255, 207, 77]); }
   if (id === "market") { [[0.05, 3.0], [3.2, 3.1]].forEach(([a, b], k) => { box(x, ...L(a, b), 0.6, 0.6, 30, light ? "#c9a27a" : "#5a4636");   // stalls of goods
       [0, 1].forEach(j => box(x, rx + a + 0.08 + j * 0.25, ry + b + 0.15, 0.2, 0.2, 18, ["#ff6ec8", "#3fd6ff", "#ffcf4d", "#46f2a4"][k * 2 + j], 30)); });
-    const p = face(x, rx + 1.3, ry + 0.02, 1.4, 34, 80, "#06171a", rgba(W_TINT.market, 0.8)); for (let k = 0; k < 8; k++) lineOn(x, p, 0.06 + k * 0.11, 0.2, 0.06 + k * 0.11, 0.2 + 0.08 * (1 + (k * 7) % 8), "#50dcc8", 6); }
-  if (id === "approvals") { [[0.3, 0.45], [2.7, 0.45]].forEach(([a, b]) => { box(x, ...L(a, b), 1.1, 0.5, 36, light ? "#e6c78f" : "#4a3a1e"); box(x, rx + a + 0.05, ry + b + 0.05, 1.0, 0.4, 3, "#ffb340", 36); });
-    const [a, b] = iso(rx + 1.0, ry + 0.7, 40); x.fillStyle = "#ffcf4d"; x.beginPath(); x.arc(a, b, 6, Math.PI, 0); x.fill(); plant(x, ...L(3.55, 3.5), light); }
+    wallBoard(x, rx + 1.22, ry + 0.02, 0.72, 34, 84, "bars", T, light); wallBoard(x, rx + 0.02, ry + 0.15, 1.7, 34, 84, "trend", T, light, true);
+    table(x, ...L(1.6, 2.1), 0.8, 0.5, light, light ? "#9fd8d0" : "#1c3a3a"); papers(x, rx + 1.7, ry + 2.18, 30, 4); }
+  if (id === "approvals") { // review: the manager's check and yours, side by side; revisions go back from here
+    [[0.15, 0.45, "MANAGER CHECK"], [3.0, 0.45, "YOUR REVIEW"]].forEach(([a, b, t]) => { box(x, ...L(a, b), 0.95, 0.5, 36, light ? "#e6c78f" : "#4a3a1e"); box(x, rx + a + 0.05, ry + b + 0.05, 0.85, 0.4, 3, "#ffb340", 36);
+      papers(x, rx + a + 0.15, ry + b + 0.1, 39, 2); label(x, rx + a + 0.47, ry + b + 0.75, 0, t, T, light); });
+    const [a, b] = iso(rx + 0.85, ry + 0.7, 40); x.fillStyle = "#ffcf4d"; x.beginPath(); x.arc(a, b, 6, Math.PI, 0); x.fill();
+    box(x, ...L(0.2, 3.2), 0.6, 0.45, 30, light ? "#d7a0a6" : "#4a1f27"); papers(x, rx + 0.28, ry + 3.28, 33, 3); label(x, rx + 0.5, ry + 3.95, 0, "REVISIONS", [255, 77, 94], light);
+    wallBoard(x, rx + 0.02, ry + 1.05, 0.9, 34, 82, "kanban", T, light, true); plant(x, ...L(3.55, 3.5), light); }
   if (id === "repair") { box(x, ...L(0.3, 0.45), 1.3, 0.5, 30, light ? "#d7a0a6" : "#4a1f27"); box(x, ...L(2.6, 0.45), 1.2, 0.5, 30, light ? "#d7a0a6" : "#4a1f27");
-    [0.4, 0.9, 2.8].forEach(o => box(x, rx + o, ry + 0.55, 0.28, 0.25, 12, "#9fb2bf", 30)); box(x, ...L(3.4, 3.4), 0.4, 0.4, 26, "#8a6d3b"); box(x, ...L(3.4, 3.4), 0.4, 0.4, 24, "#a5844b", 26); }
-  if (id === "delivery") { [[0.05, 0.3], [0.05, 2.95]].forEach(([a, b]) => { box(x, ...L(a, b), 0.45, 1.0, 76, light ? "#c9d6df" : "#1d3042");
+    [0.4, 0.9, 2.8].forEach(o => box(x, rx + o, ry + 0.55, 0.28, 0.25, 12, "#9fb2bf", 30)); box(x, ...L(3.4, 3.4), 0.4, 0.4, 26, "#8a6d3b"); box(x, ...L(3.4, 3.4), 0.4, 0.4, 24, "#a5844b", 26);
+    wallBoard(x, rx + 0.02, ry + 1.3, 1.3, 34, 80, "code", T, light, true); }
+  if (id === "delivery") { [[0.05, 0.3], [0.05, 2.95]].forEach(([a, b]) => { box(x, ...L(a, b), 0.45, 1.0, 76, light ? "#c9d6df" : "#1d3042");   // finished work on display
       [0, 1, 2].forEach(k => box(x, rx + a + 0.05, ry + b + 0.06 + k * 0.32, 0.36, 0.26, 22, ["#ffcf4d", "#3fd6ff", "#a98bff"][k], 76)); });
-    box(x, ...L(3.05, 0.4), 0.9, 0.5, 18, light ? "#7f8a94" : "#2a3440"); for (let k = 0; k < 3; k++) { const [a, b] = iso(rx + 3.15 + k * 0.29, ry + 0.65, 19); x.fillStyle = "#9fb2bf"; x.fillRect(a - 3, b - 1, 6, 2); } }   // the conveyor, clear of the door
+    box(x, ...L(3.05, 0.4), 0.9, 0.5, 18, light ? "#7f8a94" : "#2a3440"); for (let k = 0; k < 3; k++) { const [a, b] = iso(rx + 3.15 + k * 0.29, ry + 0.65, 19); x.fillStyle = "#9fb2bf"; x.fillRect(a - 3, b - 1, 6, 2); }   // the conveyor, clear of the door
+    [0, 1, 2].forEach(k => cabinet(x, rx + 1.0 + k * 0.62, ry + 3.5, light, light ? "#b8d4a8" : "#25381e")); label(x, rx + 1.9, ry + 4.0, 0, "ARCHIVE", T, light); }
   if (id === "hq") { [[0.2, 0.5], [0.2, 2.3]].forEach(([a, b]) => { box(x, ...L(a, b), 0.55, 1.2, 18, light ? "#8aa3b2" : "#2a3f52"); box(x, ...L(a, b), 0.18, 1.2, 40, light ? "#9bb4c3" : "#33495e"); });
-    box(x, ...L(1.2, 1.5), 0.6, 0.6, 14, light ? "#c9d6df" : "#22384a"); plant(x, ...L(0.25, 3.6), light, true); plant(x, ...L(7.6, 0.3), light, true); plant(x, ...L(7.6, 3.6), light);
-    [[5.6, 0.5], [6.6, 0.5]].forEach(([a, b]) => cabinet(x, ...L(a, b), light));
-    const p = face(x, rx + 2.6, ry + 0.02, 2.8, 30, 80, "#07101e", rgba(W_TINT.hq, 0.9)); for (let k = 0; k < 3; k++) lineOn(x, p, 0.05 + k * 0.32, 0.5, 0.3 + k * 0.32, 0.5 + 0.2 * Math.sin(k), "#78a0ff", 2); }
-  if (WORK.has(id)) return DESKS.map(([a, b]) => workstation(x, id, rx + a, ry + b, light));
+    box(x, ...L(1.2, 1.5), 0.6, 0.6, 14, light ? "#c9d6df" : "#22384a"); plant(x, ...L(0.25, 3.6), light, true); plant(x, ...L(7.6, 3.6), light);
+    box(x, ...L(1.3, 0.3), 0.6, 0.35, 46, light ? "#c9d6df" : "#22384a"); face(x, rx + 1.35, ry + 0.65, 0.5, 26, 44, "#07101e", rgba(T, 0.9));   // the incoming-assignments kiosk
+    label(x, rx + 1.6, ry + 1.3, 0, "INCOMING", T, light);
+    face(x, rx + HQ_BOARD[0], ry + 0.02, HQ_BOARD[1], 30, 82, "#07101e", rgba(T, 0.9));                                     // the department status board (lit live)
+    box(x, ...L(HQ_PAD[0], HQ_PAD[1]), 0.9, 0.9, 8, light ? "#c9d6df" : "#1a2440"); poly(x, [iso(rx + HQ_PAD[0] + 0.08, ry + HQ_PAD[1] + 0.08, 8), iso(rx + HQ_PAD[0] + 0.82, ry + HQ_PAD[1] + 0.08, 8), iso(rx + HQ_PAD[0] + 0.82, ry + HQ_PAD[1] + 0.82, 8), iso(rx + HQ_PAD[0] + 0.08, ry + HQ_PAD[1] + 0.82, 8)], null, rgba([169, 139, 255], 0.8), 2);   // the automaton's build pad
+    box(x, 6.25, 7.35, 0.8, 0.4, 32, light ? "#c9d6df" : "#22384a"); face(x, 6.3, 7.4, 0.7, 36, 54, "#0a1830", rgba(T, 0.7)); label(x, 6.65, 7.55, 40, "MANAGER", T, light);   // a manager's post
+    box(x, 8.95, 7.35, 0.8, 0.4, 32, light ? "#e6c78f" : "#4a3a1e"); box(x, 9.0, 7.4, 0.7, 0.3, 3, "#ffb340", 32); label(x, 9.35, 7.55, 40, "DECIDE", [255, 179, 64], light);   // approvals and decisions
+    lamp(x, ...L(0.2, 1.85), light, [120, 160, 255]); }
+  if (WORK.has(id)) return deskSpots(id).map(([a, b], k) => workstation(x, id, rx + a, ry + b, light, k));
   return []; }
+function deskSpots(id) { return id === "forge" ? [[0.15, 0.45], [1.55, 0.45], [2.95, 0.45]] : DESKS; }
 function doors() { // a door in the middle of every 4 tiles of each inside wall
   const d = new Set();
   for (const [, [rx, ry, rw, rh]] of Object.entries(W_ROOMS)) {
@@ -3396,6 +3471,7 @@ function drawStatic(c, light) { // everything that never moves, drawn once and k
     const [lx, ly] = iso(rx + rw / 2, ry + rh / 2); const glow = x.createRadialGradient(lx, ly, 10, lx, ly, rw * 60);   // each room's own light pooled on its floor
     glow.addColorStop(0, rgba(tint, light ? 0.12 : 0.16)); glow.addColorStop(1, rgba(tint, 0)); x.fillStyle = glow;
     poly(x, [iso(rx, ry), iso(rx + rw, ry), iso(rx + rw, ry + rh), iso(rx, ry + rh)], glow); }
+  W_AMB = []; W_LABELS = []; walkways(x, light);
   for (const [id, [rx, ry, rw, rh]] of Object.entries(W_ROOMS)) { const tint = W_TINT[id], glass = rgba(tint, light ? 0.14 : 0.1); // walls with door gaps
     for (let i = 0; i < rw; i++) { if (W_DOORS.has(`${rx + i},${ry},v`)) { face(x, rx + i, ry, 1, WALL - 18, WALL, glass); continue; } face(x, rx + i, ry, 1, 0, WALL, glass); }
     for (let j = 0; j < rh; j++) { if (W_DOORS.has(`${rx},${ry + j},h`)) { faceY(x, rx, ry + j, 1, WALL - 18, WALL, glass); continue; } faceY(x, rx, ry + j, 1, 0, WALL, glass); }
@@ -3405,9 +3481,43 @@ function drawStatic(c, light) { // everything that never moves, drawn once and k
     x.beginPath(); x.moveTo(...iso(rx, ry + rh, WALL)); x.lineTo(...iso(rx, ry, WALL)); x.lineTo(...iso(rx + rw, ry, WALL)); x.stroke(); x.restore(); }
   W_STATIONS = {}; const order = Object.entries(W_ROOMS).sort((p, q) => (p[1][0] + p[1][1]) - (q[1][0] + q[1][1]));
   for (const [id, [rx, ry]] of order) W_STATIONS[id] = roomProps(x, id, rx, ry, light);
+  W_LABELS.forEach(l => drawLabel(x, ...l));
   const [hx, hy] = iso(8, 6); x.fillStyle = light ? "#c9d6df" : "#14263a"; x.beginPath(); x.ellipse(hx, hy, 130, 56, 0, 0, 6.283); x.fill();
   x.strokeStyle = rgba([169, 139, 255], 0.7); x.lineWidth = 3; x.stroke(); x.fillStyle = light ? "#b5c6d2" : "#0f1e30"; x.beginPath(); x.ellipse(hx, hy - 8, 102, 44, 0, 0, 6.283); x.fill();
   box(x, 7.55, 7.45, 0.9, 0.25, 30, light ? "#c9d6df" : "#22384a"); face(x, 7.65, 7.5, 0.7, 34, 54, "#0a1830", rgba([120, 160, 255], 0.9)); }   // Jarvis's console
+// The walkways: a lit runner through every doorway, the way the agents really walk (path() goes
+// door to door), with a guide light in each tile.
+function walkways(x, light) {
+  const tiles = new Set(); [2, 6, 10].forEach(y => { for (let k = 0; k < GW; k++) tiles.add(k + "," + y); });
+  [2, 6, 10, 14].forEach(xx => { for (let k = 0; k < GH; k++) tiles.add(xx + "," + k); });
+  for (const t of tiles) { const [tx, ty] = t.split(",").map(Number); if (tx >= 7 && tx <= 8 && ty >= 5 && ty <= 6) continue;   // not under the core
+    const tint = W_TINT[roomAt(tx, ty)] || [120, 160, 255], m = 0.18;
+    poly(x, [iso(tx + m, ty + m), iso(tx + 1 - m, ty + m), iso(tx + 1 - m, ty + 1 - m), iso(tx + m, ty + 1 - m)], light ? "rgba(255,255,255,.45)" : rgba(tint, 0.1), rgba(tint, light ? 0.35 : 0.28), 1);
+    const [a, b] = iso(tx + 0.5, ty + 0.5); x.fillStyle = rgba(tint, 0.5); x.fillRect(a - 2, b - 1, 4, 2);
+    W_AMB.push({ p: [a, b], col: tint, rate: 0.35, ph: (tx + ty) * 0.6, r: 1.5 }); } }
+function wAmbient(x, t) { for (const d of W_AMB) { const k = REDUCED ? 0.75 : 0.45 + 0.55 * Math.abs(Math.sin(t / 1000 * d.rate + d.ph));
+  x.fillStyle = rgba(d.col, k); x.fillRect(d.p[0] - d.r, d.p[1] - d.r, d.r * 2, d.r * 2); } }
+// HQ's live pieces, from /api/world only: one light per department on the status board (lit while
+// an agent works there, amber while one waits for you), the incoming tasks (agents assigned and
+// not started), and the automaton's pad (its real state from the roster; built up only while it runs).
+const HQ_DEPTS = ["research", "forge", "testing", "innovation", "studio", "finance", "market"];
+function wHQLive(x, t, light) { const [rx, ry] = W_ROOMS.hq, z0 = 30, z1 = 82;
+  const p = [iso(rx + HQ_BOARD[0], ry + 0.02, z0), iso(rx + HQ_BOARD[0] + HQ_BOARD[1], ry + 0.02, z0), iso(rx + HQ_BOARD[0] + HQ_BOARD[1], ry + 0.02, z1), iso(rx + HQ_BOARD[0], ry + 0.02, z1)];
+  HQ_DEPTS.forEach((id, k) => { const here = OPS.agents.filter(a => a.room === id), work = here.some(a => a.state === "working");
+    const u = 0.04 + k * 0.137, q = [onFace(p, u, 0.3), onFace(p, u + 0.11, 0.3), onFace(p, u + 0.11, 0.85), onFace(p, u, 0.85)];
+    const al = work ? (REDUCED ? 1 : 0.7 + 0.3 * Math.sin(t / 400 + k)) : 0.18; poly(x, q, rgba(W_TINT[id], al), rgba(W_TINT[id], 0.9), 1);
+    const [a, b] = onFace(p, u + 0.055, 0.14); x.font = "800 10px ui-monospace,Consolas,monospace"; x.textAlign = "center"; x.fillStyle = rgba(W_TINT[id], 1);
+    x.fillText(id.slice(0, 4).toUpperCase(), a, b); });
+  const wait = OPS.agents.filter(a => a.state === "waiting for you").length; if (wait) { const [a, b] = onFace(p, 0.97, 0.9); x.fillStyle = "#ffb340"; x.beginPath(); x.arc(a, b, 6, 0, 6.283); x.fill(); }
+  const n = OPS.agents.filter(a => a.state === "assigned").length, [ka, kb] = iso(rx + 1.6, ry + 0.65, 36);
+  x.font = "800 13px ui-monospace,Consolas,monospace"; x.textAlign = "center"; x.fillStyle = n ? "#46f2a4" : (light ? "#516a7c" : "#3a5468"); x.fillText(String(n), ka, kb);
+  const au = (OPS.roster || []).find(r => r.name === "automaton") || { state: "not known", light: "off" }, [px, py] = iso(rx + HQ_PAD[0] + 0.45, ry + HQ_PAD[1] + 0.45, 8);
+  const col = au.light === "stopped" ? [255, 77, 94] : [169, 139, 255], on = au.light === "working", floors = on ? (REDUCED ? 4 : 1 + Math.floor(t / 700) % 6) : au.light === "stopped" ? 2 : 0;
+  x.strokeStyle = rgba(col, on ? 0.9 : 0.4); x.lineWidth = 2; x.setLineDash(on ? [] : [4, 4]);
+  for (let k = 0; k <= 5; k++) { if (k > floors && k > 0) break; x.beginPath(); x.ellipse(px, py - k * 16, 30 - k * 3, 12 - k, 0, 0, 6.283); x.stroke(); }
+  x.setLineDash([]); if (on && !REDUCED) { x.fillStyle = "#ffe48a"; x.fillRect(px - 2 + 14 * Math.sin(t / 200), py - floors * 16 - 2, 4, 4); }
+  drawLabel(x, rx + HQ_PAD[0] + 0.3, ry + HQ_PAD[1] + 1.15, 0, "AUTOMATON", col, light);
+  drawLabel(x, rx + HQ_PAD[0] + 0.3, ry + HQ_PAD[1] + 1.15, -17, au.state.length > 18 ? au.state.slice(0, 17) + "…" : au.state, col, light); }
 function wScreens(x, t) { // a working agent's own workstation screen, showing its kind of work
   OPS.agents.forEach(a => { if (a.state !== "working" || !WORK.has(a.room)) return;
     const i = OPS.agents.filter(b => b.room === a.room).indexOf(a), st = (W_STATIONS[a.room] || [])[i]; if (!st) return;
@@ -3445,7 +3555,7 @@ function drawWorld(t) {
   wStaticNow();
   x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = light ? "#dbe7ef" : "#02060b"; x.fillRect(0, 0, c.width, c.height);
   x.setTransform(W_VIEW.z, 0, 0, W_VIEW.z, W_VIEW.x, W_VIEW.y);              // your zoom and position
-  x.drawImage(W_STATIC, 0, 0); if (!W_SHEET) return;
+  x.drawImage(W_STATIC, 0, 0); wAmbient(x, t); wHQLive(x, t, light); if (!W_SHEET) return;
   const dt = Math.min(0.1, (t - (W_LAST || t)) / 1000); W_LAST = t;
   for (const a of OPS.agents) { const m = W_MOVE[a.name]; if (!m || !m.path.length) continue;      // walking: 2.2 tiles a second
     let go = 2.2 * dt; while (go > 0 && m.path.length) { const [px, py] = m.path[0], dx = px - m.x, dy = py - m.y, d = Math.hypot(dx, dy);
@@ -3471,8 +3581,11 @@ function drawWorld(t) {
     W_HITS.push([cx - 50, cy - 140, 100, 180, a]); }
   if (!core) wCore(x, t, ink);
   holos.forEach(([cx, cy, txt]) => holo(x, cx, cy, txt, t, light));
-  const SIGN = { research: [0, 2, WALL + 26], forge: [6, 0, WALL + 26], testing: [10, 0, WALL + 26], innovation: [14, 0, WALL + 26], approvals: [0, 6, WALL + 26],
-    studio: [2, 12, -SLAB / 2 - 10], finance: [6, 12, -SLAB / 2 - 10], market: [10, 12, -SLAB / 2 - 10], delivery: [14, 12, -SLAB / 2 - 10], repair: [16, 6, -SLAB / 2 - 10] };
+  const SIGN = { research: [0, 2, WALL + 26], forge: [6, 0, WALL + 26], testing: [10, 0, WALL + 26], innovation: [14, 0, WALL + 26], repair: [0, 6, WALL + 26],
+    studio: [2, 12, -SLAB / 2 - 10], finance: [6, 12, -SLAB / 2 - 10], market: [10, 12, -SLAB / 2 - 10], delivery: [14, 12, -SLAB / 2 - 10], approvals: [16, 6, -SLAB / 2 - 10] };
+  { const [lx, ly] = iso(16, 8, -SLAB / 2 - 10), text = "DELIVERY & REVIEW CENTER"; x.font = "800 17px ui-monospace,Consolas,monospace"; x.textAlign = "left";   // the review and delivery rooms are one center
+    const w = x.measureText(text).width + 20; x.fillStyle = light ? "rgba(255,255,255,.9)" : "rgba(2,6,11,.82)"; x.fillRect(lx + 14, ly - 18, w, 26); x.strokeStyle = "rgba(255,179,64,.8)"; x.strokeRect(lx + 14, ly - 18, w, 26);
+    x.fillStyle = "#ffcf4d"; x.fillText(text, lx + 24, ly); }
   for (const [id, [sx, sy, sz]] of Object.entries(SIGN)) { const r = OPS.rooms.find(q => q.id === id) || { name: id }, [lx, ly] = iso(sx, sy, sz), n = OPS.counts[id] || 0;
     const text = (r.name + (n ? ` · ${n}` : "")).toUpperCase(); x.font = "800 19px ui-monospace,Consolas,monospace"; x.textAlign = "center"; const w = x.measureText(text).width + 20;
     x.fillStyle = light ? "rgba(255,255,255,.9)" : "rgba(2,6,11,.82)"; x.fillRect(lx - w / 2, ly - 20, w, 28); x.strokeStyle = rgba(W_TINT[id], 0.85); x.lineWidth = 1.5; x.strokeRect(lx - w / 2, ly - 20, w, 28);

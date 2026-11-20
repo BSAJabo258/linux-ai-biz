@@ -48,17 +48,17 @@ never the data: every line is a real record, the same ones the floor reads.
   done, or idle (stopped shows a red tag). Jarvis is in the middle. Click one to see her
   record on the floor. Until her painted pictures exist she is shown as her floor character.
 
-The rooms in your picture and the rooms we have. Nothing has been renamed; that is your choice:
+The rooms in your picture and the rooms we have. You named four of them in prompt 2 (2026-11-20):
 
 | In your picture | Our room |
 |---|---|
 | HQ | Headquarters |
-| Development | The Forge (agents with no room of their own build there) |
+| Development | Development Forge (agents with no room of their own build there) |
 | Research | Research library |
 | Testing | Testing lab |
-| Creative | Studio |
-| Finance | Finance |
-| Workshop | Innovation lab (prototypes) |
+| Creative | Creative Studio |
+| Finance | Finance Office |
+| Workshop | Innovation Workshop (prototypes) |
 | Operations | no clear match; Market is the eighth room |
 
 ### Painting them in the neon style
@@ -94,12 +94,12 @@ console and a lounge, and the departments sit around it, each furnished for its 
 | Department | Who works there |
 |---|---|
 | Research library | the researcher, and Jarvis when she researches |
-| The Forge | any agent that has no room of its own |
+| Development Forge | any agent that has no room of its own |
 | Testing lab | Jarvis when her autopilot tests a tool in the sandbox |
-| Innovation lab | Jarvis when she scans or inspects a project |
-| Studio | the producer, and Jarvis when she drafts |
-| Finance, Market | no agent works here yet: they stay empty, and say so |
-| Waiting for you | an agent whose job waits for your approval, or whose result failed the check |
+| Innovation Workshop | Jarvis when she scans or inspects a project |
+| Creative Studio | the producer, and Jarvis when she drafts |
+| Finance Office, Market | no agent works here yet: they stay empty, and say so |
+| Review: waiting for you | an agent whose job waits for your approval, or whose result failed the check (with Delivered below it, the Delivery and Review Center) |
 | Stopped | an agent whose job failed, was interrupted or paused |
 | Delivered | an agent whose job finished and passed the check, in the last 24 hours |
 | Headquarters lounge | an agent with nothing to do |

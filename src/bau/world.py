@@ -18,17 +18,19 @@ from typing import Any
 
 from .home import bau_home
 
-# Rooms on the floor (docs/visual/VISUAL_ART_DIRECTION.md), with who really works in each.
+# Rooms on the floor (docs/visual/VISUAL_ART_DIRECTION.md), with who really works in each. The
+# department names are the owner's (2026-11-20); Review and Delivered make the Delivery and
+# Review Center.
 # ``hq`` is Jarvis's core; agents with no job wait in its lounge.
 ROOMS = (("hq", "Headquarters", "Jarvis's core; agents with nothing to do wait in its lounge"),
          ("research", "Research library", "the researcher, and Jarvis when she researches"),
-         ("forge", "The Forge", "any agent without a room of its own"),
+         ("forge", "Development Forge", "any agent without a room of its own"),
          ("testing", "Testing lab", "Jarvis when her autopilot tests a tool in the sandbox"),
-         ("innovation", "Innovation lab", "Jarvis when she scans or inspects a project"),
-         ("studio", "Studio", "the producer, and Jarvis when she drafts"),
-         ("finance", "Finance", "no agent works here yet"),
+         ("innovation", "Innovation Workshop", "Jarvis when she scans or inspects a project"),
+         ("studio", "Creative Studio", "the producer, and Jarvis when she drafts"),
+         ("finance", "Finance Office", "no agent works here yet"),
          ("market", "Market", "no agent works here yet"),
-         ("approvals", "Waiting for you", "an agent whose job waits for your approval"),
+         ("approvals", "Review: waiting for you", "an agent whose job waits for your approval"),
          ("repair", "Stopped", "an agent whose job failed, was interrupted or paused"),
          ("delivery", "Delivered", "an agent whose job finished in the last 24 hours"))
 # Where an agent works while its job runs; any other agent works in the Forge.
