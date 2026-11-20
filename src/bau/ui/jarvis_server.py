@@ -370,7 +370,9 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                 def confirm() -> dict[str, Any]:
                     out = assistant.confirm(str(data.get("id", "")),
                                             data.get("approve") is True, assistant.owner,
-                                            choices if isinstance(choices, dict) else None)
+                                            choices if isinstance(choices, dict) else None,
+                                            via="voice" if data.get("via") == "voice"
+                                            else "click")
                     return {**out, "state": state()}
                 self._json(*answer(confirm))
             elif self.path == "/api/draft":

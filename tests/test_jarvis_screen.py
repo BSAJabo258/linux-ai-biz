@@ -370,3 +370,28 @@ def test_a_mic_that_sends_no_sound_is_named_not_blamed_on_the_owner():
     # a paused audio engine reads nothing, so it can never raise a false "no sound"
     assert 'if (!actx || actx.state !== "running") return;' in page
     assert "measureMic(); } } catch (e) {}" in page and "clearInterval(swingTimer)" in page
+
+
+def test_voice_answers_a_card_only_from_the_held_mic_with_the_exact_phrase():
+    # The owner's choice, 2026-11-20. The wake word must never answer a card: a TV or
+    # Jarvis's own voice could say the phrase.
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert 'const VOICE_YES = "accept card", VOICE_NO = "not now";' in page
+    assert "if (finalText) heard(finalText);" in page and "if (out.text) heard(out.text);" in page
+    wake = page.split("function wakeListen()", 1)[1].split("function wakeStop()", 1)[0]
+    assert "heard(" not in wake and "answer(" not in wake
+    assert "if (!showing.voice)" in page                             # click-only cards
+    assert 'via: via === "voice" ? "voice" : "click"' in page
+
+
+def test_the_workstation_shows_every_waiting_card_with_accept_and_not_now():
+    # The owner, 2026-11-20: "want to control all from the virtual workstation".
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "workstation.html"
+            ).read_text(encoding="utf-8")
+    assert 'id="waiting"' in page and 'apiJson("/api/state")' in page
+    assert 'apiJson("/api/confirm", { id: p.id, approve, choices: {} })' in page
+    assert "ANSWER IN JARVIS" in page                                # choices: in Jarvis
+    assert "performance.now() - (shownCards[p.id] || 0) < SETTLE_MS" in page

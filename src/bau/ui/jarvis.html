@@ -2602,18 +2602,22 @@ function nextConfirm() {
   }
   $("confirm").classList.add("show");
   shownAt = performance.now();
+  if (showing.voice) {             // read out, so the owner hears what he answers
+    if (!note.textContent) note.textContent = "Or hold the mic and say “" + VOICE_YES + "” or “" + VOICE_NO + "”.";
+    if (STATE === "idle") speak(showing.summary + " Hold the mic and say " + VOICE_YES + ", or " + VOICE_NO + ".");
+  }
   // Take focus only when nothing else has it: a card must not grab the chat box mid-sentence.
   const free = !document.activeElement || document.activeElement === document.body;
   if (free) setTimeout(() => (form.querySelector(".opt, .typed") || $("confirm").querySelector(".box")).focus(), 50);
 }
-async function answer(approve) {
+async function answer(approve, via) {
   if (!showing) return;
   if (approve && performance.now() - shownAt < CONFIRM_SETTLE_MS) return;
   const item = showing;
   const choices = { ...picked };
   showing = null; $("confirm").classList.remove("show"); try { $("cvid").pause(); } catch (e) {}
   setState("thinking");
-  try { const r = await settle(await apiJson("/api/confirm", { id: item.id, approve, choices }));
+  try { const r = await settle(await apiJson("/api/confirm", { id: item.id, approve, choices, via: via === "voice" ? "voice" : "click" }));
     if (r.retry) { setState("idle"); caption(r.error); confirmQ.unshift(item); nextConfirm(); return; }
     // A finished action may say what really happened (a mission that ran but PAUSED is not "Done.").
     const msg = !approve ? "Understood. I won't." : r.done ? ((r.result && (r.result.say || r.result.said)) || "Done.") : "That didn't go through: " + fmt((r.result || r).error || "unknown error");
@@ -2697,7 +2701,7 @@ async function startListening() {
     let finalText = "";
     srec.onresult = (e) => { let s = ""; for (const r of e.results) s += r[0].transcript; finalText = s; caption("", s); };
     srec.onerror = (e) => { caption(e.error === "network" ? "This browser can't do speech recognition here. Type instead, or add an ElevenLabs key." : "Didn't catch that."); };
-    srec.onend = () => { live = false; $("mic").classList.remove("live"); setState("idle"); if (finalText) ask(finalText); };
+    srec.onend = () => { live = false; $("mic").classList.remove("live"); setState("idle"); if (finalText) heard(finalText); };
     srec.start();
   } catch (e) { live = false; $("mic").classList.remove("live"); setState("idle"); }
 }
@@ -2715,9 +2719,23 @@ async function stopListening() {
   if (blob.size < 2000) { setState("idle"); caption("Hold the button while you talk."); return; }
   setState("thinking"); caption("…");
   try { const out = await apiJson("/api/stt", blob, blob.type || "audio/webm");
-    if (out.text) ask(out.text);
+    if (out.text) heard(out.text);
     else { setState("idle"); caption(micMeasured && micSwing < MIC_SILENT ? NO_SOUND : "Didn't catch that."); }
   } catch (e) { setState("idle"); caption(e.message); }
+}
+// Answering a card by voice (the owner's choice, 2026-11-20): only words caught while the
+// mic button is held (never the wake word, so a TV or Jarvis's own voice cannot answer),
+// only while a card is on screen, only these exact phrases, never an explicit picture or a
+// card with choices (the server checks that again). Anything else goes to Jarvis as talk.
+const VOICE_YES = "accept card", VOICE_NO = "not now";
+function heard(text) {
+  const said = text.toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+  if (showing && (said === VOICE_YES || said === VOICE_NO)) {
+    if (!showing.voice) { const m = "This card needs a click: press Accept or Not now on it.";
+      caption(m); speak(m); return; }
+    answer(said === VOICE_YES, "voice"); return;
+  }
+  ask(text);
 }
 const mic = $("mic");
 mic.addEventListener("pointerdown", (e) => { e.preventDefault(); startListening(); });

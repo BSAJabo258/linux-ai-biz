@@ -444,3 +444,14 @@ def test_warm_never_spends_money_on_a_cloud_model(tmp_path):
     a.model = {"id": "claude-opus-5-5", "deployment": "cloud"}
     assert a.warm() is False and a.provider.calls == []
     assert make(tmp_path).warm() is False                    # no model at all: nothing to do
+
+
+def test_a_card_with_choices_cannot_be_answered_by_voice(server):
+    # The owner's choice, 2026-11-20: choices (here TikTok's audience) are made with a click.
+    url, a, client = server
+    code, r = call(url, "/api/ask", {"text": "post the video"})
+    pid = r["pending"][0]["id"]
+    assert r["pending"][0]["voice"] is False
+    code, out = call(url, "/api/confirm", {"id": pid, "approve": True, "via": "voice"})
+    assert code == 200 and out["retry"] and pid in a.pending
+    assert not client.http.json_of("/video/init/")                    # nothing posted

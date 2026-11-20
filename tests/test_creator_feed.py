@@ -300,3 +300,31 @@ def test_paid_levels_use_her_locked_lora_and_trigger_word(home, monkeypatch):
     assert kw["lora"] == "bau-x-chroma.safetensors" and kw["lane"] == "explicit"
     assert prompt.startswith("photo of baux woman, ") and "face" not in kw
     assert comfy.NEGATIVE in kw["negative"]
+
+
+def test_a_safe_picture_may_be_answered_by_voice_an_explicit_one_needs_a_click(home,
+                                                                              monkeypatch):
+    # The owner's choice, 2026-11-20: voice answers a card, but never an explicit picture.
+    from bau import team
+    from bau.assistant import Assistant
+    monkeypatch.setattr(team, "show", lambda h: {"boss": None})
+    C.make_post(home, {"detail": {"job": "fanvue_post", "theme": "a", "level": 0,
+                                  "shot": "medium", "parts": C.pick(0)}}, draw=fake_draw([]))
+    q = F.Queue(home)
+    first = q.review()[0]["item_id"]
+    nude = dict(q.review()[0], item_id="fv_explicit01", level=2, price_cents=500)
+    q.save(nude)
+    j = Assistant(home)
+    cards = {j.pending[p["id"]].args["item"]: p for p in j.setup_waiting()
+             if p["tool"] == "fanvue_review"}
+    safe, explicit = cards[first], cards["fv_explicit01"]
+    assert safe["voice"] and not explicit["voice"]
+    out = j.confirm(explicit["id"], True, "human:owner", via="voice")
+    assert out["retry"] and "click" in out["error"]
+    assert explicit["id"] in j.pending                               # still waiting
+    assert j.confirm(explicit["id"], False, "human:owner", via="voice")["retry"]  # no drop
+    assert j.confirm(safe["id"], True, "human:owner", via="voice")["done"]
+    rows = [json.loads(x) for x in (home / "audit" / "chain.jsonl").read_text().splitlines()]
+    said = [r for r in rows if r["event"] == "jarvis.confirmed"][-1]
+    assert said["data"]["via"] == "voice"                            # the log says how
+    assert j.confirm(explicit["id"], True, "human:owner")["done"]    # a click does it

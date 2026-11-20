@@ -82,6 +82,14 @@ select,input{background:#080b12;border:1px solid var(--line);color:var(--ink);bo
 input{flex:1}input:focus,select:focus{border-color:var(--cyan);outline:none}
 #msg{min-height:18px;color:var(--dim);font-size:11px;margin-top:8px}
 #msg.bad{color:var(--red)}#msg.good{color:var(--green)}
+#waiting .card{border:1px solid var(--amber);border-radius:12px;padding:12px;margin-top:10px;background:rgba(255,179,64,.05)}
+#waiting .card:first-of-type{margin-top:0}
+#waiting pre{white-space:pre-wrap;margin:0 0 10px;font:inherit;max-height:40vh;overflow:auto}
+#waiting img{display:block;max-width:min(320px,100%);max-height:320px;border-radius:8px;margin-bottom:10px}
+#waiting .btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#waiting .yes{border-color:var(--green);color:var(--green)}
+#waiting a.chip{text-decoration:none}
+#waiting .chip[disabled]{opacity:.5;cursor:default}
 @media(max-width:900px){main{grid-template-columns:1fr}#office{min-height:420px}.span{grid-column:auto}}
 </style>
 </head>
@@ -96,6 +104,10 @@ input{flex:1}input:focus,select:focus{border-color:var(--cyan);outline:none}
   </div>
 </header>
 <main>
+  <section class="panel span" id="waiting" aria-labelledby="w-h">
+    <h2 id="w-h">Waiting for you · <span id="n-wait">0</span></h2>
+    <div id="cards"></div>
+  </section>
   <section class="panel span" aria-label="Workstation summary">
     <div id="summary"><span><b id="n-workers">0</b> workers</span><span><b id="n-tasks">0</b> open tasks</span><span><b id="n-out">0</b> delivered</span><span>Manager: <span id="mgr">productivity</span></span></div>
     <div id="office" aria-label="The agent office">
@@ -203,6 +215,57 @@ function render(s) {
   }
   lastSeq = Math.max(lastSeq, s.seq || 0); first = false;
 }
+// Waiting for you (the owner's ask, 2026-11-20): every card Jarvis holds, all at once, with
+// the same Accept / Not now as Jarvis's own card. A card with choices is answered in Jarvis.
+const SETTLE_MS = 900;            // as in Jarvis: a card ignores Accept for its first moment
+const shownCards = {};
+function card(p) {
+  const c = el("div", "card"); c.dataset.id = p.id;
+  if (p.preview) {
+    const img = el("img"); img.alt = "The picture this card is about"; c.appendChild(img);
+    fetch("/api/preview/" + encodeURIComponent(p.id), { headers: { "X-Jarvis-Key": KEY } })
+      .then(r => r.ok ? r.blob() : null).then(b => { if (b && b.type.startsWith("image/")) img.src = URL.createObjectURL(b); else img.remove(); })
+      .catch(() => img.remove());
+  }
+  c.appendChild(el("pre", null, p.summary));
+  const btns = el("div", "btns");
+  if (p.form && p.form.fields && p.form.fields.length) {
+    const open = el("a", "chip", "ANSWER IN JARVIS"); open.href = "/?k=" + encodeURIComponent(KEY); open.target = "_blank"; open.rel = "noopener";
+    btns.appendChild(open); btns.appendChild(el("span", "why", "This one has choices to make."));
+  } else {
+    const yes = el("button", "chip yes", /^(setup_step|autopilot_answer|fanvue_review)$/.test(p.tool) ? "ACCEPT" : "CONFIRM");
+    const no = el("button", "chip", "NOT NOW");
+    yes.onclick = () => decide(p, true, c); no.onclick = () => decide(p, false, c);
+    btns.appendChild(yes); btns.appendChild(no);
+  }
+  c.appendChild(btns);
+  return c;
+}
+async function decide(p, approve, node) {
+  if (approve && performance.now() - (shownCards[p.id] || 0) < SETTLE_MS) return;
+  node.querySelectorAll("button").forEach(b => { b.disabled = true; });
+  try {
+    const r = await settle(await apiJson("/api/confirm", { id: p.id, approve, choices: {} }));
+    const res = r.result || r;
+    if (!approve) say("Not now: " + p.tool + ". Nothing was done.", "good");
+    else if (r.done) say((res && (res.say || res.said)) || "Done.", "good");
+    else say("That didn't go through: " + ((res && res.error) || r.error || "unknown error"), "bad");
+  } catch (e) { say(e.message, "bad"); }
+  loadWaiting();
+}
+function say(text, cls) { $("msg").textContent = text; $("msg").className = cls || ""; }
+async function loadWaiting() {
+  try {
+    const s = await apiJson("/api/state"), list = s.pending || [], box = $("cards");
+    $("n-wait").textContent = list.length;
+    for (const n of [...box.children]) if (!list.some(p => p.id === n.dataset.id)) n.remove();
+    for (const p of list) if (!box.querySelector('.card[data-id="' + CSS.escape(p.id) + '"]')) {
+      box.appendChild(card(p)); shownCards[p.id] = performance.now(); }
+    const empty = box.querySelector(".empty");
+    if (!list.length && !empty) box.appendChild(el("div", "empty", "Nothing is waiting for you."));
+    if (list.length && empty) empty.remove();
+  } catch (e) { say(e.message, "bad"); }
+}
 async function load() {
   try { render(await apiJson("/api/workstation")); }
   catch (e) { $("msg").textContent = e.message; $("msg").className = "bad"; }
@@ -221,6 +284,7 @@ $("assign").onsubmit = async (ev) => {
   catch (e) { $("msg").textContent = e.message; $("msg").className = "bad"; }
 };
 load(); setInterval(() => { if (!document.hidden && !busy) load(); }, 5000);
+loadWaiting(); setInterval(() => { if (!document.hidden) loadWaiting(); }, 15000);
 </script>
 </body>
 </html>

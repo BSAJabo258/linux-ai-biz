@@ -46,3 +46,17 @@ Built and tested 2026-11-02:
 - In a real browser on a test computer, the card popped up, Accept brought in the rules,
   and the next step came up.
 - The terminal steps were faked in that run. They have not run on your desktop yet.
+
+## Answering a card by voice
+
+Your choice (2026-11-20). While a card is on Jarvis's screen, Jarvis reads it out. Hold the mic
+button and say **"accept card"** (Accept) or **"not now"** (Not now). Only these exact words
+count, only while you hold the mic, never through the wake word (so a TV, a video or Jarvis's
+own voice cannot answer a card). Anything else you say goes to Jarvis as normal talk.
+
+Two kinds of card need a click, and Jarvis says so if you try your voice: explicit pictures
+(levels 2 and 3) and cards with choices to make. The server checks this again, and the audit
+log marks every card answered by voice (`"via": "voice"`).
+
+You can also answer every card from the workstation's **Waiting for you** panel
+(`docs/WORKSTATION.md`).
