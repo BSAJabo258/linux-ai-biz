@@ -344,6 +344,27 @@ def test_once_fanvue_and_autopost_are_on_the_automaton_card_starts_it(box, monke
     assert "automaton" not in ids(box) and "grow" not in ids(box)
 
 
+# The owner, 2026-11-20: the automaton card "errors and doesn't submit". Its dollar boxes have a
+# lowest value but no highest, and Accept's check read the highest: every Accept failed. The
+# test above called the step directly; this one goes through Jarvis's Accept, as the page does.
+def test_the_automaton_card_is_accepted_through_jarvis_as_the_page_sends_it(box, monkeypatch):
+    from bau.assistant import Assistant
+    fanvue_done(box.home, monkeypatch, automaton=False)
+    monkeypatch.setattr(S, "_probe", box.probe)
+    monkeypatch.setattr(S, "_terminal", box.terminal)
+    j = Assistant(box.home)
+    card = next(p for p in j.setup_waiting() if "Start the automaton" in p["summary"])
+    typed = {"days": "30", "budget": "0", "reinvest": "0", "cap": "0", "grow_at": "0"}
+    out = j.confirm(card["id"], True, "human:owner", {**typed, "budget": "inf"})
+    assert out["retry"] and "Dollars it may spend" in out["error"]   # not a real amount
+    out = j.confirm(card["id"], True, "human:owner", {**typed, "budget": "-5"})
+    assert out["retry"]                                              # below its lowest
+    out = j.confirm(card["id"], True, "human:owner", typed)
+    assert out["done"], out
+    from bau import automaton
+    assert automaton.load(box.home)["die_after_days"] == 30
+
+
 def test_on_the_laptop_station_only_updates_and_laws_can_wait(box, monkeypatch, tmp_path):
     # The desktop does the work: search, autopilot, pictures and Fanvue cards are its jobs.
     from bau import station

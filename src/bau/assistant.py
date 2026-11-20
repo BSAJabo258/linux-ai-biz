@@ -28,6 +28,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import re
 import secrets
@@ -291,7 +292,10 @@ def _typed(v: Any, f: dict[str, Any]) -> Any:
             n = float(v)
         except (TypeError, ValueError):
             return None
-        return n if f["min"] <= n <= f["max"] else None
+        # A box may have no lowest or highest value (the automaton's dollars: 0 or more); the
+        # check read both and failed every Accept on that card (the owner, 2026-11-20).
+        lo, hi = f.get("min", -math.inf), f.get("max", math.inf)
+        return n if math.isfinite(n) and lo <= n <= hi else None
     return v if isinstance(v, str) and v.strip() and len(v) <= 4000 else None
 
 
