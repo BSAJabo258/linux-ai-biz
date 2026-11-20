@@ -63,6 +63,34 @@ PORTRAIT_STYLE = ("digital painting, glamorous adult woman in her late twenties,
 PORTRAIT_NEGATIVE = ("child, childlike, minor, teen, young-looking, school uniform, nudity, "
                      "nipples, explicit, character sheet, real person, celebrity, text, "
                      "watermark, logo")
+# The neon headquarters (the owner's picture of 2026-11-20, "BAUBSA JARVIS - Virtual Operations
+# World"): each assistant painted in that style in four poses, one per state of her real job
+# (``POSE``), drawn with ``bau world portraits --style neon``. Swimsuit or clubwear level, never
+# nudity; this screen is never posted. Her look is the same as in her sprite and portrait.
+NEON_WHO = {
+    "jarvis": "long straight black hair, tan skin, black glossy two-piece with glowing cyan "
+              "trim, a glowing cyan choker and armbands",
+    "researcher": "dark hair in a high bun, glasses, brown skin, royal blue glossy two-piece",
+    "producer": "long wavy red hair, fair skin, red glossy two-piece and a red choker",
+    "engineer": "long blonde hair, glasses, black and gold glossy two-piece, gold armbands",
+    "coordinator": "long black hair, light olive skin, violet glossy two-piece, violet "
+                   "thigh-high boots",
+    "analyst": "big dark curly hair, deep brown skin, gold glossy two-piece",
+    "architect": "long platinum hair, fair skin, white glossy two-piece with cyan trim",
+}
+NEON_POSES = {"idle": "standing relaxed with one hand on her hip, looking at the viewer",
+              "working": "seated at a glowing holographic desk, typing, focused on the screens",
+              "waiting": "looking at the viewer and raising one hand to call someone over",
+              "done": "smiling and holding up a glowing tablet showing a green check mark"}
+NEON_STYLE = ("highly detailed digital painting, glamorous adult woman in her late twenties, "
+              "{who}, {pose}, inside a neon cyberpunk headquarters at night, tall windows with "
+              "a city skyline, purple cyan pink and gold neon light, reflections on glossy "
+              "surfaces, from the knees up, sharp focus")
+POSE = {"working": "working", "waiting for you": "waiting", "done": "done"}   # else idle
+# The roles in the owner's picture. BAU has an agent folder for some of them only: a role with
+# none is "not set up yet". Nothing here ever says "online": no record says it.
+PICTURE_ROLES = ("architect", "researcher", "developer", "tester", "coordinator")
+LIGHT = {"working": "working", "waiting for you": "waiting", "done": "done", "idle": "free"}
 # Jarvis's face on her screen (the owner's ask, 2026-11-18: "a real life looking AI model
 # replacing the orb"): a photographic portrait of an ORIGINAL fictional adult woman with
 # Jarvis's look, drawn on this computer. Never a real person or a celebrity's likeness.
@@ -156,14 +184,49 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
     agents.insert(0, jarvis(home, now))
     for rec in agents:
         rec["portrait"] = portrait_file(home, rec["look"]) is not None
+        rec["pose"] = POSE.get(rec["state"], "idle")
+        rec["neon"] = portrait_file(home, f"neon-{rec['look']}-{rec['pose']}") is not None
     held = hold_reason(home)
     counts = {r: sum(1 for a in agents if a["room"] == r) for r, _, _ in ROOMS}
+    sys_ = system(home)
+    me = agents[0]
     return {"rooms": [{"id": r, "name": n, "who": w} for r, n, w in ROOMS], "agents": agents,
             "hold": held, "counts": counts, "at": now.isoformat(timespec="seconds"),
             "tasks": [{"agent": a["name"], "state": a["state"], "task": a["job"]["objective"]}
                       for a in agents if a["job"] and a["state"] in ("working", "waiting for you")],
-            "system": system(home),
+            "system": sys_, "roster": roster(home, agents, sys_),
+            "now": {"state": me["state"], "task": me["job"]["objective"]}
+            if me["job"] and me["state"] in ("working", "waiting for you") else None,
             "how_to_read": "each character is an agent; her room is her latest job's state"}
+
+
+def roster(home: Path, agents: list[dict[str, Any]], sys_: dict[str, Any]) -> list[dict[str, Any]]:
+    """The agents panel of the neon headquarters: the picture's roles, then BAU's other agents,
+    the autopilot and the automaton, each with the state its record gives and a light."""
+    from . import automaton
+    by = {a["name"]: a for a in agents if a["name"] != "jarvis"}
+    rows = []
+    for name in (*PICTURE_ROLES, *(n for n in by if n not in PICTURE_ROLES)):
+        a = by.get(name)
+        if a is None:
+            rows.append({"name": name, "state": "not set up yet", "light": "off"})
+        elif a["state"] == "idle" and a["approval"] not in ("approved", "unknown"):
+            rows.append({"name": name, "state": a["approval"], "light": "off"})
+        else:
+            rows.append({"name": name, "state": "free" if a["state"] == "idle" else a["state"],
+                         "light": "stopped" if a["room"] == "repair" else LIGHT[a["state"]]})
+    ap = sys_["autopilot"]
+    rows.append({"name": "autopilot", **(
+        {"state": "paused by you", "light": "waiting"} if ap["paused"] else
+        {"state": f"working: {ap['running']} running", "light": "working"} if ap["running"] else
+        {"state": f"nothing running, {ap['queued']} queued", "light": "free"})})
+    st = automaton.status(home)
+    rows.append({"name": "automaton", **(
+        {"state": "not started", "light": "off"} if not st.get("started_at") else
+        {"state": "dead (only you can revive it)", "light": "stopped"} if st.get("dead") else
+        {"state": f"running, {st['tier'].replace('_', ' ')}", "light": "working"} if st.get("on")
+        else {"state": "stopped", "light": "off"})})
+    return rows
 
 
 def system(home: Path) -> dict[str, Any]:
@@ -183,11 +246,33 @@ def system(home: Path) -> dict[str, Any]:
         cash = money.summary(home)
     except Exception:  # noqa: BLE001 - the panel never breaks the world; the command says why
         cash = None
-    return {"headquarters": S.MARK.exists(), "station": S.is_station(),
-            "stations_paired": paired, "money": cash,
-            "autopilot": {"paused": bool(st.get("paused")), "running": st.get("running", 0),
-                          "queued": st.get("queued", 0),
-                          "waiting_for_you": st.get("waiting_owner", 0)}}
+    out = {"headquarters": S.MARK.exists(), "station": S.is_station(),
+           "stations_paired": paired, "money": cash,
+           "autopilot": {"paused": bool(st.get("paused")), "running": st.get("running", 0),
+                         "queued": st.get("queued", 0),
+                         "waiting_for_you": st.get("waiting_owner", 0)}}
+    out["problems"] = problems(home, out)
+    return out
+
+
+def problems(home: Path, s: dict[str, Any]) -> list[str]:
+    """What is wrong, from the same records the panel shows; none means "all systems healthy".
+    On a laptop station the money and the autopilot run on the desktop, so they are not its own."""
+    from .governor import hold_reason
+    out = []
+    held = hold_reason(home)
+    if held:
+        out.append(f"HOLD: {held}")
+    if not s["station"]:
+        if s["autopilot"]["paused"]:
+            out.append("the autopilot is paused (bau autopilot resume)")
+        m = s["money"]
+        if m is None:
+            out.append("the money machine could not be read (bau money)")
+        elif m["ready"] != m["of"]:
+            out.append(f"money machine: {m['ready']} of {m['of']} links ready; "
+                       f"next: {m['next']} (bau money)")
+    return out
 
 
 def jarvis(home: Path, now: dt.datetime) -> dict[str, Any]:
@@ -219,9 +304,13 @@ def jarvis(home: Path, now: dt.datetime) -> dict[str, Any]:
                 "artifacts": [], "next_action": t.get("note") or None}}
 
 
+NEON_NAMES = {f"neon-{k}-{p}" for k in PORTRAIT_LOOKS for p in NEON_POSES}
+
+
 def portrait_file(home: Path, look: str) -> Path | None:
-    """Her painted portrait, if one was drawn; only the fixed looks, never a path from a request."""
-    if look not in PORTRAIT_LOOKS and look != AVATAR_LOOK:
+    """Her painted portrait, if one was drawn; only the fixed looks (and ``neon-LOOK-POSE``),
+    never a path from a request."""
+    if look not in PORTRAIT_LOOKS and look != AVATAR_LOOK and look not in NEON_NAMES:
         return None
     f = home / "world" / "portraits" / f"{look}.png"
     return f if f.is_file() else None
@@ -249,11 +338,13 @@ def _say(line: str) -> None:
 
 def draw_portraits(home: Path, looks: list[str] | None = None, again: bool = False,
                    drawer: Any = None, ready: Any = None,
-                   say: Any = _say) -> list[dict[str, Any]]:
+                   say: Any = _say, style: str = "classic",
+                   poses: list[str] | None = None) -> list[dict[str, Any]]:
     """Paint each look's portrait on this computer's ComfyUI (the owner's command). One that
     exists is kept unless ``again``; a failed one is reported and the rest go on. With the
     real drawer, ComfyUI must answer first (``ready``), else PicturesNotRunning, nothing drawn;
-    each portrait is said as it goes (on the owner's desktop it printed nothing)."""
+    each portrait is said as it goes (on the owner's desktop it printed nothing).
+    ``style="neon"``: the neon headquarters, one picture per look and pose (``NEON_POSES``)."""
     from .audit import AuditLog
     from .media import comfy
     if ready is None and drawer is None:
@@ -265,6 +356,8 @@ def draw_portraits(home: Path, looks: list[str] | None = None, again: bool = Fal
     out_dir.mkdir(parents=True, exist_ok=True)
     done = []
     todo = looks or list(PORTRAIT_LOOKS)
+    if style == "neon":
+        todo = [f"neon-{k}-{p}" for k in todo for p in (poses or NEON_POSES)]
     for i, look in enumerate(todo, 1):
         say(f"painting {look} ({i}/{len(todo)})...")
         result = _draw_one(home, look, again, drawer, comfy, out_dir, AuditLog)
@@ -275,13 +368,18 @@ def draw_portraits(home: Path, looks: list[str] | None = None, again: bool = Fal
 
 def _draw_one(home: Path, look: str, again: bool, drawer: Any, comfy: Any, out_dir: Path,
               audit: Any) -> str:
-    if look not in PORTRAIT_LOOKS and look != AVATAR_LOOK:
+    if look not in PORTRAIT_LOOKS and look != AVATAR_LOOK and look not in NEON_NAMES:
         return "unknown look"
     if portrait_file(home, look) and not again:
         return "already drawn"
     name = f"world-portrait-{look}"
-    prompt, negative = ((AVATAR_PROMPT, AVATAR_NEGATIVE) if look == AVATAR_LOOK else
-                        (PORTRAIT_STYLE.format(who=PORTRAIT_WHO[look]), PORTRAIT_NEGATIVE))
+    if look in NEON_NAMES:
+        who, pose = look[5:].rsplit("-", 1)
+        prompt, negative = (NEON_STYLE.format(who=NEON_WHO[who], pose=NEON_POSES[pose]),
+                            PORTRAIT_NEGATIVE)
+    else:
+        prompt, negative = ((AVATAR_PROMPT, AVATAR_NEGATIVE) if look == AVATAR_LOOK else
+                            (PORTRAIT_STYLE.format(who=PORTRAIT_WHO[look]), PORTRAIT_NEGATIVE))
     try:
         drawer(home, prompt, name, negative=negative, width=832, height=1216)
     except (comfy.ComfyError, OSError) as e:      # ComfyUI gone mid-way: say so, go on

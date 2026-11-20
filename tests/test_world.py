@@ -216,6 +216,8 @@ def test_the_world_says_what_each_agent_is_doing_and_the_system_status(tmp_path,
         ("researcher", "working"), ("producer", "waiting for you")}       # not the stopped one
     assert all(t["task"] == "find mug suppliers" for t in w["tasks"])
     money = w["system"].pop("money")
+    assert w["system"].pop("problems") == [
+        f"money machine: {money['ready']} of 9 links ready; next: creator profile (bau money)"]
     assert w["system"] == {"headquarters": False, "station": False, "stations_paired": 0,
                            "autopilot": {"paused": False, "running": 0, "queued": 0,
                                          "waiting_for_you": 0}}
@@ -264,3 +266,108 @@ def test_the_page_shows_the_photo_face_where_the_orb_was():
     page = (resources.files("bau.ui") / "jarvis.html").read_text()
     assert 'id="avphoto"' in page and "/world/portrait/avatar.png" in page
     assert '"PHOTO"' in page and '"GLASS CORE"' in page
+
+
+# The owner's neon headquarters picture, 2026-11-20: "the picture is the style, not the data".
+# Its agents panel lists Architect, Developer, Coordinator... as Online; BAU shows only records.
+def test_the_hq_agents_panel_shows_roles_bau_does_not_have_as_not_set_up(tmp_path):
+    job(tmp_path, "researcher", "RUNNING")
+    job(tmp_path, "scout", "FAILED")
+    rows = {r["name"]: r for r in world(tmp_path, NOW)["roster"]}
+    for role in ("architect", "developer", "tester", "coordinator"):
+        assert rows[role] == {"name": role, "state": "not set up yet", "light": "off"}
+    assert rows["researcher"]["state"] == "working" and rows["researcher"]["light"] == "working"
+    assert rows["producer"]["state"] in ("free", "not approved")      # a real folder, no job
+    assert rows["scout"] == {"name": "scout", "state": "failed", "light": "stopped"}
+    assert rows["autopilot"] == {"name": "autopilot", "state": "nothing running, 0 queued",
+                                 "light": "free"}
+    assert rows["automaton"] == {"name": "automaton", "state": "not started", "light": "off"}
+    assert "jarvis" not in rows
+    assert not any("online" in r["state"].lower() for r in rows.values())
+
+
+def test_the_hq_roster_shows_the_autopilot_and_automaton_as_their_records_say(tmp_path):
+    from bau import automaton, autopilot
+    autopilot.add(tmp_path, "research", "read about mugs")
+    st = autopilot._load(tmp_path)
+    st["paused"] = True
+    autopilot._save(tmp_path, st)
+    automaton._save(tmp_path, {"started_at": NOW.isoformat(), "on": False, "dead": "no income"})
+    rows = {r["name"]: r for r in world(tmp_path, NOW)["roster"]}
+    assert rows["autopilot"]["state"] == "paused by you"
+    assert rows["automaton"] == {"name": "automaton", "state": "dead (only you can revive it)",
+                                 "light": "stopped"}
+
+
+def test_all_systems_healthy_only_when_nothing_is_wrong(tmp_path, monkeypatch):
+    from bau import autopilot, money
+    monkeypatch.setattr(money, "summary", lambda home: {"ready": 9, "of": 9, "next": None})
+    assert world(tmp_path, NOW)["system"]["problems"] == []
+    (tmp_path / "governor").mkdir()
+    (tmp_path / "governor" / "hold.json").write_text('{"reason": "test"}')
+    st = autopilot._load(tmp_path)
+    st["paused"] = True
+    autopilot._save(tmp_path, st)
+    got = world(tmp_path, NOW)["system"]["problems"]
+    assert got[0].startswith("HOLD") and "the autopilot is paused (bau autopilot resume)" in got
+    monkeypatch.setattr(money, "summary", lambda home: 1 / 0)
+    assert "the money machine could not be read (bau money)" in world(tmp_path, NOW)["system"][
+        "problems"]
+
+
+def test_what_we_doing_now_is_jarvis_real_task_or_nothing(tmp_path):
+    from bau import autopilot
+    assert world(tmp_path, NOW)["now"] is None
+    autopilot.add(tmp_path, "research", "read about mug suppliers")
+    st = autopilot._load(tmp_path)
+    st["tasks"][0].update(state="running", started=NOW.isoformat())
+    autopilot._save(tmp_path, st)
+    assert world(tmp_path, NOW)["now"] == {"state": "working", "task": st["tasks"][0]["title"]}
+
+
+def test_her_pose_changes_only_with_her_job_and_shows_only_a_drawn_picture(tmp_path):
+    from bau.world import portrait_file
+    w = {a["name"]: a for a in world(tmp_path, NOW)["agents"]}
+    assert (w["researcher"]["pose"], w["researcher"]["neon"]) == ("idle", False)
+    job(tmp_path, "researcher", "RUNNING")
+    d = tmp_path / "world" / "portraits"
+    d.mkdir(parents=True)
+    (d / "neon-researcher-working.png").write_bytes(b"\x89PNG")
+    w = {a["name"]: a for a in world(tmp_path, NOW)["agents"]}
+    assert (w["researcher"]["pose"], w["researcher"]["neon"]) == ("working", True)
+    job(tmp_path, "researcher", "WAITING_FOR_APPROVAL", minutes_ago=0)
+    assert {a["name"]: a for a in world(tmp_path, NOW)["agents"]}["researcher"]["pose"] == "waiting"
+    (d / "neon-researcher-dancing.png").write_bytes(b"\x89PNG")
+    assert portrait_file(tmp_path, "neon-researcher-dancing") is None    # only the fixed poses
+
+
+def test_neon_portraits_go_through_the_same_checks_and_never_stay_for_fanvue(tmp_path):
+    from bau.world import NEON_POSES, PORTRAIT_NEGATIVE, draw_portraits
+    asked = []
+
+    def drawer(home, prompt, name, negative, **size):
+        asked.append((name, prompt, negative))
+        media = home / "artifacts" / "media"
+        media.mkdir(parents=True, exist_ok=True)
+        (media / f"{name}.png").write_bytes(b"\x89PNG neon")
+    done = draw_portraits(tmp_path, ["producer"], drawer=drawer, style="neon")
+    assert [d["look"] for d in done] == [f"neon-producer-{p}" for p in NEON_POSES]
+    assert all(d["result"] == "drawn" for d in done)
+    assert not list((tmp_path / "artifacts" / "media").glob("*.png"))       # none for Fanvue
+    assert (tmp_path / "world" / "portraits" / "neon-producer-done.png").exists()
+    for _, prompt, negative in asked:
+        assert "adult woman" in prompt and "red hair" in prompt and negative == PORTRAIT_NEGATIVE
+    one = draw_portraits(tmp_path, ["jarvis"], drawer=drawer, style="neon", poses=["waiting"])
+    assert [d["look"] for d in one] == ["neon-jarvis-waiting"]
+
+
+def test_the_page_lays_out_the_neon_headquarters_from_records():
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html").read_text()
+    for part in ('id="hq-agents"', 'id="hq-status"', 'id="hq-tasks"', 'id="hq-rooms"',
+                 'id="hq-now"', 'id="hq-crew"', "BAUBSA JARVIS", "What We Doing Now?",
+                 "Building the Ultimate<br>Virtual Operations World"):
+        assert part in page
+    assert "OPS.roster" in page and "S.problems" in page and "OPS.now" in page
+    assert "All systems healthy" in page and "nothing right now" in page
+    assert "Online" not in page.split('id="hqview"')[1].split("</div></div></div>")[0]
+    assert "openRoom(" in page                               # a tile opens its room on the floor

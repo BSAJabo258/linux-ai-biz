@@ -13,6 +13,16 @@ of them is kept. Everything below is measured against them.
 | 2 | Pixel-art robots at work among server racks, floating green panels with text and circuits, three people at a central console | pixel-art characters, server racks, floating panels that show what is being worked on |
 | 3 | A pixel-art office: robots at desks with monitors, wall screens, storage, a person in a suit in the middle | individual desks with monitors and chairs, wall displays, a tidy office floor in tiles |
 
+A fourth reference came on 2026-11-20 (in the owner's Downloads, kept out of the repository
+for the same reason): "BAUBSA JARVIS - Virtual Operations World", a neon cyberpunk headquarters
+at night with seven glamorous women as the AI assistants, a holographic globe, a city through
+tall windows and glass panels with neon edges. It is the style of the HQ view
+(`docs/WORLD.md`); its text and statuses are not data and are never copied.
+
+| # | What it shows | What we take from it |
+|---|---|---|
+| 4 | A neon HQ: title banner, JARVIS AGENTS (left), SYSTEM STATUS and CURRENT TASKS (right), OUR VIRTUAL WORLD room tiles (bottom left), neon script lines, a BAU BSA mug, a bottom bar; purple, cyan, pink and gold on near-black glass | the HQ view's layout and colours; the text-free `hq` scene behind it; the neon portraits (`--style neon`); every panel filled from `/api/world` only |
+
 ## World identity
 
 One building, seen from above at an isometric angle, cut open so every room shows. It is

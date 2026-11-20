@@ -13,9 +13,10 @@ live anime scenes and the owner's own pictures.
 
 Live scenes (``LIVE``) are painted by the GPU in Jarvis and move: anime dusk and summer
 (petals, clouds, stars, city lights), a rainy neon city, northern lights over a mirror
-lake, a sea at golden hour with a lighthouse, a ringed planet in a nebula, and a synthwave
-sunset. Their ``.jpg`` is a still of the same scene (``scripts/render_scenes.py``) for the
-desktop, the login screen, Mission Control and computers without WebGL.
+lake, a sea at golden hour with a lighthouse, a ringed planet in a nebula, a synthwave
+sunset, and the neon headquarters (only when chosen). Their ``.jpg`` is a still of the same
+scene (``scripts/render_scenes.py``) for the desktop, the login screen, Mission Control and
+computers without WebGL.
 """
 
 from __future__ import annotations
@@ -29,7 +30,10 @@ from typing import Any
 from .home import bau_home
 from .store import YamlStore
 
-LIVE = ("dusk", "summer", "neon", "aurora", "ocean", "space", "synthwave")
+# The neon headquarters (``hq``, the owner's picture of 2026-11-20, without its words) is a
+# choice (``bau look set hq``), not part of the default rotation.
+ROTATION = ("dusk", "summer", "neon", "aurora", "ocean", "space", "synthwave")
+LIVE = (*ROTATION, "hq")
 SHIPPED = {**{n: f"{n}.jpg" for n in LIVE}, "moon": "moon.jpg", "light": "light.jpg",
            "watercolor": "watercolor.jpg", "gold": "gold.jpg", "earth": "earth.jpg"}
 DEFAULT = "dusk"
@@ -52,7 +56,7 @@ def show(home: Path | None = None) -> dict[str, Any]:
     saved = _store(home).load() or {}
     own = list(_own(home))
     pictures = [*SHIPPED, *own]
-    flow = [n for n in saved.get("flow") or [] if n in pictures] or [*LIVE, *own]
+    flow = [n for n in saved.get("flow") or [] if n in pictures] or [*ROTATION, *own]
     return {"art": saved.get("art", DEFAULT), "alive": saved.get("alive", True),
             "flow": flow, "choices": [*pictures, "none"]}
 

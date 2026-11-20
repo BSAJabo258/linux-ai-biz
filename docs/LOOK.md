@@ -91,6 +91,24 @@ the processor instead of the graphics chip (that would run it hot), it never sta
 it falls behind (under 12 pictures a second), it first draws smaller, then stops and
 shows the still picture.
 
+## The neon headquarters (2026-11-20)
+
+An eighth live scene, from your picture "BAUBSA JARVIS - Virtual Operations World": a city
+skyline through tall windows, a holographic globe on its projector, desks with their screens
+off and a glossy floor, in purple, cyan, pink and gold neon. It has no words in it, so it never
+shows a status that is not true. Only its neon breathes slowly: the globe does not turn and
+the windows do not blink. It is not in the rotation; choose it, and keep it on screen:
+
+```bash
+bau look set hq          # use it
+bau look flow hq         # stay on it (no melting into the other scenes)
+bau look set dusk        # back to the default
+bau look flow default    # and the default rotation
+```
+
+It is also the backdrop of the operations world's HQ view. The desktop's slideshow (the stick)
+does not have it.
+
 ## Choose the art
 
 ```bash
@@ -102,6 +120,7 @@ bau look set aurora      # northern lights over a mirror lake
 bau look set ocean       # golden hour at sea, with a lighthouse
 bau look set space       # a ringed planet in a nebula
 bau look set synthwave   # the 80s neon sunset
+bau look set hq          # the neon headquarters (your picture of 2026-11-20, without its words)
 bau look set moon        # the moonlit inkblot one
 bau look set light       # the white BAU one
 bau look set watercolor  # the watercolour BAU one
