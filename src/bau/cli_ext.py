@@ -806,6 +806,46 @@ def cmd_remote_desktop(a):
     return EXIT_OK
 
 
+def cmd_accounts(a):
+    """Her social accounts (docs/ACCOUNTS.md): prepared by Jarvis, created by the owner."""
+    from . import accounts as AC
+    home, c = bau_home(), a.ac_cmd or "list"
+    try:
+        if c == "prepare":
+            link = ""
+            want = AC.PLATFORMS[a.platform]["tracking"]
+            try:                              # her Fanvue tracking link for this platform
+                from . import fanvue
+                client = fanvue.FanvueClient(home)
+                handle = client.me().get("handle", "")
+                row = next((r for r in client.tracking_links() if r.get("name") == want), None)
+                if handle and row:
+                    link = f"https://www.fanvue.com/{handle}/{row['linkUrl']}"
+            except Exception:  # noqa: BLE001 - offline: the record says where to find it
+                pass
+            rec = AC.prepare(home, a.platform, _human(), a.email, link)
+            pw = AC.read_env(home)[AC._key(a.platform, "password")]
+            print(f"{rec['platform']}: everything is ready. Sign up here: {rec['signup']}\n"
+                  f"  Display name: {rec['display_name']}\n"
+                  f"  Handle (first free one): {', '.join(rec['handles'])}\n"
+                  f"  Password: {pw}\n"
+                  f"  Bio: {rec['bio']}\n  Link: {rec['link']}\n"
+                  f"  Profile picture: {rec['profile_picture'] or 'none yet (bau creator draw)'}\n"
+                  "You do the email or phone code yourself. Then: "
+                  f"bau accounts created {a.platform} --handle THE_HANDLE")
+        elif c == "created":
+            _out(AC.created(home, a.platform, a.handle, _human()))
+        elif c == "password":
+            print(AC.read_env(home).get(AC._key(a.platform, "password"),
+                                        "not prepared yet: bau accounts prepare " + a.platform))
+        else:
+            _out(AC.records(home))
+    except (AC.AccountError, PermissionError) as e:
+        print(e, file=sys.stderr)
+        return EXIT_BLOCKED
+    return EXIT_OK
+
+
 def cmd_hq(a):
     """The desktop as headquarters for the laptop station (docs/LAPTOP-STATION.md)."""
     import pwd
@@ -2645,6 +2685,20 @@ def register(sub: argparse._SubParsersAction) -> None:
     w.add_parser("off", help="sudo: stop it and close its port again")
     w.add_parser("status", help="on or off, and the address to type on the iPhone")
     s.set_defaults(fn=cmd_remote_desktop)
+
+    s = sub.add_parser("accounts", help="her social accounts: Jarvis prepares each, you sign "
+                       "up, the passwords live in the secrets env file (docs/ACCOUNTS.md)")
+    w = s.add_subparsers(dest="ac_cmd")
+    x = w.add_parser("prepare", help="name, handles, bio, link, picture and password for one")
+    x.add_argument("platform", choices=["reddit", "x", "instagram", "tiktok"])
+    x.add_argument("--email", default="", help="the email you sign up with")
+    x = w.add_parser("created", help="you made it: record the handle it got")
+    x.add_argument("platform", choices=["reddit", "x", "instagram", "tiktok"])
+    x.add_argument("--handle", required=True)
+    w.add_parser("list", help="every account and its state (no passwords)")
+    x = w.add_parser("password", help="show one password, at this terminal only")
+    x.add_argument("platform", choices=["reddit", "x", "instagram", "tiktok"])
+    s.set_defaults(fn=cmd_accounts)
 
     s = sub.add_parser("station", help="the laptop as Jarvis's operations station "
                        "(docs/LAPTOP-STATION.md)")
