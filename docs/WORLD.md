@@ -6,7 +6,8 @@ your own screen.
 
 ## Open it
 
-- **When Jarvis opens:** click **Open the operations world** on the first screen.
+- **When Jarvis opens:** click **Open the operations world** on the first screen. It opens on
+  the neon headquarters (below); **Floor** shows the floor.
 - **Any time after:** click **OPERATIONS WORLD** (it glows) in the top row. While agents work
   it says how many, for example `OPERATIONS WORLD · 2 WORKING`.
 - **From the laptop:** `bau station open` opens Jarvis straight on the world.
@@ -17,6 +18,61 @@ Inside:
 - **See it all again:** double-click.
 - **Read a character's record:** click it, or her name in the Agents panel.
 - **Close:** **Close** or Esc.
+
+## The neon headquarters (HQ)
+
+Built 2026-11-20 from your picture "BAUBSA JARVIS - Virtual Operations World". The world now
+opens on it; **Floor** switches to the floor below, **HQ** back. Your picture is the style,
+never the data: every line is a real record, the same ones the floor reads.
+
+- **Behind it:** a neon headquarters at night painted by the computer (a city through tall
+  windows, a holographic globe, desks with their screens off, a glossy floor), without any
+  words, so it can never show a status that is not true. Nothing in it moves.
+- **Jarvis agents:** the roles in your picture, then your other agents, the autopilot and the
+  automaton (`bau automaton`). A role BAU has no agent for (architect, developer, tester,
+  coordinator) says "not set up yet". An agent shows its real state (working, waiting for
+  you, failed, done, free), or "not approved" / "changed since approval" when it has nothing
+  to do and you have not approved its folder. It never says "Online": no record says that.
+- **System status:** Desktop (headquarters on or off, `sudo bau hq on`) and Laptop (how many
+  stations are paired; whether one is connected right now is not seen from here). "All
+  systems healthy" only when nothing is wrong; otherwise each problem is listed: a HOLD, the
+  autopilot paused, the money machine not ready (`bau money`).
+- **Current tasks:** every agent with a job, with its real state: working first, then waiting
+  for you, stopped, done.
+- **What We Doing Now?:** under the words, Jarvis's real task right now, or "nothing right now".
+- **Under the title:** a line for today ("Tackling Tough Tasks Tuesday" only on Tuesdays,
+  "Finish Strong Friday" on Fridays, and so on), from this computer's date.
+- **Our virtual world:** your eight rooms, each a picture of that room from the floor with how
+  many agents are in it. Click one to open it on the floor, zoomed in.
+- **The women:** each character stands in her pose for her real job: working, waiting for you,
+  done, or idle (stopped shows a red tag). Jarvis is in the middle. Click one to see her
+  record on the floor. Until her painted pictures exist she is shown as her floor character.
+
+The rooms in your picture and the rooms we have. Nothing has been renamed; that is your choice:
+
+| In your picture | Our room |
+|---|---|
+| HQ | Headquarters |
+| Development | The Forge (agents with no room of their own build there) |
+| Research | Research library |
+| Testing | Testing lab |
+| Creative | Studio |
+| Finance | Finance |
+| Workshop | Innovation lab (prototypes) |
+| Operations | no clear match; Market is the eighth room |
+
+### Painting them in the neon style
+
+```bash
+bau world portraits --style neon                       # all seven, four poses each
+bau world portraits --style neon --look jarvis         # one of them
+bau world portraits --style neon --look jarvis --pose working
+```
+
+Four poses each (idle, working, waiting, done), swimsuit or clubwear level, never nudity,
+through the same checks as the portraits below. ComfyUI does one picture at a time and the
+creator's pictures share it: on 2026-11-20 its queue held 14 of them at about 33 minutes each,
+so the 28 pictures wait their turn. Not yet painted on your desktop.
 
 ## The panels beside the floor
 

@@ -283,6 +283,53 @@ button.chip.world{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px
 #w-info code{color:var(--amber)}
 .w-portrait{display:block;width:100%;max-width:260px;border-radius:8px;margin:0 0 8px;border:1px solid var(--cyan)}
 @media (max-width:760px){#w-wrap{grid-template-columns:1fr}#w-side{border-left:0;padding-left:0}}
+/* The neon headquarters (the owner's picture, 2026-11-20): its style, our records. Nothing in it
+   moves; the scene behind is the text-free still /art/hq. */
+#worldbox .box:has(#hqview:not([hidden])){width:min(1720px,calc(100% - 16px))}
+#w-to-hq[aria-pressed="true"],#w-to-floor[aria-pressed="true"]{background:var(--cyan);color:var(--solid)}
+.hq-stage{position:relative;aspect-ratio:16/9;max-height:calc(100vh - 110px);margin:0 auto;container-type:inline-size;overflow:hidden;
+  border-radius:10px;border:1px solid rgba(169,139,255,.7);box-shadow:0 0 22px rgba(169,139,255,.45);background:#05030d url(/art/hq) center/cover;color:#e8f4ff}
+.hq-stage>*{position:absolute}
+.hq-title{left:2%;top:2.5%;width:40%;font-family:"URW Gothic","Century Gothic",ui-sans-serif,sans-serif;line-height:1.05}
+.hq-title b{display:block;font-size:4.2cqw;font-weight:800;letter-spacing:.04em;color:#bff3ff;text-shadow:0 0 .4cqw #3fd6ff,0 0 1.4cqw #3fd6ff}
+.hq-title span{display:block;font-size:1.7cqw;letter-spacing:.12em;text-transform:uppercase;color:#ffd27a;text-shadow:0 0 .6cqw #ff9a3c}
+.hq-title em{display:block;margin-top:.7cqw;white-space:nowrap;font:italic 600 1.15cqw/1.25 ui-sans-serif,system-ui,sans-serif;color:#f4ecff;text-shadow:0 0 .5cqw #a98bff}
+.hq-script{font-family:Z003,"URW Chancery L","Segoe Script","Brush Script MT",cursive;color:#ff8ae0;text-shadow:0 0 .3cqw #ff4fd1,0 0 1.2cqw #b04dff;line-height:1.15}
+.hq-top{right:2%;top:2%;width:33%;text-align:right;font-size:2.7cqw}
+.hq-bottom{right:2.5%;bottom:10%;width:25%;text-align:right;font-size:2.3cqw}
+#hq-now{margin-top:.5cqw;font:600 1cqw/1.35 ui-sans-serif,system-ui,sans-serif;color:#e8f4ff;text-shadow:none;background:rgba(8,6,24,.72);
+  border:1px solid rgba(255,138,224,.6);border-radius:.6cqw;padding:.4cqw .7cqw;display:inline-block;max-width:100%;overflow-wrap:anywhere}
+.hq-panel{background:rgba(8,6,24,.74);border:1px solid rgba(110,200,255,.75);border-radius:.8cqw;padding:.7cqw 1cqw;
+  box-shadow:0 0 .9cqw rgba(63,214,255,.45),inset 0 0 1.2cqw rgba(63,214,255,.12);overflow:hidden}
+.hq-panel h3{margin:0 0 .5cqw;font:800 1.15cqw/1.2 "URW Gothic",ui-sans-serif,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#bff3ff;text-shadow:0 0 .5cqw #3fd6ff}
+.hq-panel ul{list-style:none;margin:0;padding:0;font-size:.95cqw;line-height:1.35}
+.hq-panel li{display:flex;gap:.5cqw;align-items:baseline;margin:0 0 .35cqw;overflow-wrap:anywhere}
+.hq-panel li i{font-style:normal;color:#9fb6d0;flex:1 1 auto;min-width:0}.hq-panel li b{flex:none;font-weight:600;text-transform:capitalize}
+.hq-agents{left:1.5%;top:22.5%;width:21%}.hq-status{right:1.5%;top:22%;width:21%}
+.hq-tasks{right:1.5%;top:44%;width:21%;max-height:34%}.hq-rooms{left:1.5%;bottom:7.5%;width:27%}
+.hq-dot{flex:none;width:.85cqw;height:.85cqw;border-radius:50%;background:#55606e;align-self:center}
+.hq-dot.working,.hq-dot.done,.hq-dot.ok{background:#46f2a4;box-shadow:0 0 .5cqw #46f2a4}.hq-dot.waiting{background:#ffb340;box-shadow:0 0 .5cqw #ffb340}
+.hq-dot.stopped,.hq-dot.bad{background:#ff4d5e;box-shadow:0 0 .5cqw #ff4d5e}.hq-dot.free{background:#3fd6ff;box-shadow:0 0 .4cqw #3fd6ff}
+#hq-rooms{display:grid;grid-template-columns:repeat(4,1fr);gap:.5cqw}
+#hq-rooms button{all:unset;cursor:pointer;display:flex;flex-direction:column;border:1px solid rgba(110,200,255,.55);border-radius:.4cqw;overflow:hidden;background:#05030d}
+#hq-rooms button:hover,#hq-rooms button:focus-visible{border-color:#ff8ae0;box-shadow:0 0 .6cqw #ff4fd1}
+#hq-rooms canvas{width:100%;aspect-ratio:16/10;display:block}
+#hq-rooms span{font:600 .7cqw/1.3 ui-sans-serif,system-ui,sans-serif;text-align:center;padding:.15cqw .2cqw;color:#e8f4ff}
+#hq-crew{left:29%;right:23.5%;top:13%;bottom:12%;display:flex;align-items:flex-end;justify-content:center;gap:.4cqw}
+.hq-who{all:unset;cursor:pointer;position:relative;flex:0 1 15%;height:70%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+.hq-who.lead{flex-basis:30%;height:100%}
+.hq-who img,.hq-who canvas{width:100%;height:100%;object-fit:cover;object-position:50% 20%;
+  -webkit-mask-image:radial-gradient(ellipse 72% 80% at 50% 42%,#000 58%,transparent 100%);mask-image:radial-gradient(ellipse 72% 80% at 50% 42%,#000 58%,transparent 100%)}
+.hq-who canvas{object-fit:contain;object-position:50% 100%;image-rendering:pixelated;-webkit-mask-image:none;mask-image:none}
+.hq-who .hq-tag{position:absolute;bottom:-2%;text-align:center;font:700 .8cqw/1.2 ui-sans-serif,system-ui,sans-serif;background:rgba(8,6,24,.82);border:1px solid #3fd6ff;
+  border-radius:1cqw;padding:.15cqw .6cqw;white-space:nowrap}.hq-tag small{display:block;font-weight:500;font-size:.7cqw;color:#c9d8ea}
+.hq-who[data-light="working"] .hq-tag,.hq-who[data-light="done"] .hq-tag{border-color:#46f2a4;box-shadow:0 0 .5cqw #46f2a4}
+.hq-who[data-light="waiting"] .hq-tag{border-color:#ffb340;box-shadow:0 0 .5cqw #ffb340}
+.hq-who[data-light="stopped"] .hq-tag{border-color:#ff4d5e;box-shadow:0 0 .5cqw #ff4d5e}
+.hq-who:focus-visible .hq-tag{outline:2px solid #ff8ae0}
+.hq-mug{right:19%;bottom:1.5%;width:3.6%}
+.hq-bar{left:50%;transform:translateX(-50%);bottom:1.4%;font:700 1.05cqw/1 "URW Gothic",ui-sans-serif,sans-serif;letter-spacing:.14em;color:#d8f6ff;white-space:nowrap;
+  background:rgba(8,6,24,.8);border:1px solid rgba(110,200,255,.75);border-radius:2cqw;padding:.55cqw 1.6cqw;box-shadow:0 0 .8cqw rgba(63,214,255,.5)}
 .overlay .box{width:min(980px,calc(100% - 24px));max-height:calc(100% - 40px);overflow:auto;background:var(--solid);
   border:1px solid var(--cyan);padding:16px}
 .overlay h2{margin:0 0 10px;font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--cyan)}
@@ -479,11 +526,29 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <h2>Mission Control</h2><div class="tabs" id="mc-tabs"></div><div id="mc-body"></div></div></div>
 <div id="worldbox" class="overlay" role="dialog" aria-label="Operations world"><div class="box">
   <button class="act" id="world-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
-  <h2>Operations world</h2><div id="w-counts"></div><div id="w-help">Scroll to zoom · drag to move · double-click to see it all · click a character</div>
+  <button class="act" id="w-to-floor" title="The floor: every department, every agent where her job puts her" style="float:right">Floor</button>
+  <button class="act" id="w-to-hq" title="The neon headquarters" style="float:right">HQ</button>
+  <h2>Operations world</h2>
+  <div id="hqview" aria-label="The neon headquarters: every panel shows only real records"><div class="hq-stage">
+    <div class="hq-title"><b>BAUBSA JARVIS</b><span>Virtual Operations World</span><em id="hq-day"></em></div>
+    <div class="hq-script hq-top">The Grind Continues…<br>What We Doing Now?<div id="hq-now"></div></div>
+    <section class="hq-panel hq-agents"><h3>Jarvis agents</h3><ul id="hq-agents"></ul></section>
+    <section class="hq-panel hq-status"><h3>System status</h3><ul id="hq-status"></ul></section>
+    <section class="hq-panel hq-tasks"><h3>Current tasks</h3><ul id="hq-tasks"></ul></section>
+    <section class="hq-panel hq-rooms"><h3>Our virtual world</h3><div id="hq-rooms"></div></section>
+    <div id="hq-crew"></div>
+    <div class="hq-script hq-bottom">Building the Ultimate<br>Virtual Operations World</div>
+    <svg class="hq-mug" viewBox="0 0 60 80" aria-hidden="true"><path d="M44 30 h6 a8 8 0 0 1 0 22 h-6" fill="none" stroke="#222634" stroke-width="5"/>
+      <rect x="6" y="14" width="40" height="62" rx="5" fill="#0c0d14" stroke="#3fd6ff" stroke-opacity=".5"/><ellipse cx="26" cy="14" rx="20" ry="4" fill="#1b1d28"/>
+      <path d="M17 33 l3-7 4 5 2-7 2 7 4-5 3 7 z" fill="#ffcf4d"/><text x="26" y="47" text-anchor="middle" font-size="10" font-weight="800" fill="#ffcf4d" font-family="URW Gothic,sans-serif">BAU</text>
+      <text x="26" y="58" text-anchor="middle" font-size="10" font-weight="800" fill="#ffcf4d" font-family="URW Gothic,sans-serif">BSA</text></svg>
+    <div class="hq-bar">BAUBSA JARVIS • AUTOMATION • PRODUCTIVITY • INNOVATION</div>
+  </div></div>
+  <div id="w-floorview" hidden><div id="w-counts"></div><div id="w-help">Scroll to zoom · drag to move · double-click to see it all · click a character</div>
   <div id="w-wrap"><canvas id="w-floor" width="1800" height="1120" aria-label="The floor: each character is one of your agents"></canvas>
   <div id="w-side"><section class="w-panel"><h3>Agents</h3><div id="w-list" aria-label="Agents"></div></section>
   <section class="w-panel"><h3>Current tasks</h3><div id="w-tasks"></div></section>
-  <section class="w-panel"><h3>System status</h3><ul id="w-sys"></ul></section><div id="w-info"><p>Each character is one of your agents, or Jarvis herself. Her room comes from her latest real job; with nothing to do she waits in the Headquarters lounge. Click a character.</p></div></div></div></div></div>
+  <section class="w-panel"><h3>System status</h3><ul id="w-sys"></ul></section><div id="w-info"><p>Each character is one of your agents, or Jarvis herself. Her room comes from her latest real job; with nothing to do she waits in the Headquarters lounge. Click a character.</p></div></div></div></div></div></div>
 <div id="help" class="overlay" role="dialog" aria-label="Keyboard keys"><div class="box">
   <button class="act" id="help-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Keyboard keys</h2>
@@ -1519,7 +1584,7 @@ function holdChip(h) { const c = $("c-hold"); c.hidden = !h; c.className = "chip
 // The anime scenes (bau look's LIVE: dusk, summer) are not files but painted here every
 // frame into a small texture (SCENE_W x SCENE_H), then melted and refracted like a picture.
 const LIQUID_SCALE = 0.5, LIQUID_FPS = 30, HOLD_MS = 14000, MELT_MS = 7000, TEX = 1024, EMBERS = 2600;
-const SCENE_HOLD_MS = 40000, SCENE_W = 1024, SCENE_H = 512, SCENES = ["dusk", "summer", "neon", "aurora", "ocean", "space", "synthwave"];
+const SCENE_HOLD_MS = 40000, SCENE_W = 1024, SCENE_H = 512, SCENES = ["dusk", "summer", "neon", "aurora", "ocean", "space", "synthwave", "hq"];
 // Below this many frames a second for 5 s the art draws smaller; a second time, it stops
 // and the still picture takes over. Drawn without the graphics chip it never starts.
 const LIQUID_MIN_FPS = 12, SOFTWARE_GL = /swiftshader|llvmpipe|softpipe|software/i;
@@ -2171,13 +2236,108 @@ vec3 synthwave(vec2 P, float ca, float t) {
   }
   return col;
 }
+// The neon headquarters (the owner's picture, 2026-11-20), without its words: a city skyline
+// through tall windows, a holographic globe, desks with their screens off, a glossy floor.
+// Nothing in it moves but a slow breath of the neon: no turning globe, no blinking windows,
+// so nothing here looks like work being done.
+vec3 towers(vec3 col, vec2 P, float w, float lo, float hi, float seed, vec3 body, float lit) {
+  float id = floor(P.x / w), h = lo + (hi - lo) * hash1(id + seed), f = fract(P.x / w);
+  float gap = 0.08 + 0.1 * hash1(id * 3.1 + seed);
+  float spire = h + 0.05 * step(0.82, hash1(id * 7.7 + seed)) * smoothstep(0.08, 0.0, abs(f - 0.5));
+  if (f < gap || f > 1.0 - gap || P.y > max(h, spire)) return col;
+  col = body * (0.8 + 0.4 * f);
+  vec2 wv = vec2((f - gap) / (1.0 - 2.0 * gap) * 7.0, P.y * 150.0), wi = floor(wv);
+  float on = step(0.68, hash(wi + id * 13.0 + seed)) * step(P.y, h - 0.01);
+  vec3 wc = mix(vec3(0.3, 0.85, 1.0), mix(vec3(1.0, 0.4, 0.85), vec3(1.0, 0.8, 0.35), hash(wi + 5.0)), step(0.6, hash(wi + id)));
+  col += wc * on * lit * step(0.25, fract(wv.x)) * step(0.3, fract(wv.y));
+  col += vec3(0.6, 0.3, 1.0) * smoothstep(0.004, 0.0, abs(P.y - h)) * 0.5;        // a lit roof edge
+  return col;
+}
+vec3 hq(vec2 P, float ca, float t) {
+  float br = 0.92 + 0.08 * sin(t * 0.6), cx = 0.5 * ca, sill = 0.36;          // the neon breathes
+  vec3 col = mix(vec3(0.42, 0.1, 0.5), vec3(0.03, 0.02, 0.12), smoothstep(sill, 0.95, P.y));
+  col += vec3(1.0, 0.3, 0.6) * exp(-(P.y - sill) * 9.0) * 0.25;
+  vec2 g = P * 90.0;
+  col += vec3(0.9) * step(0.985, hash(floor(g))) * smoothstep(0.15, 0.0, length(fract(g) - 0.5)) * smoothstep(0.6, 0.9, P.y);
+  col = towers(col, P, 0.035, sill + 0.08, sill + 0.3, 1.0, vec3(0.1, 0.06, 0.22), 0.35);
+  col = towers(col, P, 0.075, sill + 0.12, sill + 0.55, 9.0, vec3(0.05, 0.03, 0.12), 0.75);
+  // the windows: tall panes between dark posts with neon on their edges, a ceiling, a sill
+  float pane = 0.24, fx = fract((P.x - cx) / pane + 0.5) - 0.5, post = abs(fx) * pane;
+  col *= 0.88;                                                                    // seen through glass
+  if (post < 0.012) col = vec3(0.02, 0.02, 0.05);
+  col += mix(vec3(0.25, 0.85, 1.0), vec3(0.75, 0.35, 1.0), step(0.0, fx)) * smoothstep(0.003, 0.0, abs(post - 0.012)) * 0.9 * br * step(sill, P.y);
+  float u = (P.x - cx) / (0.5 * ca), arch = 0.95 - 0.13 * u * u;               // the arched top
+  if (P.y > arch) col = vec3(0.025, 0.02, 0.06) + vec3(0.1, 0.05, 0.2) * (P.y - arch) * 4.0;
+  col += vec3(1.0, 0.3, 0.75) * smoothstep(0.004, 0.0, abs(P.y - arch)) * br;
+  col += vec3(0.25, 0.85, 1.0) * smoothstep(0.003, 0.0, abs(P.y - arch - 0.03)) * 0.6 * br;
+  for (int k = 0; k < 9; k++) {                                                   // ceiling lights
+    float lx = cx + (float(k) - 4.0) * 0.2, ly = 0.95 - 0.13 * pow((lx - cx) / (0.5 * ca), 2.0) + 0.015;
+    col += vec3(0.7, 0.9, 1.0) * smoothstep(0.012, 0.0, length((P - vec2(lx, ly)) * vec2(0.5, 2.0))) * 0.8;
+  }
+  // the holographic globe: land from noise, a grid of meridians, a glowing rim, see-through
+  vec2 C = vec2(cx, 0.64); float R = 0.2; vec2 d = (P - C) / R; float r2 = dot(d, d);
+  col += vec3(0.2, 0.55, 1.0) * exp(-max(sqrt(r2) - 1.0, 0.0) * 6.0) * 0.35 * br;
+  if (r2 < 1.0) {
+    float z = sqrt(1.0 - r2), lon = atan(d.x, z) + 0.9, lat = asin(clamp(d.y, -1.0, 1.0));
+    float land = smoothstep(0.5, 0.53, fbm(vec2(lon * 1.6, lat * 2.4) + 4.0));
+    float grid = max(smoothstep(0.03, 0.0, abs(fract(lon * 12.0 / 6.283) - 0.5) - 0.47), smoothstep(0.03, 0.0, abs(fract(lat * 9.0 / 3.1416) - 0.5) - 0.47));
+    vec3 holo = mix(vec3(0.04, 0.12, 0.35), vec3(0.35, 0.85, 1.0), land) + vec3(0.3, 0.6, 1.0) * grid * 0.7;
+    holo += vec3(0.5, 0.8, 1.0) * pow(1.0 - z, 3.0) * 1.2;                      // the rim
+    col = mix(col, holo * br, 0.78);
+  }
+  float ring = length(vec2((P.x - cx) / 0.24, (P.y - (C.y - R - 0.03)) / 0.03));
+  col += vec3(0.3, 0.8, 1.0) * smoothstep(0.12, 0.0, abs(ring - 1.0)) * 0.8 * br;   // its projector
+  // the floor: dark and glossy, mirroring the posts' neon
+  if (P.y < sill) {
+    float k = (sill - P.y) / sill;
+    col = mix(vec3(0.06, 0.03, 0.12), vec3(0.01, 0.01, 0.03), k);
+    col += mix(vec3(0.25, 0.85, 1.0), vec3(0.75, 0.35, 1.0), step(0.0, fx)) * smoothstep(0.02 + k * 0.03, 0.0, abs(post - 0.012)) * (1.0 - k) * 0.35 * br;
+    col += vec3(0.6, 0.25, 1.0) * smoothstep(0.004, 0.0, abs(fract((P.x - cx) * 4.0 / (0.3 + k)) - 0.5) - 0.495) * 0.12;
+    col += vec3(0.3, 0.6, 1.0) * exp(-length(vec2((P.x - cx) * 1.5, P.y - sill)) * 6.0) * 0.25;   // the globe's light
+  }
+  col += vec3(0.9, 0.3, 1.0) * smoothstep(0.004, 0.0, abs(P.y - sill)) * br;
+  // desks on both sides: a lit edge, two screens each, dark because nobody works at them here
+  for (int i = 0; i < 2; i++) {
+    float s = i == 0 ? -1.0 : 1.0, x0 = cx + s * 0.58, top = 0.26;
+    float dk = sdBox(P - vec2(x0, top - 0.06), vec2(0.2, 0.06));
+    if (dk < 0.0) col = vec3(0.03, 0.025, 0.07);
+    col += vec3(0.25, 0.85, 1.0) * smoothstep(0.004, 0.0, abs(P.y - top)) * step(abs(P.x - x0), 0.2) * br;
+    for (int j = 0; j < 2; j++) {
+      vec2 m = vec2(x0 + (float(j) - 0.5) * 0.18, top + 0.07);
+      float sc = sdBox(P - m, vec2(0.07, 0.045));
+      if (sc < 0.0) col = vec3(0.03, 0.05, 0.1);
+      col += vec3(0.3, 0.6, 1.0) * smoothstep(0.003, 0.0, abs(sc)) * 0.6;
+      if (sdBox(P - vec2(m.x, top + 0.012), vec2(0.006, 0.014)) < 0.0) col = vec3(0.04, 0.04, 0.08);
+      col += vec3(0.25, 0.85, 1.0) * smoothstep(0.004, 0.0, abs(sdBox(P - vec2(m.x, top - 0.006), vec2(0.045, 0.004)))) * 0.5;   // a keyboard's edge
+    }
+    vec2 ch = vec2(x0 - s * 0.05, top - 0.07);                                    // a chair in front
+    float back = sdBox(P - ch - vec2(0.0, 0.03), vec2(0.045, 0.06)) - 0.02;
+    if (back < 0.0) col = vec3(0.03, 0.02, 0.06) + vec3(0.06, 0.03, 0.1) * (P.y - ch.y) * 6.0;
+    col += vec3(0.6, 0.35, 1.0) * smoothstep(0.003, 0.0, abs(back)) * 0.7;
+    vec2 pot = vec2(x0 + s * 0.27, top - 0.09);                                   // a plant beside it
+    if (sdBox(P - pot, vec2(0.025 - (pot.y - P.y) * 0.15, 0.03)) < 0.0) col = vec3(0.05, 0.03, 0.09);
+    for (int l = 0; l < 7; l++) {
+      float a = 0.35 + float(l) * 0.4, ln = 0.06 + 0.03 * hash1(float(l) + s);
+      vec2 dir = vec2(cos(a), sin(a)), rel = P - pot - vec2(0.0, 0.03);
+      float al = dot(rel, dir), ac = abs(dot(rel, vec2(-dir.y, dir.x)) - al * al * 1.5 * sign(dir.x));
+      if (al > 0.0 && al < ln && ac < 0.009 * sin(3.1416 * al / ln)) col = mix(vec3(0.05, 0.25, 0.15), vec3(0.4, 0.3, 0.9), al / ln * 0.6);
+    }
+  }
+  // the front desk across the bottom, and pink neon down the far walls
+  float fd = 0.1 + 0.02 * (P.x - cx) * (P.x - cx);
+  if (P.y < fd) col = mix(vec3(0.02, 0.015, 0.05), vec3(0.06, 0.03, 0.12), P.y / fd) + vec3(0.25, 0.4, 0.8) * smoothstep(0.03, 0.0, fd - P.y) * 0.25;
+  col += vec3(0.25, 0.85, 1.0) * smoothstep(0.004, 0.0, abs(P.y - fd)) * br;
+  col += vec3(1.0, 0.3, 0.75) * smoothstep(0.006, 0.0, min(abs(P.x - 0.02), abs(P.x - ca + 0.02))) * step(sill, P.y) * br;
+  return col * (1.0 - 0.35 * pow(length((P - vec2(cx, 0.5)) / vec2(ca, 1.0)) * 1.3, 2.0));
+}
 void main() {
   float ca = uRes.x / uRes.y;
   px = 1.5 / uRes.y;
   vec2 P = vec2(vUv.x * ca, uFlip > 0.5 ? vUv.y : 1.0 - vUv.y);   // a texture's rows run bottom up
   vec3 col = uScene < 0.5 ? dusk(P, ca, uTime) : uScene < 1.5 ? summer(P, ca, uTime)
     : uScene < 2.5 ? neonCity(P, ca, uTime) : uScene < 3.5 ? aurora(P, ca, uTime)
-    : uScene < 4.5 ? ocean(P, ca, uTime) : uScene < 5.5 ? space(P, ca, uTime) : synthwave(P, ca, uTime);
+    : uScene < 4.5 ? ocean(P, ca, uTime) : uScene < 5.5 ? space(P, ca, uTime)
+    : uScene < 6.5 ? synthwave(P, ca, uTime) : hq(P, ca, uTime);
   gl_FragColor = vec4(col, 1.0);
 }`;
 let LIQ = false, CORE = null;   // whether the liquid art is showing; the core's place (CSS px)
@@ -3276,10 +3436,13 @@ function wCore(x, t, ink, under) { const busy = OPS.agents.some(a => a.state ===
     x.save(); x.shadowColor = rgba(col, 1); x.shadowBlur = busy ? 16 : 6; x.strokeStyle = rgba(col, busy ? 0.95 : 0.45); x.lineWidth = 4; x.beginPath(); x.ellipse(hx, yy, 52, 20, 0, 0, 6.283); x.stroke(); x.restore(); }
   x.fillStyle = rgba(col, 0.32); x.strokeStyle = rgba(col, 0.8); x.beginPath(); x.ellipse(hx, cy0 - H, 70, 27, 0, 0, 6.283); x.fill(); x.stroke();
   x.font = "800 22px ui-monospace,Consolas,monospace"; x.textAlign = "center"; x.fillStyle = OPS.hold ? "#ff4d5e" : ink; x.fillText(OPS.hold ? "HOLD" : "HQ CORE", hx, cy0 - H + 8); }
+function wStaticNow() { const c = $("w-floor"), light = document.documentElement.dataset.theme === "light", key = (light ? "L" : "D") + c.width;
+  if (W_STATIC_KEY !== key) { W_STATIC = document.createElement("canvas"); W_STATIC.width = c.width; W_STATIC.height = c.height; drawStatic(W_STATIC, light); W_STATIC_KEY = key; }
+  return W_STATIC; }
 function drawWorld(t) {
   const c = $("w-floor"), x = c.getContext("2d"); W_HITS = [];
-  const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#cfefff", light = document.documentElement.dataset.theme === "light", key = (light ? "L" : "D") + c.width;
-  if (W_STATIC_KEY !== key) { W_STATIC = document.createElement("canvas"); W_STATIC.width = c.width; W_STATIC.height = c.height; drawStatic(W_STATIC, light); W_STATIC_KEY = key; }
+  const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#cfefff", light = document.documentElement.dataset.theme === "light";
+  wStaticNow();
   x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = light ? "#dbe7ef" : "#02060b"; x.fillRect(0, 0, c.width, c.height);
   x.setTransform(W_VIEW.z, 0, 0, W_VIEW.z, W_VIEW.x, W_VIEW.y);              // your zoom and position
   x.drawImage(W_STATIC, 0, 0); if (!W_SHEET) return;
@@ -3314,7 +3477,7 @@ function drawWorld(t) {
     const text = (r.name + (n ? ` · ${n}` : "")).toUpperCase(); x.font = "800 19px ui-monospace,Consolas,monospace"; x.textAlign = "center"; const w = x.measureText(text).width + 20;
     x.fillStyle = light ? "rgba(255,255,255,.9)" : "rgba(2,6,11,.82)"; x.fillRect(lx - w / 2, ly - 20, w, 28); x.strokeStyle = rgba(W_TINT[id], 0.85); x.lineWidth = 1.5; x.strokeRect(lx - w / 2, ly - 20, w, 28);
     x.fillStyle = rgba(W_TINT[id], 1); x.fillText(text, lx, ly); } }
-function worldLoop(t) { if (!$("worldbox").classList.contains("show")) return; if (OPS) drawWorld(t);
+function worldLoop(t) { if (!$("worldbox").classList.contains("show")) return; if (OPS && W_MODE === "floor") drawWorld(t);
   worldAnim = REDUCED ? 0 : requestAnimationFrame(worldLoop); }
 function worldInfo(a) {
   const box2 = $("w-info"); box2.textContent = ""; if (!a) return;
@@ -3384,8 +3547,61 @@ async function loadWorld() {
    [ap.paused ? "warn" : "on", ap.paused ? "Autopilot: paused by you" : `Autopilot: ${ap.running} running, ${ap.queued} queued` + (ap.waiting_for_you ? `, ${ap.waiting_for_you} waiting for you` : "")],
    [OPS.hold ? "bad" : "on", OPS.hold ? "HOLD: " + OPS.hold : "No HOLD"]].forEach(([k, t]) => {
     const li = el("li"); li.appendChild(el("span", "w-dot " + ({ on: "working", warn: "waiting", bad: "stopped" }[k] || ""))); li.appendChild(document.createTextNode(t)); sys.appendChild(li); });
-  if (REDUCED) drawWorld(0);
+  renderHQ();
+  if (REDUCED && W_MODE === "floor") drawWorld(0);
 }
+// ---------------------------------------------------------------- the neon headquarters
+// The owner's picture (2026-11-20) is the style, never the data: every line below comes from
+// /api/world. Roles the picture names that BAU does not have say so (world.roster); "All
+// systems healthy" only when the world finds nothing wrong (world.problems).
+let W_MODE = "hq";
+const HQ_ROOMS = ["hq", "research", "forge", "testing", "innovation", "studio", "finance", "market"];
+function hqRow(ul, light, name, text) { const li = el("li"); li.appendChild(el("span", "hq-dot " + light));
+  if (name) { li.appendChild(el("b", null, name)); li.appendChild(el("i", null, "– " + text)); } else li.appendChild(el("span", null, text)); ul.appendChild(li); }
+function hqFigure(a, lead) { const b = el("button", "hq-who" + (lead ? " lead" : "")), light = wDot(a) || "free";
+  b.dataset.light = light; b.title = `${a.name}: ${a.state}` + (a.job ? ` (${a.job.objective})` : "");
+  if (a.neon) { const im = el("img"); im.alt = a.name; im.src = `/world/portrait/neon-${encodeURIComponent(a.look)}-${a.pose}.png`; b.appendChild(im); }
+  else if (W_SHEET) { const cv = el("canvas"), [fw, fh] = W_META.frame; cv.width = fw; cv.height = fh;          // her sprite until her portrait is painted
+    const [anim] = W_ANIM[a.state] || ["blocked"]; wSprite(cv.getContext("2d"), a.look || "engineer", anim, 0, fw / 2, fh - 4, false); b.appendChild(cv); }
+  const tag = el("span", "hq-tag", a.name); tag.appendChild(el("small", null, a.state)); b.appendChild(tag);
+  b.onclick = () => { showFloor(); W_SEL = a; worldInfo(a); loadList(); if (REDUCED) drawWorld(0); };
+  return b; }
+// The picture's "Tackling Tough Tasks Tuesday" is true one day a week: today's own line instead.
+const HQ_DAYS = ["Systems Check Sunday", "Mission Monday", "Tackling Tough Tasks Tuesday", "Work Hard Wednesday",
+  "Thinking Big Thursday", "Finish Strong Friday", "Side Hustle Saturday"];
+function renderHQ() { if (!OPS) return; const S = OPS.system;
+  $("hq-day").textContent = `“${HQ_DAYS[new Date().getDay()]}” on the BAU BSA Coffee Grind`;
+  const now = $("hq-now"); now.textContent = OPS.now ? `Jarvis: ${OPS.now.task}` + (OPS.now.state === "working" ? "" : " (waiting for you)") : "Jarvis: nothing right now";
+  const ag = $("hq-agents"); ag.textContent = ""; OPS.roster.forEach(r => hqRow(ag, r.light, r.name, r.state));
+  const st = $("hq-status"); st.textContent = "";
+  hqRow(st, S.station || S.headquarters ? "ok" : "", "Desktop", S.station ? "does the work (this laptop is a station)" : S.headquarters ? "headquarters on (this computer)" : "headquarters off (sudo bau hq on)");
+  hqRow(st, S.station || S.stations_paired ? "ok" : "", "Laptop", S.station ? "this computer, a station" : S.stations_paired ? `${S.stations_paired} station${S.stations_paired > 1 ? "s" : ""} paired (connected or not is not seen from here)` : "no station paired yet");
+  if (S.problems.length) S.problems.forEach(p => hqRow(st, /^HOLD/.test(p) ? "bad" : "waiting", null, p)); else hqRow(st, "ok", null, "All systems healthy");
+  const tk = $("hq-tasks"); tk.textContent = ""; const order = { working: 0, waiting: 1, free: 2, stopped: 3, done: 4 };
+  const lit = (a) => wDot(a) || (a.state === "assigned" ? "free" : "");                 // assigned: recorded, not started
+  const jobs = OPS.agents.filter(a => a.job && lit(a)).sort((p, q) => order[lit(p)] - order[lit(q)]);
+  jobs.slice(0, 5).forEach(a => hqRow(tk, lit(a), a.name, `${a.job.objective} (${a.state})`));
+  if (!jobs.length) hqRow(tk, "", null, "No tasks right now");
+  const rm = $("hq-rooms"); if (!rm.children.length) { const src = el("canvas"); src.width = $("w-floor").width; src.height = $("w-floor").height; drawStatic(src, false);   // always the night floor
+    for (const id of HQ_ROOMS) { const b = el("button"), cv = el("canvas"), [rx, ry, rw, rh] = W_ROOMS[id]; cv.width = 240; cv.height = 150;
+      const xs = [iso(rx, ry + rh)[0], iso(rx + rw, ry)[0]], top = iso(rx, ry)[1] - WALL - 30, bot = iso(rx + rw, ry + rh)[1] + 10;
+      const sw = xs[1] - xs[0], sh = sw * 150 / 240, sy = Math.max(0, Math.min(top, bot - sh));
+      cv.getContext("2d").drawImage(src, xs[0], sy, sw, sh, 0, 0, 240, 150); b.appendChild(cv); b.appendChild(el("span")); b.dataset.room = id; b.onclick = () => openRoom(id); rm.appendChild(b); } }
+  [...rm.children].forEach(b => { const r = OPS.rooms.find(q => q.id === b.dataset.room) || { name: b.dataset.room, who: "" }, n = OPS.counts[b.dataset.room] || 0;
+    b.lastChild.textContent = r.name + (n ? ` · ${n}` : ""); b.title = `${r.name}: ${r.who}. Click to open it on the floor.`; });
+  const crew = $("hq-crew"), key = OPS.agents.map(a => [a.name, a.state, a.neon, a.job && a.job.objective].join("|")).join(";") + !!W_SHEET;
+  if (crew.dataset.key === key) return; crew.dataset.key = key; crew.textContent = "";      // redrawn only when a record changed
+  const others = OPS.agents.slice(1), left = others.filter((_, i) => i % 2 === 0), right = others.filter((_, i) => i % 2 === 1);
+  left.reverse().forEach(a => crew.appendChild(hqFigure(a))); crew.appendChild(hqFigure(OPS.agents[0], true)); right.forEach(a => crew.appendChild(hqFigure(a))); }
+function showMode(m) { W_MODE = m; $("hqview").hidden = m !== "hq"; $("w-floorview").hidden = m !== "floor";
+  $("w-to-hq").setAttribute("aria-pressed", String(m === "hq")); $("w-to-floor").setAttribute("aria-pressed", String(m === "floor"));
+  if (m === "floor" && OPS) drawWorld(performance.now()); }
+function showFloor() { showMode("floor"); }
+function openRoom(id) { const c = $("w-floor"), [rx, ry, rw, rh] = W_ROOMS[id], [mx, my] = iso(rx + rw / 2, ry + rh / 2), z = id === "hq" ? 1.8 : 2.4;
+  W_VIEW = { z, x: c.width / 2 - z * mx, y: c.height / 2 - z * my }; showFloor(); }
+$("w-to-hq").onclick = () => showMode("hq");
+$("w-to-floor").onclick = () => { W_VIEW = { z: 1, x: 0, y: 0 }; showFloor(); };
+showMode("hq");
 function wPoint(e) { const c = $("w-floor"), r = c.getBoundingClientRect();
   return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; }
 $("w-floor").addEventListener("wheel", (e) => { e.preventDefault(); const [mx, my] = wPoint(e), z0 = W_VIEW.z;   // zoom where you point

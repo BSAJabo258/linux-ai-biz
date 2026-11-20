@@ -29,11 +29,12 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 
 def test_shipped_art_and_wallpapers():
     art = resources.files("bau.ui") / "art"
-    for name in [f"{n}.jpg" for n in L.SHIPPED] + [f"wall-{n}.jpg" for n in L.LIVE]:
+    # The desktop's slideshow (the stick) has the rotation's scenes; hq is Jarvis's choice only.
+    for name in [f"{n}.jpg" for n in L.SHIPPED] + [f"wall-{n}.jpg" for n in L.ROTATION]:
         assert (art / name).read_bytes()[:3] == b"\xff\xd8\xff", name
     assert not (art / "wall-moon.jpg").is_file()        # the owner did not like the inkblots
     pil = pytest.importorskip("PIL.Image")
-    for n in L.LIVE:
+    for n in L.ROTATION:
         with pil.open(str(art / f"wall-{n}.jpg")) as im:
             assert im.size == (1920, 1080)
 
@@ -104,7 +105,7 @@ def test_jarvis_serves_the_art_and_tells_the_page(jarvis):
         assert "img-src 'self'" in r.headers["Content-Security-Policy"]
         look = json.loads(r.read())["look"]
         assert look["art"] == "dusk" and look["alive"] is True
-        assert look["flow"] == list(L.LIVE) and look["live"] == list(L.LIVE)
+        assert look["flow"] == list(L.ROTATION) and look["live"] == list(L.LIVE)
     L.set_look(home, art="none")
     with pytest.raises(urllib.error.HTTPError) as e:
         urllib.request.urlopen(url + "/art")
@@ -124,7 +125,7 @@ def test_the_page_brings_the_art_to_life_calmly():
 # ------------------------------------------------------------------ liquid: the art melts
 
 def test_the_flow_starts_with_the_chosen_art_and_holds_the_rest(tmp_path):
-    assert L.brief(tmp_path)["flow"] == list(L.LIVE)                # the live scenes
+    assert L.brief(tmp_path)["flow"] == list(L.ROTATION)            # the live scenes
     L.set_look(tmp_path, art="gold")
     assert L.brief(tmp_path)["flow"][0] == "gold"
     L.set_look(tmp_path, flow=["earth", "moon"])
@@ -133,7 +134,7 @@ def test_the_flow_starts_with_the_chosen_art_and_holds_the_rest(tmp_path):
     with pytest.raises(ValueError):
         L.set_look(tmp_path, flow=["moon", "nope"])
     L.set_look(tmp_path, flow=[])                                       # empty = the default
-    assert L.show(tmp_path)["flow"] == list(L.LIVE)
+    assert L.show(tmp_path)["flow"] == list(L.ROTATION)
     L.set_look(tmp_path, art="none")
     assert L.brief(tmp_path) == {"art": None, "alive": True, "flow": [], "live": list(L.LIVE)}
 
@@ -215,7 +216,7 @@ def test_seven_live_scenes_in_very_different_styles():
         assert fn in page
     for i, fn in enumerate(("dusk", "summer", "neonCity", "aurora", "ocean", "space")):
         assert f"uScene < {i}.5 ? {fn}(" in page or (i == 0 and "uScene < 0.5 ? dusk(" in page)
-    assert ": synthwave(P, ca, uTime);" in page
+    assert "uScene < 6.5 ? synthwave(P, ca, uTime) : hq(P, ca, uTime);" in page
 
 
 def test_render_script_reads_the_same_shader(tmp_path):
@@ -236,7 +237,7 @@ def test_cli_look_flow(tmp_path, monkeypatch, capsys):
     assert cli.main(["look", "flow", "all"]) == 0                 # every picture there is
     assert len(json.loads(capsys.readouterr().out)["flow"]) == len(L.SHIPPED)
     assert cli.main(["look", "flow", "default"]) == 0
-    assert json.loads(capsys.readouterr().out)["flow"] == list(L.LIVE)
+    assert json.loads(capsys.readouterr().out)["flow"] == list(L.ROTATION)
 
 
 # ------------------------------------------------------------------ Mission Control too
@@ -404,3 +405,19 @@ def test_the_page_has_no_known_leaks_loops_or_echo():
     assert "clipUrl" in page and "URL.revokeObjectURL(clipUrl)" in page
     ps = page[page.index("function paintState(s) {"):]
     assert ps.index("if (!s) return;") < ps.index("applyLook(s.look)")
+
+
+# The owner's neon headquarters picture, 2026-11-20: its scene without its words, as a choice he
+# can switch back from; it never joins the rotation by itself and only breathes.
+def test_the_neon_headquarters_is_a_choice_without_words(tmp_path):
+    assert "hq" in L.LIVE and "hq" not in L.ROTATION and L.SHIPPED["hq"] == "hq.jpg"
+    assert (resources.files("bau.ui") / "art" / "hq.jpg").read_bytes()[:3] == b"\xff\xd8\xff"
+    L.set_look(tmp_path, art="hq")
+    assert L.brief(tmp_path)["flow"][0] == "hq"
+    L.set_look(tmp_path, flow=["hq"])
+    assert L.brief(tmp_path)["flow"] == ["hq"]                       # stays on it
+    L.set_look(tmp_path, art="dusk", flow=[])
+    assert L.brief(tmp_path)["flow"] == list(L.ROTATION)             # switched back
+    page = (resources.files("bau.ui") / "jarvis.html").read_text()
+    scene = page.split("vec3 hq(vec2 P")[1].split("void main()")[0]
+    assert "uTime" not in scene and scene.count("sin(t") == 1        # only the neon breathes

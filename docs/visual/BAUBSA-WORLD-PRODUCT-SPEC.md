@@ -43,6 +43,16 @@ A cut-away headquarters, seen from above at an angle, with doors between the roo
 | Stopped | an agent whose job failed, was interrupted or paused |
 | Delivered | an agent whose job finished and passed the check, for 24 hours |
 
+## The neon headquarters (HQ view)
+
+The world opens on a view in the style of the owner's neon picture (2026-11-20): his
+picture's layout over a text-free neon scene (`bau look set hq`). Its panels read the same
+records: Jarvis agents (`world.roster`: the picture's roles BAU has no agent for say "not set
+up yet", never "Online"; the autopilot and the automaton from their own records), System
+status ("All systems healthy" only when `system.problems` is empty), Current tasks, Jarvis's
+real task under "What We Doing Now?" (`now`), and the room tiles, which open that room on the
+floor. Each assistant stands in the pose of her real job. See [WORLD.md](../WORLD.md).
+
 ## One task's life, as the world shows it
 
 The steps below are the real path of a mission (`bau mission run`, or Jarvis's
@@ -85,8 +95,8 @@ owner's prompts 2 to 5:
 
 - **Managers as characters.** Today the manager is the fixed check rule and the
   workstation's fixed-rule manager; no manager character walks or reviews on screen.
-- **Automaton on the floor.** The automaton runs (`bau automaton`) but has no place or
-  character in the world.
+- **Automaton on the floor.** The automaton runs (`bau automaton`); its real state shows in
+  the HQ view's agents panel, but it has no place or character on the floor.
 - **The preparing walk.** No trip to an equipment station before work: the records do not
   say when an agent gathers its tools.
 - **Several agents on one task**, dependencies and hand-offs between agents: one agent per

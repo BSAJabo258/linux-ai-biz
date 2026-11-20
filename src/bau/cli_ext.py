@@ -727,7 +727,8 @@ def cmd_world(a):
     """The operations world: paint each AI assistant's portrait on this computer (docs/WORLD.md)."""
     from .world import PicturesNotRunning, draw_portraits
     try:
-        done = draw_portraits(bau_home(), [a.look] if a.look else None, again=a.again)
+        done = draw_portraits(bau_home(), [a.look] if a.look else None, again=a.again,
+                              style=a.style, poses=[a.pose] if a.pose else None)
     except PicturesNotRunning as e:
         print(f"bau world portraits: {e}", file=sys.stderr)
         return EXIT_BLOCKED
@@ -2465,6 +2466,11 @@ def register(sub: argparse._SubParsersAction) -> None:
                    "coordinator, analyst, architect; avatar = Jarvis's photo face on her "
                    "screen, drawn only when asked)")
     x.add_argument("--again", action="store_true", help="paint it again even if it exists")
+    x.add_argument("--style", choices=("classic", "neon"), default="classic",
+                   help="neon: the neon headquarters, one picture per pose (idle, working, "
+                   "waiting, done)")
+    x.add_argument("--pose", choices=("idle", "working", "waiting", "done"),
+                   help="with --style neon: only this pose")
     s.set_defaults(fn=cmd_world)
 
     s = sub.add_parser("hq", help="the desktop as headquarters for the laptop station "
