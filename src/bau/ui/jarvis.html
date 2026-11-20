@@ -270,6 +270,7 @@ body.showtime #timeline{display:block}body.showtime aside.r{display:none}
 .w-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;background:var(--dim)}
 .w-dot.working{background:var(--green);box-shadow:0 0 6px var(--green)}.w-dot.waiting{background:var(--amber);box-shadow:0 0 6px var(--amber)}
 .w-dot.stopped{background:var(--red);box-shadow:0 0 6px var(--red)}.w-dot.done{background:#8cc85a}
+.w-life{margin:6px 0 0;padding-left:18px;font-size:12px}.w-life li{margin:2px 0}.w-life .w-now b{color:#ffb340}.w-life .w-waiting b{color:#ffb340}.w-life .w-stopped b{color:#ff4d5e}.w-life .w-not-needed{opacity:.7}
 #w-list{display:flex;flex-direction:column;gap:3px}#w-list button{display:flex;align-items:center;gap:2px;width:100%;text-align:left;font:inherit;font-size:12px;padding:4px 7px}
 #w-list button small{margin-left:auto;color:var(--dim);font-size:11px}
 button.chip.world{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px rgba(63,214,255,.45);font-weight:600}
@@ -3331,6 +3332,15 @@ function worldInfo(a) {
     if (j.cost_usd) row("Cost", "$" + j.cost_usd); row("Errors", j.errors); row("Files made", j.artifacts); row("Next", j.next_action); }
   else row("Job", "none yet");
   box2.appendChild(dl);
+  // The task's steps, each from its real job and mission (world.lifecycle), never a timer.
+  if (j && j.lifecycle && j.lifecycle.length) {
+    box2.appendChild(el("h4", null, "This task, step by step"));
+    const ol = el("ol", "w-life");
+    const MARK = { done: "✓", now: "▶", waiting: "⏳", stopped: "■", "not needed": "–" };
+    j.lifecycle.forEach(s => { const li = el("li", "w-" + s.state.replace(" ", "-"));
+      li.appendChild(el("b", null, (MARK[s.state] || "·") + " " + s.step));
+      li.appendChild(el("span", null, " " + s.state + ": " + s.detail)); ol.appendChild(li); });
+    box2.appendChild(ol); }
   if (j && /^(PENDING|RUNNING|WAITING_FOR_APPROVAL)$/.test(j.status) && j.mission_id && j.mission_id !== "adhoc") {
     const p = el("p", null, "To stop it, at a terminal: "); p.appendChild(el("code", null, "bau mission cancel " + j.mission_id)); box2.appendChild(p); }
 }
