@@ -329,7 +329,7 @@ def test_slow_model_answers_as_a_job_the_page_checks_back_on(tmp_path, monkeypat
             return super().complete(*a, **kw)
 
     monkeypatch.setattr(jarvis_server, "QUICK_REPLY", 0.1)
-    from bau import agentfolders as AF       # approved once, as the owner does (2026-11-20)
+    from bau import agentfolders as AF  # approved once, as the owner does (2026-11-20)
     for name in AF.names(tmp_path):
         AF.approve(name, "human:owner", tmp_path)
     a = Assistant(tmp_path, Slow(script=["Here you are."]), {}, "human:owner",
