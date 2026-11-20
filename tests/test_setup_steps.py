@@ -55,8 +55,9 @@ def fanvue_done(home, monkeypatch, automaton=True):
     monkeypatch.setenv("FANVUE_CLIENT_ID", "id")
     monkeypatch.setenv("FANVUE_CLIENT_SECRET", "secret")
     (home / "secrets").mkdir(exist_ok=True)
+    from bau.fanvue import SCOPES
     (home / "secrets" / "fanvue.json").write_text(json.dumps(
-        {"access_token": "a", "refresh_token": "r", "expires_at": 9e12}))
+        {"access_token": "a", "refresh_token": "r", "expires_at": 9e12, "scope": SCOPES}))
     (home / "fanvue").mkdir(exist_ok=True)
     (home / "fanvue" / "autopost.json").write_text(json.dumps(
         {"on": True, "audience": "subscribers", "per_day": 2, "by": "human:owner"}))
@@ -377,3 +378,18 @@ def test_on_the_laptop_station_only_updates_and_laws_can_wait(box, monkeypatch, 
     assert ids(box) == ["laws", "updates"]
     box.facts["update"] = "auto"
     assert ids(box) == ["laws"]
+
+
+
+def test_a_sign_in_from_before_fan_chat_brings_the_connect_card_back(box, monkeypatch):
+    # The owner, 2026-11-20: "the secret is already logged in, and the ID is already saved",
+    # so the chat permissions must be one Accept on the card and Allow on Fanvue.
+    import json
+    fanvue_done(box.home, monkeypatch)
+    assert "fanvue" not in ids(box)
+    f = box.home / "secrets" / "fanvue.json"
+    tok = json.loads(f.read_text())
+    tok["scope"] = "openid offline_access offline read:self write:post read:insights"
+    f.write_text(json.dumps(tok))
+    assert "fanvue" in ids(box)
+    assert "nothing to type" in S.BY_ID["fanvue"].why

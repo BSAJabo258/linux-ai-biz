@@ -72,12 +72,15 @@ STEPS = (
          "The money starts on Fanvue, and Jarvis can't reach it yet. On fanvue.com, open the "
          "Developer Area and create an app; on its Authentication tab add the redirect "
          "http://127.0.0.1:3456/callback and turn on read:self, read:media, write:media, "
-         "write:creator, write:post and read:insights. Then press Accept: a terminal asks for "
+         "write:creator, write:post, read:insights, read:chat, write:chat, read:fan, "
+         "read:creator, read:tracking_links and write:tracking_links. Then press Accept: a terminal asks for "
          "the app's Client ID and Client Secret (not shown as you paste), then Fanvue opens: "
          "sign in and press Allow."),
     Step("fanvue", "Connect Fanvue",
-         "So Jarvis can put Aria's pictures on Fanvue (each one only after your Accept) and "
-         "count what she earns. Fanvue opens in the browser: sign in and press Allow."),
+         "So Jarvis can put Aria's pictures on Fanvue, count what she earns, and let her "
+         "answer fans in chat. Your app's keys are already on this computer: nothing to type. "
+         "Fanvue opens in the browser: press Allow (sign in first if it asks). If you were "
+         "connected before fan chat, this card comes back once for the chat permissions."),
     Step("autopost", "Let Jarvis post to Fanvue on his own",
          "Your switch: every 30 minutes the autopilot posts the next queued Fanvue post, up "
          "to your number a day, to the audience you pick. Every check (age, AI label, no "
@@ -228,7 +231,12 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
             fanvue.app_credentials()
         except fanvue.FanvueError:
             return None
-        return fanvue.TokenStore(home).store.state() == "present"
+        if fanvue.TokenStore(home).store.state() != "present":
+            return False
+        # A sign-in from before fan chat lacks its permissions: the card asks once more
+        # (the owner, 2026-11-20: the keys are saved, so it must be one Accept and Allow).
+        granted = set(str((fanvue.TokenStore(home).load() or {}).get("scope", "")).split())
+        return all(x in granted for x in fanvue.CHAT_SCOPES)
     if step == "autopost":                # once Fanvue is connected, until he chooses
         from . import fanvue
         if fanvue.TokenStore(home).store.state() != "present":
