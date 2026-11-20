@@ -418,3 +418,17 @@ def test_the_vortex_is_driven_by_real_state_and_never_takes_clicks():
     assert "canvas#vfront{position:fixed;inset:0;width:100%;height:100%;display:block;" \
            "pointer-events:none" in page
     assert "drawVortex(X, Y, R, now, dt);" in page
+
+
+def test_she_is_an_apparition_and_the_geometry_curves():
+    # The owner, 2026-11-20: "she's supposed to be an apparition", "everything's not straight
+    # lines... think multidimensional".
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert "#avphoto{mix-blend-mode:screen}" in page                  # light only
+    body = page.split("function drawVortex(", 1)[1].split("\nfunction frame(", 1)[0]
+    assert "const hopf = (eta, d, t) =>" in body                        # 4D circles
+    assert "[[0.5, 3, GOLD], [0.79, 6, col], [1.1, 9," in body          # 3, 6 and 9 of them
+    assert "quadraticCurveTo" in body                                   # arcs, not chords
+    assert "cx.lineTo(X, Y + R * 2.6)" not in body                      # no straight axis
