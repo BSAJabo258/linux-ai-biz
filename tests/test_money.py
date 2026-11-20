@@ -42,7 +42,8 @@ def ready_home(home):
 def test_a_ready_machine_says_so(tmp_path, monkeypatch):
     from bau import fanvue
     home = ready_home(tmp_path)
-    fanvue.TokenStore(home).save({"access_token": "x", "expires_in": 3600})   # the real store
+    fanvue.TokenStore(home).save({"access_token": "x", "expires_in": 3600,   # the real store
+                                  "scope": fanvue.SCOPES})
     ls = money.links(home, probe())
     assert [link["ok"] for link in ls] == [True] * len(ls), ls
     s = money.summary(home, probe())
@@ -71,7 +72,8 @@ def test_a_paused_autopilot_and_a_hold_are_not_ready(tmp_path, monkeypatch):
     from bau import autopilot, fanvue
     from bau.governor import Governor
     home = ready_home(tmp_path)
-    fanvue.TokenStore(home).save({"access_token": "x", "expires_in": 3600})   # the real store
+    fanvue.TokenStore(home).save({"access_token": "x", "expires_in": 3600,   # the real store
+                                  "scope": fanvue.SCOPES})
     monkeypatch.setattr(autopilot, "status", lambda h: {"paused": True})
     ap = next(link for link in money.links(home, probe()) if link["link"].startswith("autopilot"))
     assert not ap["ok"] and ap["found"] == "paused by you" and ap["fix"] == "bau autopilot resume"
@@ -91,7 +93,9 @@ def test_what_happened_counts_the_real_queue_and_money(tmp_path):
     (eco / "revenue.jsonl").write_text(json.dumps(
         {"ts": "2026-11-17T00:00:00+00:00", "gross_usd": 10.0, "platform_fee": 2.0}) + "\n")
     a = money.activity(tmp_path)
-    assert a == {"waiting_for_you": 1, "queued": 1, "posted": 2, "money_received_usd": 8.0}
+    assert a == {"waiting_for_you": 1, "queued": 1, "posted": 2, "money_received_usd": 8.0,
+                 "chat": {"auto_send": False, "waiting": 0, "sent_today": 0, "offers_sent": 0,
+                          "refused": 0}}
 
 
 def test_the_command_only_looks_and_exits_blocked_until_ready(tmp_path, monkeypatch, capsys):
@@ -131,3 +135,11 @@ def test_on_the_laptop_station_it_points_at_the_desktop(tmp_path, monkeypatch, c
     from bau.world import world
     s = world(tmp_path)["system"]
     assert s["station"] is True and s["money"]["station"] is True
+
+
+def test_a_sign_in_from_before_fan_chat_is_one_link_to_fix(tmp_path):
+    from bau import fanvue
+    fanvue.TokenStore(tmp_path).save({"access_token": "x", "expires_in": 3600,
+                                      "scope": "openid read:self write:post"})
+    link = next(x for x in money.links(tmp_path, probe()) if x["link"].startswith("fan chat"))
+    assert not link["ok"] and link["fix"].startswith("bau fanvue login")

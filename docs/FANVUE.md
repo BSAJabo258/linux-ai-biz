@@ -132,6 +132,8 @@ bau fanvue logout                                           # forget the Fanvue 
 
 Posting itself is always the card in Jarvis and your Accept.
 
+She also answers fans in chat and offers your paid pictures there: [FAN-CHAT.md](FAN-CHAT.md).
+
 ## What it never does
 
 - It never posts without your Accept, and never twice.

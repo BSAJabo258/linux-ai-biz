@@ -405,6 +405,9 @@ class Assistant:
                                      _schema({"task": {"type": "string"}}),
                                      self.t_autopilot_yes, kind="confirm"),
             # A picture the autopilot drafted for Fanvue: Accept lets it post, Not now drops it.
+            "fan_reply": Tool("fan_reply", "The owner sends a drafted reply to a fan.",
+                              _schema({"draft": {"type": "string"}}), self.t_fan_reply,
+                              kind="confirm"),
             "fanvue_review": Tool("fanvue_review", "The owner approves a drafted picture.",
                                   _schema({"item": {"type": "string"}}),
                                   self.t_fanvue_approve, kind="confirm")}
@@ -1483,8 +1486,32 @@ class Assistant:
                     + f".\n{item['caption']}\n\n"
                     "Accept: it joins the posting queue. Not now: it is dropped.",
                     _now(), preview=str(q.picture(item)), click_only=item["level"] >= 2)
+        from . import fan_chat
+        shown = {p.args["draft"] for p in self.pending.values() if p.tool == "fan_reply"}
+        for row in fan_chat.drafts(self.home):
+            if row["status"] not in ("DRAFT", "HELD") or row["draft_id"] in shown:
+                continue
+            offer = row.get("offer")
+            pid = "fc_" + secrets.token_hex(4)
+            self.pending[pid] = Pending(
+                pid, "fan_reply", {"draft": row["draft_id"]},
+                (f"Fan @{row['fan_handle']} wrote:\n{row['fan_text']}\n\n"
+                 + ("He wrote about harming himself. Read it and answer him yourself if you "
+                    "send this.\n\n" if row["status"] == "HELD" else "")
+                 + f"Her reply:\n{row['reply']}"
+                 + (f"\n\nWith a locked {offer['set']} picture at "
+                    f"${offer['price_cents'] / 100:.2f}." if offer else "")
+                 + "\n\nAccept: it is sent. Not now: it is dropped."),
+                _now(), preview=str(self.home / "artifacts" / "media" / offer["picture"])
+                if offer else None, click_only=bool(offer) or row["status"] == "HELD")
         return [p.public() for p in self.pending.values()
-                if p.tool in ("setup_step", "autopilot_answer", "fanvue_review")]
+                if p.tool in ("setup_step", "autopilot_answer", "fanvue_review", "fan_reply")]
+
+    def t_fan_reply(self, draft: str) -> dict[str, Any]:
+        from . import fan_chat
+        from .fanvue import FanvueClient
+        row = fan_chat.send(self.home, draft, FanvueClient(self.home), self.owner)
+        return {"done": True, "said": f"Sent to @{row['fan_handle']}."}
 
     def t_fanvue_approve(self, item: str) -> dict[str, Any]:
         from .fanvue import Queue
@@ -1631,6 +1658,9 @@ class Assistant:
         if not approve and p.tool == "fanvue_review":        # Not now on a picture = dropped
             from .fanvue import Queue
             Queue(self.home).decide(p.args["item"], False, by)
+        if not approve and p.tool == "fan_reply":            # Not now on a reply = dropped
+            from . import fan_chat
+            fan_chat.drop(self.home, p.args["draft"], by)
         if not approve and p.tool == "autopilot_answer":     # Not now on a question = no
             from . import autopilot
             autopilot.answer(self.home, p.args["task"], "no", by)

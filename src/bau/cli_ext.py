@@ -1188,6 +1188,11 @@ def cmd_autopilot(a):
             posted = fanvue.autopost_tick(home)
         except Exception as e:  # noqa: BLE001 - the autopilot's own work is already done
             posted = {"autopost": f"error: {e}"[:200]}
+        try:                              # fans' messages: drafted, sent if auto-send is on
+            from . import fan_chat
+            posted = {**posted, **fan_chat.tick(home)}
+        except Exception as e:  # noqa: BLE001
+            posted = {**posted, "chat": f"error: {e}"[:200]}
         from . import automaton
         alive = None
         if automaton.running(home):          # make money or die: count the money, then judge
@@ -1811,6 +1816,8 @@ def cmd_jarvis(a):
         print(f"Jarvis is up ({mode}). Open: {url}\nCtrl+C to stop.", file=sys.stderr)
     if not a.no_browser and not service:
         _open_browser(url)
+    from . import fan_chat  # fans' messages answered every few minutes
+    threading.Thread(target=fan_chat.watch, args=(jv.home,), daemon=True).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
@@ -2110,6 +2117,81 @@ def cmd_fanvue(a):
             return EXIT_BLOCKED
     elif a.fv_cmd == "sync":
         _out(fanvue.sync_earnings(bau_home(), fanvue.FanvueClient(), days=a.days))
+    elif a.fv_cmd == "chat":
+        return _fanvue_chat(a)
+    elif a.fv_cmd == "links":
+        return _fanvue_links(a)
+    elif a.fv_cmd == "welcome":
+        return _fanvue_welcome(a)
+    return EXIT_OK
+
+
+def _fanvue_chat(a):
+    from . import fan_chat, fanvue
+    home, c = bau_home(), a.ch_cmd or "list"
+    try:
+        if c == "run":
+            _out(fan_chat.tick(home))
+        elif c == "auto":
+            _out(fan_chat.set_auto(home, a.state == "on", _human()))
+        elif c == "list":
+            rows = fan_chat.drafts(home, None if a.all else "DRAFT")
+            _out(rows if a.all else rows + fan_chat.drafts(home, "HELD"))
+        elif c == "send":
+            _out(fan_chat.send(home, a.draft, fanvue.FanvueClient(home), _human()))
+        elif c == "drop":
+            _out(fan_chat.drop(home, a.draft, _human()))
+    except (fan_chat.ChatError, fanvue.FanvueError, PermissionError, ValueError) as e:
+        print(e, file=sys.stderr)
+        return EXIT_BLOCKED
+    return EXIT_OK
+
+
+def _fanvue_links(a):
+    """Tracking links: which platform brings fans and money (Fanvue counts it)."""
+    from . import fanvue
+    client = fanvue.FanvueClient()
+    try:
+        if a.add:
+            handle = client.me().get("handle", "")
+            row = client.add_tracking_link(a.add, a.platform)
+            row["share"] = f"https://www.fanvue.com/{handle}/{row.get('linkUrl', '')}"
+            AuditLog().append("fanvue.tracking_link", _human(), {"name": a.add,
+                                                                 "platform": a.platform})
+            _out(row)
+        else:
+            _out([{"name": r.get("name"), "platform": r.get("externalSocialPlatform"),
+                   "link": r.get("linkUrl"), "clicks": r.get("clicks"),
+                   "new_subscribers": (r.get("engagement") or {}).get("acquiredSubscribers"),
+                   "earned_gross_cents": (r.get("earnings") or {}).get("totalGross")}
+                  for r in client.tracking_links()])
+    except fanvue.FanvueError as e:
+        print(e, file=sys.stderr)
+        return EXIT_BLOCKED
+    return EXIT_OK
+
+
+def _fanvue_welcome(a):
+    """The welcome message new followers and subscribers get: shown, and set only on your y."""
+    from . import fan_chat, fanvue
+    client = fanvue.FanvueClient()
+    try:
+        if not a.text:
+            _out(client.automated_messages())
+            return EXIT_OK
+        text = a.text.strip()
+        if bad := fan_chat.problems("", text):
+            print("; ".join(bad), file=sys.stderr)
+            return EXIT_BLOCKED
+        print(f"New {a.trigger.replace('_', ' ')}s will get:\n\n{text}\n")
+        if input("Set it on Fanvue? [y/N] ").strip().lower() != "y":
+            print("Nothing changed.")
+            return EXIT_OK
+        _out(client.set_automated_message(a.trigger, text))
+        AuditLog().append("fanvue.welcome", _human(), {"trigger": a.trigger})
+    except fanvue.FanvueError as e:
+        print(e, file=sys.stderr)
+        return EXIT_BLOCKED
     return EXIT_OK
 
 
@@ -2939,6 +3021,31 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--per-day", type=int)
     x = fv.add_parser("sync", help="bring Fanvue's earnings into the ledger now")
     x.add_argument("--days", type=int, default=30)
+    x = fv.add_parser("chat", help="her replies to fans: drafted, checked, sent on your "
+                      "Accept or by auto-send (docs/FAN-CHAT.md)")
+    ch = x.add_subparsers(dest="ch_cmd")
+    ch.add_parser("run", help="read unread chats and draft replies now")
+    y = ch.add_parser("auto", help="you: she sends her replies by herself (on) or waits "
+                      "for your Accept (off)")
+    y.add_argument("state", choices=["on", "off"])
+    y = ch.add_parser("list", help="replies waiting for you")
+    y.add_argument("--all", action="store_true", help="every reply, sent and refused too")
+    y = ch.add_parser("send", help="you: send one waiting reply")
+    y.add_argument("draft")
+    y = ch.add_parser("drop", help="you: drop one waiting reply")
+    y.add_argument("draft")
+    x = fv.add_parser("links", help="tracking links: clicks, new subscribers and money per "
+                      "platform")
+    x.add_argument("--add", metavar="NAME", help="make a new link with this name")
+    x.add_argument("--platform", default="other",
+                   choices=["facebook", "instagram", "other", "reddit", "snapchat", "tiktok",
+                            "twitter", "youtube"])
+    x = fv.add_parser("welcome", help="the message new followers or subscribers get: shown; "
+                      "set with --text (asks y first)")
+    x.add_argument("--trigger", default="new_subscriber",
+                   choices=["new_subscriber", "new_follower", "re_subscribed",
+                            "new_free_trial", "subscription_canceled"])
+    x.add_argument("--text")
     s.set_defaults(fn=cmd_fanvue)
 
     s = sub.add_parser("connect", help="platform connections: state, pre-flight doctor, "
