@@ -24,6 +24,10 @@ Every 30 minutes the autopilot works through its queue, up to 20 jobs at a time:
 
 Each finished job can add the next one, so the work keeps going by itself.
 
+After a reboot or a crash, the next run frees any job the stopped run left "running": it is
+marked failed ("interrupted") and no longer counts as work on the way, so the feed keeps making
+pictures (2026-11-20; `docs/virtual-world/DEFECT-REGISTER.md`, D3).
+
 ## Point him at something
 
 Say **"look into local voice cloning"** (or "research ...", "find out about ..."). He:

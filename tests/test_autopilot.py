@@ -337,3 +337,42 @@ def test_jarvis_page_has_the_mind_and_the_autopilot_panel():
     page = (root / "jarvis.html").read_text()
     assert "function drawMind" in page and 'id="mindhud"' in page and "/api/autopilot" in page
     assert '"/api/autopilot"' in (root / "jarvis_server.py").read_text()
+
+
+def test_a_task_left_running_by_a_dead_run_is_freed(tmp_path):
+    # 2026-11-20 on the desktop: three draft tasks stayed "running" after a reboot (one for 40
+    # hours) and the feed, counting them as pictures on the way, made none.
+    import datetime as dt
+    t1 = A.add(tmp_path, "draft", "old, from before runs were recorded")
+    t2 = A.add(tmp_path, "draft", "a run on a previous boot")
+    t3 = A.add(tmp_path, "draft", "a run still alive")
+    t4 = A.add(tmp_path, "draft", "recent, from before runs were recorded")
+    st = A._load(tmp_path)
+    now = dt.datetime(2026, 11, 20, 20, 0, tzinfo=dt.UTC)
+    for t in st["tasks"]:
+        t["state"] = "running"
+    by = {t["id"]: t for t in st["tasks"]}
+    by[t1["id"]]["started"] = "2026-11-19T02:39:37+00:00"
+    by[t2["id"]].update(started="2026-11-20T19:00:00+00:00", run={"pid": 11, "boot": "old"})
+    by[t3["id"]].update(started="2026-11-20T19:00:00+00:00", run={"pid": 12, "boot": "b"})
+    by[t4["id"]]["started"] = "2026-11-20T19:00:00+00:00"
+    A._save(tmp_path, st)
+    freed = A.recover(tmp_path, now=now, boot="b", alive=lambda pid: pid == 12)
+    assert sorted(freed) == sorted([t1["id"], t2["id"]])
+    states = {t["id"]: t["state"] for t in A._load(tmp_path)["tasks"]}
+    assert states[t3["id"]] == states[t4["id"]] == "running"
+    assert "interrupted" in next(t for t in A._load(tmp_path)["tasks"]
+                                 if t["id"] == t1["id"])["note"]
+    assert A.recover(tmp_path, now=now, boot="b", alive=lambda pid: pid == 12) == []  # once
+
+
+def test_a_started_task_records_its_run(tmp_path):
+    import os
+    A.add(tmp_path, "scan", "x")
+    seen = {}
+
+    def handler(t):
+        seen.update(A._load(tmp_path)["tasks"][0])
+        return {"ok": True}
+    A.run(tmp_path, {"scan": handler}, max_steps=1)
+    assert seen["run"]["pid"] == os.getpid() and "boot" in seen["run"]

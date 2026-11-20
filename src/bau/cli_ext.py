@@ -1181,6 +1181,7 @@ def cmd_autopilot(a):
             return EXIT_OK
         from .assistant import load_env_file
         load_env_file()                   # an optional GITHUB_TOKEN raises GitHub's limit
+        A.recover(home)                   # before the feed counts work on the way
         seeded = J.seed(home)
         out = A.run(home, J.handlers(home), max_steps=a.steps)
         try:                              # the owner's Fanvue autopost, if he switched it on
