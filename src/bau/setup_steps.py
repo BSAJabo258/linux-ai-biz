@@ -73,8 +73,9 @@ STEPS = (
          "Developer Area and create an app; on its Authentication tab add the redirect "
          "http://127.0.0.1:3456/callback and turn on read:self, read:media, write:media, "
          "write:creator, write:post, read:insights, read:chat, write:chat, read:fan, "
-         "read:creator, read:tracking_links and write:tracking_links. Then press Accept: a terminal asks for "
-         "the app's Client ID and Client Secret (not shown as you paste), then Fanvue opens: "
+         "read:creator, read:tracking_links and write:tracking_links. Then press Accept: a "
+         "terminal asks for the app's Client ID and Client Secret (not shown as you paste), "
+         "then Fanvue opens: "
          "sign in and press Allow."),
     Step("fanvue", "Connect Fanvue",
          "So Jarvis can put Aria's pictures on Fanvue, count what she earns, and let her "
