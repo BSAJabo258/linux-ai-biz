@@ -34,12 +34,12 @@ A cut-away headquarters, seen from above at an angle, with doors between the roo
 |---|---|
 | Headquarters | Jarvis's core and console. An agent with nothing to do waits in its lounge; a task recorded but not started puts its agent here as **assigned** |
 | Research library | the researcher while her job runs, and Jarvis when her autopilot researches |
-| Studio | the producer while her job runs, and Jarvis when she drafts |
-| The Forge | any agent without a desk of its own, while its job runs |
+| Creative Studio | the producer while her job runs, and Jarvis when she drafts |
+| Development Forge | any agent without a desk of its own, while its job runs |
 | Testing lab | Jarvis when her autopilot tests a tool in the sandbox |
-| Innovation lab | Jarvis when her autopilot scans or inspects a project |
-| Finance, Market | built and furnished; no agent works there yet, so they stay empty |
-| Waiting for you | an agent whose job waits for your approval, or whose result failed the check |
+| Innovation Workshop | Jarvis when her autopilot scans or inspects a project |
+| Finance Office, Market | built and furnished; no agent works there yet, so they stay empty |
+| Review: waiting for you | an agent whose job waits for your approval, or whose result failed the check; with Delivered below it, the Delivery and Review Center |
 | Stopped | an agent whose job failed, was interrupted or paused |
 | Delivered | an agent whose job finished and passed the check, for 24 hours |
 
@@ -107,5 +107,6 @@ owner's prompts 2 to 5:
   history view, all from the same records (today: Agents, Current tasks, System status).
 - **Agents of their own** in Finance, Market, Testing and Innovation (today only Jarvis's
   autopilot uses Testing and Innovation).
-- **Art:** the rooms are drawn by code in one style; the owner's prompt 2 asks for a richer,
-  hand-made pixel-art environment (lighting, props, ambient animation) per room.
+- **Art:** prompt 2 furnished every room, added walkways, shadows and ambient lights
+  ([WORLD-ENVIRONMENT-QA.md](WORLD-ENVIRONMENT-QA.md)); it is still far less detailed than
+  the owner's painted references.
