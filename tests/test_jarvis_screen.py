@@ -448,3 +448,13 @@ def test_the_workstation_pops_up_every_confirm_runs_any_task_and_fills_the_scree
     assert 'apiJson("/api/ask", { text })' in page                          # Tell Jarvis
     assert "requestFullscreen()" in page and 'id="full"' in page
     assert "res.open" in page                                              # sign-in cards
+def test_the_anime_drawing_never_shows_not_even_while_her_portrait_loads():
+    # The owner, 2026-11-20: the anime woman "still pops up at the beginning ... weird and
+    # creepy". paintAvatar showed her until the portrait arrived.
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    body = page.split("function paintAvatar() {", 1)[1].split("\n}", 1)[0]
+    assert 'AVATAR.el.classList.remove("on");' in body and 'toggle("on"' not in body.split(
+        "AVATAR.el")[1].split("\n")[0]
+    assert '"ANIME"' not in page and 'AVATAR.mode = "anime"' not in page
