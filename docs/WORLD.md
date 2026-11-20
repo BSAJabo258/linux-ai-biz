@@ -43,9 +43,9 @@ console and a lounge, and the departments sit around it, each furnished for its 
 | Innovation lab | Jarvis when she scans or inspects a project |
 | Studio | the producer, and Jarvis when she drafts |
 | Finance, Market | no agent works here yet: they stay empty, and say so |
-| Waiting for you | an agent whose job waits for your approval |
+| Waiting for you | an agent whose job waits for your approval, or whose result failed the check |
 | Stopped | an agent whose job failed, was interrupted or paused |
-| Delivered | an agent whose job finished in the last 24 hours |
+| Delivered | an agent whose job finished and passed the check, in the last 24 hours |
 | Headquarters lounge | an agent with nothing to do |
 
 Every character is one of your agents (`bau agents list`), or Jarvis herself. Since
@@ -84,6 +84,8 @@ Jarvis, her autopilot's queue (`bau autopilot`).
 
 When that job changes, the character walks to its new room through the doors. Nothing walks
 for show:
+- **Assigned:** a task is recorded and given to her but has not started: she waits at
+  Headquarters. When it starts she walks to her department.
 - **Working:** the character uses its tool, its own desk screen lights up, and a green panel
   above it shows its real task.
 - **Waiting for you:** she raises a hand and shows "!".
@@ -94,7 +96,10 @@ for show:
 - **Reduced motion:** if it is turned on in your computer's settings, nothing moves.
 
 Clicking a character shows its record: task, status, model, last step, cost, errors and
-files made. For a running mission it also shows the exact command to stop it,
+files made, and **This task, step by step**: recorded, dispatched, working, the result (with
+the tools used), the check (every fact backed by what the tools returned), your review, and
+delivered. Each step says done, now, waiting for you, stopped or not needed, read from the
+job and its mission. The whole picture is in `docs/visual/BAUBSA-WORLD-PRODUCT-SPEC.md`. For a running mission it also shows the exact command to stop it,
 `bau mission cancel MISSION_ID`.
 
 The world only reads: it changes nothing.
