@@ -88,7 +88,7 @@ def test_jarvis_goes_where_his_autopilot_works(tmp_path):
 def test_rooms_say_who_works_there(tmp_path):
     w = world(tmp_path, NOW)
     who = {r["id"]: r["who"] for r in w["rooms"]}
-    assert who["finance"] == "no agent works here yet" and "researcher" in who["research"]
+    assert "finance agent" in who["finance"] and "researcher" in who["research"]
 
 
 # The owner's picture, 2026-11-17: his AI assistants are seven different women. An agent with

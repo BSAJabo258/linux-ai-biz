@@ -203,12 +203,12 @@ def test_jarvis_pops_every_waiting_step_up_once_and_accept_runs_it(tmp_path, mon
     monkeypatch.setattr(S, "_probe", b.probe)
     monkeypatch.setattr(S, "_terminal", b.terminal)
     j = Assistant(b.home)
-    first = j.setup_waiting()
+    first = [p for p in j.setup_waiting() if p["tool"] != "agent_approve"]
     assert [p["tool"] for p in first] == ["setup_step"] * 8
     assert "Accept" in first[0]["summary"] or first[0]["summary"]
     again = j.setup_waiting()                          # not stacked twice
     assert len([p for p in j.pending.values() if p.tool == "setup_step"]) == 8
-    assert {p["id"] for p in again} == {p["id"] for p in first}
+    assert {p["id"] for p in again if p["tool"] != "agent_approve"} == {p["id"] for p in first}
     nvidia = next(p for p in first if "NVIDIA" in p["summary"])
     with pytest.raises(PermissionError):
         j.confirm(nvidia["id"], True, "jarvis")          # only the owner accepts
@@ -238,7 +238,7 @@ def test_the_page_shows_them_when_jarvis_opens():
     text = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis_server.py").read_text()
     assert "setup_waiting()" in text
     page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
-    assert ('/^(setup_step|autopilot_answer|fanvue_review|fan_reply)$/'
+    assert ('/^(setup_step|autopilot_answer|fanvue_review|fan_reply|agent_approve|work_review)$/'
             '.test(showing.tool) ? "Accept"') in page
     # typed boxes on cards come filled in from Fanvue's advice, and the greeting never takes
     # the keyboard from them

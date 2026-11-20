@@ -19,6 +19,31 @@ Each new card also **pops up** over the workstation, with its picture and its ch
 
 **Tell Jarvis** (at the top) takes any request you would type in Jarvis's chat, and whatever he stages pops up at once. **FULL SCREEN** (top row) fills the screen; Esc leaves it.
 
+## The departments at work (2026-11-20)
+
+Four agents work for the company every day, each in its own room of the world:
+
+| Agent | Room | Daily work | Reads |
+|---|---|---|---|
+| finance | Finance Office | today's earnings report | the ledger and Fanvue records (`data.money`, `data.fanvue`) |
+| marketer | Market | this week's promotion plan | Fanvue activity, money, the web |
+| researcher | Research library | one new legitimate way to earn, with links | memory, the web |
+| producer | Creative Studio | three caption ideas for tomorrow | the Second Brain |
+
+How it runs, with nothing new to switch on:
+1. **Approve each agent once:** a card "New worker for your company" pops up (in Jarvis and
+   here). Accept approves that folder exactly as it is; if an update changes it, the card
+   asks again.
+2. Each morning the autopilot puts each approved agent's task in its inbox; the
+   productivity manager checks it (internal work only); a shift runs whenever work waits.
+3. The agent walks to its room in the world and works there; every tool goes through the
+   gateway; its result goes through the same fact check as a mission.
+4. **Work delivered** pops up with the report: checked (every fact backed by its tools) or
+   "not checked: read it carefully". Accept files it as good, Not now as not good enough.
+   The full draft is in your drafts folder.
+
+They only read and draft: no agent posts, sends, pays or signs anything.
+
 ## Health, death and the successor
 
 | What happened | Health |

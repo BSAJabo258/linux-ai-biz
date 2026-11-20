@@ -1,0 +1,22 @@
+# Each department's standing work (the owner, 2026-11-20: the women "don't move or get to
+# work"; "this is supposed to be highly efficient"). The autopilot puts each in its agent's
+# workstation inbox once per `every_hours`, only when the owner approved that agent folder;
+# the productivity manager still reviews every task (low-risk internal work only) and the
+# autopilot's shifts run it through the gateway. Objectives must not name outside effects
+# (workstation.EXTERNAL), or the manager holds them for the owner.
+- role: finance
+  kind: review
+  every_hours: 24
+  objective: Write today's earnings report from the ledger and the Fanvue records.
+- role: marketer
+  kind: research
+  every_hours: 24
+  objective: Plan this week's promotion for the creator from what was posted and what it earned.
+- role: researcher
+  kind: research
+  every_hours: 24
+  objective: Find one new legitimate way this business could earn, with evidence and a link for every fact.
+- role: producer
+  kind: draft
+  every_hours: 24
+  objective: Draft three caption ideas for tomorrow's Fanvue posts in the creator's voice.

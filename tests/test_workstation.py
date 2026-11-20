@@ -28,11 +28,12 @@ def test_a_good_delivery_raises_health_and_shows_a_drop_off(tmp_path):
     h = home(tmp_path)
     j = job(h)
     st = W.refresh(h)
-    w = st["workers"][0]
-    assert w["role"] == "producer" and w["health"] == 100
+    w = next(x for x in st["workers"] if x["role"] == "producer")
+    assert w["health"] == 100
     assert w["stats"]["delivered"] == 1
     assert any(e["kind"] == "delivered" and e["job"] == j.job_id for e in st["events"])
-    assert W.view_from(st, h)["workers"][0]["status"] == "delivering"
+    assert next(x for x in W.view_from(st, h)["workers"]
+                if x["role"] == "producer")["status"] == "delivering"
 
 
 def test_four_bad_jobs_retire_the_worker_and_spawn_a_successor_with_the_logs(tmp_path):
@@ -94,10 +95,11 @@ def test_a_shift_runs_approved_work_with_no_confirm_card(tmp_path):
 def test_autopilot_shift_is_queued_only_when_manager_work_waits(tmp_path):
     from bau import autopilot as A
     from bau import autopilot_jobs as J
-    h = home(tmp_path)
-    J.seed(h)
+    h = home(tmp_path, approved=False)
+    J.seed(h)                    # no approved agent: no standing work, no shift
     assert not any(t["kind"] == "workstation" for t in A._load(h)["tasks"])
     t = W.assign(h, "producer", "review the latest log", "human:owner")
-    assert t["status"] == "approved"
-    assert J.seed(h) >= 1
+    assert t["status"] != "approved"
+    AF.approve("producer", "human:owner", h)
+    J.seed(h)                    # approved: its standing task, and a shift to run work
     assert any(t["kind"] == "workstation" for t in A._load(h)["tasks"])

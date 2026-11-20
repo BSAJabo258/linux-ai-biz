@@ -14,6 +14,11 @@ from bau.models.providers import ScriptedProvider
 
 
 def make(home, script=None, **kw):
+    # The shipped agents are approved here, as the owner does once, so their approval cards
+    # (2026-11-20) do not stand in front of what these tests look at.
+    from bau import agentfolders as AF
+    for name in AF.names(home):
+        AF.approve(name, "human:owner", home)
     audit = AuditLog(home / "audit" / "chain.jsonl", key=b"")
     prov = ScriptedProvider(script=list(script)) if script is not None else None
     return Assistant(home, prov, {}, kw.pop("owner", "human:owner"), audit, **kw)
@@ -324,6 +329,9 @@ def test_slow_model_answers_as_a_job_the_page_checks_back_on(tmp_path, monkeypat
             return super().complete(*a, **kw)
 
     monkeypatch.setattr(jarvis_server, "QUICK_REPLY", 0.1)
+    from bau import agentfolders as AF  # approved once, as the owner does (2026-11-20)
+    for name in AF.names(tmp_path):
+        AF.approve(name, "human:owner", tmp_path)
     a = Assistant(tmp_path, Slow(script=["Here you are."]), {}, "human:owner",
                   AuditLog(tmp_path / "audit" / "chain.jsonl", key=b""))
     srv, _ = serve(a, Voice(tmp_path), 0, key="k123")

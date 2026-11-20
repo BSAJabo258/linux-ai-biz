@@ -354,7 +354,8 @@ def refresh(home: Path | None = None, now: dt.datetime | None = None) -> dict[st
     return st
 
 
-def assign(home: Path, role: str, objective: str, by: str, kind: str = "review") -> dict[str, Any]:
+def assign(home: Path, role: str, objective: str, by: str, kind: str = "review",
+           source_note: str = "") -> dict[str, Any]:
     """Put one piece of work in a role's inbox. The manager reviews it at once."""
     if not by.startswith(("human:", "process:autopilot")):
         raise PermissionError("only the owner or the autopilot assigns work")
@@ -366,7 +367,8 @@ def assign(home: Path, role: str, objective: str, by: str, kind: str = "review")
     st = refresh(home)
     if _living(st, role) is None:
         raise ValueError(f"no living worker for {role}")
-    _new_task(st, role, objective, kind, f"assigned by {by}")
+    _new_task(st, role, objective, kind, f"assigned by {by}" + (f" {source_note}"
+                                                                 if source_note else ""))
     review(st, home)
     _save(home, st)
     t = st["tasks"][-1]
@@ -418,7 +420,8 @@ def run_shift(home: Path | None = None, audit: Any = None, runner: Callable[...,
             task.update(status="done" if ok else
                         "review" if status == "COMPLETED" else "failed",
                         finished=_now(), source_job=checked["job_id"],
-                        result=(text if ok else checked["why_not_verified"] or text)[:600])
+                        result=(text if ok else checked["why_not_verified"] or text)[:600],
+                        report=text[:4000])   # what the owner reads on the delivered card
             linked = next((j for j in JobStore(home).all()
                            if j.job_id == checked["job_id"]), None)
             if linked is not None:
@@ -485,3 +488,23 @@ def view_from(st: dict[str, Any], home: Path) -> dict[str, Any]:
 def view(home: Path | None = None) -> dict[str, Any]:
     home = home or bau_home()
     return view_from(refresh(home), home)
+
+
+def delivered_unseen(home: Path | None = None) -> list[dict[str, Any]]:
+    """Finished work the owner has not looked at yet: done (checked) or waiting for review."""
+    st = _load(home or bau_home())
+    return [t for t in st["tasks"] if t["status"] in ("done", "review") and not t.get("seen")]
+
+
+def mark_seen(home: Path, task_id: str, by: str, kept: bool) -> dict[str, Any]:
+    """The owner read a delivered piece of work (kept: Accept, else Not now)."""
+    if not by.startswith("human:"):
+        raise PermissionError("only the owner files delivered work")
+    st = _load(home)
+    t = next((t for t in st["tasks"] if t["id"] == task_id), None)
+    if t is None:
+        raise KeyError(task_id)
+    t["seen"] = {"by": by, "at": _now(), "kept": bool(kept)}
+    _save(home, st)
+    _audit(home, "seen", by, {"task": task_id, "kept": bool(kept)})
+    return t
