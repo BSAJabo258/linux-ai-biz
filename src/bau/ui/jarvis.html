@@ -77,14 +77,24 @@ body[data-state="thinking"] #art.on .spine{animation-duration:1.4s;opacity:1}
   transform:translate(-50%,-50%) scale(calc(1 + var(--lvl,0)*.012));z-index:2;pointer-events:none;
   opacity:0;transition:opacity .45s}
 #avphoto.on{opacity:1}
-#avphoto img{display:block;width:100%;height:100%;object-fit:cover;border-radius:46% 46% 18% 18%/30% 30% 12% 12%;
-  -webkit-mask-image:radial-gradient(ellipse 72% 80% at 50% 40%,#000 58%,transparent 100%);
-  mask-image:radial-gradient(ellipse 72% 80% at 50% 40%,#000 58%,transparent 100%);
+/* An apparition, not a picture (the owner, 2026-11-20): light only. Screen blending drops her
+   dark background so the geometry shows through; the edges dissolve; she shimmers. */
+#avphoto{mix-blend-mode:screen}
+#avphoto.on{animation:av-apparition 7s ease-in-out infinite}
+#avphoto::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:repeating-linear-gradient(0deg,rgba(63,214,255,.07) 0 1px,transparent 1px 4px);mix-blend-mode:screen;
+  -webkit-mask-image:radial-gradient(ellipse 60% 70% at 50% 42%,#000 40%,transparent 85%);
+  mask-image:radial-gradient(ellipse 60% 70% at 50% 42%,#000 40%,transparent 85%)}
+@keyframes av-apparition{0%,100%{opacity:.88}38%{opacity:1}52%{opacity:.8}54%{opacity:.95}80%{opacity:.92}}
+@media (prefers-reduced-motion: reduce){#avphoto.on{animation:none;opacity:.82}}
+#avphoto img{display:block;width:100%;height:100%;object-fit:cover;
+  -webkit-mask-image:radial-gradient(ellipse 52% 64% at 50% 44%,#000 35%,rgba(0,0,0,.55) 62%,transparent 92%);
+  mask-image:radial-gradient(ellipse 52% 64% at 50% 44%,#000 35%,rgba(0,0,0,.55) 62%,transparent 92%);
   animation:av-photo-breathe 5.6s ease-in-out infinite;transform-origin:50% 90%;
-  filter:drop-shadow(0 0 calc(18px + var(--lvl,0)*40px) rgba(63,214,255,calc(.18 + var(--lvl,0)*.5)))
-    brightness(calc(1 + var(--lvl,0)*.08))}
-body[data-state="listening"] #avphoto img{filter:drop-shadow(0 0 26px rgba(255,179,64,.42))}
-body[data-state="thinking"] #avphoto img{filter:drop-shadow(0 0 28px rgba(169,139,255,.48)) saturate(.92)}
+  filter:contrast(1.3) saturate(.85) brightness(calc(.92 + var(--lvl,0)*.25))
+    drop-shadow(0 0 calc(18px + var(--lvl,0)*40px) rgba(63,214,255,calc(.18 + var(--lvl,0)*.5)))}
+body[data-state="listening"] #avphoto img{filter:contrast(1.3) saturate(.85) drop-shadow(0 0 26px rgba(255,179,64,.42))}
+body[data-state="thinking"] #avphoto img{filter:contrast(1.3) saturate(.75) drop-shadow(0 0 28px rgba(169,139,255,.48))}
 @keyframes av-photo-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.008) translateY(-1px)}}
 @media (prefers-reduced-motion: reduce){#avphoto img{animation:none}}
 body[data-state="listening"] #avatar{filter:drop-shadow(0 18px 28px rgba(0,0,0,.55)) drop-shadow(0 0 28px rgba(255,179,64,.34))}
@@ -856,16 +866,35 @@ function drawVortex(X, Y, R, now, dt) {
   cx.save(); cx.globalCompositeOperation = "lighter";
   const proj = (u, v) => { const rr = A + B * Math.cos(v), x = rr * Math.cos(u), y0 = B * Math.sin(v), z0 = rr * Math.sin(u);
     const y = y0 * ct - z0 * st, z = y0 * st + z0 * ct, sc = F / (F + z); return [X + x * sc, Y + y * sc, z]; };
-  // the form: 24 field lines, each a little circle round the ring, turning with it
-  for (let k = 0; k < 24; k++) { const u = spinU + k * 6.283 / 24;
-    for (let half = 0; half < 2; half++) {
-      const to = fx && AVATAR.on && half ? fx : cx;
-      to.strokeStyle = rgba(k % 3 ? col : GOLD, (k % 3 ? 0.1 : 0.2) + level * 0.18 + busy * 0.02); to.lineWidth = k % 3 ? 0.8 : 1.3;
-      to.beginPath(); let started = false;
-      for (let i = 0; i <= 48; i++) { const [px, py, z] = proj(u, i / 48 * 6.283);
-        if ((z < 0) !== !!half) { started = false; continue; }
-        if (started) to.lineTo(px, py); else { to.moveTo(px, py); started = true; } }
-      to.stroke(); } }
+  // the form: a Hopf fibration (the owner, 2026-11-20: "think multidimensional", no straight
+  // lines). Circles that live in four dimensions, each linked through every other: 3, 6 and 9
+  // of them on three tori. Two rotations at once in 4D (the two circulations) turn them
+  // inside out, inward and outward, up and down; stereographic projection brings them to 3D,
+  // the same tilt and perspective as the field brings them to the screen.
+  const a4 = now * 0.00021 * flow, b4 = now * 0.00013 * flow + Math.sin(now / 7000) * 0.4;
+  const ca = Math.cos(a4), sa = Math.sin(a4), cb = Math.cos(b4), sb = Math.sin(b4), HS = R * (AVATAR.on ? 1.05 : 0.8);
+  const hopf = (eta, d, t) => {
+    const x1 = Math.sin(eta) * Math.cos(t + d), x2 = Math.sin(eta) * Math.sin(t + d);
+    const x3 = Math.cos(eta) * Math.cos(t), x4 = Math.cos(eta) * Math.sin(t);
+    const y1 = x1 * ca - x4 * sa, y4 = x1 * sa + x4 * ca;          // turn in the x1-x4 plane
+    const y2 = x2 * cb - x3 * sb, y3 = x2 * sb + x3 * cb;          // and in the x2-x3 plane
+    const k = 1 / Math.max(0.12, 1 - y4);                          // stereographic, kept finite
+    const X3 = y1 * k * HS, Y3 = y3 * k * HS, Z3 = y2 * k * HS;
+    const y = Y3 * ct - Z3 * st, z = Y3 * st + Z3 * ct, sc = F / (F + z);
+    return [X + X3 * sc, Y + y * sc, z, k];
+  };
+  [[0.5, 3, GOLD], [0.79, 6, col], [1.1, 9, [169, 139, 255]]].forEach(([eta, n, c], ring) => {
+    for (let j = 0; j < n; j++) { const d = j * 6.283 / n + ring * 0.35;
+      for (let half = 0; half < 2; half++) {
+        const to = fx && AVATAR.on && half ? fx : cx;
+        to.strokeStyle = rgba(c, (ring ? 0.16 : 0.3) + level * 0.25 + busy * 0.03); to.lineWidth = ring ? 1 : 1.6;
+        to.beginPath(); let started = false, last = null;
+        for (let i = 0; i <= 96; i++) { const [px, py, z, k] = hopf(eta, d, i / 96 * 6.283);
+          const jump = last && Math.abs(px - last[0]) + Math.abs(py - last[1]) > R * 1.4;
+          if ((z < 0) !== !!half || k > 6 || jump) { started = false; last = [px, py]; continue; }
+          if (started) to.lineTo(px, py); else { to.moveTo(px, py); started = true; }
+          last = [px, py]; }
+        to.stroke(); } } });
   // the field: each point flows round its little circle (v) and the big one (u)
   for (const p of VORTEX.pts) {
     p.v += dt * 0.0011 * flow * p.s; p.u += dt * 0.00018 * flow * p.s;
@@ -885,10 +914,12 @@ function drawVortex(X, Y, R, now, dt) {
     p.px = px; p.py = py;
   }
   if (fx) fx.restore();
-  // above and below: the axis the field turns on
-  const g = cx.createLinearGradient(X, Y - R * 2.6, X, Y + R * 2.6);
-  g.addColorStop(0, rgba(GOLD, 0)); g.addColorStop(0.5, rgba(GOLD, 0.16 + level * 0.3)); g.addColorStop(1, rgba(GOLD, 0));
-  cx.strokeStyle = g; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(X, Y - R * 2.6); cx.lineTo(X, Y + R * 2.6); cx.stroke();
+  // above and below: two strands winding round the axis, one rising, one falling
+  for (const dir of [1, -1]) { cx.beginPath();
+    for (let i = 0; i <= 120; i++) { const t = i / 120, yy = Y + (t - 0.5) * R * 5.2, fade = Math.sin(t * Math.PI);
+      const xx = X + Math.sin(t * 18 + dir * now * 0.002 * flow) * R * 0.22 * fade;
+      i ? cx.lineTo(xx, yy) : cx.moveTo(xx, yy); }
+    cx.strokeStyle = rgba(dir > 0 ? GOLD : col, 0.18 + level * 0.3); cx.lineWidth = 1.4; cx.stroke(); }
   // the three rings: 3, 6 and 9 lobes, moved by the voice
   [[3, 1.95, 0.0007], [6, 2.08, -0.0011], [9, 2.21, 0.0016]].forEach(([n, f, w], j) => {
     cx.strokeStyle = rgba(j === 2 ? GOLD : col, 0.2 + level * 0.35); cx.lineWidth = 1.2; cx.beginPath();
@@ -899,11 +930,15 @@ function drawVortex(X, Y, R, now, dt) {
   const r9 = R * 2.42;
   cx.strokeStyle = rgba(col, 0.12); cx.lineWidth = 1; cx.beginPath(); cx.arc(X, Y, r9, 0, 6.283); cx.stroke();
   cx.setLineDash([6, 10]); cx.lineDashOffset = -now * 0.02 * flow; cx.strokeStyle = rgba(col, 0.38); cx.lineWidth = 1.3; cx.beginPath();
-  RODIN.concat(1).forEach((d, i) => { const [px, py] = ninePoint(d, X, Y, r9); i ? cx.lineTo(px, py) : cx.moveTo(px, py); });
+  const bow = (seq, k) => seq.forEach((d, i) => { const [px, py] = ninePoint(d, X, Y, r9);
+    if (!i) { cx.moveTo(px, py); return; }
+    const [qx, qy] = ninePoint(seq[i - 1], X, Y, r9), mx = (px + qx) / 2, my = (py + qy) / 2;
+    cx.quadraticCurveTo(X + (mx - X) * k, Y + (my - Y) * k, px, py); });
+  bow(RODIN.concat(1), 0.35);
   cx.stroke(); cx.setLineDash([]);
   const pulse = 0.25 + 0.25 * (1 + Math.sin(now * 0.003 * SPEED)) / 2 + level * 0.3;
   cx.strokeStyle = rgba(GOLD, pulse); cx.lineWidth = 1.6; cx.beginPath();
-  [3, 6, 9, 3].forEach((d, i) => { const [px, py] = ninePoint(d, X, Y, r9); i ? cx.lineTo(px, py) : cx.moveTo(px, py); });
+  bow([3, 6, 9, 3], 0.2 + 0.1 * Math.sin(now * 0.001 * SPEED));
   cx.stroke();
   cx.font = "600 " + Math.max(10, R * 0.16) + "px ui-monospace,monospace"; cx.textAlign = "center"; cx.textBaseline = "middle";
   for (let d = 1; d <= 9; d++) { const [px, py] = ninePoint(d, X, Y, r9 + R * 0.2), key = d % 3 === 0;

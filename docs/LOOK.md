@@ -189,6 +189,17 @@ Without that photo, she now wears her neon headquarters portrait (`bau world por
 neon --look jarvis`), else her desk portrait (`bau world portraits --look jarvis`), instead of
 the anime drawing (your ask, 2026-11-20). Both are already painted on your desktop.
 
+## Her apparition and the four-dimensional geometry (2026-11-20, later)
+
+She is an apparition now, not a framed picture: her portrait is drawn as light only (the dark
+parts vanish into the screen), her edges dissolve, faint scan lines run over her and she
+shimmers. Around and through her, a **Hopf fibration**: circles that live in four dimensions,
+each linked through every other, 3 on the inner torus, 6 on the middle and 9 on the outer. Two
+rotations at once in four dimensions (the two circulations) turn them inward and outward, up
+and down, while they flow in front of her and behind her. No straight lines: the doubling path
+and the 3-6-9 triangle are arcs bowing to the centre, and the axis is two strands winding up
+and down.
+
 ## The 3-6-9 vortex (2026-11-20)
 
 Round her, a torus of light: it rises through the middle and falls round the outside (the two
