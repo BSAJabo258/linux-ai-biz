@@ -12,8 +12,12 @@ with what really happened in BAU's job logs and shifts.
 At the top of the workstation, **Waiting for you** shows every card Jarvis holds for you, all
 at once: setup steps, Jarvis's questions and new Fanvue pictures (with the picture). Each has
 **Accept** and **Not now**, exactly like the card in Jarvis, and does the same thing. A card
-with choices to make (prices, limits, an audience) says **Answer in Jarvis** and opens Jarvis.
+with choices to make (prices, limits, an audience) opens in the pop-up.
 Not now on a picture drops it, as in Jarvis. The list refreshes every 15 seconds.
+
+Each new card also **pops up** over the workstation, with its picture and its choices (prices, limits, audience), so every confirm can be answered here; Accept stays locked until each choice is made. **Later** closes the pop-up and the card stays in the list.
+
+**Tell Jarvis** (at the top) takes any request you would type in Jarvis's chat, and whatever he stages pops up at once. **FULL SCREEN** (top row) fills the screen; Esc leaves it.
 
 ## Health, death and the successor
 
