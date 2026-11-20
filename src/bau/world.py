@@ -90,7 +90,8 @@ POSE = {"working": "working", "waiting for you": "waiting", "done": "done"}   # 
 # The roles in the owner's picture. BAU has an agent folder for some of them only: a role with
 # none is "not set up yet". Nothing here ever says "online": no record says it.
 PICTURE_ROLES = ("architect", "researcher", "developer", "tester", "coordinator")
-LIGHT = {"working": "working", "waiting for you": "waiting", "done": "done", "idle": "free"}
+LIGHT = {"working": "working", "waiting for you": "waiting", "done": "done", "idle": "free",
+         "assigned": "free"}
 # Jarvis's face on her screen (the owner's ask, 2026-11-18: "a real life looking AI model
 # replacing the orb"): a photographic portrait of an ORIGINAL fictional adult woman with
 # Jarvis's look, drawn on this computer. Never a real person or a celebrity's likeness.
@@ -109,7 +110,7 @@ AVATAR_NEGATIVE = ("child, childlike, minor, teen, young-looking, school uniform
 JOB_ROOM = {"scan": "innovation", "inspect": "innovation", "blueprint": "innovation",
             "sandbox_test": "testing", "research": "research", "learn": "research",
             "draft": "studio"}
-WORKING = {"PENDING", "RUNNING"}
+WORKING = {"RUNNING"}
 STOPPED = {"PAUSED", "WAITING_FOR_NETWORK", "INTERRUPTED", "FAILED", "ROLLED_BACK"}
 RECENT = dt.timedelta(hours=24)          # a finished job stays in its room this long
 QUIET = dt.timedelta(minutes=30)         # a running job with no checkpoint this long is flagged
@@ -127,15 +128,61 @@ def place(name: str, job: Any, now: dt.datetime) -> tuple[str, str]:
         return "hq", "idle"
     at = _when(job.updated_at)
     fresh = at is not None and now - at < RECENT
-    if job.status in WORKING:
+    if job.status == "PENDING":       # recorded and given to her, not started: at Headquarters
+        return "hq", "assigned"
+    if job.status in WORKING:         # started: she has walked to her department's desk
         return DESK.get(name, "forge"), "working"
-    if job.status == "WAITING_FOR_APPROVAL":
+    # Finished but its result failed the check: the owner reviews it, it is not delivered.
+    if job.status == "WAITING_FOR_APPROVAL" or (
+            job.status == "COMPLETED" and getattr(job, "verification", "") == "FAILED"):
         return "approvals", "waiting for you"
     if job.status in STOPPED:
         return "repair", job.status.lower().replace("_", " ")
     if job.status == "COMPLETED" and fresh:
         return "delivery", "done"
     return "hq", "idle"
+
+
+def lifecycle(job: Any, mission: dict[str, Any] | None) -> list[dict[str, str]]:
+    """The steps of one real task, each read from its job record and its mission, never
+    guessed (the owner's world spec, 2026-11-19): done, now, waiting (for the owner),
+    stopped, or not needed. Nothing here is a timer or an animation of its own."""
+    st, ver = job.status, getattr(job, "verification", "UNCHECKED")
+    ended = st in ("COMPLETED", "FAILED", "CANCELLED", "ROLLED_BACK")
+    started = st != "PENDING"
+    tools = ", ".join(getattr(job, "tools", []) or []) or "none recorded"
+
+    def step(name: str, state: str, detail: str) -> dict[str, str]:
+        return {"step": name, "state": state, "detail": detail}
+    out = [step("Recorded", "done", f"job {job.job_id}: {job.objective[:120]}"),
+           step("Dispatched", "done" if started else "now",
+                f"to {_agent_name(job.agent)}" if started else "waiting to start")]
+    if st in ("RUNNING",):
+        out.append(step("Working", "now", "at her desk; every tool through the gateway"))
+    elif started:
+        out.append(step("Working", "done" if ended else "stopped",
+                        st.lower().replace("_", " ")))
+    if st == "COMPLETED":
+        out.append(step("Result", "done", f"tools used: {tools}"))
+        out.append(step("Checked (manager)", {"VERIFIED": "done", "FAILED": "stopped"}.get(
+            ver, "not needed"), {"VERIFIED": "every fact backed by what the tools returned",
+                                 "FAILED": job.next_action or "a fact no tool backs",
+                                 }.get(ver, "this kind of job is not checked")))
+    elif ended:
+        out.append(step("Result", "stopped", "; ".join(job.errors[-1:]) or st.lower()))
+    if ended:
+        mst = (mission or {}).get("status")
+        if ver == "FAILED" or mst == "PAUSED":
+            out.append(step("Your review", "waiting",
+                            "read the result, then plan it again or drop it"))
+        elif st == "COMPLETED":
+            out.append(step("Your review", "not needed",
+                            "no outside effect: posting, money and the like always wait "
+                            "for your Accept"))
+        out.append(step("Delivered", "done" if st == "COMPLETED" and ver == "VERIFIED"
+                        else "stopped" if st != "COMPLETED" else "waiting",
+                        "in the mission's report" if job.mission_id else "kept with the job"))
+    return out
 
 
 def _agent_name(job_agent: str) -> str:
@@ -148,6 +195,8 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
     from .jobs import JobStore
     home = home or bau_home()
     now = now or dt.datetime.now(dt.UTC)
+    from .jarvis import _latest as latest_missions
+    missions = latest_missions(home)
     latest: dict[str, Any] = {}
     for job in JobStore(home).all():
         name = _agent_name(job.agent)
@@ -176,7 +225,10 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
                           "steps_done": len(job.completed_steps),
                           "steps_left": len(job.remaining_steps),
                           "cost_usd": round(job.cost_usd, 4), "errors": job.errors[-3:],
-                          "artifacts": job.artifacts[-5:], "next_action": job.next_action}
+                          "artifacts": job.artifacts[-5:], "next_action": job.next_action,
+                          "verification": getattr(job, "verification", "UNCHECKED"),
+                          "tools": list(getattr(job, "tools", []) or []),
+                          "lifecycle": lifecycle(job, missions.get(job.mission_id))}
             if state == "working" and at is not None and now - at > QUIET:
                 rec["quiet_minutes"] = int((now - at).total_seconds() // 60)
         rec["look"] = LOOK.get(name) or OTHER_LOOKS[zlib.crc32(name.encode()) % len(OTHER_LOOKS)]
@@ -193,7 +245,8 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
     return {"rooms": [{"id": r, "name": n, "who": w} for r, n, w in ROOMS], "agents": agents,
             "hold": held, "counts": counts, "at": now.isoformat(timespec="seconds"),
             "tasks": [{"agent": a["name"], "state": a["state"], "task": a["job"]["objective"]}
-                      for a in agents if a["job"] and a["state"] in ("working", "waiting for you")],
+                      for a in agents if a["job"] and a["state"] in ("assigned", "working",
+                                                                     "waiting for you")],
             "system": sys_, "roster": roster(home, agents, sys_),
             "now": {"state": me["state"], "task": me["job"]["objective"]}
             if me["job"] and me["state"] in ("working", "waiting for you") else None,

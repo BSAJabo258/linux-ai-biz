@@ -25,12 +25,18 @@ def approve(home):
     AF.approve("helper", "human:owner", home, AuditLog(home / "audit" / "chain.jsonl"))
 
 
-def ok(role, objective, home, audit):
-    return SimpleNamespace(status="COMPLETED", final_text="done: " + objective)
+# A shift runs the same path as a mission (jarvis.run_checked): its result must pass the same
+# check, so a good stand-in answers with a fact its tool really returned.
+def ok(role, objective, mission_id, job):
+    return SimpleNamespace(status="COMPLETED", final_text="Saved: https://example.com/caption-1",
+                           steps=1, cost_usd=0.0, injection_flags=0,
+                           tool_calls=[{"capability": "artifact.write_draft", "ok": True}],
+                           evidence=['{"saved": "https://example.com/caption-1"}'])
 
 
-def bad(role, objective, home, audit):
-    return SimpleNamespace(status="FAILED", final_text="it broke")
+def bad(role, objective, mission_id, job):
+    return SimpleNamespace(status="FAILED", final_text="it broke", steps=1, cost_usd=0.0,
+                           injection_flags=0, tool_calls=[], evidence=[])
 
 
 def test_a_worker_clocks_in_for_each_agent_folder(home):
@@ -81,13 +87,14 @@ def helper(st):
 
 def test_a_worker_that_keeps_failing_dies_and_its_successor_inherits(home):
     approve(home)
-    for _ in range(4):
+    for _ in range(3):
         W.assign(home, "helper", "draft a caption", "human:owner", kind="draft")
         W.run_shift(home, runner=bad)
-    assert helper(W.refresh(home))["health"] == 20          # 4 failures at -20 each
+    assert helper(W.refresh(home))["health"] == 25          # 3 failed jobs at -25 each
+    W.refresh(home, now=dt.datetime.now(dt.UTC) + dt.timedelta(days=1))     # a day idle: -4
     t = W.assign(home, "helper", "draft one more caption", "human:owner", kind="draft")
     assert t["status"] == "waiting_owner" and "health" in t["manager"]["reason"]
-    v = W.view_from(W.refresh(home, now=dt.datetime.now(dt.UTC) + dt.timedelta(days=6)),
+    v = W.view_from(W.refresh(home, now=dt.datetime.now(dt.UTC) + dt.timedelta(days=7)),
                     home)                                    # too weak to work, it fades
     assert v["graveyard"] and v["graveyard"][0]["id"] == "helper:1"
     heir = helper(v)

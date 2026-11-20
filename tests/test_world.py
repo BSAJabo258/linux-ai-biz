@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from bau.jobs import JobStore
-from bau.world import world
+from bau.world import LIGHT, world
 
 NOW = dt.datetime(2026, 11, 15, 12, 0, tzinfo=dt.UTC)
 
@@ -374,3 +374,11 @@ def test_the_page_lays_out_the_neon_headquarters_from_records():
     days = page.split("const HQ_DAYS = [")[1].split("];")[0]
     assert days.count('"') == 14 and "Tuesday" in days.split(",")[2]   # today's line, Sunday first
     assert "new Date().getDay()" in page
+
+
+def test_the_hq_roster_shows_a_recorded_job_not_yet_started_as_assigned(tmp_path):
+    job(tmp_path, "researcher", "PENDING")      # main's #207: recorded, not started = assigned
+    w = world(tmp_path, NOW)
+    state = {a["name"]: a["state"] for a in w["agents"]}["researcher"]
+    rows = {r["name"]: r for r in w["roster"]}
+    assert rows["researcher"] == {"name": "researcher", "state": state, "light": LIGHT[state]}

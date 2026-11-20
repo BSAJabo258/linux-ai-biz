@@ -9,6 +9,25 @@ through BAU's own code, ComfyUI and the real model (90 s at 512×512, 7 minutes 
 both on the processor). It has **not run on your desktop yet**. With the graphics card it
 should be much faster, but that has not been measured.
 
+## How long BAU waits for a picture (fixed 2026-11-20)
+
+ComfyUI draws one picture at a time; the others wait in its line. BAU now waits like this:
+
+- **While a picture waits in line:** up to an hour. After that BAU takes it out of the line
+  and says so.
+- **While it is being drawn:** up to 15 minutes for a safe-for-work picture, 45 for a Chroma
+  (levels 2 and 3) picture. On your desktop Chroma took 9 to 33 minutes a picture. After
+  that BAU stops that picture.
+- **Whenever BAU gives up** (or you press Ctrl-C), it takes its own picture back, and never
+  anyone else's.
+
+Before this, BAU gave up after 15 minutes counted from sending, so every Chroma picture and
+every picture that waited in line was given up, but ComfyUI still drew it for nobody, and the
+next run sent another. On 2026-11-20 the line held 15 of them. Pictures already in the line
+from before the fix still run; this fix only stops new ones from piling up.
+
+To see the line: `curl -s http://127.0.0.1:8188/queue`.
+
 ## Set it up once (the installed desktop)
 
 You need NVIDIA's driver first (docs/DESKTOP.md, `sudo bau-gpu-setup`), then the internet
