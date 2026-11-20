@@ -16,18 +16,41 @@ PNG = b"\x89PNG\r\n\x1a\nfake"
 
 
 class FakeComfy:
-    """Answers like ComfyUI's /prompt, /history/{id} and /view (server.py, read 2026-11-01)."""
+    """Answers like ComfyUI's /prompt, /history/{id}, /view, /queue and /interrupt (server.py,
+    read 2026-11-01 and 2026-11-20). ``ahead``: polls our job waits in line before it is drawn;
+    ``others``: someone else's job, drawing first."""
 
-    def __init__(self, polls_before_done=1):
-        self.jobs, self.left = [], polls_before_done
+    def __init__(self, polls_before_done=1, ahead=0, others=()):
+        self.jobs, self.left, self.ahead = [], polls_before_done, ahead
+        self.running, self.pending, self.calls = list(others), [], []
 
     def __call__(self, req, timeout=0):
         url = req.full_url
+        body = json.loads(req.data) if req.data else None
+        if url.endswith("/queue") and body is None:
+            if self.ahead:
+                self.ahead -= 1
+            elif "p1" in self.pending:                     # its turn: drawn now
+                self.pending.remove("p1")
+                self.running = ["p1"]
+            return _Resp({"queue_running": [[0, pid, {}, {}, []] for pid in self.running],
+                          "queue_pending": [[1, pid, {}, {}, []] for pid in self.pending]})
+        if url.endswith("/queue"):                         # POST {"delete": [...]}
+            self.calls.append(("delete", body["delete"]))
+            self.pending = [p for p in self.pending if p not in body["delete"]]
+            return _Resp({})
+        if url.endswith("/interrupt"):
+            self.calls.append(("interrupt", body.get("prompt_id")))
+            self.running = [p for p in self.running if p != body.get("prompt_id")]
+            return _Resp({})
         if url.endswith("/prompt"):
+            self.pending.append("p1")
             body = json.loads(req.data)
             self.jobs.append(body["prompt"])
             return _Resp({"prompt_id": "p1", "number": 0, "node_errors": {}})
         if "/history/p1" in url:
+            if self.ahead or "p1" in self.pending:
+                return _Resp({})
             if self.left:
                 self.left -= 1
                 return _Resp({})
@@ -203,3 +226,53 @@ def test_the_age_check_runs_on_the_processor_never_the_full_graphics_card():
     text = (Path(__file__).resolve().parents[1] / "src/bau/media/agecheck_run.py").read_text()
     assert 'os.environ["CUDA_VISIBLE_DEVICES"] = ""' in text and 'device="cpu"' in text
     assert text.index("CUDA_VISIBLE_DEVICES") < text.index("from transformers import")
+
+
+# The owner's desktop, 2026-11-20: Chroma took 9 to 33 minutes a picture; draw gave up after 15
+# minutes counted from sending, and left the job running for nobody. The line grew to 15 jobs.
+NEVER = 10 ** 9
+
+
+def _draw(tmp_path, fake, monkeypatch, **kw):
+    monkeypatch.setattr(comfy.time, "sleep", lambda s: None)
+    return comfy.draw(tmp_path, "a fictional adult, cafe", "pic", opener=fake, wait=60,
+                      checker=lambda p: {"20-29": 0.9}, **kw)
+
+
+def test_time_waiting_in_line_does_not_count_as_drawing_time(tmp_path, monkeypatch):
+    fake = FakeComfy(polls_before_done=3, ahead=40, others=["someone-elses"])   # 40 min in line
+    assert _draw(tmp_path, fake, monkeypatch, max_wait=600)["file"] == "pic.png"
+    assert fake.calls == []                                     # nothing taken back
+
+
+def test_a_picture_that_waits_too_long_in_line_leaves_the_line(tmp_path, monkeypatch):
+    fake = FakeComfy(ahead=NEVER, others=["someone-elses"])
+    with pytest.raises(comfy.ComfyError, match="taken out of the line"):
+        _draw(tmp_path, fake, monkeypatch, max_line=3600)
+    assert fake.calls == [("delete", ["p1"])] and fake.pending == []
+    assert fake.running == ["someone-elses"]                    # never someone else's job
+
+
+def test_a_picture_that_draws_too_long_is_stopped_not_left_running(tmp_path, monkeypatch):
+    fake = FakeComfy(polls_before_done=NEVER)
+    with pytest.raises(comfy.ComfyError, match="the job was stopped"):
+        _draw(tmp_path, fake, monkeypatch, max_wait=900)
+    assert fake.calls == [("interrupt", "p1")] and fake.running == []
+
+
+def test_chroma_gets_its_measured_time_and_sfw_keeps_fifteen_minutes(tmp_path, monkeypatch):
+    assert comfy.DRAW_EXPLICIT >= 33 * 60 and comfy.DRAW_SFW == 900
+    fake = FakeComfy(polls_before_done=33)                      # 33 minutes of drawing
+    assert _draw(tmp_path, fake, monkeypatch, lane="explicit")["file"] == "pic.png"
+    assert fake.calls == []
+
+
+def test_stopping_the_wait_takes_the_job_back(tmp_path, monkeypatch):
+    fake = FakeComfy(ahead=NEVER)
+
+    def stop(_s):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(comfy.time, "sleep", stop)
+    with pytest.raises(KeyboardInterrupt):
+        comfy.draw(tmp_path, "a fictional adult, cafe", "pic", opener=fake, wait=60)
+    assert fake.calls == [("delete", ["p1"])]

@@ -249,12 +249,63 @@ def _call(opener: Any, url: str, body: dict[str, Any] | None = None, raw: bool =
     return got if raw else json.loads(got or b"{}")
 
 
+# How long one picture may take once ComfyUI is drawing it, and how long it may wait in
+# ComfyUI's line before that. Chroma on the desktop's RTX 3060 took 9 to 33 minutes a picture
+# (bau-pictures journal, 2026-11-20: 548.97 s to 00:32:47); the old 15 minutes for everything,
+# counted from the moment the job was sent, gave up on every Chroma picture and on any picture
+# that waited in line, and left the job running for nobody: the line grew to 15.
+DRAW_SFW, DRAW_EXPLICIT, IN_LINE = 900.0, 2700.0, 3600.0
+
+
+def _cancel(opener: Any, base: str, pid: str) -> None:
+    """Take our own job back from ComfyUI: out of the line if it waits, stopped if it is being
+    drawn. Only ever this ``pid`` (server.py's POST /queue delete and POST /interrupt with a
+    prompt_id, read 2026-11-20 in /usr/local/comfyui/ComfyUI/server.py). Best effort: the reason
+    we gave up is what the caller hears."""
+    try:
+        q = _call(opener, f"{base}/queue")
+        if any(item[1] == pid for item in q.get("queue_pending", [])):
+            _call(opener, f"{base}/queue", {"delete": [pid]})
+        elif any(item[1] == pid for item in q.get("queue_running", [])):
+            _call(opener, f"{base}/interrupt", {"prompt_id": pid})
+    except Exception:  # noqa: BLE001 - ComfyUI gone: nothing is left to take back
+        pass
+
+
+def _await(opener: Any, base: str, pid: str, wait: float, max_draw: float,
+           max_line: float) -> dict[str, Any]:
+    """Wait for one job's picture. Time in ComfyUI's line counts against ``max_line``, time
+    being drawn against ``max_draw``."""
+    in_line = drawing = 0.0
+    step = max(wait, 0.001)
+    while True:
+        hist = _call(opener, f"{base}/history/{urllib.parse.quote(pid)}").get(pid)
+        if hist and hist.get("outputs"):
+            return hist
+        if hist and (hist.get("status") or {}).get("status_str") == "error":
+            raise ComfyError(f"ComfyUI failed the job: {hist['status']}")
+        q = _call(opener, f"{base}/queue")
+        if any(item[1] == pid for item in q.get("queue_pending", [])):
+            in_line += step
+            if in_line >= max_line:
+                raise ComfyError(f"still waiting in ComfyUI's line after {int(max_line)} s "
+                                 "(other pictures ahead); it was taken out of the line")
+        else:
+            drawing += step
+            if drawing >= max_draw:
+                raise ComfyError(f"no picture after {int(max_draw)} s of drawing; "
+                                 "the job was stopped")
+        time.sleep(wait)
+
+
 def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str = BASE,
-         opener: Any = None, wait: float = 2.0, max_wait: float = 900.0,
+         opener: Any = None, wait: float = 2.0, max_wait: float | None = None,
+         max_line: float = IN_LINE,
          checker: Any = None, negative: str = NEGATIVE, lane: str = "sfw",
          face: Path | None = None, lora: str | None = None, **size: int) -> dict[str, Any]:
     """Draw one picture into BAU_HOME/artifacts/media/NAME.png and record where it came from.
-    ``face``: the creator's locked face picture, used on the safe-for-work lane."""
+    ``face``: the creator's locked face picture, used on the safe-for-work lane. ``max_wait``:
+    seconds of drawing (by lane when not given); ``max_line``: seconds in ComfyUI's line."""
     if not LOCAL.match(base):
         raise ComfyError("pictures are drawn only by a model server on this computer")
     if not NAME.match(name or ""):
@@ -277,17 +328,14 @@ def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str 
         err = job.get("error")
         why = err.get("message") if isinstance(err, dict) else err
         raise ComfyError(f"ComfyUI refused the job: {why or job.get('node_errors')}")
-    pid, waited = job["prompt_id"], 0.0
-    while True:
-        hist = _call(opener, f"{base}/history/{urllib.parse.quote(pid)}").get(pid)
-        if hist and hist.get("outputs"):
-            break
-        if hist and (hist.get("status") or {}).get("status_str") == "error":
-            raise ComfyError(f"ComfyUI failed the job: {hist['status']}")
-        if waited >= max_wait:
-            raise ComfyError(f"no picture after {int(max_wait)} s")
-        time.sleep(wait)
-        waited += max(wait, 0.001)
+    pid = job["prompt_id"]
+    if max_wait is None:
+        max_wait = DRAW_EXPLICIT if lane == "explicit" else DRAW_SFW
+    try:
+        hist = _await(opener, base, pid, wait, max_wait, max_line)
+    except BaseException:                   # gave up, or stopped (Ctrl-C): never left behind
+        _cancel(opener, base, pid)
+        raise
     images = [i for o in hist["outputs"].values() for i in o.get("images", [])]
     if not images:
         raise ComfyError("ComfyUI finished without a picture")
