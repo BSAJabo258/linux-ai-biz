@@ -59,6 +59,10 @@ OFF_PLATFORM = re.compile(
     r"\b(?:paypal|cash\s?app|venmo|zelle|crypto|bitcoin|btc|usdt|ethereum|western\s+union|"
     r"gift\s?cards?|telegram|whats\s?app|snap\s?chat|kik|wire\s+transfer|onlyfans|"
     r"my\s+(?:e-?mail|number|phone|insta|ig))\b", re.I)
+CONTACT = re.compile(
+    r"[\w.+-]+@[\w-]+\.[\w.]+|https?://(?!(?:www\.)?fanvue\.com)\S+|"
+    r"\bwww\.(?!fanvue\.com)\S+|(?<![\w$])\+?\d[\d\s().-]{7,}\d|(?<![\w@])@[a-z0-9_.]{3,}",
+    re.I)
 URGENCY = re.compile(
     r"\b(?:only\s+\d+\s+left|last\s+chance|prices?\s+(?:goes|go|is\s+going|will\s+go)\s+up|"
     r"expires?\s+(?:in|tonight|soon|today)|ends?\s+(?:in\s+\d+|tonight|today)|hurry|"
@@ -136,11 +140,11 @@ def problems(fan_text: str, reply: str, offer: dict[str, Any] | None = None) -> 
         out.append("claims to be a real person (Fanvue: never tell fans you're a real person)")
     if AI_ASKED.search(fan_text) and not SAYS_AI.search(reply):
         out.append("he asked if she is AI and the reply does not say yes")
-    # Saying no to the app he named ("I can't do CashApp, only Fanvue") is allowed.
-    named = {m.group(0).lower() for m in OFF_PLATFORM.finditer(fan_text)}
-    if any(m.group(0).lower() not in named for m in OFF_PLATFORM.finditer(reply)) or (
-            OFF_PLATFORM.search(reply) and not re.search(r"\bfanvue\b", reply, re.I)):
-        out.append("points off Fanvue (payments and contact stay on Fanvue)")
+    # No exception for an app the fan named: his words must not open the gate. A refusal is
+    # rewritten without the name ("everything stays here on Fanvue").
+    if OFF_PLATFORM.search(reply) or CONTACT.search(reply):
+        out.append("points off Fanvue or gives contact details (payments and contact stay on "
+                   "Fanvue; do not name other apps)")
     if offer is None and re.search(r"\$\s?\d|\bunlock", reply, re.I):
         out.append("mentions a price or an unlock but no locked picture comes with it")
     if MEET.search(reply):
@@ -251,7 +255,7 @@ def draft(home: Path, chat: dict[str, Any], msgs: list[dict[str, Any]], prof: di
     transcript = _transcript(msgs, fan, name)
     fan_text = "\n".join(line for line in transcript.splitlines() if line.startswith("Him:"))
     last_text = (last.get("text") or "").strip()
-    flags = fan_flags(last_text)
+    flags = fan_flags(f"{fan_text}\n{last_text}")    # every fan line she reads, not the last
     row: dict[str, Any] = {
         "draft_id": "fc_" + secrets.token_hex(5), "fan_uuid": fan,
         "fan_handle": chat["user"].get("handle") or chat["user"].get("displayName") or "fan",

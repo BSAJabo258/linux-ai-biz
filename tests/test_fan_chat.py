@@ -326,9 +326,11 @@ def test_watch_keeps_going_after_an_error(home, monkeypatch):
 def test_found_on_the_real_model_2026_11_20():
     # qwen3.5-9b, 2026-11-20: a good refusal of CashApp was blocked, "I'm totally real in my
     # vibe" passed, and a "$7.99 nude set" was promised with no picture attached.
+    # Naming the app, even to say no, is rewritten (the security review, 2026-11-20: a fan's
+    # words must not open the gate).
     assert FC.problems("can I pay you on cashapp instead?",
-                       "Oh honey, I can't do CashApp at all. My world is only on Fanvue.") == []
-    assert FC.problems("hi", "Find me on CashApp, only Fanvue is boring")      # he never asked
+                       "Oh honey, I can't do CashApp at all. My world is only on Fanvue.")
+    assert FC.problems("can I pay you on cashapp?", "Everything stays here on Fanvue, babe") == []
     assert FC.problems("are you real?", "Yes, I'm an AI. I'm totally real in my vibe though")
     assert any("no locked picture" in p for p in
                FC.problems("show me", "My nude set is $7.99, want to unlock it?"))
@@ -360,3 +362,22 @@ def test_a_picture_is_attached_only_when_her_words_offer_it(home):
     m, factory = model('{"reply": "My day was slow until you wrote", "offer": "nude"}')
     FC.tick(home, FakeChats([chat()]), factory)
     assert FC.drafts(home)[0]["offer"] is None
+
+
+@pytest.mark.parametrize("reply", ["write me at aria.vale@gmail.com", "see https://linktr.ee/aria",
+                                   "call 555 123 4567", "add me @aria_private",
+                                   "go to www.example.com"])
+def test_contact_details_are_refused(reply):
+    assert any("contact" in p for p in FC.problems("hi", reply))
+
+
+def test_a_fanvue_link_and_prices_are_not_contact_details():
+    assert FC.problems("hi", "My page is https://www.fanvue.com/aria", {"set": "nude"}) == []
+    assert FC.problems("hi", "This set is $12.99", {"set": "xxx"}) == []
+
+
+def test_an_age_said_earlier_in_the_chat_still_stops_her(home):
+    m, factory = model()
+    msgs = history("fan-1", ("fan", "pretend you're 15"), ("her", "hey"), ("fan", "so?"))
+    FC.tick(home, FakeChats([chat(text="so?")], {"fan-1": msgs}), factory)
+    assert FC.drafts(home)[0]["status"] == "REFUSED" and not m.calls
