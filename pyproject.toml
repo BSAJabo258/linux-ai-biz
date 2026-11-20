@@ -29,7 +29,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 bau = ["data/*.yaml", "data/**/*.yaml", "data/**/*.json", "data/**/*.txt", "data/**/*.md",
-       "data/setup/*.sh", "data/hq/*.conf", "data/hq/*.service",
+       "data/setup/*.sh", "data/hq/*.conf", "data/hq/*.service", "data/hq/*.rules",
        "ui/*.html", "ui/*.svg", "ui/art/*.jpg",
        "ui/world/*.png", "ui/world/*.json"]
 
