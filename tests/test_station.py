@@ -473,11 +473,16 @@ def test_remote_desktop_opens_3389_to_the_home_network_only_and_closes_again():
         assert S.with_remote_desktop(on) == on                       # added once
         assert S.without_remote_desktop(on) == base                  # and taken away
     assert "tcp dport 3389" not in S.firewall() and "tcp dport 3389" in S.firewall(True)
-    nft = shutil.which("nft")
+    nft = shutil.which("nft") or ("/usr/sbin/nft" if Path("/usr/sbin/nft").exists() else None)
     if nft:
-        r = subprocess.run([nft, "-c", "-f", "-"], input=S.firewall(True), capture_output=True,
-                           text=True)
-        if "not permitted" in r.stderr.lower():
+        # nft -c needs network admin rights; a private user and network namespace gives them
+        # without root (checked on the desktop 2026-11-20: a planted typo fails there).
+        cmd = [nft, "-c", "-f", "-"]
+        r = subprocess.run(cmd, input=S.firewall(True), capture_output=True, text=True)
+        if "not permitted" in r.stderr.lower() and shutil.which("unshare"):
+            r = subprocess.run(["unshare", "-rn", *cmd], input=S.firewall(True),
+                               capture_output=True, text=True)
+        if "not permitted" in r.stderr.lower() or r.returncode and "unshare" in r.stderr:
             pytest.skip("nft -c needs privileges here")
         assert r.returncode == 0, r.stderr
 
