@@ -92,6 +92,58 @@ def _now() -> str:
     return dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
 
 
+# A task left "running" by a run that died (a reboot or a crash) used to stay running forever:
+# on 2026-11-20 three of them held the creator feed at "enough pictures on the way" and it made
+# none (docs/virtual-world/DEFECT-REGISTER.md, D3). Each running task now records its run;
+# tasks from before that are freed after LEGACY_STALE_S (a picture may take 1 h 45 min).
+LEGACY_STALE_S = 3 * 3600
+
+
+def _boot_id() -> str:
+    try:
+        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    except OSError:
+        return ""
+
+
+def _alive(pid: int) -> bool:
+    try:
+        cmd = Path(f"/proc/{int(pid)}/cmdline").read_bytes()
+    except (OSError, ValueError):
+        return False
+    return b"bau" in cmd
+
+
+def recover(home: Path, now: dt.datetime | None = None, boot: str | None = None,
+            alive: Callable[[int], bool] = _alive) -> list[str]:
+    """Free running tasks whose run is gone: marked failed ("interrupted"), audited, no
+    longer counted as work on the way. Returns their ids."""
+    now = now or dt.datetime.now(dt.UTC)
+    boot = _boot_id() if boot is None else boot
+    st = _load(home)
+    freed = []
+    for t in st["tasks"]:
+        if t["state"] != "running":
+            continue
+        run = t.get("run") or {}
+        if run:
+            gone = run.get("boot") != boot or not alive(run.get("pid", 0))
+        else:
+            try:
+                age = (now - dt.datetime.fromisoformat(t["started"])).total_seconds()
+            except (KeyError, TypeError, ValueError):
+                age = LEGACY_STALE_S
+            gone = age >= LEGACY_STALE_S
+        if gone:
+            t["state"], t["finished"] = "failed", now.isoformat(timespec="seconds")
+            t["note"] = "interrupted: the run working on it stopped (a reboot or a crash)"
+            freed.append(t["id"])
+    if freed:
+        _save(home, st)
+        _audit(home, "recovered", "autopilot", {"tasks": freed})
+    return freed
+
+
 def _audit(home: Path, event: str, who: str, data: dict[str, Any]) -> None:
     AuditLog(home / "audit" / "chain.jsonl").append(f"autopilot.{event}", who, data)
 
@@ -184,7 +236,9 @@ def step(home: Path, handlers: dict[str, Handler]) -> dict[str, Any] | None:
         _save(home, st)
         _audit(home, "blocked", "autopilot", {"task": t["id"], "note": t["note"]})
         return {"task": t["id"], "state": t["state"]}
+    import os
     t["state"], t["started"] = "running", _now()
+    t["run"] = {"pid": os.getpid(), "boot": _boot_id()}
     _save(home, st)
     try:
         out = fn(t) or {}
@@ -197,6 +251,7 @@ def step(home: Path, handlers: dict[str, Handler]) -> dict[str, Any] | None:
 def run(home: Path, handlers: dict[str, Handler], max_steps: int = MAX_STEPS
         ) -> dict[str, Any]:
     done = []
+    recover(home)
     for _ in range(max_steps):
         r = step(home, handlers)
         if r is None:
