@@ -476,8 +476,9 @@ def video_frames(clip: Path, out: Path) -> list[Path]:
     """Every frame of the clip as a picture for the age check (ffmpeg, no frame skipped: the
     security review of 2026-11-21 found one a second left most frames unchecked)."""
     out.mkdir(parents=True, exist_ok=True)
-    run = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-fps_mode", "passthrough",
-                          str(out / "f%05d.png")], capture_output=True, text=True, timeout=600)
+    run = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clip),
+                          "-fps_mode", "passthrough", str(out / "f%05d.png")],
+                         capture_output=True, text=True, timeout=600)
     if run.returncode != 0:
         raise OSError((run.stderr or "ffmpeg failed").strip()[-300:])
     frames = sorted(out.glob("f*.png"))
