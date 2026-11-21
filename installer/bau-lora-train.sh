@@ -68,7 +68,8 @@ while IFS= read -r -d '' png; do
 done < <(as_bau find "${DATA}" -maxdepth 1 -type f -name '*.png' -print0)
 
 say "1/4 the trainer (sd-scripts ${SD_COMMIT:0:8})..."
-install -d -o comfyui -g comfyui "${APP}" "${WORK}"
+install -d -o comfyui -g comfyui "${APP}"   # its own folder, in root's /usr/local: safe
+as_comfy mkdir -p "${WORK}"                  # inside it, comfyui's: never root (2026-11-21)
 if [[ ! -d ${SRC}/.git ]]; then
   runuser -u comfyui -- git clone --quiet "${SD_REPO}" "${SRC}"
 fi
