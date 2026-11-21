@@ -13,10 +13,12 @@ to skip it for this time. A step that is done does not come back.
 | Bring in the current rules | Swaps in the rules that came with your newest BAU (creator, Michigan, Fanvue). The old copy is kept beside it as `regulations.before-DATE` |
 | Install NVIDIA's driver | Opens a terminal running `sudo bau-gpu-setup`. Type your password there, then restart when it says |
 | Set up pictures on this computer | Opens a terminal running the pictures setup (about 10 GB download, once). It shows up only after NVIDIA's driver works |
+| Start the picture maker | Shown only when pictures are set up but not running (no new pictures, no posts). Opens a terminal running `sudo systemctl start bau-pictures.service`; no download |
 | Make room for Jarvis | Shown only while the system part of the disk is over 85% full. Opens a terminal running the make-room script: the big folders move into `/home` and are linked back (docs/MAKE-ROOM.md) |
 | Set up private web search | Opens a terminal running the search setup |
 | Turn on nightly updates | Opens a terminal running `sudo bau update auto` |
 | Let Jarvis work on his own | Opens a terminal that switches on the autopilot timer (docs/AUTOPILOT.md) |
+| Create her profile | Shown only when there is no creator profile on this computer (until then every Fanvue card stays hidden). Puts the starter profile in place, as `bau creator init` does: Aria Vale, a fictional adult (25), AI disclosure on. No terminal |
 | Connect Fanvue | Opens a terminal running `bau fanvue login`; Fanvue opens in the browser, you sign in and press Allow. Shown only once your Fanvue app's keys are on this computer (docs/FANVUE.md) |
 | Let Jarvis post to Fanvue on his own | Your switch, on the card: who sees the posts and how many a day. Then the autopilot posts queued posts by itself (docs/FANVUE.md). Shown once Fanvue is connected |
 | Write your explicit limits | A box on the card: type what explicit (Fanvue-only) content must never show, one limit per line. Anything about minors is refused. Until you write them, Jarvis plans sfw content only |

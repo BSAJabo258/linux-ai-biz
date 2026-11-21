@@ -29,7 +29,8 @@ class Box:
         (self.home / "creators" / "aria.yaml").write_text(yaml.safe_dump(prof))
         self.facts = {"nvidia": nvidia, "driver": driver, "pictures": pictures,
                       "search": search, "update": update, "autopilot": autopilot,
-                      "room": False, "explicit": False}
+                      "room": False, "explicit": False,
+                      "pictures_installed": pictures, "pictures_running": pictures}
         self.opened = []
 
     def probe(self, what):
@@ -393,3 +394,23 @@ def test_a_sign_in_from_before_fan_chat_brings_the_connect_card_back(box, monkey
     f.write_text(json.dumps(tok))
     assert "fanvue" in ids(box)
     assert "nothing to type" in S.BY_ID["fanvue"].why
+
+
+def test_no_profile_gets_a_card_and_accept_puts_the_starter_in_place(tmp_path):
+    """Found 2026-11-21: without a profile every Fanvue card stayed hidden, with no card."""
+    b = Box(tmp_path)
+    (b.home / "creators" / "aria.yaml").unlink()
+    assert "creator" in ids(b) and "fanvue_app" not in ids(b)
+    out = S.run("creator", b.home, probe=b.probe, terminal=b.terminal, owner="human:owner")
+    assert out["done"] and (b.home / "creators" / "aria.yaml").is_file() and not b.opened
+    assert "creator" not in ids(b) and "fanvue_app" in ids(b)
+
+
+def test_pictures_installed_but_stopped_get_a_start_card(tmp_path):
+    b = Box(tmp_path, driver=True, pictures=True)
+    assert "pictures_start" not in ids(b)                    # running
+    b.facts["pictures_running"] = False
+    assert "pictures" not in ids(b) and "pictures_start" in ids(b)
+    S.run("pictures_start", b.home, probe=b.probe, terminal=b.terminal, owner="human:owner")
+    assert b.opened[-1][1] == "sudo systemctl start bau-pictures.service"
+    assert "pictures_start" not in ids(Box(tmp_path / "x", driver=False, pictures=True))

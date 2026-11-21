@@ -27,8 +27,12 @@ an autopilot kind), with a test in `tests/test_world.py`. Never invent a state o
 - Zoom and move: `W_VIEW` (wheel zoom where you point, 1x to 3.5x; drag to move;
   double-click resets). Clicking a character inverts that view to find it.
 - The panel on the right (`worldInfo`) shows the record: task, status, model, last step,
-  cost, errors, files made, and the exact `bau mission cancel` command. Controls that change
-  something stay with the owner's own commands and cards; the world only reads.
+  cost, errors, files made, and the exact `bau mission cancel` command.
+- Controls (2026-11-21, `workPanel`): her workstation record from `/api/world` (`rec["work"]`,
+  read from the saved state only, never `W.view`, which ages workers), her cards
+  (`pending[].about`), give work (`/api/workstation/assign`), run a shift, remove a held task
+  (`/api/workstation/withdraw`). Every change goes through the workstation's own functions
+  and the confirm box (`focusCard`); the floor's drawing still only shows records.
 
 ## Rules
 

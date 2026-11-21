@@ -207,6 +207,7 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
         if old is None or (job.updated_at or "") >= (old.updated_at or ""):
             latest[name] = job
     agents = []
+    desk = _desk(home)
     names = AF.names(home)
     for name in names + sorted(set(latest) - set(names)):
         try:
@@ -234,6 +235,7 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
                           "lifecycle": lifecycle(job, missions.get(job.mission_id))}
             if state == "working" and at is not None and now - at > QUIET:
                 rec["quiet_minutes"] = int((now - at).total_seconds() // 60)
+        _workstation(rec, desk, name)
         rec["look"] = LOOK.get(name) or OTHER_LOOKS[zlib.crc32(name.encode()) % len(OTHER_LOOKS)]
         agents.append(rec)
     agents.insert(0, jarvis(home, now))
@@ -247,13 +249,59 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
     me = agents[0]
     return {"rooms": [{"id": r, "name": n, "who": w} for r, n, w in ROOMS], "agents": agents,
             "hold": held, "counts": counts, "at": now.isoformat(timespec="seconds"),
-            "tasks": [{"agent": a["name"], "state": a["state"], "task": a["job"]["objective"]}
-                      for a in agents if a["job"] and a["state"] in ("assigned", "working",
-                                                                     "waiting for you")],
+            "tasks": [{"agent": a["name"], "state": a["state"],
+                       "task": a["job"]["objective"] if a["job"] else a["work"]["now"]}
+                      for a in agents if (a["job"] or (a.get("work") or {}).get("now"))
+                      and a["state"] in ("assigned", "working", "waiting for you")],
             "system": sys_, "roster": roster(home, agents, sys_),
             "now": {"state": me["state"], "task": me["job"]["objective"]}
             if me["job"] and me["state"] in ("working", "waiting for you") else None,
             "how_to_read": "each character is an agent; her room is her latest job's state"}
+
+
+def _desk(home: Path) -> dict[str, Any]:
+    """The workstation's saved state, read only (its own view also ages and retires workers,
+    which a screen refreshing every few seconds must never do)."""
+    from . import workstation as W
+    return W._load(home)
+
+
+# A workstation task moves its agent only when her job log says nothing stronger: running work
+# at her desk, work for the owner in Review, recorded work at Headquarters (2026-11-21: the
+# world showed "idle" while the workstation had her report waiting for the owner).
+TASK_PLACE = {"running": ("working", 0), "review": ("waiting for you", 1),
+              "waiting_owner": ("waiting for you", 1), "done": ("waiting for you", 1),
+              "approved": ("assigned", 2), "queued": ("assigned", 2)}
+
+
+def _workstation(rec: dict[str, Any], st: dict[str, Any], name: str) -> None:
+    worker = next((w for w in st.get("workers", []) if w["role"] == name), None)
+    tasks = [t for t in st.get("tasks", []) if t["role"] == name and (
+        t["status"] in ("queued", "approved", "waiting_owner", "running", "review")
+        or (t["status"] == "done" and not t.get("seen")))]
+    rec["work"] = {
+        "worker": {k: worker[k] for k in ("name", "health", "generation", "status")}
+        | {"mood": _mood(worker["health"])} if worker else None,
+        "tasks": [{"id": t["id"], "objective": t["objective"], "kind": t["kind"],
+                   "state": t["status"], "reason": (t.get("manager") or {}).get("reason", ""),
+                   "report": (t.get("report") or t.get("result") or "")[:4000]
+                   if t["status"] in ("done", "review") else ""} for t in tasks],
+        "now": None}
+    best = min(tasks, key=lambda t: TASK_PLACE[t["status"]][1], default=None)
+    if best is None or rec["state"] not in ("idle", "assigned", "done"):
+        return
+    state = TASK_PLACE[best["status"]][0]
+    if state == "assigned" and rec["state"] == "done":
+        return                                    # just delivered: she stays at the outbox
+    rec["state"] = state
+    rec["room"] = {"working": DESK.get(name, "forge"), "waiting for you": "approvals",
+                   "assigned": "hq"}[state]
+    rec["work"]["now"] = best["objective"][:300]
+
+
+def _mood(health: int) -> str:
+    from .workstation import _mood as mood
+    return mood(health)
 
 
 def roster(home: Path, agents: list[dict[str, Any]], sys_: dict[str, Any]) -> list[dict[str, Any]]:

@@ -304,7 +304,10 @@ def _retire(st: dict[str, Any], worker: dict[str, Any], home: Path, now: str,
            {"dead": worker["id"], "successor": successor["id"], "tasks": len(moved)})
 
 
-def decay(st: dict[str, Any], now: str) -> None:
+def decay(st: dict[str, Any], now: str, home: Path) -> None:
+    """A day without work costs health; but a worker whose folder the owner has not approved
+    yet is not on the job, and a critical one told to rest gets its rest back up to the work
+    threshold (found 2026-11-21: both faded to 0 and died with no card ever shown)."""
     at = dt.datetime.fromisoformat(now)
     for w in st["workers"]:
         try:
@@ -313,7 +316,14 @@ def decay(st: dict[str, Any], now: str) -> None:
             last = at
         days = max(0.0, (at - last).total_seconds() / 86400)
         if days >= 1:
-            w["health"] = max(0, int(w["health"]) - int(days * IDLE_DECAY_PER_DAY))
+            step = int(days * IDLE_DECAY_PER_DAY)
+            health = int(w["health"])
+            if _approval(w["role"], home)[0] != "approved":
+                pass
+            elif health < LOW_HEALTH:
+                w["health"] = min(LOW_HEALTH, health + step)
+            else:
+                w["health"] = max(LOW_HEALTH, health - step)
             w["last_tick"] = now
 
 
@@ -321,8 +331,10 @@ def review(st: dict[str, Any], home: Path) -> None:
     for t in st["tasks"]:
         # A task parked only because its agent folder was not approved yet is looked at
         # again, so the owner's one `bau agents approve` lets the work go on by itself.
-        parked = t["status"] == "waiting_owner" and \
-            str((t.get("manager") or {}).get("reason", "")).startswith("agent folder ")
+        # So is one parked only to let its worker rest: rested, it goes on.
+        reason = str((t.get("manager") or {}).get("reason", ""))
+        parked = t["status"] == "waiting_owner" and reason.startswith(
+            ("agent folder ", "health is below"))
         if t["status"] != "queued" and not parked:
             continue
         worker = _living(st, t["role"])
@@ -346,7 +358,7 @@ def refresh(home: Path | None = None, now: dt.datetime | None = None) -> dict[st
     stamp = _now(now)
     st = _load(home)
     ensure_roster(st, home, stamp)
-    decay(st, stamp)
+    decay(st, stamp, home)
     process_jobs(st, home, stamp)
     reap(st, home, stamp)
     review(st, home)
@@ -496,6 +508,23 @@ def delivered_unseen(home: Path | None = None) -> list[dict[str, Any]]:
     return [t for t in st["tasks"] if t["status"] in ("done", "review") and not t.get("seen")]
 
 
+def withdraw(home: Path, task_id: str, by: str) -> dict[str, Any]:
+    """The owner takes back a task that waits for him (found 2026-11-21: a task held for its
+    outside effect sat in the inbox for good, its worker "waiting for you" with nothing to
+    press). Agents only read and draft, so a held task is never forced through; it is removed,
+    and the owner can give her the drafting part instead."""
+    if not by.startswith("human:"):
+        raise PermissionError("only the owner removes a task")
+    st = _load(home)
+    t = next((t for t in st["tasks"] if t["id"] == task_id), None)
+    if t is None or t["status"] not in ("waiting_owner", "queued", "approved"):
+        raise ValueError(f"{task_id} is not waiting; only work not started can be removed")
+    t.update(status="withdrawn", finished=_now(), result=f"removed by {by}")
+    _save(home, st)
+    _audit(home, "withdrawn", by, {"task": task_id, "role": t["role"]})
+    return t
+
+
 def mark_seen(home: Path, task_id: str, by: str, kept: bool) -> dict[str, Any]:
     """The owner read a delivered piece of work (kept: Accept, else Not now)."""
     if not by.startswith("human:"):
@@ -505,6 +534,10 @@ def mark_seen(home: Path, task_id: str, by: str, kept: bool) -> dict[str, Any]:
     if t is None:
         raise KeyError(task_id)
     t["seen"] = {"by": by, "at": _now(), "kept": bool(kept)}
+    if t["status"] == "review":
+        # Filed by the owner: no longer open, so the department's next standing task can
+        # come (found 2026-11-21: one filed review stopped that department for good).
+        t["status"] = "filed"
     _save(home, st)
     _audit(home, "seen", by, {"task": task_id, "kept": bool(kept)})
     return t

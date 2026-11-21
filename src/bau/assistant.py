@@ -317,7 +317,9 @@ class Pending:
 
     def public(self) -> dict[str, Any]:
         return {"id": self.id, "tool": self.tool, "summary": self.summary, "form": self.form,
-                "preview": bool(self.preview), "voice": self.voice()}
+                "preview": bool(self.preview), "voice": self.voice(),
+                # which agent or item it is about, so the world can put it on her panel
+                "about": {k: v for k, v in self.args.items() if k in ("agent", "task")}}
 
 
 @dataclass
@@ -408,6 +410,12 @@ class Assistant:
             "fan_reply": Tool("fan_reply", "The owner sends a drafted reply to a fan.",
                               _schema({"draft": {"type": "string"}}), self.t_fan_reply,
                               kind="confirm"),
+            "governor_finding": Tool("governor_finding", "The owner has seen a problem.",
+                                     _schema({"finding": {"type": "string"}}),
+                                     self.t_governor_finding, kind="confirm"),
+            "fanvue_drop": Tool("fanvue_drop", "The owner sends this week's Fanvue drop.",
+                                _schema({"drop": {"type": "string"}}), self.t_fanvue_drop,
+                                kind="confirm"),
             "agent_approve": Tool("agent_approve", "The owner approves an agent folder.",
                                   _schema({"agent": {"type": "string"}}), self.t_agent_approve,
                                   kind="confirm"),
@@ -1510,6 +1518,43 @@ class Assistant:
                  + "\n\nAccept: it is sent. Not now: it is dropped."),
                 _now(), preview=str(self.home / "artifacts" / "media" / offer["picture"])
                 if offer else None, click_only=bool(offer) or row["status"] == "HELD")
+        # The watch (the owner's plan, 2026-11-20: "problems pop up as cards"): each open
+        # breakdown the Governor found (a money link, a service, the disk), with its fix,
+        # until the owner has seen it. Its other findings stay in the night report.
+        from .governor import Governor
+        now = time.monotonic()
+        shown = {p.args["finding"] for p in self.pending.values()
+                 if p.tool == "governor_finding"}
+        for f in Governor(self.home, audit=self.audit, systemctl="").open_findings():
+            snooze = self.setup_snoozed.get("finding:" + f["id"])
+            if (f["check"] not in ("money", "services", "disk") or f["id"] in shown
+                    or (snooze and now - snooze < SETUP_SNOOZE_S)):
+                continue
+            pid = "gf_" + secrets.token_hex(4)
+            self.pending[pid] = Pending(
+                pid, "governor_finding", {"finding": f["id"]},
+                (f"Problem found ({f['check']}): {f['subject']}\n{f['detail']}"
+                 + (f"\nWhat the watch did: {f['remedy']}" if f.get("remedy") else "")
+                 + "\n\nAccept: you've seen it (it pops up again only if it clears and "
+                 "breaks again). Not now: asked again later."), _now())
+        # This week's drops (docs/DROPS.md): one card each.
+        from . import drops
+        shown = {p.args["drop"] for p in self.pending.values() if p.tool == "fanvue_drop"}
+        for row in drops.plan(self.home):
+            if row["drop_id"] in shown:
+                continue
+            pid = "dp_" + secrets.token_hex(4)
+            who = ("all her subscribers" if row["kind"] == "subscribers"
+                   else "her VIPs (fans who spent more than $50)")
+            self.pending[pid] = Pending(
+                pid, "fanvue_drop", {"drop": row["drop_id"]},
+                (f"This week's drop to {who}: a locked level {row['level']} picture at "
+                 f"${row['price_cents'] / 100:.2f}"
+                 + (", with a free preview picture" if row.get("preview") else "")
+                 + f".\n\n{row['text']}\n\nAccept: sent once on Fanvue. Not now: skipped "
+                 "until next week."),
+                _now(), preview=str(self.home / "artifacts" / "media" / row["locked"]),
+                click_only=True)
         # The company's workers (the owner, 2026-11-20: the women "don't move or get to
         # work"): an agent folder waiting for his approval, and work a department delivered.
         from . import agentfolders as AF
@@ -1553,7 +1598,8 @@ class Assistant:
                 _now())
         return [p.public() for p in self.pending.values()
                 if p.tool in ("setup_step", "autopilot_answer", "fanvue_review", "fan_reply",
-                              "agent_approve", "work_review")]
+                              "fanvue_drop", "governor_finding", "agent_approve",
+                              "work_review")]
 
     def t_agent_approve(self, agent: str) -> dict[str, Any]:
         from . import agentfolders as AF
@@ -1570,6 +1616,20 @@ class Assistant:
         from .fanvue import FanvueClient
         row = fan_chat.send(self.home, draft, FanvueClient(self.home), self.owner)
         return {"done": True, "said": f"Sent to @{row['fan_handle']}."}
+
+    def t_governor_finding(self, finding: str) -> dict[str, Any]:
+        from .governor import Governor
+        Governor(self.home, audit=self.audit, systemctl="").close(finding, self.owner,
+                                                                  "seen on its Jarvis card")
+        return {"done": True, "said": "Noted."}
+
+    def t_fanvue_drop(self, drop: str) -> dict[str, Any]:
+        from . import drops
+        from .fanvue import FanvueClient
+        row = drops.send(self.home, drop, FanvueClient(self.home), self.owner)
+        n = row.get("recipients")
+        return {"done": True, "said": "Drop sent" + (f" to {n} fans." if n is not None
+                                                      else ".")}
 
     def t_fanvue_approve(self, item: str) -> dict[str, Any]:
         from .fanvue import Queue
@@ -1721,6 +1781,11 @@ class Assistant:
         if not approve and p.tool == "work_review":          # Not now: filed as not good
             from . import workstation as W
             W.mark_seen(self.home, p.args["task"], by, False)
+        if not approve and p.tool == "governor_finding":     # Not now: asked again later
+            self.setup_snoozed["finding:" + p.args["finding"]] = time.monotonic()
+        if not approve and p.tool == "fanvue_drop":          # Not now: skipped this week
+            from . import drops
+            drops.skip(self.home, p.args["drop"], by)
         if not approve and p.tool == "fan_reply":            # Not now on a reply = dropped
             from . import fan_chat
             fan_chat.drop(self.home, p.args["draft"], by)
