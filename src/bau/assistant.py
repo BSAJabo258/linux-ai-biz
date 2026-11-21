@@ -414,6 +414,9 @@ class Assistant:
             "work_review": Tool("work_review", "The owner files a department's delivered work.",
                                 _schema({"task": {"type": "string"}}), self.t_work_review,
                                 kind="confirm"),
+            "work_hold": Tool("work_hold", "The owner lets held workstation work go on.",
+                              _schema({"task": {"type": "string"}}), self.t_work_hold,
+                              kind="confirm"),
             "fanvue_review": Tool("fanvue_review", "The owner approves a drafted picture.",
                                   _schema({"item": {"type": "string"}}),
                                   self.t_fanvue_approve, kind="confirm")}
@@ -1551,9 +1554,23 @@ class Assistant:
                  + "\n\nThe full draft is in your drafts folder. Accept: filed as good. "
                  "Not now: filed as not good enough."),
                 _now())
+        # Work the productivity manager held: the office stops here for his yes, and only
+        # here (the owner, 2026-11-21).
+        shown = {p.args.get("task") for p in self.pending.values() if p.tool == "work_hold"}
+        for t in W.held(self.home):
+            if t["id"] in shown:
+                continue
+            pid = "wh_" + secrets.token_hex(4)
+            self.pending[pid] = Pending(
+                pid, "work_hold", {"task": t["id"]},
+                (f"{t['role']} was asked: {t['objective']}\n"
+                 f"The productivity manager held it: {t['manager'].get('reason', 'held')}.\n\n"
+                 "Accept: you approve it and it runs on the next shift (RUN SHIFT runs it "
+                 "now). Posting, paying or sending still asks you again. Not now: dropped."),
+                _now(), click_only=True)
         return [p.public() for p in self.pending.values()
                 if p.tool in ("setup_step", "autopilot_answer", "fanvue_review", "fan_reply",
-                              "agent_approve", "work_review")]
+                              "agent_approve", "work_review", "work_hold")]
 
     def t_agent_approve(self, agent: str) -> dict[str, Any]:
         from . import agentfolders as AF
@@ -1564,6 +1581,11 @@ class Assistant:
         from . import workstation as W
         W.mark_seen(self.home, task, self.owner, True)
         return {"done": True, "said": "Filed as good."}
+
+    def t_work_hold(self, task: str) -> dict[str, Any]:
+        from . import workstation as W
+        t = W.owner_decide(self.home, task, self.owner, True)
+        return {"done": True, "said": f"Approved: {t['role']} takes it on the next shift."}
 
     def t_fan_reply(self, draft: str) -> dict[str, Any]:
         from . import fan_chat
@@ -1721,6 +1743,9 @@ class Assistant:
         if not approve and p.tool == "work_review":          # Not now: filed as not good
             from . import workstation as W
             W.mark_seen(self.home, p.args["task"], by, False)
+        if not approve and p.tool == "work_hold":            # Not now on held work = dropped
+            from . import workstation as W
+            W.owner_decide(self.home, p.args["task"], by, False)
         if not approve and p.tool == "fan_reply":            # Not now on a reply = dropped
             from . import fan_chat
             fan_chat.drop(self.home, p.args["draft"], by)

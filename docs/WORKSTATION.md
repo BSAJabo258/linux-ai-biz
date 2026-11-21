@@ -39,6 +39,13 @@ Not now on a picture drops it, as in Jarvis. The list refreshes every 15 seconds
 
 Each new card also **pops up** over the workstation, with its picture and its choices (prices, limits, audience), so every confirm can be answered here; Accept stays locked until each choice is made. **Later** closes the pop-up and the card stays in the list.
 
+**Work the manager held** (2026-11-21) is a card too. When the productivity manager stops a
+task (it would post, pay, send or touch keys, or the worker is too tired), the card says who
+was asked, what, and why it was held. **Accept** approves it: it runs on the next shift
+(**RUN SHIFT** runs it now), and anything it then wants to post, pay or send still pops up for
+you again. **Not now** drops it. So the office keeps working by itself and stops only where
+you have to say yes. Work that mentions minors never gets a card.
+
 **Tell Jarvis** (at the top) takes any request you would type in Jarvis's chat, and whatever he stages pops up at once. **FULL SCREEN** (top row) fills the screen; Esc leaves it.
 
 ## The departments at work (2026-11-20)

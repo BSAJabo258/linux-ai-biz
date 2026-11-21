@@ -558,3 +558,41 @@ def mark_seen(home: Path, task_id: str, by: str, kept: bool) -> dict[str, Any]:
     _save(home, st)
     _audit(home, "seen", by, {"task": task_id, "kept": bool(kept)})
     return t
+
+
+def held(home: Path | None = None) -> list[dict[str, Any]]:
+    """Work the productivity manager held for the owner. Each becomes a card, so the office
+    runs on by itself and stops only at his yes (the owner, 2026-11-21: "other people's AI
+    virtual offices can run most tasks, stopping at confirming"). Not: work held only
+    because its folder is unapproved (that has its own card), or work about minors."""
+    st = _load(home or bau_home())
+    out = []
+    for t in st["tasks"]:
+        why = str((t.get("manager") or {}).get("reason", ""))
+        if t["status"] == "waiting_owner" and not why.startswith("agent folder ") \
+                and why != "refers to minors" and not MINOR_REFERENCE.search(t["objective"]):
+            out.append(t)
+    return out
+
+
+def owner_decide(home: Path, task_id: str, by: str, yes: bool) -> dict[str, Any]:
+    """The owner's answer to held work: yes, it runs on the next shift (the agent's own
+    gateway still stops at every post, payment or send); no, it is dropped."""
+    if not by.startswith("human:"):
+        raise PermissionError("only the owner answers held work")
+    st = _load(home)
+    t = next((t for t in st["tasks"] if t["id"] == task_id), None)
+    if t is None or t["status"] != "waiting_owner":
+        raise KeyError(f"no held work {task_id}")
+    if MINOR_REFERENCE.search(t["objective"]):
+        raise PermissionError("refers to minors")
+    if yes:
+        t.update(status="approved", manager={"approved": True, "reason": f"approved by {by}"})
+    else:
+        t.update(status="declined", finished=_now(), result=f"dropped by {by}")
+    _event(st, "approved" if yes else "declined", _living(st, t["role"]),
+           f"{'you approved' if yes else 'you dropped'}: {t['objective'][:120]}", task=task_id)
+    _save(home, st)
+    _audit(home, "owner_decided", by, {"task": task_id, "yes": bool(yes)})
+    return t
+
