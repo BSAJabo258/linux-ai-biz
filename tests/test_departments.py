@@ -94,3 +94,16 @@ def test_the_owner_approves_a_worker_and_files_delivered_work_on_cards(tmp_path)
     assert W._load(tmp_path)["tasks"][-1]["seen"]["kept"] is True
     assert not [p for p in j.setup_waiting() if p["tool"] == "work_review"]
     assert t["role"] == "finance"
+
+
+def test_filing_a_review_lets_the_department_work_again(tmp_path):
+    """Found 2026-11-21: a filed review stayed open, so that department never worked again."""
+    AF.approve("finance", "human:owner", tmp_path)
+    task = D.due(tmp_path)[0]
+    st = W._load(tmp_path)
+    st["tasks"][0]["status"] = "review"                      # its check did not pass
+    W._save(tmp_path, st)
+    tomorrow = dt.datetime.now(dt.UTC) + dt.timedelta(days=2)
+    assert D.due(tmp_path, tomorrow) == []                   # still waiting for the owner
+    W.mark_seen(tmp_path, task["id"], "human:owner", False)
+    assert [t["role"] for t in D.due(tmp_path, tomorrow)] == ["finance"]

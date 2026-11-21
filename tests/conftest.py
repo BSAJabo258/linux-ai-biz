@@ -32,13 +32,18 @@ def no_live_world(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def setup_all_done(monkeypatch):
+def setup_all_done(monkeypatch, request):
     """Tests never probe this computer's card or services for setup steps: everything is
-    set up unless a test says else (tests/test_setup_steps.py)."""
+    set up unless a test says else (tests/test_setup_steps.py). A home with no creator
+    profile counts as having one too, except where the setup steps themselves are tested."""
     from bau import setup_steps
     facts = {"nvidia": False, "driver": False, "pictures": False, "search": True,
              "update": "auto", "autopilot": True, "room": False}
     monkeypatch.setattr(setup_steps, "_probe", facts.__getitem__)
+    if request.path.name != "test_setup_steps.py":
+        real = setup_steps._done
+        monkeypatch.setattr(setup_steps, "_done", lambda step, home, probe: True
+                            if step == "creator" else real(step, home, probe))
 
 
 @pytest.fixture(autouse=True)
