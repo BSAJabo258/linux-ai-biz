@@ -132,12 +132,13 @@ zero health. Two causes, both fixed:
 
 - **The researcher had no model.** Its brain is the strong one, and a shift did not give it
   Jarvis's model to fall back on. A shift now gives it the team's boss model (`bau team`).
-- **The local model stopped answering.** Its server keeps one memory window of 8,192
-  word-pieces, shared by four conversations. An agent's conversation grew to 6,653 of them
-  and the server froze until the computer restarted; every job in between waited 10 minutes
-  and failed. An agent's request to the local model now always fits the window (the longest
-  search results are cut, and an answer is at most 2,048 word-pieces). To give one
-  conversation the whole window, run once: `sudo bau models tune --parallel 1` (docs/GPU.md).
+- **The local model stopped answering.** The graphics card fell off the bus at 02:21 (it has
+  at the end of every boot since 2026-11-19), so the model on it could not answer until the
+  computer restarted; every job in between waited 10 minutes and failed. See docs/GPU.md,
+  "When the card falls off the bus", for the checks and the watchdog. (First written up as
+  the model's memory window filling: that was wrong.) Separately, an agent's request to the
+  local model now always fits the window (the longest search results are cut, and an answer
+  is at most 2,048 word-pieces).
 
 A retry that fails too is no longer retried a third time; it stays in the workload for you.
 

@@ -99,8 +99,9 @@ def fit_local(spec: AgentSpec, system: str, messages: list[dict[str, Any]],
     """Make the next request fit the local server's real window, as Jarvis's chat does
     (assistant._fit): a shorter answer, then the longest texts cut in place, their last
     words kept so an untrusted block stays closed. Returns the answer's token limit.
-    2026-11-21: an agent's history grew to 6,653 tokens of the 8,192 the desktop's server
-    shares, and the server stopped answering for three hours."""
+    Without it an agent's history grew to 6,653 tokens of the 8,192 the desktop's server
+    shares (2026-11-21); the server's stop that night was the card falling off the bus
+    (docs/GPU.md), not this, but a request past the window fails either way."""
     if spec.model.get("deployment") != "local":
         return spec.max_tokens
     from .assistant import CHARS_PER_TOKEN, LOCAL_SERVER_CTX, _longest_text

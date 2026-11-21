@@ -152,10 +152,10 @@ Use it only when long prompts run out of card memory; `sudo bau models tune --kv
 goes back. `sudo bau models tune --reset` forgets every tune setting.
 
 **One conversation at a time.** The server keeps one memory window (8,192 word-pieces)
-and by default four conversations share it. On 2026-11-21 an agent's conversation grew to
-6,653 of them while others held the rest, and the server stopped answering for three hours
-(every agent job in that time failed after 10 minutes). With one conversation the whole
-window is its own; a second request waits its turn instead (a few seconds on the card).
+and by default four conversations share it. With one conversation the whole window is its
+own; a second request waits its turn instead (a few seconds on the card). Corrected
+2026-11-21: this was first written up as the cause of that night's three-hour stop. It was
+not: the card itself fell off the bus (next section).
 
 ```bash
 sudo bau models tune --parallel 1
@@ -166,6 +166,40 @@ sudo bau models tune --parallel 1
 The tune settings live in `/etc/bau/llm-tune.env` and stay when you change the model.
 Only these settings exist; a model's own settings (the MTP files' `server_env`) are
 checked against a short list, so no file can move the server off this computer.
+
+## When the card falls off the bus (2026-11-21)
+
+Each of the four boots from 2026-11-19 to 2026-11-21 ended the same way: the kernel wrote
+`NVRM: Xid (PCI:0000:05:00): 79, ... GPU has fallen off the bus` and the card was gone. The
+pictures, the local model and the agents then stayed dead until someone restarted the
+computer (on 2026-11-21 from 02:21 to 05:35). Crashes: 2026-11-20 04:06, 10:58, 16:07 and
+2026-11-21 02:21.
+
+NVIDIA says (docs.nvidia.com/deploy/xid-errors, section 4.9, read 2026-11-21) that Xid 79
+"is often caused by hardware failures on the PCI Express link" and "may also be cause[d] by
+failing GPU hardware or other driver issues"; the only way back is a restart.
+
+What this desktop shows (read 2026-11-21): the card links at **PCIe 3.0 x4** through the
+chipset (root port 00:1c.4), while it can do PCIe 4.0 x16, and the processor's own graphics
+slot shows no card. Check, in this order, with the computer off and unplugged:
+
+1. Is the card in the top long slot, the one nearest the processor? If not, move it there.
+2. Push it fully into the slot until the latch clicks; screw it to the case.
+3. Unplug and firmly replug the power cable on the card.
+4. Look for a BIOS update for the ASUS G15CF on ASUS's support page.
+
+Afterwards `sudo bash installer/bau-gpu-watch.sh` (read only) should show x16.
+
+Until then, the watchdog keeps a crash to minutes instead of hours:
+
+```bash
+sudo bash installer/bau-gpu-watch.sh --install
+```
+
+It watches the kernel log; when the card falls off the bus it saves NVIDIA's report
+(`nvidia-bug-report.sh`, as the kernel asks) in `/var/log/bau-gpu`, then restarts the
+computer after a minute. Never more than 3 restarts in 6 hours: after that it only records,
+so a card that is gone for good cannot keep the computer restarting.
 
 ## 6. TensorFlow: not installed, on purpose
 
