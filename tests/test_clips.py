@@ -277,11 +277,12 @@ def test_the_feed_makes_at_most_one_clip_a_day_among_his_posts(tmp_path, monkeyp
     assert jobs.count("fanvue_clip") == 1
 
 
-def test_the_video_setup_never_writes_as_root_in_comfyuis_folder():
+@pytest.mark.parametrize("script", ["bau-video-setup.sh", "bau-explicit-setup.sh"])
+def test_the_model_setups_never_write_as_root_in_comfyuis_folder(script):
     # The security review, 2026-11-21: the folder is the comfyui account's, so root following a
     # link planted there could change a system file. Every write there runs as comfyui.
     from pathlib import Path
-    text = (Path(__file__).resolve().parents[1] / "installer" / "bau-video-setup.sh").read_text()
+    text = (Path(__file__).resolve().parents[1] / "installer" / script).read_text()
     body = text.split('for entry in "${FILES[@]}"; do', 1)[1].split("\ndone", 1)[0]
     for line in body.splitlines():
         cmd = line.strip()
