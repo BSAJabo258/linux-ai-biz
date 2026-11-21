@@ -1,6 +1,8 @@
 """Run by ComfyUI's own Python on the desktop, never imported by BAU (src/bau/media/comfy.py):
 python -I agecheck_run.py MODEL_DIR PICTURE prints the age model's scores per FairFace group
-as JSON. The model files are local (bau-pictures-setup.sh); nothing is downloaded here."""
+as JSON. With several pictures (a clip's frames, 2026-11-21) it prints a JSON list, one entry
+per picture in the same order, so the model loads once. The model files are local
+(bau-pictures-setup.sh); nothing is downloaded here."""
 
 import json
 import os
@@ -15,5 +17,7 @@ from transformers import pipeline  # noqa: E402
 
 classify = pipeline("image-classification", model=sys.argv[1], device="cpu")
 every = len(classify.model.config.id2label)   # all groups: a young one must never drop off
-print(json.dumps({r["label"]: round(float(r["score"]), 6)
-                  for r in classify(sys.argv[2], top_k=every)}))
+pictures = sys.argv[2:]
+scores = [{r["label"]: round(float(r["score"]), 6) for r in classify(p, top_k=every)}
+          for p in pictures]
+print(json.dumps(scores[0] if len(pictures) == 1 else scores))

@@ -40,6 +40,11 @@ def tiers() -> dict[int, dict[str, Any]]:
     return {int(k): v for k, v in yaml.safe_load(path.read_text())["levels"].items()}
 
 
+def clips() -> dict[str, Any]:
+    path = Path(__file__).parent / "data" / "creator_prompts.yaml"
+    return yaml.safe_load(path.read_text())["clips"]
+
+
 def pick(level: int) -> dict[str, str]:
     """One line from every section of this level's library."""
     return {name: secrets.choice(lines) for name, lines in tiers()[level]["sections"].items()}
@@ -59,8 +64,9 @@ def fill(home: Path) -> int:
     choice = autopost_choice(home)
     if not choice or not choice.get("on") or _profile(home) is None:
         return 0
-    open_drafts = [t for t in A._load(home)["tasks"] if t["kind"] == "draft"
-                   and t["detail"].get("job") == "fanvue_post"
+    tasks = A._load(home)["tasks"]
+    open_drafts = [t for t in tasks if t["kind"] == "draft"
+                   and t["detail"].get("job") in ("fanvue_post", "fanvue_clip")
                    and t["state"] in ("queued", "running")]
     q = Queue(home)
     need = choice["per_day"] - len(q.pending()) - len(q.review()) - len(open_drafts)
@@ -72,6 +78,19 @@ def fill(home: Path) -> int:
     themes = list(prof.get("themes") or THEMES)
     timely = _timely(home)
     n = 0
+    today = dt.datetime.now(dt.UTC).date().isoformat()
+    if need > 0 and clips_ready(home, prof) and not any(
+            t["detail"].get("job") == "fanvue_clip" and str(t.get("created", "")).startswith(today)
+            for t in tasks):                      # at most one clip a day, until measured
+        kind = secrets.choice(("feet", "solo"))
+        c = clips()
+        detail = {"job": "fanvue_clip", "kind": kind, "level": int(c[kind]["level"]),
+                  "motion": secrets.choice(c[kind]["motion"]),
+                  "camera": secrets.choice(c["camera"])}
+        if A.add(home, "draft", f"Fanvue clip: {kind} ({secrets.token_hex(2)})", detail,
+                 source="autopilot (feed)"):
+            n += 1
+            need -= 1
     for i in range(max(0, need)):
         level = levels[(made + i) % len(levels)]
         moment = timely.pop(0) if timely else None   # God's Eye: today's sky, first post
@@ -105,6 +124,62 @@ def explicit_ready(prof: dict[str, Any]) -> bool:
     prices = prof.get("prices") or {}
     return bool(prof.get("explicit_boundaries") and prices.get("nude") and prices.get("xxx")
                 and comfy.chroma_ready())
+
+
+def clips_ready(home: Path, prof: dict[str, Any]) -> bool:
+    """Clips only with Wan 2.2 installed, the explicit lane ready, her own explicit picture
+    to start from, and the owner's clip price."""
+    from .media import comfy
+    return bool(explicit_ready(prof) and (prof.get("prices") or {}).get("clip")
+                and comfy.wan_ready() and start_picture(home) is not None)
+
+
+def start_picture(home: Path) -> str | None:
+    """Her newest kept picture from the explicit lane (age-checked), a clip's first frame."""
+    import json
+    media = home / "artifacts" / "media"
+    for p in sorted(media.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            prov = json.loads((media / f"{p.name}.provenance.json").read_text())
+        except (OSError, ValueError):
+            continue
+        if prov.get("lane") == "explicit" and (prov.get("age_check") or {}).get("passed"):
+            return p.name
+    return None
+
+
+def make_clip(home: Path, task: dict[str, Any], animate: Any = None,
+              factory: Any = None) -> dict[str, Any]:
+    """One clip job: animate her newest explicit picture, caption it, queue it at his price.
+    The age check of every frame and the solo-only refusal run inside animate."""
+    from .fanvue import Queue
+    from .media import comfy
+    found = _profile(home)
+    if found is None:
+        return {"ok": False, "evidence": "no creator profile"}
+    _, prof = found
+    d = task["detail"]
+    start = start_picture(home)
+    clip_price = (prof.get("prices") or {}).get("clip")
+    if start is None or not clip_price:
+        return {"ok": False, "evidence": "no explicit picture to start from, or no clip price"}
+    name = f"{prof.get('id', 'creator')}-clip-{dt.datetime.now(dt.UTC):%Y%m%d-%H%M%S}-" \
+           f"{secrets.token_hex(2)}"
+    level = int(d["level"])
+    negative = comfy.CLIP_NEGATIVE + ", " + clips()["negative"]
+    limits = _limit_words(prof.get("explicit_boundaries") or [])
+    if limits:                                   # the owner's limits never leave the clip
+        negative += ", " + ", ".join(limits)
+    prompt = f"{d['motion']}, {d['camera']}, realistic adult video"
+    clip = (animate or comfy.animate)(home, start, prompt, name, negative=negative)
+    from .automaton import running
+    auto = running(home)                         # the automaton: no Accept card, it posts
+    theme = {"feet": "her bare feet, up close", "solo": "a private moment, just for you"}.get(
+        d["kind"], "a private clip")
+    item = Queue(home).add(clip["file"], caption(home, prof, theme, factory, level), level,
+                           "autopilot", review=not auto, price_cents=round(float(clip_price) * 100))
+    return {"ok": True, "evidence": ("queued for posting" if auto else "waiting for the owner")
+            + f": {item['item_id']} ({clip['file']})"}
 
 
 def caption(home: Path, prof: dict[str, Any], theme: str, factory: Any = None,

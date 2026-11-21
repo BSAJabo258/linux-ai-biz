@@ -531,6 +531,12 @@ def cmd_creator(a):
         from .virtual_creator import set_prices
         who = _human()
         prices = {"subscription": a.subscription, "nude": a.nude, "xxx": a.xxx}
+        if a.clip is not None:
+            prices["clip"] = a.clip
+        else:                             # an earlier clip price stays as it was
+            had = (yaml.safe_load(Path(a.profile).read_text()) or {}).get("prices") or {}
+            if "clip" in had:
+                prices["clip"] = had["clip"]
         try:
             set_prices(Path(a.profile), prices)
         except CreatorError as exc:
@@ -2643,6 +2649,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--subscription", type=float, required=True, help="a month")
     x.add_argument("--nude", type=float, required=True, help="level 2, each unlock")
     x.add_argument("--xxx", type=float, required=True, help="level 3, each unlock")
+    x.add_argument("--clip", type=float, help="a clip (levels 2-3), each unlock")
     s.set_defaults(fn=cmd_creator)
 
     s = sub.add_parser("toolbox", help="researched open-source tools; ask before guessing")
