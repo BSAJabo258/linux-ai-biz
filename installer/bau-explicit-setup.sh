@@ -38,25 +38,30 @@ if (( free_kb < NEED_KB )); then
   exit 1
 fi
 
+# Everything inside ComfyUI's models folder is done as the comfyui account, never as root: that
+# account owns the folder, so root following a link planted there could change a system file
+# (security review, 2026-11-21, as in bau-video-setup.sh). Root only opens a local copy.
+as_comfy() { runuser -u comfyui -- "$@"; }
+
 n=0
 for entry in "${FILES[@]}"; do
   read -r dir name sum url <<<"${entry}"
   n=$((n + 1))
   dest="${MODELS}/${dir}/${name}"
-  install -d -o comfyui -g comfyui "${MODELS}/${dir}"
-  if [[ -f ${dest} ]]; then
+  as_comfy mkdir -p "${MODELS}/${dir}"
+  if as_comfy test -f "${dest}"; then
     say "${n}/3 ${name}: already here."
     continue
   fi
   say "${n}/3 ${name} (checked against its pinned SHA-256)..."
   if [[ -n ${BAU_EXPLICIT_DIR:-} ]]; then
-    install -o comfyui -g comfyui -m 0644 "${BAU_EXPLICIT_DIR}/${name}" "${dest}.part"
+    as_comfy tee "${dest}.part" >/dev/null <"${BAU_EXPLICIT_DIR}/${name}"
   else
-    runuser -u comfyui -- curl -fL --retry 3 -C - -o "${dest}.part" "${url}"
+    as_comfy curl -fL --retry 3 -C - -o "${dest}.part" "${url}"
   fi
-  echo "${sum}  ${dest}.part" | sha256sum -c --quiet \
-    || { rm -f "${dest}.part"; say "${name} is not the pinned file: stopping"; exit 1; }
-  mv "${dest}.part" "${dest}"
+  echo "${sum}  ${dest}.part" | as_comfy sha256sum -c --quiet \
+    || { as_comfy rm -f "${dest}.part"; say "${name} is not the pinned file: stopping"; exit 1; }
+  as_comfy mv "${dest}.part" "${dest}"
 done
 
 say "Done. Chroma is ready for levels 2 and 3; every picture still goes through the age check"
