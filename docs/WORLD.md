@@ -2,7 +2,7 @@
 
 Built 2026-11-15 from your three reference pictures; the full art direction is
 `docs/visual/VISUAL_ART_DIRECTION.md`. Checked in a browser here with sample jobs; not yet on
-your own screen.
+your own screen. Full screen, tabs and the agent controls added 2026-11-21, checked the same way.
 
 ## Open it
 
@@ -12,12 +12,43 @@ your own screen.
   it says how many, for example `OPERATIONS WORLD · 2 WORKING`.
 - **From the laptop:** `bau station open` opens Jarvis straight on the world.
 
-Inside:
+It fills the whole screen; only the talk bar stays at the bottom, so you can talk to Jarvis
+from inside it. The tabs along the top take the place of the menu:
+
+| Tab | What it does |
+|---|---|
+| **HQ** | The neon headquarters (below) |
+| **Floor** | Every department, every agent where her work puts her |
+| **Inbox** | Every card waiting for your Accept (setup, pictures, fan replies, drops, problems, new workers, delivered work), with its number. **Open** shows it in the confirm box |
+| **Workstation** | Every worker with her health, her work and her controls, what just happened, and who retired. **Run a shift now** at the top |
+| **Mission Control** | Mission Control, over the world |
+| **Back to Jarvis** | Closes the world (or Esc) |
+
+On the floor:
 - **Zoom:** scroll on the floor; it zooms where you point.
 - **Move:** drag the floor.
 - **See it all again:** double-click.
-- **Read a character's record:** click it, or her name in the Agents panel.
-- **Close:** **Close** or Esc.
+- **Open an agent:** click her, or her name in the Agents panel. Her panel comes to the top.
+
+## Running the work from an agent's panel
+
+Click an agent and her panel shows, besides her record:
+- **Health:** her number, her mood and a bar (the workstation's own, `docs/WORKSTATION.md`).
+- **Needs you:** her cards: approve her as a new worker, or read what she delivered. **Open**
+  shows the card in the confirm box, with Accept and Not now.
+- **Her work:** each task with what is happening to it: queued, approved (runs on the next
+  shift), working on it now, held for you (and why), delivered (**Read what she delivered**).
+  A held task can be taken back with **Remove it**: agents only read and draft, so posting,
+  money and legal stay on your own cards; give her the drafting part instead.
+- **Give her work:** type what she should do, pick the kind (research, draft, review,
+  organise, test, fix) and press **Give it to her**. The productivity manager approves
+  low-risk work at once and says so; anything with an outside effect is held for you.
+- **Run a shift now:** the next approved task runs at once, oldest first (whoever's it is).
+  You see who walks to her desk, and the panel says how it ended.
+
+Her room follows her workstation too: approved work puts her at Headquarters ("assigned"),
+running work at her desk, and work for you (a report to read, a held task) in **Review:
+waiting for you**. Her job log comes first when it says more.
 
 ## The neon headquarters (HQ)
 
@@ -158,4 +189,5 @@ delivered. Each step says done, now, waiting for you, stopped or not needed, rea
 job and its mission. The whole picture is in `docs/visual/BAUBSA-WORLD-PRODUCT-SPEC.md`. For a running mission it also shows the exact command to stop it,
 `bau mission cancel MISSION_ID`.
 
-The world only reads: it changes nothing.
+The floor itself only shows records; what you do from the panels goes through the same
+workstation, productivity manager and confirm cards as everywhere else in Jarvis.

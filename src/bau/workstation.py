@@ -508,6 +508,23 @@ def delivered_unseen(home: Path | None = None) -> list[dict[str, Any]]:
     return [t for t in st["tasks"] if t["status"] in ("done", "review") and not t.get("seen")]
 
 
+def withdraw(home: Path, task_id: str, by: str) -> dict[str, Any]:
+    """The owner takes back a task that waits for him (found 2026-11-21: a task held for its
+    outside effect sat in the inbox for good, its worker "waiting for you" with nothing to
+    press). Agents only read and draft, so a held task is never forced through; it is removed,
+    and the owner can give her the drafting part instead."""
+    if not by.startswith("human:"):
+        raise PermissionError("only the owner removes a task")
+    st = _load(home)
+    t = next((t for t in st["tasks"] if t["id"] == task_id), None)
+    if t is None or t["status"] not in ("waiting_owner", "queued", "approved"):
+        raise ValueError(f"{task_id} is not waiting; only work not started can be removed")
+    t.update(status="withdrawn", finished=_now(), result=f"removed by {by}")
+    _save(home, st)
+    _audit(home, "withdrawn", by, {"task": task_id, "role": t["role"]})
+    return t
+
+
 def mark_seen(home: Path, task_id: str, by: str, kept: bool) -> dict[str, Any]:
     """The owner read a delivered piece of work (kept: Accept, else Not now)."""
     if not by.startswith("human:"):

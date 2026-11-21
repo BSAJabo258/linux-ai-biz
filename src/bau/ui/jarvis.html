@@ -274,6 +274,36 @@ body.showtime #timeline{display:block}body.showtime aside.r{display:none}
 .overlay.show{display:grid}
 #w-counts{font-size:12px;color:var(--dim)}#w-help{font-size:11px;color:var(--dim);margin:2px 0 8px;opacity:.8}#w-counts b{color:var(--ink);font-weight:600}
 #worldbox .box{width:min(1400px,calc(100% - 24px))}
+/* Full screen (the owner, 2026-11-21: "full screen so I don't have problems toggling"): the
+   world covers everything but the talk bar; its tabs replace the menu on top. */
+#worldbox.overlay{inset:0 0 84px 0;background:var(--solid);place-items:stretch}
+#worldbox .box,#worldbox .box:has(#hqview:not([hidden])){width:100%;max-width:none;height:100%;max-height:none;
+  border:0;border-radius:0;box-sizing:border-box;padding:8px 14px;overflow:auto}
+#w-tabs{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;position:sticky;top:-8px;z-index:2;background:var(--solid);padding:6px 0}
+#w-tabs .w-brand{font-size:12px;letter-spacing:.3em;color:var(--cyan);margin-right:6px}#w-tabs .w-gap{flex:1}
+#w-tabs button[aria-pressed="true"]{background:var(--cyan);color:var(--solid)}
+#w-inbox-n:not(:empty){display:inline-block;min-width:18px;margin-left:4px;padding:0 5px;border-radius:9px;background:var(--amber);color:var(--solid);font-weight:700}
+#mcbox.overlay{z-index:16}
+#w-floor{max-width:calc((100vh - 190px) * 1.607);margin:0 auto}
+#w-side{max-height:calc(100vh - 170px);overflow:auto}
+.w-note{font-size:12px;color:var(--dim);margin:0 0 10px}
+.w-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:start;border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:0 0 8px;font-size:13px}
+.w-card b{color:var(--amber)}.w-card button{grid-column:2;grid-row:1}
+.w-card span{grid-column:1/3;white-space:pre-wrap;overflow-wrap:break-word}
+/* In the world the confirm box opens over the floor's left side, never over the agent panel. */
+body:has(#worldbox.show) #confirm{left:16px;right:auto;bottom:100px}
+#w-side{display:flex;flex-direction:column}#w-side.picked #w-info{order:-1;border:1px solid var(--cyan);border-radius:6px;padding:8px 10px;margin-bottom:10px}
+.w-health{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:4px 0 8px}.w-health i{display:block;height:100%;background:var(--green)}
+.w-health.strained i{background:var(--amber)}.w-health.critical i{background:var(--red)}
+.w-task{border-left:3px solid var(--line);padding:2px 0 2px 8px;margin:0 0 8px}.w-task.running{border-color:var(--green)}
+.w-task.waiting_owner,.w-task.review,.w-task.done{border-color:var(--amber)}.w-task small{display:block;color:var(--dim)}
+.w-task details pre{white-space:pre-wrap;font:12px/1.45 inherit;max-height:240px;overflow:auto;margin:4px 0 0}
+.w-give textarea{width:100%;box-sizing:border-box;min-height:56px;font:inherit;font-size:12px;background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px}
+.w-kinds{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.w-kinds .opt{font:inherit;font-size:12px;padding:8px 10px;cursor:pointer;
+  border:1px solid var(--line);color:var(--ink);background:var(--field)}.w-kinds .opt.on{border-color:var(--green);color:var(--green);background:rgba(70,242,164,.1)}
+.w-said{font-size:12px;margin:4px 0}.w-said.bad{color:var(--red)}.w-said.good{color:var(--green)}
+#w-desk{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.w-deskbar{display:flex;gap:10px;align-items:center;margin:0 0 10px;font-size:12px}
 #w-wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:start}
 .w-panel{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:10px;background:rgba(63,214,255,.04)}
 .w-panel h3{margin:0 0 6px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan)}
@@ -299,7 +329,7 @@ button.chip.world{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px
    moves; the scene behind is the text-free still /art/hq. */
 #worldbox .box:has(#hqview:not([hidden])){width:min(1720px,calc(100% - 16px))}
 #w-to-hq[aria-pressed="true"],#w-to-floor[aria-pressed="true"]{background:var(--cyan);color:var(--solid)}
-.hq-stage{position:relative;aspect-ratio:16/9;max-height:calc(100vh - 110px);margin:0 auto;container-type:inline-size;overflow:hidden;
+.hq-stage{position:relative;aspect-ratio:16/9;max-height:calc(100vh - 160px);margin:0 auto;container-type:inline-size;overflow:hidden;
   border-radius:10px;border:1px solid rgba(169,139,255,.7);box-shadow:0 0 22px rgba(169,139,255,.45);background:#05030d url(/art/hq) center/cover;color:#e8f4ff}
 .hq-stage>*{position:absolute}
 .hq-title{left:2%;top:2.5%;width:40%;font-family:"URW Gothic","Century Gothic",ui-sans-serif,sans-serif;line-height:1.05}
@@ -538,10 +568,16 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <button class="act" id="mc-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Mission Control</h2><div class="tabs" id="mc-tabs"></div><div id="mc-body"></div></div></div>
 <div id="worldbox" class="overlay" role="dialog" aria-label="Operations world"><div class="box">
-  <button class="act" id="world-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
-  <button class="act" id="w-to-floor" title="The floor: every department, every agent where her job puts her" style="float:right">Floor</button>
-  <button class="act" id="w-to-hq" title="The neon headquarters" style="float:right">HQ</button>
-  <h2>Operations world</h2>
+  <nav id="w-tabs" aria-label="The world's tabs: everything is run from here">
+    <b class="w-brand">OPERATIONS WORLD</b>
+    <button class="act" id="w-to-hq" title="The neon headquarters">HQ</button>
+    <button class="act" id="w-to-floor" title="The floor: every department, every agent where her work puts her">Floor</button>
+    <button class="act" id="w-to-inbox" title="Everything waiting for your Accept">Inbox <span id="w-inbox-n"></span></button>
+    <button class="act" id="w-to-desk" title="The AI workstation: workers, health, every task, what just happened">Workstation</button>
+    <button class="act" id="w-to-mc" title="Mission Control">Mission Control</button>
+    <span class="w-gap"></span>
+    <button class="act" id="world-close" data-key="Esc" title="Back to Jarvis (Esc)">Back to Jarvis</button>
+  </nav>
   <div id="hqview" aria-label="The neon headquarters: every panel shows only real records"><div class="hq-stage">
     <div class="hq-title"><b>BAUBSA JARVIS</b><span>Virtual Operations World</span><em id="hq-day"></em></div>
     <div class="hq-script hq-top">The Grind Continues…<br>What We Doing Now?<div id="hq-now"></div></div>
@@ -561,7 +597,10 @@ code.cmd{display:block;background:var(--field);border:1px solid var(--line);padd
   <div id="w-wrap"><canvas id="w-floor" width="1800" height="1120" aria-label="The floor: each character is one of your agents"></canvas>
   <div id="w-side"><section class="w-panel"><h3>Agents</h3><div id="w-list" aria-label="Agents"></div></section>
   <section class="w-panel"><h3>Current tasks</h3><div id="w-tasks"></div></section>
-  <section class="w-panel"><h3>System status</h3><ul id="w-sys"></ul></section><div id="w-info"><p>Each character is one of your agents, or Jarvis herself. Her room comes from her latest real job; with nothing to do she waits in the Headquarters lounge. Click a character.</p></div></div></div></div></div></div>
+  <section class="w-panel"><h3>System status</h3><ul id="w-sys"></ul></section><div id="w-info"><p>Each character is one of your agents, or Jarvis herself. Her room comes from her latest real work; with nothing to do she waits in the Headquarters lounge. Click a character to see her work, give her work and answer what she needs from you.</p></div></div></div></div>
+  <div id="w-inboxview" hidden><h3>Waiting for you</h3><p class="w-note">Every card that needs your Accept, from every part of the business. Open one to read it and answer it.</p><div id="w-inbox"></div></div>
+  <div id="w-deskview" hidden><div class="w-deskbar"><button class="act" id="w-shift" title="The productivity manager runs the next approved task now">Run a shift now</button><span id="w-shift-said"></span></div>
+    <div id="w-desk"></div></div></div></div>
 <div id="help" class="overlay" role="dialog" aria-label="Keyboard keys"><div class="box">
   <button class="act" id="help-close" data-key="Esc" title="Close (Esc)" style="float:right">Close</button>
   <h2>Keyboard keys</h2>
@@ -2660,11 +2699,19 @@ function paintState(s) {
       (s.answered_by ? "\nLast answer from: " + s.answered_by : "") : "";
   $("c-mode").className = "chip " + (s.mode === "model" ? "on" : "warn");
   canListen = s.listen; paintMic();
+  if (s.pending) { CARDS = s.pending; if ($("worldbox").classList.contains("show")) { renderInbox(); if (W_MODE === "desk") renderDesk(); } }
   if (s.pending && s.pending.length) queueConfirms(s.pending);
 }
 
 // ---------------------------------------------------------------- confirmations
-let confirmQ = [], showing = null, picked = {}, shownAt = 0;
+let confirmQ = [], showing = null, picked = {}, shownAt = 0, CARDS = [];
+// Open one waiting card now, in the same confirm box (the world's inbox and agent panels).
+function focusCard(id) {
+  if (showing && showing.id === id) return;
+  const i = confirmQ.findIndex(x => x.id === id), item = i >= 0 ? confirmQ.splice(i, 1)[0] : CARDS.find(x => x.id === id);
+  if (!item) return;
+  if (showing) { confirmQ.unshift(showing); showing = null; $("confirm").classList.remove("show"); }
+  confirmQ.unshift(item); nextConfirm(); }
 // A confirmation is a deliberate act: Confirm never takes keyboard focus, and nothing counts
 // in the first moment after the box opens (an Enter, Space or "y" already on its way, or a
 // tap meant for something else, must not approve what the owner has not read).
@@ -3732,7 +3779,7 @@ function drawWorld(t) {
 function worldLoop(t) { if (!$("worldbox").classList.contains("show")) return; if (OPS && W_MODE === "floor") drawWorld(t);
   worldAnim = REDUCED ? 0 : requestAnimationFrame(worldLoop); }
 function worldInfo(a) {
-  const box2 = $("w-info"); box2.textContent = ""; if (!a) return;
+  const box2 = $("w-info"); box2.textContent = ""; $("w-side").classList.toggle("picked", !!a); if (!a) return;
   box2.appendChild(el("h3", null, a.name));
   if (a.portrait) { const im = el("img", "w-portrait"); im.src = "/world/portrait/" + encodeURIComponent(a.look) + ".png"; im.alt = a.name + "'s portrait"; box2.appendChild(im); }
   const dl = el("dl");
@@ -3758,7 +3805,87 @@ function worldInfo(a) {
     box2.appendChild(ol); }
   if (j && /^(PENDING|RUNNING|WAITING_FOR_APPROVAL)$/.test(j.status) && j.mission_id && j.mission_id !== "adhoc") {
     const p = el("p", null, "To stop it, at a terminal: "); p.appendChild(el("code", null, "bau mission cancel " + j.mission_id)); box2.appendChild(p); }
+  if (a.work) workPanel(box2, a);
 }
+// What she does at the workstation, run from her own panel (the owner, 2026-11-21: "click each
+// agent and complete the work and confirm things and review things from that same screen").
+const CARD_LABEL = { setup_step: "Setup", autopilot_answer: "Jarvis asks", fanvue_review: "Picture for Fanvue", fan_reply: "Fan reply",
+  fanvue_drop: "Weekly drop", governor_finding: "Problem found", agent_approve: "New worker", work_review: "Delivered work" };
+const TASK_STATE = { queued: "queued", approved: "approved, runs on the next shift", running: "working on it now",
+  waiting_owner: "held for you", review: "finished, its check did not pass: read it", done: "delivered: read it", failed: "failed" };
+const KINDS = [["research", "Research"], ["draft", "Draft"], ["review", "Review"], ["organise", "Organise"], ["test", "Test"], ["fix", "Fix"]];
+const W_DRAFT = {}, W_SAID = {};          // what she is typing, and the last answer she got, kept across redraws
+function say(el2, name, cls, text) { W_SAID[name] = [cls, text]; el2.className = "w-said " + cls; el2.textContent = text; }
+const typingIn = (box) => box.contains(document.activeElement) && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
+function cardRow(c) { const r = el("div", "w-card"); r.appendChild(el("b", null, CARD_LABEL[c.tool] || "Confirm"));
+  r.appendChild(el("span", null, (c.summary || "").split("\n").slice(0, 2).join("\n")));
+  const b = el("button", "act", "Open"); b.title = "Read it and answer it"; b.onclick = () => focusCard(c.id); r.appendChild(b); return r; }
+function workPanel(box, a) {
+  if (box.id === "w-info") $("w-side").classList.add("picked");
+  const w = a.work, tasks = w.tasks || [];
+  if (w.worker) { const k = w.worker;
+    box.appendChild(el("h4", null, `${k.name} · health ${k.health} · ${k.mood}` + (k.generation > 1 ? ` · generation ${k.generation}` : "")));
+    const bar = el("div", "w-health " + k.mood), fill = el("i"); fill.style.width = Math.max(0, Math.min(100, k.health)) + "%"; bar.appendChild(fill); box.appendChild(bar); }
+  const ids = new Set(tasks.map(t => t.id));
+  const mine = CARDS.filter(c => c.about && (c.about.agent === a.name || ids.has(c.about.task)));
+  if (mine.length) { box.appendChild(el("h4", null, "Needs you")); mine.forEach(c => box.appendChild(cardRow(c))); }
+  box.appendChild(el("h4", null, "Her work"));
+  if (!tasks.length) box.appendChild(el("p", "none", "Nothing in her inbox."));
+  tasks.forEach(t => { const d = el("div", "w-task " + t.state); d.appendChild(el("b", null, t.objective));
+    d.appendChild(el("small", null, `${t.kind} · ${TASK_STATE[t.state] || t.state}` + (t.reason && t.state === "waiting_owner" ? ` (${t.reason})` : "")));
+    if (t.report) { const det = el("details"); det.appendChild(el("summary", null, "Read what she delivered")); det.appendChild(el("pre", null, t.report)); d.appendChild(det); }
+    if (t.state === "waiting_owner") {           // agents only read and draft: a held task is removed, never forced
+      d.appendChild(el("small", null, "Agents only read and draft; posting, money and legal stay on your own cards. Remove it, or give her the drafting part."));
+      const rm = el("button", "act", "Remove it"); rm.onclick = async () => {
+        const r = await apiJson("/api/workstation/withdraw", { task: t.id }).catch(e => ({ error: e.message }));
+        if (r.error) { rm.textContent = r.error; return; } loadWorld(); };
+      d.appendChild(rm); }
+    box.appendChild(d); });
+  const give = el("div", "w-give"); give.appendChild(el("h4", null, "Give her work"));
+  const ta = el("textarea"); ta.placeholder = "What should she do? For example: research three new ways to promote the creator";
+  ta.setAttribute("aria-label", "Work for " + a.name); ta.value = W_DRAFT[a.name] || ""; ta.oninput = () => { W_DRAFT[a.name] = ta.value; };
+  // The kind of work as big buttons, nothing picked until she is told (the page's rule: no drop-downs).
+  const kind = el("div", "opts w-kinds"); kind.setAttribute("aria-label", "Kind of work"); kind.value = "";
+  KINDS.forEach(([v, l]) => { const b = el("button", "opt", l); b.type = "button";
+    b.onclick = () => { kind.value = v; kind.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === b)); }; kind.appendChild(b); });
+  const send = el("button", "act", "Give it to her"), run = el("button", "act", "Run a shift now"), said = el("p", "w-said");
+  if (W_SAID[a.name]) say(said, a.name, ...W_SAID[a.name]);
+  send.onclick = async () => { if (!kind.value) { say(said, a.name, "bad", "First choose the kind of work."); return; }
+    say(said, a.name, "", "Giving it to her…");
+    try { const t = await apiJson("/api/workstation/assign", { role: a.name, objective: ta.value, kind: kind.value });
+      if (t.error) { say(said, a.name, "bad", t.error); return; }
+      const ok = t.manager && t.manager.approved; W_DRAFT[a.name] = ""; ta.value = "";
+      say(said, a.name, ok ? "good" : "bad", ok ? "The productivity manager approved it: it runs on the next shift (or press Run a shift now)." : "Held for you: " + ((t.manager && t.manager.reason) || "the manager did not approve it"));
+      loadWorld(); } catch (e) { say(said, a.name, "bad", e.message); } };
+  run.onclick = () => runShift(said, a.name);
+  give.append(ta, kind, send, run, said); box.appendChild(give); }
+// A shift runs the oldest approved task, whoever's it is (the productivity manager's order).
+async function runShift(said, name) { const who = name || "_desk";
+  say(said, who, "", "Shift running: the next approved task, oldest first. Watch who walks to her desk…");
+  try { const r = await settle(await apiJson("/api/workstation/shift", { max_tasks: 1 }));
+    if (r.error) { say(said, who, "bad", r.error); return; }
+    const ran = r.ran || [];
+    say(said, who, ran.length && ran.every(x => x.status === "done") ? "good" : ran.length ? "bad" : "",
+      ran.length ? "Shift finished: " + ran.map(x => `${x.role}: ${TASK_STATE[x.status] || x.status}` + (x.status === "failed" && x.result ? ` (${x.result})` : "")).join("; ") : "No approved work was waiting.");
+    loadWorld(); apiJson("/api/state").then(paintState).catch(() => {}); } catch (e) { say(said, who, "bad", e.message); } }
+// The inbox: every card waiting, from every part of the business.
+function renderInbox() { const box = $("w-inbox"), n = CARDS.length; $("w-inbox-n").textContent = n ? String(n) : "";
+  if (W_MODE !== "inbox") return; box.textContent = "";
+  if (!n) { box.appendChild(el("p", "none", "Nothing is waiting for you.")); return; }
+  CARDS.forEach(c => box.appendChild(cardRow(c))); }
+// The workstation, inside the world: each worker, her health and work, and what just happened.
+async function renderDesk() { let v; try { v = await apiJson("/api/workstation"); } catch (e) { $("w-desk").textContent = e.message; return; }
+  const box = $("w-desk"); if (typingIn(box)) return; box.textContent = "";
+  const agents = (OPS && OPS.agents) || [];
+  for (const k of v.workers) { const a = agents.find(x => x.name === k.role) || { name: k.role, work: { worker: k, tasks: [] }, state: k.status };
+    const sec = el("section", "w-panel"); const h = el("h3"); const b = el("button", "act", k.role); b.title = "Open her panel on the floor";
+    b.onclick = () => { showFloor(); W_SEL = agents.find(x => x.name === k.role) || null; worldInfo(W_SEL); loadList(); }; h.appendChild(b); sec.appendChild(h);
+    workPanel(sec, a); box.appendChild(sec); }
+  const log = el("section", "w-panel"); log.appendChild(el("h3", null, "What just happened"));
+  const ul = el("ul"); (v.events || []).slice().reverse().forEach(e => ul.appendChild(el("li", null, `${(e.at || "").slice(11, 16)} ${e.worker ? e.worker + ": " : ""}${e.text}`)));
+  if (!ul.children.length) ul.appendChild(el("li", "none", "Nothing yet.")); log.appendChild(ul); box.appendChild(log);
+  if ((v.graveyard || []).length) { const g = el("section", "w-panel"); g.appendChild(el("h3", null, "Retired"));
+    const gl = el("ul"); v.graveyard.forEach(d => gl.appendChild(el("li", null, `${d.name} (${d.role}, generation ${d.generation}): ${d.cause || ""}`))); g.appendChild(gl); box.appendChild(g); } }
 let W_SEQ = 0, W_GEN = 0;
 async function loadWorld() {
   const seq = ++W_SEQ; let got;
@@ -3779,7 +3906,10 @@ async function loadWorld() {
   [["working", "working"], ["waiting for you", "waiting for you"], ["failed", "stopped"], ["done", "delivered today"], ["idle", "free"]].forEach(([st, label]) => {
     const k = OPS.agents.filter(a => st === "failed" ? a.room === "repair" : a.state === st).length; s.appendChild(el("b", null, String(k))); s.appendChild(document.createTextNode(` ${label} · `)); });
   if (OPS.hold) s.appendChild(el("b", null, "HOLD: " + OPS.hold));
-  if (W_SEL) { W_SEL = OPS.agents.find(a => a.name === W_SEL.name) || null; worldInfo(W_SEL); }
+  if (W_SEL) { W_SEL = OPS.agents.find(a => a.name === W_SEL.name) || null;
+    if (!typingIn($("w-info"))) worldInfo(W_SEL); }                                        // never under the owner's typing
+  apiJson("/api/state").then(paintState).catch(() => {});
+  if (W_MODE === "desk") renderDesk();
   const list = $("w-list"), had = list.contains(document.activeElement) ? document.activeElement.dataset.name : null;
   list.textContent = "";                                                                      // the same characters, for the keyboard
   for (const a of OPS.agents) { const b = el("button", "act"); b.dataset.name = a.name; b.title = `${a.name}: ${a.state}`;
@@ -3787,8 +3917,8 @@ async function loadWorld() {
     b.setAttribute("aria-pressed", String(a === W_SEL)); b.onclick = () => { W_SEL = a; worldInfo(a); if (REDUCED) drawWorld(0); loadList(); }; list.appendChild(b);
     if (a.name === had) b.focus(); }                                                          // keep the keyboard where it was
   const tasks = $("w-tasks"); tasks.textContent = "";
-  if (OPS.tasks.length) { const ul = el("ul"); OPS.tasks.forEach(t => { const li = el("li"); li.appendChild(el("span", "w-dot " + (t.state === "working" ? "working" : "waiting")));
-      li.appendChild(el("b", null, t.agent + ": ")); li.appendChild(document.createTextNode(t.task + (t.state === "working" ? "" : " (waiting for you)"))); ul.appendChild(li); }); tasks.appendChild(ul); }
+  if (OPS.tasks.length) { const ul = el("ul"); OPS.tasks.forEach(t => { const li = el("li"); li.appendChild(el("span", "w-dot " + (t.state === "working" ? "working" : t.state === "assigned" ? "" : "waiting")));
+      li.appendChild(el("b", null, t.agent + ": ")); li.appendChild(document.createTextNode(t.task + (t.state === "working" ? "" : t.state === "assigned" ? " (queued)" : " (waiting for you)"))); ul.appendChild(li); }); tasks.appendChild(ul); }
   else { const p = el("p", "none", "No agent is working right now. Ask Jarvis to start a mission, or at a terminal: "); p.appendChild(el("code", null, "bau mission list"));
     p.appendChild(document.createTextNode(" then ")); p.appendChild(el("code", null, "bau mission run ID")); tasks.appendChild(p); }
   const sys = $("w-sys"), S = OPS.system, ap = S.autopilot, M = S.money; sys.textContent = "";
@@ -3846,12 +3976,18 @@ function renderHQ() { if (!OPS) return; const S = OPS.system;
   const others = OPS.agents.slice(1), left = others.filter((_, i) => i % 2 === 0), right = others.filter((_, i) => i % 2 === 1);
   left.reverse().forEach(a => crew.appendChild(hqFigure(a))); crew.appendChild(hqFigure(OPS.agents[0], true)); right.forEach(a => crew.appendChild(hqFigure(a))); }
 function showMode(m) { W_MODE = m; $("hqview").hidden = m !== "hq"; $("w-floorview").hidden = m !== "floor";
-  $("w-to-hq").setAttribute("aria-pressed", String(m === "hq")); $("w-to-floor").setAttribute("aria-pressed", String(m === "floor"));
-  if (m === "floor" && OPS) drawWorld(performance.now()); }
+  $("w-inboxview").hidden = m !== "inbox"; $("w-deskview").hidden = m !== "desk";
+  [["hq", "w-to-hq"], ["floor", "w-to-floor"], ["inbox", "w-to-inbox"], ["desk", "w-to-desk"]].forEach(([k, id]) => $(id).setAttribute("aria-pressed", String(m === k)));
+  if (m === "floor" && OPS) drawWorld(performance.now());
+  if (m === "inbox") renderInbox(); if (m === "desk") renderDesk(); }
 function showFloor() { showMode("floor"); }
 function openRoom(id) { const c = $("w-floor"), [rx, ry, rw, rh] = W_ROOMS[id], [mx, my] = iso(rx + rw / 2, ry + rh / 2), z = id === "hq" ? 1.8 : 2.4;
   W_VIEW = { z, x: c.width / 2 - z * mx, y: c.height / 2 - z * my }; showFloor(); }
 $("w-to-hq").onclick = () => showMode("hq");
+$("w-to-inbox").onclick = () => showMode("inbox");
+$("w-to-desk").onclick = () => showMode("desk");
+$("w-to-mc").onclick = () => { overlay("mcbox", true); showMc("status"); };
+$("w-shift").onclick = () => runShift($("w-shift-said"));
 $("w-to-floor").onclick = () => { W_VIEW = { z: 1, x: 0, y: 0 }; showFloor(); };
 showMode("hq");
 function wPoint(e) { const c = $("w-floor"), r = c.getBoundingClientRect();

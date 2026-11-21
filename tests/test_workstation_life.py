@@ -158,3 +158,18 @@ def test_only_failed_or_interrupted_jobs_come_back_as_work(home, status, kind):
     st = W.refresh(home)
     made = [t for t in st["tasks"] if t.get("source_job") == j.job_id]
     assert [t["kind"] for t in made] == ([kind] if kind else [])   # the owner's cancel holds
+
+
+def test_the_owner_removes_a_held_task_and_her_inbox_clears(home):
+    """Found 2026-11-21: a task held for its outside effect sat in her inbox for good."""
+    approve(home)
+    t = W.assign(home, "helper", "post the weekly plan on reddit", "human:owner", kind="draft")
+    assert t["status"] == "waiting_owner"
+    with pytest.raises(PermissionError):
+        W.withdraw(home, t["id"], "agent:helper")
+    W.withdraw(home, t["id"], "human:owner")
+    st = W.refresh(home)
+    assert next(x for x in st["tasks"] if x["id"] == t["id"])["status"] == "withdrawn"
+    assert t["id"] not in [x["id"] for x in W.view_from(st, home)["tasks"]]
+    with pytest.raises(ValueError):
+        W.withdraw(home, t["id"], "human:owner")              # once

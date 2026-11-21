@@ -317,7 +317,9 @@ class Pending:
 
     def public(self) -> dict[str, Any]:
         return {"id": self.id, "tool": self.tool, "summary": self.summary, "form": self.form,
-                "preview": bool(self.preview), "voice": self.voice()}
+                "preview": bool(self.preview), "voice": self.voice(),
+                # which agent or item it is about, so the world can put it on her panel
+                "about": {k: v for k, v in self.args.items() if k in ("agent", "task")}}
 
 
 @dataclass
