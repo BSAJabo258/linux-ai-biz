@@ -331,7 +331,7 @@ function render(s) {
 const SETTLE_MS = 900;            // as in Jarvis: a card ignores Accept for its first moment
 const shownCards = {}, popQ = [], dismissed = new Set();
 let popping = null, popPicked = {};
-const ACCEPT = /^(setup_step|autopilot_answer|fanvue_review|fan_reply|agent_approve|work_review)$/;
+const ACCEPT = /^(setup_step|autopilot_answer|fanvue_review|fan_reply|agent_approve|work_review|work_hold)$/;
 function hasChoices(p) { return !!(p.form && p.form.fields && p.form.fields.length); }
 function preview(p, img) {
   fetch("/api/preview/" + encodeURIComponent(p.id), { headers: { "X-Jarvis-Key": KEY } })

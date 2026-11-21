@@ -125,3 +125,39 @@ def test_a_hosted_model_keeps_its_own_answer_length_and_history():
     msgs = [{"role": "user", "content": "x" * 90000}]
     assert agents.fit_local(spec("cloud"), "s", msgs, []) == 16000
     assert len(msgs[0]["content"]) == 90000
+
+
+def test_held_work_stops_at_a_card_and_goes_on_at_the_owners_yes(tmp_path, monkeypatch):
+    # The owner, 2026-11-21: "other people's AI virtual offices can run most tasks, stopping
+    # at confirming". Held work used to sit as waiting_owner with no way to say yes.
+    from test_assistant import make
+    j = make(tmp_path)
+    t = W.assign(tmp_path, "marketer", "post the week's plan on Fanvue", "human:owner")
+    assert t["status"] == "waiting_owner"                     # the manager held it
+    W.assign(tmp_path, "marketer", "email the plan to a fan", "human:owner")
+    W.assign(tmp_path, "marketer", "post pictures of a teen", "human:owner")
+    cards = [p for p in j.setup_waiting() if p["tool"] == "work_hold"]
+    assert len(cards) == 2                                    # minors: never a card
+    assert "post the week's plan" in cards[0]["summary"] and "asks you again" in cards[0]["summary"]
+    assert len([p for p in j.setup_waiting() if p["tool"] == "work_hold"]) == 2   # once each
+    assert "work_hold" not in {s.name for s in j.specs()}     # never offered to a model
+    assert j.confirm(cards[0]["id"], True, "human:owner")["done"]
+    j.confirm(cards[1]["id"], False, "human:owner")
+    st = {x["objective"]: x["status"] for x in W._load(tmp_path)["tasks"]}
+    assert st["post the week's plan on Fanvue"] == "approved"
+    assert st["email the plan to a fan"] == "declined"
+    ran = []
+    monkeypatch.setattr(AF, "run", lambda name, objective, home, audit=None, **kw: ran.append(
+        objective) or agents.RunResult("COMPLETED", "done", 1, [], 0.0, 0))
+    W.run_shift(tmp_path, by="process:autopilot")
+    assert ran == ["post the week's plan on Fanvue"]
+
+
+def test_only_the_owner_answers_held_work(tmp_path):
+    import pytest
+    AF.approve("marketer", "human:owner", tmp_path)
+    t = W.assign(tmp_path, "marketer", "post the plan", "human:owner")
+    with pytest.raises(PermissionError):
+        W.owner_decide(tmp_path, t["id"], "process:autopilot", True)
+    with pytest.raises(PermissionError):
+        W.owner_decide(tmp_path, t["id"], "agent:jarvis", True)
