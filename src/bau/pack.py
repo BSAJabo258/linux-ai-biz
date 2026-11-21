@@ -460,17 +460,19 @@ KV_TYPES = ("f16", "q8_0")    # llama.cpp b11747 -ctk/-ctv values, both run ther
 
 
 def tune(etc: Path, run: Run, draft: str | None = None, kv: str | None = None,
-         reset: bool = False) -> dict[str, str]:
+         reset: bool = False, parallel: str | None = None) -> dict[str, str]:
     """Write /etc/bau/llm-tune.env and restart the model server. ``draft``: how many words
     an MTP model guesses ahead (1-16), or "off". ``kv``: the memory format of the
-    model's working memory (f16 is llama.cpp's own default). Nothing else can be set."""
+    model's working memory (f16 is llama.cpp's own default). ``parallel``: how many
+    conversations share the server's one window (1-4). Nothing else can be set."""
     path = etc / TUNE
     cur: dict[str, str] = {}
     if path.exists() and not reset:
         for line in path.read_text().splitlines():
             k, _, v = line.partition("=")
             if k in ("LLAMA_ARG_SPEC_TYPE", "LLAMA_ARG_SPEC_DRAFT_N_MAX",
-                     "LLAMA_ARG_CACHE_TYPE_K", "LLAMA_ARG_CACHE_TYPE_V"):
+                     "LLAMA_ARG_CACHE_TYPE_K", "LLAMA_ARG_CACHE_TYPE_V",
+                     "LLAMA_ARG_N_PARALLEL"):
                 cur[k] = v
     if draft == "off":
         cur.pop("LLAMA_ARG_SPEC_DRAFT_N_MAX", None)
@@ -484,6 +486,10 @@ def tune(etc: Path, run: Run, draft: str | None = None, kv: str | None = None,
         if kv not in KV_TYPES:
             raise ValueError(f"--kv is one of {', '.join(KV_TYPES)}")
         cur["LLAMA_ARG_CACHE_TYPE_K"] = cur["LLAMA_ARG_CACHE_TYPE_V"] = kv
+    if parallel is not None:
+        if not parallel.isdigit() or not 1 <= int(parallel) <= 4:
+            raise ValueError("--parallel is a number from 1 to 4")
+        cur["LLAMA_ARG_N_PARALLEL"] = str(int(parallel))
     etc.mkdir(parents=True, exist_ok=True)
     if cur:
         path.write_text("".join(f"{k}={v}\n" for k, v in sorted(cur.items())))

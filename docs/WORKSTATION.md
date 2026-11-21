@@ -1,8 +1,28 @@
 # The AI workstation
 
 Open it from Jarvis (the **WORKSTATION** link) or at `/workstation` with Jarvis's key. It is an
-office where each approved agent folder is a worker at a desk. When a worker finishes a job it
-walks to the outbox and drops the work off; when it fails, its health drops.
+office where each approved agent folder is a worker. When a worker finishes a job its health
+goes up; when it fails, its health drops.
+
+## The floor (2026-11-21)
+
+Every department of the operations world is a station on the floor: Headquarters, Research
+library, Development Forge, Testing lab, Innovation Workshop, Creative Studio, Finance Office,
+Market, Review (waiting for you), Stopped and Delivered. Jarvis (in gold) and every worker
+stand at the station their latest real job puts them in, the same room the WORLD view gives:
+
+| Their job | Where they stand | What they do |
+|---|---|---|
+| none, or only handed over | Headquarters | breathe, idle |
+| running | their own department's desk | type at the desk; the station lights up |
+| waits for your approval | Review | raise a hand |
+| failed, paused or interrupted | Stopped | slump |
+| finished and checked (last 24 hours) | Delivered | hold the finished work; the pile grows |
+
+When a job changes they **walk** to the new station, legs and arms moving. A delivery ends
+with a little hop. Nothing moves on a timer or at random: no change in the job logs, no walk.
+Hover over a figure for its name, state, task and the model it used. With "reduce motion" on
+in your computer's settings, they stand still at their stations.
 
 Nothing on the page is invented: every worker is a real agent folder, and its health moves only
 with what really happened in BAU's job logs and shifts.
@@ -95,3 +115,20 @@ Work that finished without the check earns nothing.
 
 Only you or the autopilot can assign work or run a shift; Jarvis's model cannot. The autopilot
 runs one approved task per shift (`workstation` job, Go lane).
+
+## Why the workers were failing (2026-11-21)
+
+On the desktop every shift failed for three hours one night and three workers fell close to
+zero health. Two causes, both fixed:
+
+- **The researcher had no model.** Its brain is the strong one, and a shift did not give it
+  Jarvis's model to fall back on. A shift now gives it the team's boss model (`bau team`).
+- **The local model stopped answering.** Its server keeps one memory window of 8,192
+  word-pieces, shared by four conversations. An agent's conversation grew to 6,653 of them
+  and the server froze until the computer restarted; every job in between waited 10 minutes
+  and failed. An agent's request to the local model now always fits the window (the longest
+  search results are cut, and an answer is at most 2,048 word-pieces). To give one
+  conversation the whole window, run once: `sudo bau models tune --parallel 1` (docs/GPU.md).
+
+A retry that fails too is no longer retried a third time; it stays in the workload for you.
+

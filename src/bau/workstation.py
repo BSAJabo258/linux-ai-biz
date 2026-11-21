@@ -43,6 +43,7 @@ EXTERNAL = re.compile(
     r"deploy|install|sign|approve|money|transfer|password|api.?key)\b", re.I)
 # "review": finished, but its result did not pass the check; it waits for the owner and is
 # never run again by itself.
+RETRY = "Retry after failure: "
 OPEN = {"queued", "approved", "waiting_owner", "running", "review"}
 NAMES = ("Nova", "Iris", "Juno", "Vera", "Sable", "Lark", "Rune", "Mica", "Echo",
          "Onyx", "Tess", "Wren", "Kite", "Marlow", "Indigo", "Remy")
@@ -196,8 +197,10 @@ def _outcome(job: Any) -> tuple[str, int, str] | None:
 
 def _job_task(st: dict[str, Any], job: Any, role: str, kind: str) -> None:
     objective = (job.objective or job.next_action or "continue the last task")[:1200]
+    if objective.startswith(RETRY):
+        return       # a retry failed too: it waits for the owner, not for a third try
     if kind == "retry":
-        objective = "Retry after failure: " + objective
+        objective = RETRY + objective
     elif kind == "continue":
         objective = "Continue from the log: " + objective
         if job.remaining_steps:
@@ -382,6 +385,22 @@ def queued(home: Path | None = None) -> int:
     return sum(t["status"] in ("approved", "queued") for t in st["tasks"])
 
 
+def _boss(home: Path) -> tuple[Any, dict[str, Any]] | None:
+    """The team's boss model as Jarvis's own: an agent on the strong brain uses it when no
+    strong model is chosen (2026-11-21: without it the researcher failed every shift with
+    "no approved model to draft with")."""
+    from . import team
+    from .runtime import provider_for
+    boss = team.show(home).get("boss")
+    if not boss:
+        return None
+    try:
+        p, rec = provider_for(boss, home)
+    except (KeyError, PermissionError, ImportError, ValueError):
+        return None
+    return p, {**rec, "id": boss}
+
+
 def run_shift(home: Path | None = None, audit: Any = None, runner: Callable[..., Any] | None = None,
               max_tasks: int = 1, by: str = "process:autopilot") -> dict[str, Any]:
     """Run manager-approved work. The runner defaults to an approved agent folder; a test
@@ -412,7 +431,8 @@ def run_shift(home: Path | None = None, audit: Any = None, runner: Callable[...,
                 from . import agentfolders as AF
 
                 def runner(name: str, objective: str, mission_id: str, job: Any) -> Any:
-                    return AF.run(name, objective, home, audit, mission_id=mission_id, job=job)
+                    return AF.run(name, objective, home, audit, mission_id=mission_id, job=job,
+                                  jarvis=_boss(home))
             checked = run_checked(home, task["role"], task["objective"],
                                   f"workstation:{task['id']}", runner)
             status, text = checked["status"], checked["report"] or ""
@@ -480,9 +500,38 @@ def view_from(st: dict[str, Any], home: Path) -> dict[str, Any]:
                        "manager": t.get("manager", {}), "created": t["created"],
                        "inherited_from": t.get("inherited_from", "")} for t in tasks],
             "graveyard": graveyard,
+            "floor": floor(home, st["workers"]),
             "events": st["events"][-20:],
             "outbox": sum(e["kind"] == "delivered" for e in st["events"]),
             "seq": st["seq"]}
+
+
+def floor(home: Path, workers: list[dict[str, Any]],
+          now: dt.datetime | None = None) -> dict[str, Any]:
+    """Every department of the operations world as a station, and who stands at which: the
+    room is the one the world gives for that AI's latest real job (world.place, world.jarvis),
+    so a worker walks only when its job really changes (the owner, 2026-11-21: "all sections
+    and AI models have motion when delivering or walking to different stations")."""
+    from . import team
+    from . import world as WD
+    now = now or dt.datetime.now(dt.UTC)
+    latest: dict[str, Any] = {}
+    for job in JobStore(home).all():
+        name = _role(job.agent)
+        if name not in latest or (job.updated_at or "") >= (latest[name].updated_at or ""):
+            latest[name] = job
+    me = WD.jarvis(home, now)
+    people = [{"id": "jarvis", "name": "Jarvis", "role": "jarvis", "room": me["room"],
+               "state": me["state"], "task": ((me["job"] or {}).get("objective") or "")[:160],
+               "model": team.show(home).get("boss"), "mood": "steady"}]
+    for w in workers:
+        job = latest.get(w["role"])
+        room, state = WD.place(w["role"], job, now)
+        people.append({"id": w["id"], "name": w["name"], "role": w["role"], "room": room,
+                       "state": state, "task": job.objective[:160] if job else "",
+                       "model": job.model if job else None, "mood": _mood(w["health"])})
+    return {"rooms": [{"id": r, "name": n, "who": who} for r, n, who in WD.ROOMS],
+            "agents": people}
 
 
 def view(home: Path | None = None) -> dict[str, Any]:

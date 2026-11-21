@@ -151,6 +151,18 @@ the saving is small at the stick's 8K context (the 9B not measured yet).
 Use it only when long prompts run out of card memory; `sudo bau models tune --kv f16`
 goes back. `sudo bau models tune --reset` forgets every tune setting.
 
+**One conversation at a time.** The server keeps one memory window (8,192 word-pieces)
+and by default four conversations share it. On 2026-11-21 an agent's conversation grew to
+6,653 of them while others held the rest, and the server stopped answering for three hours
+(every agent job in that time failed after 10 minutes). With one conversation the whole
+window is its own; a second request waits its turn instead (a few seconds on the card).
+
+```bash
+sudo bau models tune --parallel 1
+```
+
+`sudo bau models tune --parallel 4` goes back to four.
+
 The tune settings live in `/etc/bau/llm-tune.env` and stay when you change the model.
 Only these settings exist; a model's own settings (the MTP files' `server_env`) are
 checked against a short list, so no file can move the server off this computer.
