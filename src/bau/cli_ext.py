@@ -122,7 +122,8 @@ def cmd_models(a):
         if not sys.stdin.isatty():
             raise PermissionError("this action must be taken by a human at a terminal")
         try:
-            now = P.tune(Path("/etc/bau"), P.run_cmd, draft=a.draft, kv=a.kv, reset=a.reset)
+            now = P.tune(Path("/etc/bau"), P.run_cmd, draft=a.draft, kv=a.kv, reset=a.reset,
+                         parallel=a.parallel)
         except ValueError as e:
             print(f"tune: {e}", file=sys.stderr)
             return EXIT_ERROR
@@ -2362,6 +2363,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--draft", help="words an MTP model guesses ahead (1-16), or off")
     x.add_argument("--kv", help="KV cache format: f16 (llama.cpp's default), q8_0 (half the "
                    "memory)")
+    x.add_argument("--parallel", help="conversations sharing the server's window (1-4); 1 "
+                   "gives one conversation all of it (docs/GPU.md)")
     x.add_argument("--reset", action="store_true", help="forget earlier settings first")
     x = ms.add_parser("compare", help="two models' latest lab results side by side "
                       "(e.g. a compressed file against a bigger one)")

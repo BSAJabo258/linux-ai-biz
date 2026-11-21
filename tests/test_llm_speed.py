@@ -75,9 +75,19 @@ def test_tune_writes_the_owners_settings_and_restarts(tmp_path):
     assert ran == [["systemctl", "restart", "bau-llm.service"]] * 4
 
 
+def test_tune_gives_one_conversation_the_whole_window(tmp_path):
+    # 2026-11-21: four conversations shared the desktop's 8,192-token window and the server
+    # stopped answering for three hours. --parallel 1 gives one conversation all of it.
+    etc = tmp_path / "etc"
+    assert pack.tune(etc, lambda c: "", parallel="1") == {"LLAMA_ARG_N_PARALLEL": "1"}
+    pack.tune(etc, lambda c: "", kv="q8_0")                # kept with the next setting
+    assert "LLAMA_ARG_N_PARALLEL=1" in (etc / "llm-tune.env").read_text().splitlines()
+
+
 @pytest.mark.parametrize("kw", [{"draft": "0"}, {"draft": "17"}, {"draft": "3; rm"},
                                 {"kv": "q8_0\nLLAMA_ARG_HOST=0.0.0.0"}, {"kv": "f32"},
-                                {"kv": "q4_0"}])
+                                {"kv": "q4_0"}, {"parallel": "0"}, {"parallel": "5"},
+                                {"parallel": "1 --host 0.0.0.0"}])
 def test_tune_refuses_anything_else(tmp_path, kw):
     with pytest.raises(ValueError):
         pack.tune(tmp_path, lambda c: "", **kw)
