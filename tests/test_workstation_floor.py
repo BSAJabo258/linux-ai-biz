@@ -161,3 +161,43 @@ def test_only_the_owner_answers_held_work(tmp_path):
         W.owner_decide(tmp_path, t["id"], "process:autopilot", True)
     with pytest.raises(PermissionError):
         W.owner_decide(tmp_path, t["id"], "agent:jarvis", True)
+
+
+def test_a_held_card_for_work_already_answered_never_errors(tmp_path):
+    # The owner's screen, 2026-11-21: "That didn't go through: KeyError: 'no held work
+    # wt_c0eba147'". Jarvis's page and the workstation asked for cards at the same moment and
+    # each made one for the same task; he approved one, and the other then failed.
+    import threading
+    import time
+
+    from test_assistant import make
+    j = make(tmp_path)
+    W.assign(tmp_path, "marketer", "post the week's plan on Fanvue", "human:owner")
+
+    class Slow(dict):                     # a card takes a moment to save: the asks overlap
+        def __setitem__(self, k, v):
+            time.sleep(0.05)
+            super().__setitem__(k, v)
+    j.pending = Slow(j.pending)
+    out = []
+    ts = [threading.Thread(target=lambda: out.append(j.setup_waiting())) for _ in range(8)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    cards = [p for p in j.pending.values() if p.tool == "work_hold"]
+    assert len(cards) == 1                                   # one card, however many ask
+    task = cards[0].args["task"]
+    W.owner_decide(tmp_path, task, "human:owner", True)      # answered elsewhere meanwhile
+    out = j.confirm(cards[0].id, True, "human:owner")
+    assert out["done"] and out["result"]["said"].startswith("Already taken care of")
+    assert not [p for p in j.setup_waiting() if p["tool"] == "work_hold"]   # taken down
+
+
+def test_a_stale_held_card_is_taken_down(tmp_path):
+    from test_assistant import make
+    j = make(tmp_path)
+    t = W.assign(tmp_path, "marketer", "post the week's plan on Fanvue", "human:owner")
+    assert [p for p in j.setup_waiting() if p["tool"] == "work_hold"]
+    W.owner_decide(tmp_path, t["id"], "human:owner", False)  # dropped on the other page
+    assert not [p for p in j.setup_waiting() if p["tool"] == "work_hold"]
