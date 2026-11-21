@@ -168,8 +168,9 @@ def test_a_held_card_for_work_already_answered_never_errors(tmp_path):
     # wt_c0eba147'". Jarvis's page and the workstation asked for cards at the same moment and
     # each made one for the same task; he approved one, and the other then failed.
     import threading
-    from test_assistant import make
     import time
+
+    from test_assistant import make
     j = make(tmp_path)
     W.assign(tmp_path, "marketer", "post the week's plan on Fanvue", "human:owner")
 
