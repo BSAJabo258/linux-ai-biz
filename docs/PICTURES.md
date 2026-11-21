@@ -174,9 +174,9 @@ What happens:
 
 - At most one of the day's posts is a clip: feet (level 2) or her alone, touching herself or
   with a toy (level 3), from `clips:` in `src/bau/data/creator_prompts.yaml`.
-- **Every frame is age-checked:** one a second and the last one, each through the same age
-  model as the pictures. One frame that could pass for under 20, or a check that cannot run,
-  and the clip is not kept (it stays in `artifacts/rejected`).
+- **Every frame is age-checked:** all of them (73 in a 3-second clip), each through the same
+  age model as the pictures. One frame that could pass for under 20, a frame missing, or a
+  check that cannot run, and the clip is not kept (it stays in `artifacts/rejected`).
 - **Her alone, within Fanvue's rules.** Fanvue's own pages (read 2026-11-21) ban bodily fluids
   and need ID and signed consent for anyone else shown. So a clip prompt that names another
   person, fluids (finishing on her, creampies, squirting) or anything Fanvue bans is refused

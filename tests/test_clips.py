@@ -68,7 +68,10 @@ def kept(home, name="her.png", lane="explicit", passed=True):
     return name
 
 
-def frames(n=3):
+FRAMES = 5                     # a short test clip: 4k+1 frames, as Wan makes them
+
+
+def frames(n=FRAMES):
     def get(clip, out):
         out.mkdir(parents=True, exist_ok=True)
         files = []
@@ -89,7 +92,8 @@ def run(home, prompt="she slowly points her bare feet toward the camera", **kw):
     fake = FakeComfy()
     out = comfy.animate(home, kw.pop("picture", kept(home)), prompt, "clip-1", opener=fake,
                         wait=0.001, frames_of=kw.pop("frames_of", frames()),
-                        checker=kw.pop("checker", scores([0.01, 0.02, 0.03])), **kw)
+                        checker=kw.pop("checker", scores([0.01, 0.02, 0.03, 0.01, 0.02])),
+                        frames=FRAMES, **kw)
     return out, fake
 
 
@@ -114,7 +118,8 @@ def test_a_clip_whose_every_frame_passes_is_kept_with_its_record(tmp_path):
     assert out["file"] == "clip-1.mp4" and clip.read_bytes() == MP4
     prov = json.loads((tmp_path / "artifacts/media/clip-1.mp4.provenance.json").read_text())
     assert prov["ai_generated"] and prov["model"] == comfy.WAN and prov["lane"] == "explicit"
-    assert prov["age_check"]["passed"] and prov["age_check"]["frames"] == 3
+    assert prov["age_check"]["passed"] and prov["age_check"]["frames"] == FRAMES
+    assert prov["age_check"]["of_frames"] == FRAMES                  # every frame, none skipped
     assert prov["file_sha256"] == hashlib.sha256(MP4).hexdigest()
     assert prov["start"]["file"] == "her.png"
     assert fake.uploads and fake.jobs[0]["8"]["class_type"] == "Wan22ImageToVideoLatent"
@@ -125,9 +130,27 @@ def test_a_clip_whose_every_frame_passes_is_kept_with_its_record(tmp_path):
 
 def test_one_young_looking_frame_keeps_nothing(tmp_path):
     with pytest.raises(comfy.ComfyError, match="under 20"):
-        run(tmp_path, checker=scores([0.01, 0.4, 0.01]))
+        run(tmp_path, checker=scores([0.01, 0.01, 0.01, 0.4, 0.01]))
     assert not (tmp_path / "artifacts" / "media" / "clip-1.mp4").exists()
     assert (tmp_path / "artifacts" / "rejected" / "clip-1.mp4").exists()
+
+
+def test_a_clip_with_a_frame_missing_keeps_nothing(tmp_path):
+    # The security review, 2026-11-21: frames left unchecked could hide a young-looking one.
+    with pytest.raises(comfy.ComfyError, match="frames decoded"):
+        run(tmp_path, frames_of=frames(FRAMES - 1))
+    assert not (tmp_path / "artifacts" / "media" / "clip-1.mp4").exists()
+
+
+def test_the_frames_are_scored_in_one_run_of_the_age_model(tmp_path, monkeypatch):
+    calls = []
+
+    def many(paths):
+        calls.append(len(paths))
+        return [{"10-19": 0.01, "20-29": 0.9}] * len(paths)
+    monkeypatch.setattr(comfy, "age_scores_many", many)
+    run(tmp_path, checker=None)
+    assert calls == [FRAMES]
 
 
 def test_an_age_check_that_cannot_run_keeps_nothing(tmp_path):
@@ -252,3 +275,17 @@ def test_the_feed_makes_at_most_one_clip_a_day_among_his_posts(tmp_path, monkeyp
     assert CF.fill(tmp_path) == 3                        # ...more posts, no second clip today
     jobs = [t["detail"]["job"] for t in A._load(tmp_path)["tasks"]]
     assert jobs.count("fanvue_clip") == 1
+
+
+def test_the_video_setup_never_writes_as_root_in_comfyuis_folder():
+    # The security review, 2026-11-21: the folder is the comfyui account's, so root following a
+    # link planted there could change a system file. Every write there runs as comfyui.
+    from pathlib import Path
+    text = (Path(__file__).resolve().parents[1] / "installer" / "bau-video-setup.sh").read_text()
+    body = text.split('for entry in "${FILES[@]}"; do', 1)[1].split("\ndone", 1)[0]
+    for line in body.splitlines():
+        cmd = line.strip()
+        if cmd.startswith(("mkdir", "install", "mv ", "rm ", "chown", "chmod", "cp ")) or \
+                cmd.startswith(("|| { rm", "curl")):
+            raise AssertionError(f"runs as root in comfyui's folder: {cmd}")
+    assert body.count("as_comfy") >= 6 and "install -" not in body

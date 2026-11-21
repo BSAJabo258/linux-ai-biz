@@ -52,7 +52,8 @@ wan2.2_ti2v_5B_fp16.safetensors and wan2.2_vae.safetensors, Comfy-Org/Wan-2.1
 umt5_xxl_fp8_e4m3fn_scaled.safetensors, all Apache-2.0. Fanvue's rules (read 2026-11-21,
 examples/platform-fanvue.yaml) ban bodily fluids and need ID and consent for anyone else shown,
 so a clip prompt naming a second person, fluids or a banned act is refused (SOLO_ONLY). Every
-clip's frames (one a second, and the last) each pass the same age check, or nothing is kept.
+frame of every clip passes the same age check (one run of the age model for all of them), or
+nothing is kept.
 
 Every picture: the prompt is checked for anything about minors first (never sent if so), the
 file lands in BAU_HOME/artifacts/media with a provenance record (AI-generated, model, seed,
@@ -135,6 +136,22 @@ def age_scores(path: Path) -> dict[str, float]:
     if run.returncode != 0:
         raise OSError((run.stderr or run.stdout).strip()[-300:] or "the age model did not run")
     return json.loads(run.stdout)
+
+
+def age_scores_many(paths: list[Path]) -> list[dict[str, float]]:
+    """The age model on many pictures in one run (a clip's frames): one list, same order."""
+    if not paths:
+        return []
+    run = subprocess.run([str(AGE_PYTHON), "-I", str(Path(__file__).with_name("agecheck_run.py")),
+                          str(AGE_DIR), *map(str, paths)],
+                         capture_output=True, text=True, timeout=1800)
+    if run.returncode != 0:
+        raise OSError((run.stderr or run.stdout).strip()[-300:] or "the age model did not run")
+    got = json.loads(run.stdout)
+    got = got if isinstance(got, list) else [got]
+    if len(got) != len(paths):
+        raise OSError(f"the age model scored {len(got)} of {len(paths)} frames")
+    return got
 
 
 def creator_prompt(profile: dict[str, Any], theme: str, shot: str) -> str:
@@ -456,16 +473,14 @@ def wan_graph(start: str, prompt: str, seed: int, negative: str = CLIP_NEGATIVE,
 
 
 def video_frames(clip: Path, out: Path) -> list[Path]:
-    """One frame a second and the very last one, as pictures for the age check (ffmpeg)."""
+    """Every frame of the clip as a picture for the age check (ffmpeg, no frame skipped: the
+    security review of 2026-11-21 found one a second left most frames unchecked)."""
     out.mkdir(parents=True, exist_ok=True)
-    for cmd in (["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-vf", "fps=1",
-                 str(out / "f%03d.png")],
-                ["ffmpeg", "-v", "error", "-y", "-sseof", "-0.1", "-i", str(clip),
-                 "-frames:v", "1", str(out / "last.png")]):
-        run = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        if run.returncode != 0:
-            raise OSError((run.stderr or "ffmpeg failed").strip()[-300:])
-    frames = sorted(out.glob("*.png"))
+    run = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-fps_mode", "passthrough",
+                          str(out / "f%05d.png")], capture_output=True, text=True, timeout=600)
+    if run.returncode != 0:
+        raise OSError((run.stderr or "ffmpeg failed").strip()[-300:])
+    frames = sorted(out.glob("f*.png"))
     if not frames:
         raise OSError("ffmpeg found no frames in the clip")
     return frames
@@ -476,8 +491,8 @@ def animate(home: Path, picture: str, prompt: str, name: str, seed: int | None =
             max_wait: float = DRAW_CLIP, max_line: float = IN_LINE, checker: Any = None,
             frames_of: Any = None, negative: str = CLIP_NEGATIVE, **size: int) -> dict[str, Any]:
     """Make one clip, BAU_HOME/artifacts/media/NAME.mp4, from ``picture``: one of her pictures
-    in artifacts/media that already passed the age check. Every frame checked is age-checked
-    again; one failing, or the check not running, keeps nothing."""
+    in artifacts/media that already passed the age check. Every frame of the clip is
+    age-checked again; one failing, a frame missing, or the check not running keeps nothing."""
     if not LOCAL.match(base):
         raise ComfyError("clips are made only by a model server on this computer")
     if not NAME.match(name or ""):
@@ -523,9 +538,13 @@ def animate(home: Path, picture: str, prompt: str, name: str, seed: int | None =
     held = rejected / f"{name}.mp4"                  # stays here unless every frame passes
     held.write_bytes(data)
     look = rejected / f".frames-{name}"
+    expected = int(size.get("frames", CLIP_FRAMES))
     try:
-        scores = [under_20((checker or age_scores)(f))
-                  for f in (frames_of or video_frames)(held, look)]
+        frames = (frames_of or video_frames)(held, look)
+        if len(frames) != expected:          # every frame, or the clip is not kept
+            raise OSError(f"{len(frames)} frames decoded, {expected} made")
+        found = [checker(f) for f in frames] if checker else age_scores_many(frames)
+        scores = [under_20(x) for x in found]
     except Exception as e:  # noqa: BLE001 - any failure means the clip is not kept
         audit.append("media.rejected", "bau", {"file": held.name, "why": "age check failed"})
         raise ComfyError(f"the age check could not run ({e}); the clip was not kept") from e
@@ -546,7 +565,7 @@ def animate(home: Path, picture: str, prompt: str, name: str, seed: int | None =
                  "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
                  "file_sha256": hashlib.sha256(data).hexdigest(),
                  "age_check": {"passed": True, "under_20": max(scores), "frames": len(scores),
-                               "max": MAX_UNDER_20, "model": AGE_MODEL,
+                               "of_frames": expected, "max": MAX_UNDER_20, "model": AGE_MODEL,
                                "revision": AGE_REVISION},
                  "created": dt.datetime.now(dt.UTC).isoformat()}
     (media / f"{name}.mp4.provenance.json").write_text(json.dumps(clip_prov, indent=1))
