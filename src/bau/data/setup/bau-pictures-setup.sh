@@ -63,10 +63,14 @@ if [[ ${BAU_PICTURES_CPU:-} != 1 ]] && ! compgen -G '/usr/lib/x86_64-linux-gnu/l
   apt-get install -y libcuda1 >/dev/null || { say "Could not install libcuda1 (NVIDIA's CUDA library)."; exit 1; }
 fi
 
+# Inside the folders the comfyui account owns, every write runs as comfyui, never as root: root
+# following a link planted there could change a system file (security review, 2026-11-21).
+as_comfy() { runuser -u comfyui -- "$@"; }
+
 say "2/5 The comfyui account (no login, no password)..."
 id comfyui >/dev/null 2>&1 || useradd --shell /usr/sbin/nologin --system \
   --home-dir "${HOME_DIR}" --comment 'Local pictures for BAU' comfyui
-install -d -o comfyui -g comfyui "${HOME_DIR}"
+install -d -o comfyui -g comfyui "${HOME_DIR}"   # its own home, in root's /usr/local: safe
 id -nG comfyui | grep -qw video || usermod -aG video,render comfyui 2>/dev/null || true
 
 say "3/5 ComfyUI ${COMFY_COMMIT:0:9} (checking the exact version)..."
@@ -92,27 +96,28 @@ fi
 
 say "5/5 The picture model (6.9 GB, checked), the service (this computer only)..."
 DEST="${SRC}/models/checkpoints/${MODEL_FILE}"
-if [[ ! -f ${DEST} ]]; then
+if ! as_comfy test -f "${DEST}"; then
+  as_comfy mkdir -p "${DEST%/*}"
   if [[ -n ${BAU_PICTURES_MODEL:-} ]]; then
-    install -o comfyui -g comfyui -m 0644 "${BAU_PICTURES_MODEL}" "${DEST}.part"
+    as_comfy tee "${DEST}.part" >/dev/null <"${BAU_PICTURES_MODEL}"
   else
-    runuser -u comfyui -- curl -fL --retry 3 -o "${DEST}.part" "${MODEL_URL}"
+    as_comfy curl -fL --retry 3 -o "${DEST}.part" "${MODEL_URL}"
   fi
-  echo "${MODEL_SHA256}  ${DEST}.part" | sha256sum -c --quiet \
-    || { rm -f "${DEST}.part"; say "The model file is not the pinned one: stopping"; exit 1; }
-  mv "${DEST}.part" "${DEST}"
+  echo "${MODEL_SHA256}  ${DEST}.part" | as_comfy sha256sum -c --quiet \
+    || { as_comfy rm -f "${DEST}.part"; say "The model file is not the pinned one: stopping"; exit 1; }
+  as_comfy mv "${DEST}.part" "${DEST}"
 fi
 
 say "   The age check model (343 MB, checked) and its runner..."
-install -d -o comfyui -g comfyui "${AGE_DIR}"
+as_comfy mkdir -p "${AGE_DIR}"
 for entry in "${AGE_FILES[@]}"; do
   read -r f sum <<< "${entry}"
-  if [[ ! -f ${AGE_DIR}/${f} ]]; then
-    runuser -u comfyui -- curl -fsSL --retry 3 -o "${AGE_DIR}/${f}.part" \
+  if ! as_comfy test -f "${AGE_DIR}/${f}"; then
+    as_comfy curl -fsSL --retry 3 -o "${AGE_DIR}/${f}.part" \
       "https://huggingface.co/dima806/fairface_age_image_detection/resolve/${AGE_REVISION}/${f}"
-    echo "${sum}  ${AGE_DIR}/${f}.part" | sha256sum -c --quiet \
-      || { rm -f "${AGE_DIR}/${f}.part"; say "${f} is not the pinned one: stopping"; exit 1; }
-    mv "${AGE_DIR}/${f}.part" "${AGE_DIR}/${f}"
+    echo "${sum}  ${AGE_DIR}/${f}.part" | as_comfy sha256sum -c --quiet \
+      || { as_comfy rm -f "${AGE_DIR}/${f}.part"; say "${f} is not the pinned one: stopping"; exit 1; }
+    as_comfy mv "${AGE_DIR}/${f}.part" "${AGE_DIR}/${f}"
   fi
 done
 # BAU runs agecheck_run.py (shipped with BAU) with ${VENV}/bin/python; check it works now.

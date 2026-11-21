@@ -26,6 +26,9 @@ FILES=(
 NEED_KB=$((4 * 1024 * 1024))
 
 say() { printf '%s\n' "$*"; }
+# Inside folders the comfyui account owns, every write runs as comfyui, never as root: root
+# following a link planted there could change a system file (security review, 2026-11-21).
+as_comfy() { runuser -u comfyui -- "$@"; }
 
 if [[ $(id -u) -ne 0 ]]; then
   say "Run it with sudo: sudo bash $0"; exit 1
@@ -43,8 +46,8 @@ if (( free_kb < NEED_KB )); then
 fi
 
 say "1/3 the IP-Adapter nodes (commit ${NODE_COMMIT:0:8})..."
-if [[ ! -d ${NODE_DIR}/.git ]]; then
-  install -d -o comfyui -g comfyui "${APP}/custom_nodes"
+if ! as_comfy test -d "${NODE_DIR}/.git"; then
+  as_comfy mkdir -p "${APP}/custom_nodes"
   runuser -u comfyui -- git clone --quiet "${NODE_REPO}" "${NODE_DIR}"
 fi
 runuser -u comfyui -- git -C "${NODE_DIR}" fetch --quiet origin "${NODE_COMMIT}" || true
@@ -57,16 +60,16 @@ for entry in "${FILES[@]}"; do
   read -r dir name sum url <<<"${entry}"
   n=$((n + 1))
   dest="${MODELS}/${dir}/${name}"
-  install -d -o comfyui -g comfyui "${MODELS}/${dir}"
-  if [[ -f ${dest} ]] && echo "${sum}  ${dest}" | sha256sum -c --quiet 2>/dev/null; then
+  as_comfy mkdir -p "${MODELS}/${dir}"
+  if as_comfy test -f "${dest}" && echo "${sum}  ${dest}" | as_comfy sha256sum -c --quiet 2>/dev/null; then
     say "${n}/3 ${name}: already here."
     continue
   fi
   say "${n}/3 ${name} (checked against its pinned SHA-256)..."
-  runuser -u comfyui -- curl -fL --retry 3 -C - -o "${dest}.part" "${url}"
-  echo "${sum}  ${dest}.part" | sha256sum -c --quiet \
-    || { rm -f "${dest}.part"; say "${name} is not the pinned file: stopping"; exit 1; }
-  mv "${dest}.part" "${dest}"
+  as_comfy curl -fL --retry 3 -C - -o "${dest}.part" "${url}"
+  echo "${sum}  ${dest}.part" | as_comfy sha256sum -c --quiet \
+    || { as_comfy rm -f "${dest}.part"; say "${name} is not the pinned file: stopping"; exit 1; }
+  as_comfy mv "${dest}.part" "${dest}"
 done
 
 say "Restarting the picture maker so it loads the face nodes..."

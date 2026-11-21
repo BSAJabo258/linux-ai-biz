@@ -5,6 +5,7 @@ owner's clip price. Fakes only: no ComfyUI, no ffmpeg, no Fanvue."""
 
 import hashlib
 import json
+import re
 
 import pytest
 import yaml
@@ -290,3 +291,28 @@ def test_the_model_setups_never_write_as_root_in_comfyuis_folder(script):
                 cmd.startswith(("|| { rm", "curl")):
             raise AssertionError(f"runs as root in comfyui's folder: {cmd}")
     assert body.count("as_comfy") >= 6 and "install -" not in body
+
+
+WRITES = re.compile(r"^\s*(?:\|\|\s*\{\s*)?(install|mv|rm|mkdir|chown|chmod|cp|tee|curl)\b|"
+                    r"sha256sum -c")
+
+
+@pytest.mark.parametrize("script", ["bau-pictures-setup.sh", "bau-explicit-setup.sh",
+                                    "bau-video-setup.sh", "bau-face-setup.sh",
+                                    "bau-lora-train.sh"])
+def test_no_setup_script_writes_as_root_inside_comfyuis_folders(script):
+    # The owner, 2026-11-21: "fix all". Every write, copy, check or move inside folders the
+    # comfyui account owns runs as comfyui (as_comfy) or reads as bau (as_bau); root only
+    # creates comfyui's own top folders, which sit in root's /usr/local.
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    text = (root / "installer" / script).read_text()
+    assert text == (root / "src/bau/data/setup" / script).read_text()      # the shipped copy
+    for line in text.splitlines():
+        if line.lstrip().startswith("#") or not WRITES.search(line) or "-o /dev/null" in line:
+            continue                                  # a health check's answer, thrown away
+        if "as_comfy" in line or "as_bau" in line or "runuser -u comfyui" in line:
+            continue
+        if line.rstrip().endswith("in root's /usr/local: safe"):
+            continue
+        raise AssertionError(f"{script} writes as root: {line.strip()}")
