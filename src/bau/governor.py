@@ -46,7 +46,10 @@ DEFAULTS: dict[str, Any] = {
     "denials_per_hour": 5,          # gateway denials before an agent is quarantined
     "daily_spend_hold_usd": 50.0,   # total spend in 24h that puts BAU on HOLD
     "min_free_disk_pct": 10,
-    "services": ["bau-ui.service", "bau-regwatch.timer"],
+    # The money machine's own services too (2026-11-21, the owner's watch timer): a failed
+    # one is a finding; one not installed here ("inactive") is not.
+    "services": ["bau-ui.service", "bau-regwatch.timer", "bau-jarvis.service",
+                 "bau-pictures.service", "bau-llm.service", "bau-autopilot.timer"],
     "reviewer_model": None,
 }
 SEVERITIES = ["INFO", "WARN", "ACTION", "CRITICAL"]
@@ -92,8 +95,10 @@ class Finding:
 
 class Governor:
     def __init__(self, home: Path | None = None, audit: AuditLog | None = None,
-                 reviewer: Any = None, systemctl: Any = None, online: Any = None):
+                 reviewer: Any = None, systemctl: Any = None, online: Any = None,
+                 money: Any = None):
         self.home = home or bau_home()
+        self.money = money          # () -> money.links(home); None reads this computer
         self.dir = self.home / "governor"
         self.dir.mkdir(parents=True, exist_ok=True)
         self.audit = audit or AuditLog(self.home / "audit" / "chain.jsonl")
@@ -134,7 +139,8 @@ class Governor:
         since = _ts(st["last_tick"]) if st["last_tick"] else _now() - dt.timedelta(hours=1)
         found: list[Finding] = []
         for check in (self._audit_chain, self._jobs, self._missions, self._agents,
-                      self._spend, self._dashboard, self._disk, self._services):
+                      self._spend, self._dashboard, self._disk, self._services,
+                      self._money):
             try:
                 found += check(st, since, executor)
             except Exception as e:  # a broken check is itself a finding, never silent
@@ -146,7 +152,7 @@ class Governor:
         st["last_tick"] = _now().isoformat()
         atomic_write_json(self.state_path, st)
         report = {"at": st["last_tick"], "hold": hold_reason(self.home),
-                  "checked": 8 + (self.reviewer is not None), "findings": len(found),
+                  "checked": 9 + (self.reviewer is not None), "findings": len(found),
                   "new": [f.__dict__ for f in new]}
         self.audit.append("governor.tick", ACTOR, {
             "findings": len(found), "new": len(new), "hold": bool(report["hold"]),
@@ -351,6 +357,25 @@ class Governor:
                                    f"journalctl -u {unit}"))
             elif state not in ("inactive", "unknown", ""):
                 out.append(Finding("services", "WARN", unit, f"state {state}"))
+        return out
+
+    def _money(self, st, since, executor) -> list[Finding]:
+        """Like an uptime monitor: a money link (bau money) that was working and is not any
+        more is a finding with its exact fix. A link never set up has its setup card instead,
+        so it is not said twice."""
+        from .station import is_station
+        if is_station():
+            return []
+        if self.money is not None:
+            links = self.money()
+        else:
+            from . import money
+            links = money.links(self.home)
+        was_ok = set(st.get("money_ok", []))
+        out = [Finding("money", "ACTION", link["link"],
+                       f"stopped working ({link['found']}); fix: {link['fix']}"[:300])
+               for link in links if not link["ok"] and link["link"] in was_ok]
+        st["money_ok"] = sorted(was_ok | {link["link"] for link in links if link["ok"]})
         return out
 
     # ------------------------------------------------------------ validator model

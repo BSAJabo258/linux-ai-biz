@@ -37,3 +37,5 @@ still world with links missing means the money machine is waiting on you, not th
 broken.
 
 Not yet run on your desktop.
+
+Once a link has worked, the watch keeps an eye on it: if it stops, a card pops up in Jarvis with the fix (`docs/WATCH.md`).

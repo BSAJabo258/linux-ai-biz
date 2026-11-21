@@ -56,6 +56,10 @@ While autopost is on, the autopilot keeps the queue stocked with your number of 
 **You approve every picture.** Accept puts it in the posting queue; Not now drops it. Autopost
 only posts pictures you accepted.
 
+Once a week the pictures you accepted are also sold as **drops**: one locked message to all
+her subscribers with a free preview, and her most explicit set to her VIPs first
+(`docs/DROPS.md`).
+
 Subscribers-only posts are level 1. Posts for followers and subscribers are level 0. Once
 Chroma is set up and you have written your explicit limits and prices, the feed takes turns:
 your base level, then a level 2 nude unlock, then a level 3 xxx unlock. Your limits are added
