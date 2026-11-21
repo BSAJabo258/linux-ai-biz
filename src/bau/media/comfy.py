@@ -36,6 +36,24 @@ SHA-256 (Hugging Face API, 2026-11-09), all Apache-2.0:
   Comfy-Org/Lumina-Image-2  split_files/vae/ae.safetensors  335,304,388  afc8e282...9e38
 The age check below runs on these pictures exactly as on every other.
 
+Clips (the owner's ask 2026-11-21, levels 2 and 3, Fanvue only, solo only): Wan 2.2 TI2V-5B
+(Wan-AI/Wan2.2-TI2V-5B, Apache-2.0) animates one of her pictures that already passed the age
+check, in ComfyUI's own Wan 2.2 5B workflow (docs.comfy.org/tutorials/video/wan/wan2_2 and the
+template video_wan2_2_5B_ti2v.json, read 2026-11-21): UNETLoader(weight_dtype default) ->
+ModelSamplingSD3(shift 8); CLIPLoader(type "wan"); VAELoader; LoadImage ->
+Wan22ImageToVideoLatent(width, height, length 4k+1, start_image); KSampler(20 steps, cfg 5,
+uni_pc, simple); VAEDecode; CreateVideo(fps 24); SaveVideo, whose result is listed under
+"images" in /history like a picture (comfy_api/latest/_ui.py PreviewVideo). Every node was
+checked in ComfyUI commit 17ff1dc on 2026-11-21; SaveVideo's nested inputs are named with dots
+("format.codec", _io.py finalize_prefix). ComfyUI says the 5B "should fit well on 8GB vram
+with the ComfyUI native offloading" (their claim; measured on this card before the defaults
+below are trusted). Files (installer/bau-video-setup.sh, SHA-256 pinned): Comfy-Org/Wan-2.2
+wan2.2_ti2v_5B_fp16.safetensors and wan2.2_vae.safetensors, Comfy-Org/Wan-2.1
+umt5_xxl_fp8_e4m3fn_scaled.safetensors, all Apache-2.0. Fanvue's rules (read 2026-11-21,
+examples/platform-fanvue.yaml) ban bodily fluids and need ID and consent for anyone else shown,
+so a clip prompt naming a second person, fluids or a banned act is refused (SOLO_ONLY). Every
+clip's frames (one a second, and the last) each pass the same age check, or nothing is kept.
+
 Every picture: the prompt is checked for anything about minors first (never sent if so), the
 file lands in BAU_HOME/artifacts/media with a provenance record (AI-generated, model, seed,
 prompt hash), and the audit chain gets a media.drawn row.
@@ -221,10 +239,11 @@ def chroma_ready() -> bool:
     return CHROMA_FILES.is_file()
 
 
-def upload_face(opener: Any, base: str, face: Path) -> str:
-    """Send the locked face picture to ComfyUI's input folder; returns the name it uses."""
+def upload_face(opener: Any, base: str, face: Path, prefix: str = "bau-face-") -> str:
+    """Send a picture (the locked face, or a clip's start) to ComfyUI's input folder; returns
+    the name it uses."""
     data = face.read_bytes()
-    name = "bau-face-" + hashlib.sha256(data).hexdigest()[:16] + ".png"
+    name = prefix + hashlib.sha256(data).hexdigest()[:16] + ".png"
     boundary = "bau" + hashlib.sha256(data[:64] + name.encode()).hexdigest()[:24]
     body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\ntrue\r\n"
             f"--{boundary}\r\nContent-Disposition: form-data; name=\"image\"; "
@@ -376,3 +395,163 @@ def draw(home: Path, prompt: str, name: str, seed: int | None = None, base: str 
     audit.append("media.drawn", "bau", {"file": out.name, "model": model, "seed": seed,
                                         "under_20": young, "file_sha256": prov["file_sha256"]})
     return {"file": out.name, "seed": seed, "bytes": len(png)}
+
+
+# ---------------------------------------------------------------- clips (Wan 2.2 TI2V-5B)
+WAN = "wan2.2_ti2v_5B_fp16.safetensors"
+WAN_TEXT = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+WAN_VAE = "wan2.2_vae.safetensors"
+WAN_FILES = (COMFY_APP / "models" / "diffusion_models" / WAN,
+             COMFY_APP / "models" / "text_encoders" / WAN_TEXT,
+             COMFY_APP / "models" / "vae" / WAN_VAE)
+# Cautious until measured on the desktop's card: portrait, 3 seconds at 24 a second.
+CLIP_WIDTH, CLIP_HEIGHT, CLIP_FRAMES, CLIP_FPS = 704, 1280, 73, 24
+DRAW_CLIP = 3600.0
+CLIP_NEGATIVE = NEGATIVE + (", another person, man, partner, couple, bodily fluids, "
+                            "static, frozen, blurry, distorted face, extra limbs")
+# Solo only, and nothing Fanvue bans (community guidelines C.6, read 2026-11-21): a second
+# person, fluids, choking, sleep, family roles, non-consent, blood. Refused, never sent.
+SOLO_ONLY = re.compile(
+    r"\b(man|men|male|guy|boyfriend|husband|partner|couple|threesome|two people|"
+    r"another (?:person|woman|girl)|second person|penis|cock|dick|ejaculat\w*|cum|cums|"
+    r"cumshot\w*|creampie\w*|facial|squirt\w*|gush\w*|semen|sperm|urinat\w*|pee|piss\w*|"
+    r"chok\w*|strangl\w*|asleep|sleeping|unconscious|incest|step(?:mom|mother|sister|dad|"
+    r"father|brother|daughter|son)|rape|forced|non-?consent\w*|blood\w*)\b", re.I)
+
+
+def wan_ready() -> bool:
+    return all(f.is_file() for f in WAN_FILES)
+
+
+def wan_graph(start: str, prompt: str, seed: int, negative: str = CLIP_NEGATIVE,
+              width: int = CLIP_WIDTH, height: int = CLIP_HEIGHT,
+              frames: int = CLIP_FRAMES, fps: int = CLIP_FPS) -> dict[str, Any]:
+    """ComfyUI's own Wan 2.2 5B workflow in its API format, starting from ``start`` (a picture
+    already in ComfyUI's input folder)."""
+    if frames % 4 != 1:
+        raise ComfyError("a clip's length is 4k+1 frames (Wan22ImageToVideoLatent)")
+    return {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": WAN, "weight_dtype": "default"}},
+        "2": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["1", 0], "shift": 8}},
+        "3": {"class_type": "CLIPLoader",
+              "inputs": {"clip_name": WAN_TEXT, "type": "wan", "device": "default"}},
+        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["3", 0]}},
+        "5": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["3", 0]}},
+        "6": {"class_type": "VAELoader", "inputs": {"vae_name": WAN_VAE}},
+        "7": {"class_type": "LoadImage", "inputs": {"image": start}},
+        "8": {"class_type": "Wan22ImageToVideoLatent",
+              "inputs": {"vae": ["6", 0], "width": width, "height": height, "length": frames,
+                         "batch_size": 1, "start_image": ["7", 0]}},
+        "9": {"class_type": "KSampler",
+              "inputs": {"model": ["2", 0], "seed": seed, "steps": 20, "cfg": 5,
+                         "sampler_name": "uni_pc", "scheduler": "simple",
+                         "positive": ["4", 0], "negative": ["5", 0],
+                         "latent_image": ["8", 0], "denoise": 1}},
+        "10": {"class_type": "VAEDecode", "inputs": {"samples": ["9", 0], "vae": ["6", 0]}},
+        "11": {"class_type": "CreateVideo", "inputs": {"images": ["10", 0], "fps": fps}},
+        "12": {"class_type": "SaveVideo",
+               "inputs": {"video": ["11", 0], "filename_prefix": "bau/clip", "format": "mp4",
+                          "format.codec": "auto"}},
+    }
+
+
+def video_frames(clip: Path, out: Path) -> list[Path]:
+    """One frame a second and the very last one, as pictures for the age check (ffmpeg)."""
+    out.mkdir(parents=True, exist_ok=True)
+    for cmd in (["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-vf", "fps=1",
+                 str(out / "f%03d.png")],
+                ["ffmpeg", "-v", "error", "-y", "-sseof", "-0.1", "-i", str(clip),
+                 "-frames:v", "1", str(out / "last.png")]):
+        run = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if run.returncode != 0:
+            raise OSError((run.stderr or "ffmpeg failed").strip()[-300:])
+    frames = sorted(out.glob("*.png"))
+    if not frames:
+        raise OSError("ffmpeg found no frames in the clip")
+    return frames
+
+
+def animate(home: Path, picture: str, prompt: str, name: str, seed: int | None = None,
+            base: str = BASE, opener: Any = None, wait: float = 5.0,
+            max_wait: float = DRAW_CLIP, max_line: float = IN_LINE, checker: Any = None,
+            frames_of: Any = None, negative: str = CLIP_NEGATIVE, **size: int) -> dict[str, Any]:
+    """Make one clip, BAU_HOME/artifacts/media/NAME.mp4, from ``picture``: one of her pictures
+    in artifacts/media that already passed the age check. Every frame checked is age-checked
+    again; one failing, or the check not running, keeps nothing."""
+    if not LOCAL.match(base):
+        raise ComfyError("clips are made only by a model server on this computer")
+    if not NAME.match(name or ""):
+        raise ComfyError("a clip name is lowercase letters, digits, dot, dash")
+    if m := MINOR_REFERENCE.search(prompt):
+        raise ComfyError(f"refers to minors ({m.group(0)!r}); BAU never makes that")
+    if m := SOLO_ONLY.search(prompt):
+        raise ComfyError(f"clips are her alone and within Fanvue's rules ({m.group(0)!r} is "
+                         "not); never sent")
+    media = home / "artifacts" / "media"
+    start = media / Path(picture).name
+    try:
+        prov = json.loads((media / f"{start.name}.provenance.json").read_text())
+    except (OSError, ValueError):
+        prov = {}
+    if start.suffix != ".png" or not start.is_file() or \
+            not (prov.get("age_check") or {}).get("passed"):
+        raise ComfyError(f"{picture} is not one of her kept pictures (age-checked)")
+    opener = opener or urllib.request.urlopen
+    seed = random.randrange(2**32) if seed is None else int(seed)
+    first = upload_face(opener, base, start, prefix="bau-clip-")
+    job = _call(opener, base + "/prompt",
+                {"prompt": wan_graph(first, prompt, seed, negative=negative, **size)})
+    if not job.get("prompt_id"):
+        err = job.get("error")
+        why = err.get("message") if isinstance(err, dict) else err
+        raise ComfyError(f"ComfyUI refused the job: {why or job.get('node_errors')}")
+    pid = job["prompt_id"]
+    try:
+        hist = _await(opener, base, pid, wait, max_wait, max_line)
+    except BaseException:
+        _cancel(opener, base, pid)
+        raise
+    made = [i for o in hist["outputs"].values() for i in o.get("images", [])]
+    if not made:
+        raise ComfyError("ComfyUI finished without a clip")
+    q = urllib.parse.urlencode({k: made[0].get(k, "") for k in ("filename", "subfolder",
+                                                                 "type")})
+    data = _call(opener, f"{base}/view?{q}", raw=True, timeout=300)
+    audit = AuditLog(home / "audit" / "chain.jsonl")
+    rejected = home / "artifacts" / "rejected"
+    rejected.mkdir(parents=True, exist_ok=True)
+    held = rejected / f"{name}.mp4"                  # stays here unless every frame passes
+    held.write_bytes(data)
+    look = rejected / f".frames-{name}"
+    try:
+        scores = [under_20((checker or age_scores)(f))
+                  for f in (frames_of or video_frames)(held, look)]
+    except Exception as e:  # noqa: BLE001 - any failure means the clip is not kept
+        audit.append("media.rejected", "bau", {"file": held.name, "why": "age check failed"})
+        raise ComfyError(f"the age check could not run ({e}); the clip was not kept") from e
+    finally:
+        shutil.rmtree(look, ignore_errors=True)
+    if not scores or max(scores) > MAX_UNDER_20:
+        audit.append("media.rejected", "bau", {"file": held.name, "under_20": max(scores or [1])})
+        raise ComfyError(f"a frame could pass for under 20 ({max(scores or [1]):.2f}); the "
+                         "clip was moved to artifacts/rejected and will not be used")
+    out = media / f"{name}.mp4"
+    shutil.move(held, out)
+    w, h, n = (size.get("width", CLIP_WIDTH), size.get("height", CLIP_HEIGHT),
+               size.get("frames", CLIP_FRAMES))
+    clip_prov = {"ai_generated": True, "generator": "ComfyUI (local)", "model": WAN,
+                 "lane": prov.get("lane", "explicit"), "seed": seed, "kind": "clip",
+                 "start": {"file": start.name, "file_sha256": prov.get("file_sha256")},
+                 "size": [w, h], "frames": n, "fps": CLIP_FPS,
+                 "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+                 "file_sha256": hashlib.sha256(data).hexdigest(),
+                 "age_check": {"passed": True, "under_20": max(scores), "frames": len(scores),
+                               "max": MAX_UNDER_20, "model": AGE_MODEL,
+                               "revision": AGE_REVISION},
+                 "created": dt.datetime.now(dt.UTC).isoformat()}
+    (media / f"{name}.mp4.provenance.json").write_text(json.dumps(clip_prov, indent=1))
+    audit.append("media.animated", "bau", {"file": out.name, "start": start.name, "seed": seed,
+                                           "under_20": max(scores), "frames": len(scores),
+                                           "file_sha256": clip_prov["file_sha256"]})
+    return {"file": out.name, "seed": seed, "bytes": len(data)}
+
