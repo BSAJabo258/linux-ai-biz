@@ -333,9 +333,14 @@ const shownCards = {}, popQ = [], dismissed = new Set();
 let popping = null, popPicked = {};
 const ACCEPT = /^(setup_step|autopilot_answer|fanvue_review|fan_reply|agent_approve|work_review|work_hold)$/;
 function hasChoices(p) { return !!(p.form && p.form.fields && p.form.fields.length); }
-function preview(p, img) {
+function preview(p, img) {        // a picture, or a clip (video/mp4) played muted on a loop
   fetch("/api/preview/" + encodeURIComponent(p.id), { headers: { "X-Jarvis-Key": KEY } })
-    .then(r => r.ok ? r.blob() : null).then(b => { if (b && b.type.startsWith("image/")) img.src = URL.createObjectURL(b); else img.remove(); })
+    .then(r => r.ok ? r.blob() : null).then(b => {
+      if (b && b.type.startsWith("image/")) img.src = URL.createObjectURL(b);
+      else if (b && b.type.startsWith("video/")) { const v = el("video"); v.src = URL.createObjectURL(b);
+        v.controls = v.muted = v.loop = v.playsInline = true; v.style.cssText = "display:block;max-width:100%;max-height:46vh;border-radius:10px;margin:0 auto 12px";
+        img.replaceWith(v); }
+      else img.remove(); })
     .catch(() => img.remove());
 }
 function card(p) {

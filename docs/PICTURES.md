@@ -153,6 +153,41 @@ changed, BAU stops using it until you lock it again.
 Not tested yet: the trainer has not run on this computer. sd-scripts is tested on Python
 3.10 to 3.12 and this computer has 3.13, so the first run is the test.
 
+## Clips for levels 2 and 3 (Wan 2.2, 2026-11-21)
+
+Short clips of her alone, made on this desktop from one of her kept explicit pictures, so her
+face stays hers. The model is Wan 2.2 TI2V-5B (free licence, Apache-2.0), run inside the same
+ComfyUI as the pictures, with ComfyUI's own workflow.
+
+Set it up once (about 18 GB, checked file by file):
+
+```bash
+sudo bash installer/bau-video-setup.sh
+```
+
+Or press Accept on the **Set up short clips** card in Jarvis; it comes after the Chroma card.
+Then the **Set your clip price** card asks what a fan pays to unlock one clip (filled in from
+Fanvue's advice, $14.99; nothing posts until you Accept). At a terminal it is
+`bau creator prices PROFILE --subscription .. --nude .. --xxx .. --clip ..`.
+
+What happens:
+
+- At most one of the day's posts is a clip: feet (level 2) or her alone, touching herself or
+  with a toy (level 3), from `clips:` in `src/bau/data/creator_prompts.yaml`.
+- **Every frame is age-checked:** one a second and the last one, each through the same age
+  model as the pictures. One frame that could pass for under 20, or a check that cannot run,
+  and the clip is not kept (it stays in `artifacts/rejected`).
+- **Her alone, within Fanvue's rules.** Fanvue's own pages (read 2026-11-21) ban bodily fluids
+  and need ID and signed consent for anyone else shown. So a clip prompt that names another
+  person, fluids (finishing on her, creampies, squirting) or anything Fanvue bans is refused
+  and never sent. Those wait for Fanvue's written answer.
+- Your limits are added to what every clip must never show.
+- It goes on a card like a picture, and the card plays the clip. While the automaton runs it
+  posts by itself, as pictures do (your choice).
+
+Not measured yet: how long a clip takes on the RTX 3060 and the largest size that fits. It
+starts at 704x1280, 3 seconds; the first real clip sets these.
+
 ## Still to do
 
 - Showing the pictures themselves on the week's card.

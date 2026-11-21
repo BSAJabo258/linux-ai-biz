@@ -183,11 +183,12 @@ def handlers(home: Path, sc: Any = None, gh: Any = None) -> dict[str, A.Handler]
         return {"ok": True, "evidence": B.summary(bp).split("\n")[1]}
 
     def draft(task: dict[str, Any]) -> dict[str, Any]:
-        if task["detail"].get("job") != "fanvue_post":
+        job = task["detail"].get("job")
+        if job not in ("fanvue_post", "fanvue_clip"):
             return {"ok": False, "evidence": "no handler for this draft"}
-        from .creator_feed import make_post
+        from .creator_feed import make_clip, make_post
         try:
-            return make_post(home, task)
+            return (make_clip if job == "fanvue_clip" else make_post)(home, task)
         except Exception as e:  # noqa: BLE001 - a refused or failed picture is the evidence
             return {"ok": False, "evidence": f"{type(e).__name__}: {e}"[:300]}
 
