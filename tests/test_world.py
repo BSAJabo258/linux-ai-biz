@@ -382,3 +382,20 @@ def test_the_hq_roster_shows_a_recorded_job_not_yet_started_as_assigned(tmp_path
     state = {a["name"]: a["state"] for a in w["agents"]}["researcher"]
     rows = {r["name"]: r for r in w["roster"]}
     assert rows["researcher"] == {"name": "researcher", "state": state, "light": LIGHT[state]}
+
+
+def test_the_hq_line_up_moves_with_the_records():
+    # The owner, 2026-11-21: "does the virtual AI world [have] motion": the HQ view showed each
+    # character frozen on frame 0. Now her sprite plays her state's animation, the line stands
+    # in department order, and a real room change makes her walk to her new place.
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert 'else if (OPS && W_MODE === "hq") hqTick(t);' in page          # animated, every frame
+    body = page.split("function hqTick(t) {", 1)[1].split("\n}", 1)[0]
+    assert 'walking ? ["walk_front", 140] : (W_ANIM[cv.dataset.state]' in body
+    assert "Math.random" not in body                                     # from records only
+    assert 'const HQ_LINE = [...HQ_ROOMS, "approvals", "repair", "delivery"]' in page
+    assert "walks = was !== undefined && was !== a.room" in page          # only a real change
+    assert 'const seen = W_MODE === "hq" && !REDUCED' in page             # reduced motion: still
+    assert "[a.name, a.room, a.state," in page                            # a room change redraws

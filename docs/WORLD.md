@@ -27,7 +27,7 @@ never the data: every line is a real record, the same ones the floor reads.
 
 - **Behind it:** a neon headquarters at night painted by the computer (a city through tall
   windows, a holographic globe, desks with their screens off, a glossy floor), without any
-  words, so it can never show a status that is not true. Nothing in it moves.
+  words, so it can never show a status that is not true. The picture itself never moves.
 - **Jarvis agents:** the roles in your picture, then your other agents, the autopilot and the
   automaton (`bau automaton`). A role BAU has no agent for (architect, developer, tester,
   coordinator) says "not set up yet". An agent shows its real state (working, waiting for
@@ -44,9 +44,14 @@ never the data: every line is a real record, the same ones the floor reads.
   "Finish Strong Friday" on Fridays, and so on), from this computer's date.
 - **Our virtual world:** your eight rooms, each a picture of that room from the floor with how
   many agents are in it. Click one to open it on the floor, zoomed in.
-- **The women:** each character stands in her pose for her real job: working, waiting for you,
-  done, or idle (stopped shows a red tag). Jarvis is in the middle. Click one to see her
-  record on the floor. Until her painted pictures exist she is shown as her floor character.
+- **The women:** each character plays her animation for her real job: working, waiting for
+  you, done, or idle (stopped shows a red tag). Jarvis is in the middle; the others stand in
+  the order of the departments their jobs put them in (Headquarters, Research, Forge, ...,
+  Review, Stopped, Delivered). When a real job moves one to another department she **walks**
+  to her new place, with "→ the department" under her name, and the others step aside
+  (2026-11-21). Nothing walks without a change in the records; with "reduce motion" on in
+  your computer's settings, they stand still. Click one to see her record on the floor.
+  Until her painted pictures exist she is shown as her floor character.
 
 The rooms in your picture and the rooms we have. You named four of them in prompt 2 (2026-11-20):
 
