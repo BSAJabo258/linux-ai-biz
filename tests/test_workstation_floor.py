@@ -35,6 +35,12 @@ def test_every_department_is_a_station_and_each_ai_stands_where_its_job_is(tmp_p
     assert [r["id"] for r in f["rooms"]] == [r for r, _, _ in ROOMS]
     at = {a["role"]: (a["room"], a["state"]) for a in f["agents"]}
     assert at["jarvis"] == ("hq", "idle")
+    looks = {a["role"]: a["look"] for a in f["agents"]}
+    assert looks["jarvis"] == "jarvis" and looks["researcher"] == "researcher"
+    import json
+    sheet = json.loads((Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "world" /
+                        "characters.json").read_text())
+    assert set(looks.values()) <= set(sheet["characters"])     # every look is on the sheet
     assert at["researcher"] == ("research", "working")
     assert at["producer"] == ("approvals", "waiting for you")
     assert at["finance"] == ("delivery", "done")
@@ -56,8 +62,12 @@ def test_a_worker_walks_only_when_its_real_job_changes(tmp_path):
 def test_the_page_walks_between_stations_and_respects_reduced_motion():
     assert "function renderFloor(f, delivered)" in PAGE
     assert 'w.classList.add("walking")' in PAGE and ".walker.placed{transition:left" in PAGE
-    for pose in ("working", "waiting", "stopped", "done"):
-        assert f'.walker[data-pose="{pose}"]' in PAGE
+    # the owner, 2026-11-21: "the motion should be the virtual ai models": her own character
+    # from the world's sprite sheet, her walk while she walks, her state's animation after
+    assert 'url("/world/characters.png")' in PAGE and 'apiJson("/world/characters.json")' in PAGE
+    assert '"walk_back" : "walk_front"' in PAGE
+    for anim in ("work", "wait", "done", "idle", "blocked"):
+        assert f'["{anim}", ' in PAGE
     assert "@media(prefers-reduced-motion:reduce)" in PAGE
     assert "Math.random" not in PAGE                          # motion only from real state
     assert 'id="drop"' not in PAGE                           # Delivered is a station now

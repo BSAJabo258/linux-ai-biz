@@ -188,6 +188,11 @@ def lifecycle(job: Any, mission: dict[str, Any] | None) -> list[dict[str, str]]:
     return out
 
 
+def look(name: str) -> str:
+    """Her character on the sprite sheet: her own, or always the same one of the others."""
+    return LOOK.get(name) or OTHER_LOOKS[zlib.crc32(name.encode()) % len(OTHER_LOOKS)]
+
+
 def _agent_name(job_agent: str) -> str:
     return job_agent.removeprefix("folder:")
 
@@ -234,7 +239,7 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
                           "lifecycle": lifecycle(job, missions.get(job.mission_id))}
             if state == "working" and at is not None and now - at > QUIET:
                 rec["quiet_minutes"] = int((now - at).total_seconds() // 60)
-        rec["look"] = LOOK.get(name) or OTHER_LOOKS[zlib.crc32(name.encode()) % len(OTHER_LOOKS)]
+        rec["look"] = look(name)
         agents.append(rec)
     agents.insert(0, jarvis(home, now))
     for rec in agents:

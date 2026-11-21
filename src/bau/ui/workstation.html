@@ -44,46 +44,18 @@ main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.8fr);gap:1
 #pile{display:flex;gap:3px;flex-wrap:wrap;position:absolute;left:10px;bottom:20px;max-width:60%}
 #pile i{display:block;width:8px;height:10px;border:1px solid var(--gold);background:rgba(255,209,102,.18);border-radius:1px}
 #walkers{position:absolute;inset:0;pointer-events:none;z-index:4}
-.walker{position:absolute;left:0;top:0;width:54px;height:122px;margin:-104px 0 0 -27px;pointer-events:auto;cursor:default}
+.walker{position:absolute;left:0;top:0;width:86px;height:136px;margin:-120px 0 0 -43px;pointer-events:auto;cursor:default}
 .walker.placed{transition:left 2.6s cubic-bezier(.45,0,.3,1),top 2.6s cubic-bezier(.45,0,.3,1)}
-.walker .figure{position:relative;width:54px;height:102px;transform-origin:50% 80%}
-.walker .tag{position:absolute;top:102px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;letter-spacing:.06em;color:var(--ink);background:rgba(8,11,18,.85);border:1px solid var(--line);border-radius:99px;padding:0 6px}
-.walker[data-role="jarvis"] .head,.walker[data-role="jarvis"] .torso{border-color:var(--gold)}
-.walker[data-role="jarvis"] .neck,.walker[data-role="jarvis"] .leg,.walker[data-role="jarvis"] .arm{background:var(--gold)}
-.walker[data-mood="critical"] .head{border-color:var(--red)}
-.box{position:absolute;left:33px;top:44px;width:12px;height:10px;border:1px solid var(--gold);background:rgba(255,209,102,.35);border-radius:1px;opacity:0;transition:opacity .4s}
-.head{position:absolute;left:19px;top:0;width:17px;height:17px;border-radius:50%;border:2px solid var(--cyan);background:rgba(63,214,255,.18)}
-.neck{position:absolute;left:26px;top:16px;width:3px;height:7px;background:var(--cyan);opacity:.6}
-.torso{position:absolute;left:16px;top:22px;width:23px;height:31px;border:2px solid var(--cyan);border-radius:9px 9px 7px 7px;background:linear-gradient(180deg,rgba(63,214,255,.18),rgba(169,139,255,.12))}
-.hips{position:absolute;left:14px;top:51px;width:27px;height:18px;border:2px solid var(--violet);border-radius:8px 8px 12px 12px;background:rgba(169,139,255,.13)}
-.leg{position:absolute;top:67px;width:4px;height:31px;border-radius:3px;background:var(--cyan);opacity:.85;transform-origin:top center}
-.leg.l{left:21px}.leg.r{left:30px}
-.arm{position:absolute;top:27px;width:3px;height:28px;border-radius:3px;background:var(--cyan);opacity:.65;transform-origin:top center}
-.arm.l{left:12px}.arm.r{left:39px}
-/* idle: breathing; working: typing at the desk; waiting: a raised hand; stopped: slumped;
-   done: holding the finished work; walking (only while moving between stations): steps */
-.walker .figure{animation:breathe 3.4s ease-in-out infinite}
-.walker[data-pose="working"] .arm.l{animation:type .34s ease-in-out infinite}
-.walker[data-pose="working"] .arm.r{animation:type .34s ease-in-out infinite reverse}
-.walker[data-pose="waiting"] .arm.r{transform:rotate(160deg);animation:wave 1.1s ease-in-out infinite}
-.walker[data-pose="stopped"] .figure{animation:none;transform:rotate(-9deg) translateY(4px)}
-.walker[data-pose="done"] .box{opacity:1}
-.walker[data-pose="done"] .arm.r{transform:rotate(-38deg)}
-.walker.walking .figure{animation:sashay .52s ease-in-out infinite}
-.walker.walking .hips{box-shadow:0 0 14px rgba(169,139,255,.65)}
-.walker.walking .leg.l{animation:step .52s ease-in-out infinite}
-.walker.walking .leg.r{animation:step .52s ease-in-out infinite reverse}
-.walker.walking .arm.l{animation:swing .52s ease-in-out infinite}
-.walker.walking .arm.r{animation:swing .52s ease-in-out infinite reverse}
-.walker.hop .figure{animation:hop .5s ease-out 2}
-@keyframes sashay{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
-@keyframes step{0%,100%{transform:rotate(-23deg)}50%{transform:rotate(23deg)}}
-@keyframes swing{0%,100%{transform:rotate(14deg)}50%{transform:rotate(-14deg)}}
-@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.025)}}
-@keyframes type{0%,100%{transform:rotate(-34deg)}50%{transform:rotate(-46deg)}}
-@keyframes wave{0%,100%{transform:rotate(150deg)}50%{transform:rotate(175deg)}}
-@keyframes hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-12px)}}
-@media(prefers-reduced-motion:reduce){.walker.placed{transition:none}.walker *,.station:after{animation:none!important}}
+/* her own character from the world's sprite sheet (world/characters.png, 96x132 frames):
+   the frame is chosen from her real state by tick(), never at random */
+.walker .sprite{width:96px;height:132px;margin-left:-5px;background:url("/world/characters.png") no-repeat 0 0;image-rendering:pixelated;transform:scale(.9);transform-origin:50% 100%}
+.walker.flip .sprite{transform:scale(-.9,.9)}
+.walker .tag{position:absolute;top:122px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;letter-spacing:.06em;color:var(--ink);background:rgba(8,11,18,.85);border:1px solid var(--line);border-radius:99px;padding:0 6px}
+.walker[data-role="jarvis"] .tag{border-color:var(--gold);color:var(--gold)}
+.walker[data-mood="critical"] .tag{border-color:var(--red);color:var(--red)}
+.walker.hop .sprite{animation:hop .5s ease-out 2}
+@keyframes hop{0%,100%{translate:0 0}40%{translate:0 -12px}}
+@media(prefers-reduced-motion:reduce){.walker.placed{transition:none}.walker .sprite,.station:after{animation:none!important}}
 #desks{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:12px}
 .desk{position:relative;border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(8,12,19,.55)}
 .worker{position:relative;display:flex;gap:10px;align-items:flex-start}
@@ -225,7 +197,25 @@ async function settle(r) {
 function health(w) { const b = el("div", "health"); const i = el("i"); i.style.width = Math.max(0, Math.min(100, w.health || 0)) + "%"; b.appendChild(i); return b; }
 // ---- the floor: stations are drawn once; a walker is kept between refreshes so that when
 // its AI's job moves it to another department it walks there instead of jumping
+// her animation on the sheet for each state, and how long each frame shows (as in WORLD)
+const ANIM = { working: ["work", 180], waiting: ["wait", 500], done: ["done", 600], idle: ["idle", 1400],
+               stopped: ["blocked", 700] };
 const POSE = { working: "working", "waiting for you": "waiting", done: "done", idle: "idle", assigned: "idle" };
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let SHEET = null;
+apiJson("/world/characters.json").then(m => { SHEET = m; }).catch(() => {});
+function tick() {                 // pick each sprite's frame: her state, or her walk while she walks
+  if (SHEET) for (const w of document.querySelectorAll(".walker")) {
+    const c = SHEET.characters[w.dataset.look] || SHEET.characters.engineer;
+    const [name, ms] = w.classList.contains("walking") ? [w.dataset.dir === "up" ? "walk_back" : "walk_front", 140]
+                                                        : (ANIM[w.dataset.pose] || ANIM.idle);
+    const A = c.animations[name] || c.animations.idle, [fw, fh] = SHEET.frame;
+    const k = REDUCED ? 0 : Math.floor(performance.now() / ms) % A.frames;
+    w.firstChild.style.backgroundPosition = (-k * fw) + "px " + (-A.row * fh) + "px";
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
 let FLOOR = null;
 function floorStations(f) {
   const box = $("floor"), ids = f.rooms.map(r => r.id).join(",");
@@ -250,10 +240,8 @@ function spot(room, i, n) {
 function walker(a) {
   let w = document.querySelector('.walker[data-id="' + CSS.escape(a.id) + '"]');
   if (w) return w;
-  w = el("div", "walker"); w.dataset.id = a.id; w.dataset.role = a.role;
-  const fig = el("div", "figure");
-  ["head","neck","torso","hips","leg l","leg r","arm l","arm r","box"].forEach(c => fig.appendChild(el("div", c)));
-  w.appendChild(fig); w.appendChild(el("span", "tag", a.role === "jarvis" ? "Jarvis" : a.role));
+  w = el("div", "walker"); w.dataset.id = a.id; w.dataset.role = a.role; w.dataset.look = a.look || "engineer";
+  w.appendChild(el("div", "sprite")); w.appendChild(el("span", "tag", a.role === "jarvis" ? "Jarvis" : a.role));
   $("walkers").appendChild(w);
   return w;
 }
@@ -276,8 +264,10 @@ function renderFloor(f, delivered) {
     w.title = a.name + " · " + a.role + " · " + a.state + (a.model ? " · model " + a.model : "") + (a.task ? "\n" + a.task : "");
     const moved = w.dataset.room !== undefined && (w.dataset.room !== room || w.dataset.x !== String(Math.round(p.x)));
     if (moved && w.dataset.room !== room) {          // a real change of department: walk there
+      const ox = parseFloat(w.style.left) || p.x, oy = parseFloat(w.style.top) || p.y;
+      w.dataset.dir = p.y < oy - 20 ? "up" : "down"; w.classList.toggle("flip", p.x < ox - 4);
       w.classList.add("walking"); clearTimeout(w._t);
-      w._t = setTimeout(() => { w.classList.remove("walking"); if (delivered.has(a.id)) hop(w); }, 2650);
+      w._t = setTimeout(() => { w.classList.remove("walking", "flip"); if (delivered.has(a.id)) hop(w); }, 2650);
     } else if (delivered.has(a.id)) hop(w);
     w.dataset.room = room; w.dataset.x = String(Math.round(p.x));
     w.style.left = p.x + "px"; w.style.top = p.y + "px";

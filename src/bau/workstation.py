@@ -523,13 +523,14 @@ def floor(home: Path, workers: list[dict[str, Any]],
     me = WD.jarvis(home, now)
     people = [{"id": "jarvis", "name": "Jarvis", "role": "jarvis", "room": me["room"],
                "state": me["state"], "task": ((me["job"] or {}).get("objective") or "")[:160],
-               "model": team.show(home).get("boss"), "mood": "steady"}]
+               "model": team.show(home).get("boss"), "mood": "steady", "look": "jarvis"}]
     for w in workers:
         job = latest.get(w["role"])
         room, state = WD.place(w["role"], job, now)
         people.append({"id": w["id"], "name": w["name"], "role": w["role"], "room": room,
                        "state": state, "task": job.objective[:160] if job else "",
-                       "model": job.model if job else None, "mood": _mood(w["health"])})
+                       "model": job.model if job else None, "mood": _mood(w["health"]),
+                       "look": WD.look(w["role"])})
     return {"rooms": [{"id": r, "name": n, "who": who} for r, n, who in WD.ROOMS],
             "agents": people}
 

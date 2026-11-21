@@ -8,18 +8,20 @@ goes up; when it fails, its health drops.
 
 Every department of the operations world is a station on the floor: Headquarters, Research
 library, Development Forge, Testing lab, Innovation Workshop, Creative Studio, Finance Office,
-Market, Review (waiting for you), Stopped and Delivered. Jarvis (in gold) and every worker
-stand at the station their latest real job puts them in, the same room the WORLD view gives:
+Market, Review (waiting for you), Stopped and Delivered. Jarvis and every worker are the same
+AI models as in the WORLD view, each her own character from its sprite sheet, and each stands
+at the station her latest real job puts her in, the same room the WORLD view gives:
 
 | Their job | Where they stand | What they do |
 |---|---|---|
-| none, or only handed over | Headquarters | breathe, idle |
-| running | their own department's desk | type at the desk; the station lights up |
-| waits for your approval | Review | raise a hand |
-| failed, paused or interrupted | Stopped | slump |
-| finished and checked (last 24 hours) | Delivered | hold the finished work; the pile grows |
+| none, or only handed over | Headquarters | her idle animation |
+| running | her own department's desk | her work animation; the station lights up |
+| waits for your approval | Review | her waiting animation |
+| failed, paused or interrupted | Stopped | her blocked animation |
+| finished and checked (last 24 hours) | Delivered | her done animation; the pile grows |
 
-When a job changes they **walk** to the new station, legs and arms moving. A delivery ends
+When a job changes she **walks** to the new station with her walk animation (her back to you
+when she walks up the floor, facing you when she walks down). A delivery ends
 with a little hop. Nothing moves on a timer or at random: no change in the job logs, no walk.
 Hover over a figure for its name, state, task and the model it used. With "reduce motion" on
 in your computer's settings, they stand still at their stations.
