@@ -69,7 +69,8 @@ How it runs, with nothing new to switch on:
    gateway; its result goes through the same fact check as a mission.
 4. **Work delivered** pops up with the report: checked (every fact backed by its tools) or
    "not checked: read it carefully". Accept files it as good, Not now as not good enough.
-   The full draft is in your drafts folder.
+   The full draft is in your drafts folder. Either way the department's next daily task can
+   come.
 
 They only read and draft: no agent posts, sends, pays or signs anything.
 
@@ -81,10 +82,14 @@ They only read and draft: no agent posts, sends, pays or signs anything.
 | Finished, but its result failed the check (it waits for your review) | −12 |
 | A job stalled (paused, waiting) | −12 |
 | A job failed or was cancelled | −25 (a failed shift −20) |
-| A day without work | −4 |
+| A day without work | −4, never below 25 (waiting never kills) |
 
 Moods: thriving (80+), steady (50+), strained (25+), critical (below 25). A critical worker gets
-no new work: the manager tells it to rest. At **0 health it retires** to the graveyard (nothing
+no new work: the manager tells it to rest, and each day of rest gives back 4 health up to 25;
+then its held work goes on by itself. A worker whose folder you have not approved yet is not on
+the job, so its health does not move. A day without work never takes a worker to 0;
+failed or stalled work (the table above) can. At **0 health it
+retires** to the graveyard (nothing
 is deleted), and a **successor** of the same role clocks in at 80 health. The successor takes
 over every open task, carries the last six lines of its predecessor's log as a brief, and its
 own manager looks at those tasks again. Each death and successor is written to the audit chain.

@@ -193,12 +193,13 @@ class FanvueClient:
                                 "refresh_token": tok["refresh_token"]})["access_token"]
 
     # -------------------------------------------------------- API
-    def call(self, method: str, path: str, payload: dict[str, Any] | None = None
-             ) -> dict[str, Any]:
+    def call(self, method: str, path: str, payload: dict[str, Any] | None = None,
+             headers: dict[str, str] | None = None) -> dict[str, Any]:
         for attempt in range(3):
             code, raw = self.http.request(method, API + path, {
                 "Authorization": f"Bearer {self.access_token()}",
-                "X-Fanvue-API-Version": VERSION, "Content-Type": "application/json"},
+                "X-Fanvue-API-Version": VERSION, "Content-Type": "application/json",
+                **(headers or {})},
                 json.dumps(payload).encode() if payload is not None else None)
             if code == 429 and attempt < 2:          # honour Fanvue's limit, then try again
                 self.sleep(2 * (attempt + 1))
@@ -268,6 +269,16 @@ class FanvueClient:
         if price is not None:                     # locked: USD cents, >= 300, needs media
             body["price"] = int(price)
         return self.call("POST", f"/v1/chats/{fan}/message", body)
+
+    def mass_message(self, smart_list: str, text: str, media: list[str], preview: str | None,
+                     price: int, key: str) -> dict[str, Any]:
+        """One locked message to a whole smart list (drops.py). The key makes a retry safe:
+        Fanvue replays the first send instead of sending twice."""
+        body: dict[str, Any] = {"includedLists": {"smartListIds": [smart_list]},
+                                "text": text, "mediaUuids": media, "price": int(price)}
+        if preview:
+            body["mediaPreviewUuid"] = preview
+        return self.call("POST", "/v1/chats/mass-messages", body, {"Idempotency-Key": key})
 
     def mark_read(self, fan: str) -> None:
         self.call("PATCH", f"/v1/chats/{fan}", {"isRead": True})

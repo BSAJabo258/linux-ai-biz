@@ -426,7 +426,8 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                                    lanes["workstation"]))
             elif self.path == "/api/workstation/assign":
                 self._json(200, screen.workstation_assign(
-                    assistant, str(data.get("role", "")), str(data.get("objective", ""))))
+                    assistant, str(data.get("role", "")), str(data.get("objective", "")),
+                    str(data.get("kind", ""))))
             elif self.path == "/api/ws/stage":
                 with lock:
                     self._json(200, screen.stage_write(

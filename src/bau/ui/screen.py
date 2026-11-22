@@ -125,11 +125,14 @@ def workstation_view(asst: Any) -> dict[str, Any]:
     return W.view(asst.home)
 
 
-def workstation_assign(asst: Any, role: str, objective: str) -> dict[str, Any]:
+def workstation_assign(asst: Any, role: str, objective: str, kind: str = "") -> dict[str, Any]:
     from .. import workstation as W
     asst.activity.emit("workstation", "start", f"Assigning work to {role}")
     try:
-        t = W.assign(asst.home, role, objective, asst.owner)
+        # the kind the owner picked (research, draft...); anything else stays "review" and the
+        # productivity manager judges the work as always
+        t = W.assign(asst.home, role, objective, asst.owner,
+                     kind=kind if kind in W.LOW_RISK else "review")
     except (KeyError, ValueError, PermissionError) as e:
         msg = str(e).strip("'\"")[:300]
         asst.activity.emit("workstation", "error", msg)

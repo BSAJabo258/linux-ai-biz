@@ -53,6 +53,9 @@ STEPS = (
     Step("pictures", "Set up pictures on this computer",
          "ComfyUI and the picture model (about 10 GB download, once). A terminal opens; type "
          "your password."),
+    Step("pictures_start", "Start the picture maker",
+         "Pictures are set up on this computer but not running, so nothing new can be drawn "
+         "or posted. This starts it (no download). A terminal opens; type your password."),
     Step("room", "Make room for Jarvis",
          "The system part of the disk is nearly full, while /home has room to spare. This "
          "moves the big folders (local models, the picture maker, the CUDA engine) into "
@@ -68,6 +71,10 @@ STEPS = (
          "The autopilot: every 30 minutes Jarvis scans GitHub, inspects what he finds and "
          "votes on what to add, and asks you only about money, posting and legal. A "
          "terminal opens; type your password."),
+    Step("creator", "Create her profile",
+         "Every Fanvue step waits for your creator's profile, and there is none on this "
+         "computer yet. Accept puts the starter one in place: Aria Vale, a fictional adult "
+         "(25) with AI disclosure on. Change her details any time in the file it names."),
     Step("fanvue_app", "Make your Fanvue app (once)",
          "The money starts on Fanvue, and Jarvis can't reach it yet. On fanvue.com, open the "
          "Developer Area and create an app; on its Authentication tab add the redirect "
@@ -149,6 +156,10 @@ def _probe(what: str) -> object:
             ["nvidia-smi"], capture_output=True, check=False).returncode == 0
     if what == "pictures":
         return _answers("http://127.0.0.1:8188/system_stats") or pictures_installed()
+    if what == "pictures_running":
+        return _answers("http://127.0.0.1:8188/system_stats")
+    if what == "pictures_installed":
+        return pictures_installed()
     if what == "search":
         return _answers("http://127.0.0.1:8888/")
     if what == "autopilot":
@@ -211,6 +222,12 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         return None if not probe("nvidia") else bool(probe("driver"))
     if step == "pictures":
         return None if not (probe("nvidia") and probe("driver")) else bool(probe("pictures"))
+    if step == "pictures_start":          # installed, but not answering (money.py's link)
+        if not (probe("nvidia") and probe("driver")) or not probe("pictures_installed"):
+            return None
+        return bool(probe("pictures_running"))
+    if step == "creator":                 # without it every Fanvue card stays hidden
+        return _profile(home) is not None
     if step == "room":                    # shown only while "/" is nearly full
         return None if not probe("room") else False
     if step == "search":
@@ -319,6 +336,8 @@ def _command(step: str, home: Path) -> str:
         return "sudo bau-gpu-setup"
     if step == "pictures":
         return f"sudo bash {q(str(script('bau-pictures-setup.sh')))}"
+    if step == "pictures_start":
+        return "sudo systemctl start bau-pictures.service"
     if step == "room":
         return f"sudo bash {q(str(script('bau-make-room.sh')))}"
     if step == "explicit":
@@ -575,6 +594,16 @@ def run(step: str, home: Path, probe: Probe | None = None,
         except (KeyError, ValueError, TypeError, V.CreatorError) as e:
             return {"error": str(e)}
         return {"done": True, "said": "Saved in your creator profile."}
+    if step == "creator":                 # what `bau creator init` does, from the card
+        starter = shipped_data() / "virtual_creator_profile.example.yaml"
+        import yaml
+        dst = home / "creators" / (yaml.safe_load(starter.read_text())["id"] + ".yaml")
+        if _profile(home) is not None or dst.exists():
+            return {"done": True, "said": "Her profile is already here."}
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(starter, dst)
+        return {"done": True, "said": f"Her profile is in place: {dst}. The Fanvue steps "
+                                      "come next."}
     if step == "fanvue":                  # the terminal's own sign-in, run from the card
         return connect_in_jarvis("fanvue", home, owner)
     cmd = _command(step, home)

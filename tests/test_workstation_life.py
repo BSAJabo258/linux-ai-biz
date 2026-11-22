@@ -85,17 +85,31 @@ def helper(st):
     return next(w for w in st["workers"] if w["role"] == "helper")
 
 
+def _fail_a_job(home):
+    from bau.jobs import JobStore
+    store = JobStore(home)
+    j = store.create("m1", "draft a caption", "folder:helper", ["step-1"])
+    j.status = "FAILED"
+    store.checkpoint(j)
+
+
+def _set_health(home, n):
+    st = W.refresh(home)
+    helper(st)["health"] = n
+    W._save(home, st)
+
+
 def test_a_worker_that_keeps_failing_dies_and_its_successor_inherits(home):
     approve(home)
     for _ in range(3):
         W.assign(home, "helper", "draft a caption", "human:owner", kind="draft")
         W.run_shift(home, runner=bad)
     assert helper(W.refresh(home))["health"] == 25          # 3 failed jobs at -25 each
-    W.refresh(home, now=dt.datetime.now(dt.UTC) + dt.timedelta(days=1))     # a day idle: -4
+    _set_health(home, 10)
     t = W.assign(home, "helper", "draft one more caption", "human:owner", kind="draft")
     assert t["status"] == "waiting_owner" and "health" in t["manager"]["reason"]
-    v = W.view_from(W.refresh(home, now=dt.datetime.now(dt.UTC) + dt.timedelta(days=7)),
-                    home)                                    # too weak to work, it fades
+    _fail_a_job(home)                                        # one more failure: 10 - 25
+    v = W.view_from(W.refresh(home), home)
     assert v["graveyard"] and v["graveyard"][0]["id"] == "helper:1"
     heir = helper(v)
     assert heir["id"] == "helper:2" and heir["health"] <= W.SUCCESSOR_HEALTH
@@ -106,11 +120,31 @@ def test_a_worker_that_keeps_failing_dies_and_its_successor_inherits(home):
     assert "died" in kinds and "spawned" in kinds
 
 
-def test_idle_workers_lose_health_by_the_day(home):
-    st = W.refresh(home)
-    later = dt.datetime.now(dt.UTC) + dt.timedelta(days=5)
-    st = W.refresh(home, now=later)
+def test_a_resting_worker_gets_its_health_back_and_its_held_work_goes_on(home):
+    """Found 2026-11-21: "rest first" never gave health back, the held task had no card and
+    was never looked at again, and the worker faded to 0 and died."""
+    approve(home)
+    _set_health(home, 10)
+    t = W.assign(home, "helper", "draft one more caption", "human:owner", kind="draft")
+    assert t["status"] == "waiting_owner"
+    st = W.refresh(home, now=dt.datetime.now(dt.UTC) + dt.timedelta(days=4))
+    assert helper(st)["health"] == W.LOW_HEALTH and not st["graveyard"]
+    assert next(x for x in st["tasks"] if x["id"] == t["id"])["status"] == "approved"
+
+
+def test_idle_workers_lose_health_by_the_day_but_waiting_never_kills(home):
+    approve(home)
+    W.refresh(home)
+    st = W.refresh(home, now=dt.datetime.now(dt.UTC) + dt.timedelta(days=5))
     assert helper(st)["health"] == W.START_HEALTH - 5 * W.IDLE_DECAY_PER_DAY
+    st = W.refresh(home, now=dt.datetime.now(dt.UTC) + dt.timedelta(days=60))
+    assert helper(st)["health"] == W.LOW_HEALTH and not st["graveyard"]
+
+
+def test_a_worker_waiting_for_the_owners_approval_does_not_fade(home):
+    W.refresh(home)                                          # folder not approved yet
+    st = W.refresh(home, now=dt.datetime.now(dt.UTC) + dt.timedelta(days=60))
+    assert helper(st)["health"] == W.START_HEALTH and not st["graveyard"]
 
 
 @pytest.mark.parametrize("status,kind", [("FAILED", "retry"), ("PAUSED", "continue"),
@@ -124,3 +158,4 @@ def test_only_failed_or_interrupted_jobs_come_back_as_work(home, status, kind):
     st = W.refresh(home)
     made = [t for t in st["tasks"] if t.get("source_job") == j.job_id]
     assert [t["kind"] for t in made] == ([kind] if kind else [])   # the owner's cancel holds
+

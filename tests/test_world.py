@@ -384,6 +384,69 @@ def test_the_hq_roster_shows_a_recorded_job_not_yet_started_as_assigned(tmp_path
     assert rows["researcher"] == {"name": "researcher", "state": state, "light": LIGHT[state]}
 
 
+def desk_task(home, role, status, objective="draft three captions", **extra):
+    from bau import workstation as W
+    st = W._load(home)
+    st["tasks"].append({"id": f"wt_{role}_{status}", "role": role, "objective": objective,
+                        "kind": "draft", "source": "test", "source_job": "", "status": status,
+                        "created": NOW.isoformat(), "finished": "", "result": "",
+                        "manager": {}, **extra})
+    W._save(home, st)
+
+
+def test_the_workstation_moves_her_when_her_job_log_says_nothing_stronger(tmp_path):
+    """Found 2026-11-21: the workstation had her report waiting for the owner while the world
+    showed her idle and counted nobody waiting."""
+    from bau import workstation as W
+    W.refresh(tmp_path)
+    desk_task(tmp_path, "finance", "approved")
+    desk_task(tmp_path, "researcher", "running")
+    desk_task(tmp_path, "producer", "done", report="1. Golden hour on the balcony")
+    desk_task(tmp_path, "marketer", "waiting_owner", manager={"reason": "outside effect"})
+    before = (tmp_path / "workstation" / "state.json").read_bytes()
+    w = world(tmp_path, NOW)
+    got = {a["name"]: (a["room"], a["state"]) for a in w["agents"]}
+    assert got["finance"] == ("hq", "assigned")
+    assert got["researcher"] == ("research", "working")
+    assert got["producer"] == ("approvals", "waiting for you")
+    assert got["marketer"] == ("approvals", "waiting for you")
+    a = {a["name"]: a for a in w["agents"]}
+    assert a["producer"]["work"]["tasks"][0]["report"].startswith("1. Golden hour")
+    assert a["marketer"]["work"]["tasks"][0]["reason"] == "outside effect"
+    assert a["finance"]["work"]["worker"]["health"] == W.START_HEALTH
+    assert {t["agent"] for t in w["tasks"]} >= {"finance", "researcher", "producer"}
+    # reading the world never changes the workstation (no ageing, no retiring)
+    assert (tmp_path / "workstation" / "state.json").read_bytes() == before
+
+
+def test_a_running_job_outranks_her_workstation_and_filed_work_does_not_count(tmp_path):
+    job(tmp_path, "researcher", "RUNNING")
+    desk_task(tmp_path, "researcher", "approved")
+    desk_task(tmp_path, "producer", "done", seen={"by": "human:owner", "kept": True})
+    got = rooms(tmp_path)
+    assert got["researcher"] == ("research", "working")
+    assert got["producer"] == ("hq", "idle")
+
+
+def test_a_waiting_card_says_which_agent_or_task_it_is_about():
+    from bau.assistant import Pending
+    p = Pending("ag_1", "agent_approve", {"agent": "finance"}, "New worker", "now")
+    assert p.public()["about"] == {"agent": "finance"}
+    assert Pending("su_1", "setup_step", {"step": "prices"}, "x", "now").public()["about"] == {}
+
+
+def test_the_world_runs_the_business_full_screen_from_its_own_tabs():
+    """The owner, 2026-11-21: full screen, the menu as tabs, and every agent's work run from
+    her own panel: give work, run a shift, open what she needs from him (held work too)."""
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html").read_text()
+    for tab in ("w-to-hq", "w-to-floor", "w-to-inbox", "w-to-desk", "w-to-mc", "world-close"):
+        assert f'id="{tab}"' in page, tab
+    assert "#worldbox.overlay{inset:0 0 84px 0" in page                 # all but the talk bar
+    for call in ('"/api/workstation/assign"', '"/api/workstation/shift"', "focusCard(c.id)"):
+        assert call in page, call
+    assert "c.about.agent === a.name" in page                          # her own cards on her panel
+
+
 def test_the_hq_line_up_moves_with_the_records():
     # The owner, 2026-11-21: "does the virtual AI world [have] motion": the HQ view showed each
     # character frozen on frame 0. Now her sprite plays her state's animation, the line stands
@@ -399,3 +462,19 @@ def test_the_hq_line_up_moves_with_the_records():
     assert "walks = was !== undefined && was !== a.room" in page          # only a real change
     assert 'const seen = W_MODE === "hq" && !REDUCED' in page             # reduced motion: still
     assert "[a.name, a.room, a.state," in page                            # a room change redraws
+
+
+def test_a_filed_report_releases_her_and_current_tasks_name_her_new_work(tmp_path):
+    """CodeRabbit, 2026-11-22: a filed report kept her waiting, and Current tasks showed the
+    old job's words for new workstation work."""
+    job(tmp_path, "producer", "COMPLETED", job_id="job_aaaaaaaaaaaa")
+    j = json.loads((tmp_path / "jobs" / "job_aaaaaaaaaaaa.json").read_text())
+    j["verification"] = "FAILED"
+    (tmp_path / "jobs" / "job_aaaaaaaaaaaa.json").write_text(json.dumps(j))
+    assert rooms(tmp_path)["producer"] == ("approvals", "waiting for you")
+    desk_task(tmp_path, "producer", "filed", source_job="job_aaaaaaaaaaaa")
+    desk_task(tmp_path, "producer", "approved", objective="draft the weekend captions")
+    w = world(tmp_path, NOW)
+    assert {a["name"]: (a["room"], a["state"]) for a in w["agents"]}["producer"] == \
+        ("hq", "assigned")
+    assert {t["agent"]: t["task"] for t in w["tasks"]}["producer"] == "draft the weekend captions"
