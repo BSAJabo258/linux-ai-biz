@@ -362,6 +362,9 @@ button.chip.world{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px
 .hq-who.lead{flex-basis:30%;height:100%}
 .hq-who img,.hq-who canvas{width:100%;height:100%;object-fit:cover;object-position:50% 20%;
   -webkit-mask-image:radial-gradient(ellipse 72% 80% at 50% 42%,#000 58%,transparent 100%);mask-image:radial-gradient(ellipse 72% 80% at 50% 42%,#000 58%,transparent 100%)}
+.hq-who.walking{z-index:2}
+.hq-who.walking img{animation:hq-step .5s ease-in-out infinite}
+@keyframes hq-step{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-1.2%) rotate(2deg)}}
 .hq-who canvas{object-fit:contain;object-position:50% 100%;image-rendering:pixelated;-webkit-mask-image:none;mask-image:none}
 .hq-who .hq-tag{position:absolute;bottom:-2%;text-align:center;font:700 .8cqw/1.2 ui-sans-serif,system-ui,sans-serif;background:rgba(8,6,24,.82);border:1px solid #3fd6ff;
   border-radius:1cqw;padding:.15cqw .6cqw;white-space:nowrap}.hq-tag small{display:block;font-weight:500;font-size:.7cqw;color:#c9d8ea}
@@ -2721,7 +2724,7 @@ let previewUrl = null;
 function nextConfirm() {
   if (showing || !confirmQ.length) return;
   showing = confirmQ.shift(); $("csum").textContent = showing.summary;
-  $("yes").textContent = /^(setup_step|autopilot_answer|fanvue_review|fan_reply|agent_approve|work_review)$/.test(showing.tool) ? "Accept" : "Confirm";
+  $("yes").textContent = /^(setup_step|autopilot_answer|fanvue_review|fan_reply|fanvue_drop|governor_finding|agent_approve|work_review|work_hold)$/.test(showing.tool) ? "Accept" : "Confirm";
   const form = $("cform"), note = $("cnote"), need = $("cneed"), vid = $("cvid");
   form.textContent = ""; note.textContent = ""; need.textContent = ""; picked = {};
   const fields = (showing.form && showing.form.fields) || [];
@@ -3777,6 +3780,7 @@ function drawWorld(t) {
     x.fillStyle = light ? "rgba(255,255,255,.9)" : "rgba(2,6,11,.82)"; x.fillRect(lx - w / 2, ly - 20, w, 28); x.strokeStyle = rgba(W_TINT[id], 0.85); x.lineWidth = 1.5; x.strokeRect(lx - w / 2, ly - 20, w, 28);
     x.fillStyle = rgba(W_TINT[id], 1); x.fillText(text, lx, ly); } }
 function worldLoop(t) { if (!$("worldbox").classList.contains("show")) return; if (OPS && W_MODE === "floor") drawWorld(t);
+  else if (OPS && W_MODE === "hq") hqTick(t);
   worldAnim = REDUCED ? 0 : requestAnimationFrame(worldLoop); }
 function worldInfo(a) {
   const box2 = $("w-info"); box2.textContent = ""; $("w-side").classList.toggle("picked", !!a); if (!a) return;
@@ -3810,7 +3814,8 @@ function worldInfo(a) {
 // What she does at the workstation, run from her own panel (the owner, 2026-11-21: "click each
 // agent and complete the work and confirm things and review things from that same screen").
 const CARD_LABEL = { setup_step: "Setup", autopilot_answer: "Jarvis asks", fanvue_review: "Picture for Fanvue", fan_reply: "Fan reply",
-  fanvue_drop: "Weekly drop", governor_finding: "Problem found", agent_approve: "New worker", work_review: "Delivered work" };
+  fanvue_drop: "Weekly drop", governor_finding: "Problem found", agent_approve: "New worker", work_review: "Delivered work",
+  work_hold: "Held work" };
 const TASK_STATE = { queued: "queued", approved: "approved, runs on the next shift", running: "working on it now",
   waiting_owner: "held for you", review: "finished, its check did not pass: read it", done: "delivered: read it", failed: "failed" };
 const KINDS = [["research", "Research"], ["draft", "Draft"], ["review", "Review"], ["organise", "Organise"], ["test", "Test"], ["fix", "Fix"]];
@@ -3834,12 +3839,6 @@ function workPanel(box, a) {
   tasks.forEach(t => { const d = el("div", "w-task " + t.state); d.appendChild(el("b", null, t.objective));
     d.appendChild(el("small", null, `${t.kind} · ${TASK_STATE[t.state] || t.state}` + (t.reason && t.state === "waiting_owner" ? ` (${t.reason})` : "")));
     if (t.report) { const det = el("details"); det.appendChild(el("summary", null, "Read what she delivered")); det.appendChild(el("pre", null, t.report)); d.appendChild(det); }
-    if (t.state === "waiting_owner") {           // agents only read and draft: a held task is removed, never forced
-      d.appendChild(el("small", null, "Agents only read and draft; posting, money and legal stay on your own cards. Remove it, or give her the drafting part."));
-      const rm = el("button", "act", "Remove it"); rm.onclick = async () => {
-        const r = await apiJson("/api/workstation/withdraw", { task: t.id }).catch(e => ({ error: e.message }));
-        if (r.error) { rm.textContent = r.error; return; } loadWorld(); };
-      d.appendChild(rm); }
     box.appendChild(d); });
   const give = el("div", "w-give"); give.appendChild(el("h4", null, "Give her work"));
   const ta = el("textarea"); ta.placeholder = "What should she do? For example: research three new ways to promote the creator";
@@ -3938,13 +3937,16 @@ async function loadWorld() {
 // systems healthy" only when the world finds nothing wrong (world.problems).
 let W_MODE = "hq";
 const HQ_ROOMS = ["hq", "research", "forge", "testing", "innovation", "studio", "finance", "market"];
+const HQ_LINE = [...HQ_ROOMS, "approvals", "repair", "delivery"], HQ_ROOM = {}, HQ_WALK_MS = 2400;
 function hqRow(ul, light, name, text) { const li = el("li"); li.appendChild(el("span", "hq-dot " + light));
   if (name) { li.appendChild(el("b", null, name)); li.appendChild(el("i", null, "– " + text)); } else li.appendChild(el("span", null, text)); ul.appendChild(li); }
 function hqFigure(a, lead) { const b = el("button", "hq-who" + (lead ? " lead" : "")), light = wDot(a) || "free";
   b.dataset.light = light; b.title = `${a.name}: ${a.state}` + (a.job ? ` (${a.job.objective})` : "");
   if (a.neon) { const im = el("img"); im.alt = a.name; im.src = `/world/portrait/neon-${encodeURIComponent(a.look)}-${a.pose}.png`; b.appendChild(im); }
   else if (W_SHEET) { const cv = el("canvas"), [fw, fh] = W_META.frame; cv.width = fw; cv.height = fh;          // her sprite until her portrait is painted
-    const [anim] = W_ANIM[a.state] || ["blocked"]; wSprite(cv.getContext("2d"), a.look || "engineer", anim, 0, fw / 2, fh - 4, false); b.appendChild(cv); }
+    const [anim] = W_ANIM[a.state] || ["blocked"]; wSprite(cv.getContext("2d"), a.look || "engineer", anim, 0, fw / 2, fh - 4, false);
+    cv.dataset.look = a.look || "engineer"; cv.dataset.state = a.state; b.appendChild(cv); }
+  b.dataset.name = a.name;
   const tag = el("span", "hq-tag", a.name); tag.appendChild(el("small", null, a.state)); b.appendChild(tag);
   b.onclick = () => { showFloor(); W_SEL = a; worldInfo(a); loadList(); if (REDUCED) drawWorld(0); };
   return b; }
@@ -3971,10 +3973,38 @@ function renderHQ() { if (!OPS) return; const S = OPS.system;
       cv.getContext("2d").drawImage(src, xs[0], sy, sw, sh, 0, 0, 240, 150); b.appendChild(cv); b.appendChild(el("span")); b.dataset.room = id; b.onclick = () => openRoom(id); rm.appendChild(b); } }
   [...rm.children].forEach(b => { const r = OPS.rooms.find(q => q.id === b.dataset.room) || { name: b.dataset.room, who: "" }, n = OPS.counts[b.dataset.room] || 0;
     b.lastChild.textContent = r.name + (n ? ` · ${n}` : ""); b.title = `${r.name}: ${r.who}. Click to open it on the floor.`; });
-  const crew = $("hq-crew"), key = OPS.agents.map(a => [a.name, a.state, a.neon, a.job && a.job.objective].join("|")).join(";") + !!W_SHEET;
-  if (crew.dataset.key === key) return; crew.dataset.key = key; crew.textContent = "";      // redrawn only when a record changed
-  const others = OPS.agents.slice(1), left = others.filter((_, i) => i % 2 === 0), right = others.filter((_, i) => i % 2 === 1);
-  left.reverse().forEach(a => crew.appendChild(hqFigure(a))); crew.appendChild(hqFigure(OPS.agents[0], true)); right.forEach(a => crew.appendChild(hqFigure(a))); }
+  const crew = $("hq-crew"), key = OPS.agents.map(a => [a.name, a.room, a.state, a.neon, a.job && a.job.objective].join("|")).join(";") + !!W_SHEET;
+  if (crew.dataset.key === key) return; crew.dataset.key = key;                              // redrawn only when a record changed
+  const seen = W_MODE === "hq" && !REDUCED, before = {};
+  for (const b of crew.children) before[b.dataset.name] = b.getBoundingClientRect().left;
+  crew.textContent = "";
+  // The line stands in department order (the owner, 2026-11-21: motion in the world): when a
+  // real job moves her to another department, her place changes and she walks to it.
+  const line = (a) => { const i = HQ_LINE.indexOf(a.room); return i < 0 ? HQ_LINE.length : i; };
+  const others = OPS.agents.slice(1).sort((p, q) => line(p) - line(q) || (p.name < q.name ? -1 : 1));
+  const left = others.filter((_, i) => i % 2 === 0), right = others.filter((_, i) => i % 2 === 1);
+  left.reverse().forEach(a => crew.appendChild(hqFigure(a))); crew.appendChild(hqFigure(OPS.agents[0], true)); right.forEach(a => crew.appendChild(hqFigure(a)));
+  for (const b of crew.children) { const a = OPS.agents.find(q => q.name === b.dataset.name), was = HQ_ROOM[a.name];
+    HQ_ROOM[a.name] = a.room;
+    if (!seen || before[a.name] === undefined) continue;
+    const dx = before[a.name] - b.getBoundingClientRect().left, walks = was !== undefined && was !== a.room;
+    if (!walks && Math.abs(dx) < 1) continue;
+    if (walks) { b.classList.add("walking"); b.dataset.left = String(dx > 0);
+      const r = OPS.rooms.find(q => q.id === a.room), tag = b.querySelector(".hq-tag small");
+      if (tag) tag.textContent = "→ " + (r ? r.name : a.room);
+      setTimeout(() => { b.classList.remove("walking"); if (tag) tag.textContent = a.state; }, HQ_WALK_MS + 100); }
+    b.style.transition = "none"; b.style.transform = `translateX(${dx}px)`;               // from where she stood...
+    requestAnimationFrame(() => requestAnimationFrame(() => {                              // ...to her new place
+      b.style.transition = `transform ${HQ_WALK_MS}ms ease-in-out`; b.style.transform = ""; })); } }
+// Her sprite in the line plays her state's animation, or her walk while she walks (as on the floor).
+function hqTick(t) { if (!W_SHEET) return;
+  for (const cv of $("hq-crew").querySelectorAll("canvas[data-look]")) {
+    const walking = cv.parentElement.classList.contains("walking");
+    const [anim, ms] = walking ? ["walk_front", 140] : (W_ANIM[cv.dataset.state] || ["blocked", 400]);
+    const k = Math.floor(t / ms), id = anim + k;
+    if (cv.dataset.k === id) continue; cv.dataset.k = id;
+    const x = cv.getContext("2d"), [fw, fh] = W_META.frame; x.clearRect(0, 0, fw, fh);
+    wSprite(x, cv.dataset.look, anim, k, fw / 2, fh - 4, walking && cv.parentElement.dataset.left === "true"); } }
 function showMode(m) { W_MODE = m; $("hqview").hidden = m !== "hq"; $("w-floorview").hidden = m !== "floor";
   $("w-inboxview").hidden = m !== "inbox"; $("w-deskview").hidden = m !== "desk";
   [["hq", "w-to-hq"], ["floor", "w-to-floor"], ["inbox", "w-to-inbox"], ["desk", "w-to-desk"]].forEach(([k, id]) => $(id).setAttribute("aria-pressed", String(m === k)));

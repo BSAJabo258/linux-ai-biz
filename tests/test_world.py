@@ -437,12 +437,28 @@ def test_a_waiting_card_says_which_agent_or_task_it_is_about():
 
 def test_the_world_runs_the_business_full_screen_from_its_own_tabs():
     """The owner, 2026-11-21: full screen, the menu as tabs, and every agent's work run from
-    her own panel: give work, run a shift, open what she needs from him, remove a held task."""
+    her own panel: give work, run a shift, open what she needs from him (held work too)."""
     page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html").read_text()
     for tab in ("w-to-hq", "w-to-floor", "w-to-inbox", "w-to-desk", "w-to-mc", "world-close"):
         assert f'id="{tab}"' in page, tab
     assert "#worldbox.overlay{inset:0 0 84px 0" in page                 # all but the talk bar
-    for call in ('"/api/workstation/assign"', '"/api/workstation/shift"',
-                 '"/api/workstation/withdraw"', "focusCard(c.id)"):
+    for call in ('"/api/workstation/assign"', '"/api/workstation/shift"', "focusCard(c.id)"):
         assert call in page, call
     assert "c.about.agent === a.name" in page                          # her own cards on her panel
+
+
+def test_the_hq_line_up_moves_with_the_records():
+    # The owner, 2026-11-21: "does the virtual AI world [have] motion": the HQ view showed each
+    # character frozen on frame 0. Now her sprite plays her state's animation, the line stands
+    # in department order, and a real room change makes her walk to her new place.
+    from pathlib import Path
+    page = (Path(__file__).resolve().parents[1] / "src" / "bau" / "ui" / "jarvis.html"
+            ).read_text(encoding="utf-8")
+    assert 'else if (OPS && W_MODE === "hq") hqTick(t);' in page          # animated, every frame
+    body = page.split("function hqTick(t) {", 1)[1].split("\n}", 1)[0]
+    assert 'walking ? ["walk_front", 140] : (W_ANIM[cv.dataset.state]' in body
+    assert "Math.random" not in body                                     # from records only
+    assert 'const HQ_LINE = [...HQ_ROOMS, "approvals", "repair", "delivery"]' in page
+    assert "walks = was !== undefined && was !== a.room" in page          # only a real change
+    assert 'const seen = W_MODE === "hq" && !REDUCED' in page             # reduced motion: still
+    assert "[a.name, a.room, a.state," in page                            # a room change redraws

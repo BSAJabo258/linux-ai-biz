@@ -29,7 +29,7 @@ class Box:
         (self.home / "creators" / "aria.yaml").write_text(yaml.safe_dump(prof))
         self.facts = {"nvidia": nvidia, "driver": driver, "pictures": pictures,
                       "search": search, "update": update, "autopilot": autopilot,
-                      "room": False, "explicit": False,
+                      "room": False, "explicit": False, "video": False,
                       "pictures_installed": pictures, "pictures_running": pictures}
         self.opened = []
 
@@ -85,10 +85,30 @@ def test_everything_still_waiting_is_listed_in_order(box):
 def test_done_steps_disappear(tmp_path, monkeypatch):
     b = Box(tmp_path, driver=True, pictures=True, search=True, update="auto",
             laws_new=True, autopilot=True,
-            profile_prices={"subscription": 9.99, "nude": 14.99, "xxx": 29.99})
+            profile_prices={"subscription": 9.99, "nude": 14.99, "xxx": 29.99,
+                            "clip": 19.99})
     b.facts["explicit"] = True                       # Chroma is in place too
+    b.facts["video"] = True                          # and Wan 2.2 for clips
     fanvue_done(b.home, monkeypatch)
     assert ids(b) == []
+
+
+def test_clips_are_offered_only_after_the_explicit_pictures(tmp_path, monkeypatch):
+    b = Box(tmp_path, driver=True, pictures=True, search=True, update="auto",
+            laws_new=True, autopilot=True,
+            profile_prices={"subscription": 9.99, "nude": 14.99, "xxx": 29.99})
+    fanvue_done(b.home, monkeypatch)
+    assert "explicit" in ids(b) and "video" not in ids(b)     # Chroma first
+    b.facts["explicit"] = True
+    assert ids(b) == ["video"]
+    assert "bau-video-setup.sh" in S._command("video", b.home)
+    b.facts["video"] = True                                   # clips can be made: his price
+    assert ids(b) == ["clip_price"]
+    assert S.form("clip_price")["fields"][0]["value"] == 14.99         # Fanvue's advice
+    out = S.run("clip_price", b.home, values={"clip": "24.99"})
+    assert out["done"] and ids(b) == []
+    prices = yaml.safe_load((b.home / "creators" / "aria.yaml").read_text())["prices"]
+    assert prices == {"subscription": 9.99, "nude": 14.99, "xxx": 29.99, "clip": 24.99}
 
 
 def test_pictures_wait_for_nvidias_driver_and_need_a_card(tmp_path):
@@ -119,7 +139,7 @@ def test_without_a_screen_the_card_says_do_it_at_the_desktop(box, monkeypatch):
 
 def test_the_shipped_setup_scripts_are_the_installers_own():
     root = Path(__file__).resolve().parents[1]
-    for name in ("bau-pictures-setup.sh", "bau-search-setup.sh"):
+    for name in ("bau-pictures-setup.sh", "bau-search-setup.sh", "bau-video-setup.sh"):
         assert (root / "src/bau/data/setup" / name).read_text() == \
             (root / "installer" / name).read_text()
         assert S.script(name).exists()
@@ -127,13 +147,13 @@ def test_the_shipped_setup_scripts_are_the_installers_own():
 
 def test_prices_are_set_on_the_card_only_by_the_owners_accept(box):
     fields = S.form("prices")["fields"]
-    assert [f["name"] for f in fields] == ["subscription", "nude", "xxx"]
+    assert [f["name"] for f in fields] == ["subscription", "nude", "xxx", "clip"]
     assert all("options" not in f for f in fields)            # typed boxes, filled in, changeable
     out = S.run("prices", box.home, values={"subscription": "9.99", "nude": "14.99",
-                                            "xxx": "29.99"})
+                                            "xxx": "29.99", "clip": "19.99"})
     assert out["done"] and not box.opened                        # no terminal needed
     prof = yaml.safe_load((box.home / "creators" / "aria.yaml").read_text())
-    assert prof["prices"] == {"subscription": 9.99, "nude": 14.99, "xxx": 29.99}
+    assert prof["prices"] == {"subscription": 9.99, "nude": 14.99, "xxx": 29.99, "clip": 19.99}
     assert "prices" not in ids(box)
 
 
@@ -224,7 +244,7 @@ def test_jarvis_pops_every_waiting_step_up_once_and_accept_runs_it(tmp_path, mon
     out = j.confirm(prices["id"], True, "human:owner", {"subscription": "abc"})
     assert out["retry"]                                  # still waiting until typed right
     out = j.confirm(prices["id"], True, "human:owner",
-                    {"subscription": "9.99", "nude": "20", "xxx": "40"})
+                    {"subscription": "9.99", "nude": "20", "xxx": "40", "clip": "25"})
     assert out["done"]
 
 
@@ -239,8 +259,8 @@ def test_the_page_shows_them_when_jarvis_opens():
     text = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis_server.py").read_text()
     assert "setup_waiting()" in text
     page = (Path(__file__).resolve().parents[1] / "src/bau/ui/jarvis.html").read_text()
-    assert ('/^(setup_step|autopilot_answer|fanvue_review|fan_reply|agent_approve|work_review)$/'
-            '.test(showing.tool) ? "Accept"') in page
+    assert ('/^(setup_step|autopilot_answer|fanvue_review|fan_reply|agent_approve|work_review|'
+            'work_hold)$/.test(showing.tool) ? "Accept"') in page
     # typed boxes on cards come filled in from Fanvue's advice, and the greeting never takes
     # the keyboard from them
     assert "if (f.value !== undefined) { box.value = f.value; box.oninput(); }" in page
@@ -276,7 +296,7 @@ def test_the_cards_come_filled_in_from_fanvues_own_advice():
     from bau.fanvue import AUDIENCES, MAX_PER_DAY
     prices = {f["name"]: f for f in S.form("prices")["fields"]}
     assert {k: f["value"] for k, f in prices.items()} == {
-        "subscription": 9.99, "nude": 10.99, "xxx": 14.99}
+        "subscription": 9.99, "nude": 10.99, "xxx": 14.99, "clip": 14.99}
     assert not V.price_problems({k: f["value"] for k, f in prices.items()})  # Fanvue limits
     assert all("help.fanvue.com" in f["why"] for f in prices.values())       # the source is shown
     auto = {f["name"]: f for f in S.form("autopost")["fields"]}

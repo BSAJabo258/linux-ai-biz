@@ -130,3 +130,27 @@ levels:
         - 50mm lens, explicit adult photography
         - close intimate framing, sharp focus
     negative: second person, man, couple, censor bar, mosaic, clothes
+# Clips (the owner's ask 2026-11-21, docs/PICTURES.md): a few seconds of one of her kept level 2
+# or 3 pictures brought to life by Wan 2.2 (comfy.animate). Her alone, within Fanvue's rules
+# (read 2026-11-21, examples/platform-fanvue.yaml): no second person, no fluids, nothing on its
+# banned list; comfy.SOLO_ONLY refuses any line that tries. One motion line and one camera line.
+clips:
+  feet:
+    level: 2
+    motion:
+      - she slowly points and flexes her bare feet toward the camera
+      - she crosses and uncrosses her legs, bare feet in focus
+      - she runs one bare foot slowly along her other leg
+      - she wiggles her toes and smiles at the camera
+  solo:
+    level: 3
+    motion:
+      - she slowly touches herself, eyes on the camera
+      - she arches her back on the bed, touching herself
+      - she uses a toy, slow rhythm, eyes half closed
+      - she bites her lip and moves her hips slowly
+  camera:
+    - static camera, smooth natural motion
+    - slow push-in, smooth natural motion
+    - handheld feel, gentle sway, smooth natural motion
+  negative: another person, man, partner, couple, bodily fluids, static, frozen, distorted face

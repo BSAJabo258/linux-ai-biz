@@ -48,7 +48,8 @@ LEVELS: dict[int, dict[str, Any]] = {
                                 "explicit_boundaries."},
 }
 # Fanvue's limits in US dollars (read 2026-11-01, see the module docstring).
-PRICE_LIMITS = {"subscription": (3.99, 100.0), "nude": (3.0, 500.0), "xxx": (3.0, 500.0)}
+PRICE_LIMITS = {"subscription": (3.99, 100.0), "nude": (3.0, 500.0), "xxx": (3.0, 500.0),
+                "clip": (3.0, 500.0)}        # a clip unlock is a post price too (2026-11-21)
 SHOT_TYPES = ("portrait", "lifestyle", "behind-the-scenes", "story", "short-video")
 # Also the old kids-channel list's terms (2026-10-31), so nothing it caught gets through:
 # toddlers, preschool, nursery, "little ones", plural ages, "ages 2-4", "aged 5". Ages count
@@ -240,7 +241,7 @@ class VirtualCreator:
 
 def price_problems(prices: Any) -> list[str]:
     if not isinstance(prices, dict):
-        return ["prices must map subscription, nude and xxx to US dollars"]
+        return ["prices must map subscription, nude, xxx and clip to US dollars"]
     out = []
     for key, value in prices.items():
         if key not in PRICE_LIMITS:

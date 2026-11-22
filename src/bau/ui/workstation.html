@@ -26,34 +26,39 @@ main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.8fr);gap:1
   repeating-linear-gradient(90deg,transparent 0 79px,rgba(63,214,255,.035) 80px),
   repeating-linear-gradient(0deg,transparent 0 79px,rgba(63,214,255,.035) 80px);
   border:1px solid var(--line);border-radius:14px}
-#drop{position:absolute;left:50%;top:16px;transform:translateX(-50%);width:190px;text-align:center;border:1px dashed var(--gold);border-radius:12px;padding:9px;color:var(--gold);background:rgba(255,209,102,.06);z-index:2}
-#drop small{display:block;color:var(--dim);letter-spacing:.05em;margin-top:2px}
-#pile{display:flex;gap:3px;justify-content:center;min-height:12px;margin-top:6px;flex-wrap:wrap}
+/* The floor (the owner, 2026-11-21): every department is a station; each AI walks between
+   them as its real job changes (workstation.floor). */
+#floor{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:14px;min-height:470px}
+.station{position:relative;min-height:172px;border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:rgba(8,12,19,.6);overflow:hidden;transition:border-color .6s,box-shadow .6s}
+.station.hq{grid-column:span 2;border-color:rgba(63,214,255,.45)}
+.station b{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.station small{display:block;color:var(--dim);font-size:9px;line-height:1.3;margin-top:2px;max-height:24px;overflow:hidden}
+.station .count{position:absolute;right:9px;top:7px;color:var(--dim);font-size:10px}
+.station:after{content:"";position:absolute;left:10px;right:10px;bottom:9px;height:6px;border-radius:2px;background:linear-gradient(90deg,var(--line),rgba(63,214,255,.35),var(--line))}
+.station.busy{border-color:var(--violet);box-shadow:0 0 22px rgba(169,139,255,.22) inset}
+.station.busy:after{background:linear-gradient(90deg,var(--violet),var(--cyan),var(--violet));background-size:200% 100%;animation:flow 2.2s linear infinite}
+.station.approvals.busy{border-color:var(--amber);box-shadow:0 0 22px rgba(255,179,64,.2) inset}
+.station.repair.busy{border-color:var(--red);box-shadow:0 0 22px rgba(255,77,94,.18) inset}
+.station.delivery.busy{border-color:var(--gold);box-shadow:0 0 22px rgba(255,209,102,.2) inset}
+@keyframes flow{to{background-position:-200% 0}}
+#pile{display:flex;gap:3px;flex-wrap:wrap;position:absolute;left:10px;bottom:20px;max-width:60%}
 #pile i{display:block;width:8px;height:10px;border:1px solid var(--gold);background:rgba(255,209,102,.18);border-radius:1px}
-#desks{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;padding:96px 16px 18px}
-.desk{position:relative;min-height:230px;border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(8,12,19,.55)}
-.desk:before{content:"";position:absolute;left:10px;right:10px;bottom:8px;height:8px;background:linear-gradient(90deg,var(--line),rgba(63,214,255,.45),var(--line));border-radius:2px}
-.worker{position:relative;z-index:3;display:flex;gap:10px;align-items:flex-start}
-.worker .figure{position:relative;width:54px;height:102px;flex:none;transform-origin:50% 80%}
-.head{position:absolute;left:19px;top:0;width:17px;height:17px;border-radius:50%;border:2px solid var(--cyan);background:rgba(63,214,255,.18)}
-.neck{position:absolute;left:26px;top:16px;width:3px;height:7px;background:var(--cyan);opacity:.6}
-.torso{position:absolute;left:16px;top:22px;width:23px;height:31px;border:2px solid var(--cyan);border-radius:9px 9px 7px 7px;background:linear-gradient(180deg,rgba(63,214,255,.18),rgba(169,139,255,.12))}
-.hips{position:absolute;left:14px;top:51px;width:27px;height:18px;border:2px solid var(--violet);border-radius:8px 8px 12px 12px;background:rgba(169,139,255,.13)}
-.leg{position:absolute;top:67px;width:4px;height:31px;border-radius:3px;background:var(--cyan);opacity:.85;transform-origin:top center}
-.leg.l{left:21px}.leg.r{left:30px}
-.arm{position:absolute;top:27px;width:3px;height:28px;border-radius:3px;background:var(--cyan);opacity:.65;transform-origin:top center}
-.arm.l{left:12px}.arm.r{left:39px}
-.worker.dropping .figure{animation:sashay .52s ease-in-out infinite}
-.worker.dropping .hips{box-shadow:0 0 14px rgba(169,139,255,.65)}
-.worker.dropping .leg.l{animation:step .52s ease-in-out infinite}
-.worker.dropping .leg.r{animation:step .52s ease-in-out infinite reverse}
-.worker.dropping .arm.l{animation:swing .52s ease-in-out infinite}
-.worker.dropping .arm.r{animation:swing .52s ease-in-out infinite reverse}
-.worker.dropping{animation:dropoff 3s cubic-bezier(.4,0,.2,1) both;z-index:8}
-@keyframes sashay{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
-@keyframes step{0%,100%{transform:rotate(-23deg)}50%{transform:rotate(23deg)}}
-@keyframes swing{0%,100%{transform:rotate(14deg)}50%{transform:rotate(-14deg)}}
-@keyframes dropoff{0%,100%{transform:translate(0,0)}42%,58%{transform:translate(var(--wx,0),var(--wy,0))}50%{transform:translate(var(--wx,0),calc(var(--wy,0) - 8px))}}
+#walkers{position:absolute;inset:0;pointer-events:none;z-index:4}
+.walker{position:absolute;left:0;top:0;width:86px;height:136px;margin:-120px 0 0 -43px;pointer-events:auto;cursor:default}
+.walker.placed{transition:left 2.6s cubic-bezier(.45,0,.3,1),top 2.6s cubic-bezier(.45,0,.3,1)}
+/* her own character from the world's sprite sheet (world/characters.png, 96x132 frames):
+   the frame is chosen from her real state by tick(), never at random */
+.walker .sprite{width:96px;height:132px;margin-left:-5px;background:url("/world/characters.png") no-repeat 0 0;image-rendering:pixelated;transform:scale(.9);transform-origin:50% 100%}
+.walker.flip .sprite{transform:scale(-.9,.9)}
+.walker .tag{position:absolute;top:122px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;letter-spacing:.06em;color:var(--ink);background:rgba(8,11,18,.85);border:1px solid var(--line);border-radius:99px;padding:0 6px}
+.walker[data-role="jarvis"] .tag{border-color:var(--gold);color:var(--gold)}
+.walker[data-mood="critical"] .tag{border-color:var(--red);color:var(--red)}
+.walker.hop .sprite{animation:hop .5s ease-out 2}
+@keyframes hop{0%,100%{translate:0 0}40%{translate:0 -12px}}
+@media(prefers-reduced-motion:reduce){.walker.placed{transition:none}.walker .sprite,.station:after{animation:none!important}}
+#desks{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:12px}
+.desk{position:relative;border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(8,12,19,.55)}
+.worker{position:relative;display:flex;gap:10px;align-items:flex-start}
 .worker .meta{min-width:0;flex:1}
 .worker .who{font-weight:700;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .worker .role{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.1em}
@@ -108,7 +113,7 @@ input{flex:1}input:focus,select:focus{border-color:var(--cyan);outline:none}
 #ask-out .you{color:var(--dim)}#ask-out .bad{color:var(--red)}
 body.fs{padding:10px}
 body.fs #office{min-height:calc(100vh - 230px)}
-@media(max-width:900px){main{grid-template-columns:1fr}#office{min-height:420px}.span{grid-column:auto}}
+@media(max-width:900px){main{grid-template-columns:1fr}#office{min-height:420px}.span{grid-column:auto}#floor{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 <body>
@@ -134,10 +139,11 @@ body.fs #office{min-height:calc(100vh - 230px)}
   </section>
   <section class="panel span" aria-label="Workstation summary">
     <div id="summary"><span><b id="n-workers">0</b> workers</span><span><b id="n-tasks">0</b> open tasks</span><span><b id="n-out">0</b> delivered</span><span>Manager: <span id="mgr">productivity</span></span></div>
-    <div id="office" aria-label="The agent office">
-      <div id="drop"><b>DROP-OFF</b><small>finished work lands here</small><div id="pile"></div></div>
-      <div id="desks"></div>
+    <div id="office" aria-label="The floor: every department, and who works where">
+      <div id="floor"></div>
+      <div id="walkers" aria-hidden="true"></div>
     </div>
+    <div id="desks" aria-label="The workers"></div>
   </section>
   <section class="panel" aria-labelledby="t-h">
     <h2 id="t-h">Workload · from the logs</h2>
@@ -189,14 +195,91 @@ async function settle(r) {
   return r;
 }
 function health(w) { const b = el("div", "health"); const i = el("i"); i.style.width = Math.max(0, Math.min(100, w.health || 0)) + "%"; b.appendChild(i); return b; }
-function animateDrop(node) {
-  const office = $("office").getBoundingClientRect(), drop = $("drop").getBoundingClientRect(), box = node.getBoundingClientRect();
-  const dx = (drop.left + drop.width / 2) - (box.left + box.width / 2);
-  const dy = (drop.top + drop.height) - (box.top + box.height / 2);
-  node.style.setProperty("--wx", dx + "px"); node.style.setProperty("--wy", dy + "px");
-  node.classList.add("dropping");
-  setTimeout(() => node.classList.remove("dropping"), 3100);
+// ---- the floor: stations are drawn once; a walker is kept between refreshes so that when
+// its AI's job moves it to another department it walks there instead of jumping
+// her animation on the sheet for each state, and how long each frame shows (as in WORLD)
+const ANIM = { working: ["work", 180], waiting: ["wait", 500], done: ["done", 600], idle: ["idle", 1400],
+               stopped: ["blocked", 700] };
+const POSE = { working: "working", "waiting for you": "waiting", done: "done", idle: "idle", assigned: "idle" };
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let SHEET = null;
+apiJson("/world/characters.json").then(m => { SHEET = m; }).catch(() => {});
+function tick() {                 // pick each sprite's frame: her state, or her walk while she walks
+  if (SHEET) for (const w of document.querySelectorAll(".walker")) {
+    const c = SHEET.characters[w.dataset.look] || SHEET.characters.engineer;
+    const [name, ms] = w.classList.contains("walking") ? [w.dataset.dir === "up" ? "walk_back" : "walk_front", 140]
+                                                        : (ANIM[w.dataset.pose] || ANIM.idle);
+    const A = c.animations[name] || c.animations.idle, [fw, fh] = SHEET.frame;
+    const k = REDUCED ? 0 : Math.floor(performance.now() / ms) % A.frames;
+    w.firstChild.style.backgroundPosition = (-k * fw) + "px " + (-A.row * fh) + "px";
+  }
+  requestAnimationFrame(tick);
 }
+requestAnimationFrame(tick);
+let FLOOR = null;
+function floorStations(f) {
+  const box = $("floor"), ids = f.rooms.map(r => r.id).join(",");
+  if (box.dataset.ids === ids) return;
+  box.dataset.ids = ids; box.textContent = "";
+  for (const r of f.rooms) {
+    const st = el("div", "station " + r.id); st.dataset.room = r.id;
+    st.appendChild(el("b", null, r.name)); st.appendChild(el("small", null, r.who));
+    st.appendChild(el("span", "count", ""));
+    if (r.id === "delivery") { const pile = el("div"); pile.id = "pile"; st.appendChild(pile); }
+    box.appendChild(st);
+  }
+}
+function spot(room, i, n) {
+  const office = $("office").getBoundingClientRect();
+  const st = document.querySelector('.station[data-room="' + CSS.escape(room) + '"]') ||
+             document.querySelector('.station[data-room="hq"]');
+  if (!st) return { x: 40, y: 120 };
+  const r = st.getBoundingClientRect(), gap = Math.min(60, (r.width - 40) / Math.max(1, n));
+  return { x: r.left - office.left + r.width / 2 + (i - (n - 1) / 2) * gap, y: r.bottom - office.top - 14 };
+}
+function walker(a) {
+  let w = document.querySelector('.walker[data-id="' + CSS.escape(a.id) + '"]');
+  if (w) return w;
+  w = el("div", "walker"); w.dataset.id = a.id; w.dataset.role = a.role; w.dataset.look = a.look || "engineer";
+  w.appendChild(el("div", "sprite")); w.appendChild(el("span", "tag", a.role === "jarvis" ? "Jarvis" : a.role));
+  $("walkers").appendChild(w);
+  return w;
+}
+function renderFloor(f, delivered) {
+  if (!f) return;
+  FLOOR = f; floorStations(f);
+  const by = {};
+  for (const a of f.agents) (by[a.room] = by[a.room] || []).push(a);
+  for (const st of document.querySelectorAll(".station")) {
+    const here = by[st.dataset.room] || [];
+    st.querySelector(".count").textContent = here.length ? String(here.length) : "";
+    st.classList.toggle("busy", here.some(a => a.state !== "idle"));
+  }
+  const keep = new Set(f.agents.map(a => a.id));
+  for (const w of [...document.querySelectorAll(".walker")]) if (!keep.has(w.dataset.id)) w.remove();
+  for (const [room, list] of Object.entries(by)) list.forEach((a, i) => {
+    const w = walker(a), p = spot(room, i, list.length);
+    w.dataset.mood = a.mood || "steady";
+    w.dataset.pose = a.room === "repair" ? "stopped" : (POSE[a.state] || "idle");
+    w.title = a.name + " · " + a.role + " · " + a.state + (a.model ? " · model " + a.model : "") + (a.task ? "\n" + a.task : "");
+    const moved = w.dataset.room !== undefined && (w.dataset.room !== room || w.dataset.x !== String(Math.round(p.x)));
+    if (moved && w.dataset.room !== room) {          // a real change of department: walk there
+      const ox = parseFloat(w.style.left) || p.x, oy = parseFloat(w.style.top) || p.y;
+      w.dataset.dir = p.y < oy - 20 ? "up" : "down"; w.classList.toggle("flip", p.x < ox - 4);
+      w.classList.add("walking"); clearTimeout(w._t);
+      w._t = setTimeout(() => { w.classList.remove("walking", "flip"); if (delivered.has(a.id)) hop(w); }, 2650);
+    } else if (delivered.has(a.id)) hop(w);
+    w.dataset.room = room; w.dataset.x = String(Math.round(p.x));
+    w.style.left = p.x + "px"; w.style.top = p.y + "px";
+    if (!w.classList.contains("placed")) requestAnimationFrame(() => requestAnimationFrame(() => w.classList.add("placed")));
+  });
+}
+function hop(w) { w.classList.remove("hop"); void w.offsetWidth; w.classList.add("hop"); setTimeout(() => w.classList.remove("hop"), 1100); }
+addEventListener("resize", () => {           // a new layout: stand at the new spots at once
+  if (!FLOOR) return;
+  document.querySelectorAll(".walker").forEach(w => w.classList.remove("placed"));
+  renderFloor(FLOOR, new Set());
+});
 function render(s) {
   $("n-workers").textContent = s.workers.length; $("n-tasks").textContent = s.tasks.length; $("n-out").textContent = s.outbox;
   $("mgr").textContent = s.manager ? s.manager.name : "productivity manager";
@@ -205,7 +288,6 @@ function render(s) {
   if (!s.workers.length) desks.appendChild(el("div", "empty", "No agent folders are installed yet."));
   for (const w of s.workers) {
     const card = el("div", "desk worker"); card.dataset.id = w.id; card.dataset.mood = w.mood;
-    const fig = el("div", "figure"); ["head","neck","torso","hips","leg l","leg r","arm l","arm r"].forEach(c => fig.appendChild(el("div", c)));
     const meta = el("div", "meta");
     meta.appendChild(el("div", "who", w.name + " · gen " + w.generation));
     meta.appendChild(el("div", "role", w.role + " · " + (w.status || "idle")));
@@ -214,7 +296,7 @@ function render(s) {
     const task = s.tasks.find(t => t.role === w.role);
     meta.appendChild(el("div", "doing", task ? task.objective : "waiting for work"));
     if (w.inherited && w.inherited.from) { const b = el("span", "badge", "from " + w.inherited.from + " · " + (w.inherited.tasks || 0) + " inherited"); meta.appendChild(b); }
-    card.appendChild(fig); card.appendChild(meta); desks.appendChild(card);
+    card.appendChild(meta); desks.appendChild(card);
   }
   const role = $("role"), old = role.value; role.textContent = "";
   for (const w of s.workers) role.appendChild(new Option(w.role, w.role));
@@ -238,10 +320,9 @@ function render(s) {
   }
   const events = $("events"); events.textContent = "";
   for (const e of s.events.slice().reverse()) { const row = el("div"); row.appendChild(el("b", null, e.kind + " · " + (e.worker || "workstation"))); row.appendChild(document.createTextNode(" — " + e.text)); events.appendChild(row); }
-  const pile = $("pile"); pile.textContent = ""; for (let i = 0; i < Math.min(12, s.outbox); i++) pile.appendChild(el("i"));
-  if (!first) for (const e of s.events) if (e.seq > lastSeq && e.kind === "delivered") {
-    const node = document.querySelector('.worker[data-id="' + CSS.escape(e.worker_id) + '"]'); if (node) animateDrop(node);
-  }
+  const delivered = new Set(first ? [] : s.events.filter(e => e.seq > lastSeq && e.kind === "delivered").map(e => e.worker_id));
+  renderFloor(s.floor, delivered);
+  const pile = $("pile"); if (pile) { pile.textContent = ""; for (let i = 0; i < Math.min(12, s.outbox); i++) pile.appendChild(el("i")); }
   lastSeq = Math.max(lastSeq, s.seq || 0); first = false;
 }
 // Waiting for you (the owner's ask, 2026-11-20): every card Jarvis holds, all at once, with
@@ -250,11 +331,16 @@ function render(s) {
 const SETTLE_MS = 900;            // as in Jarvis: a card ignores Accept for its first moment
 const shownCards = {}, popQ = [], dismissed = new Set();
 let popping = null, popPicked = {};
-const ACCEPT = /^(setup_step|autopilot_answer|fanvue_review|fan_reply|agent_approve|work_review)$/;
+const ACCEPT = /^(setup_step|autopilot_answer|fanvue_review|fan_reply|agent_approve|work_review|work_hold)$/;
 function hasChoices(p) { return !!(p.form && p.form.fields && p.form.fields.length); }
-function preview(p, img) {
+function preview(p, img) {        // a picture, or a clip (video/mp4) played muted on a loop
   fetch("/api/preview/" + encodeURIComponent(p.id), { headers: { "X-Jarvis-Key": KEY } })
-    .then(r => r.ok ? r.blob() : null).then(b => { if (b && b.type.startsWith("image/")) img.src = URL.createObjectURL(b); else img.remove(); })
+    .then(r => r.ok ? r.blob() : null).then(b => {
+      if (b && b.type.startsWith("image/")) img.src = URL.createObjectURL(b);
+      else if (b && b.type.startsWith("video/")) { const v = el("video"); v.src = URL.createObjectURL(b);
+        v.controls = v.muted = v.loop = v.playsInline = true; v.style.cssText = "display:block;max-width:100%;max-height:46vh;border-radius:10px;margin:0 auto 12px";
+        img.replaceWith(v); }
+      else img.remove(); })
     .catch(() => img.remove());
 }
 function card(p) {
@@ -398,7 +484,7 @@ $("assign").onsubmit = async (ev) => {
   try { const t = await apiJson("/api/workstation/assign", { role: $("role").value, objective }); $("objective").value = ""; $("msg").textContent = t.manager && t.manager.approved ? "Productivity manager approved it. It will run on the next shift." : "Held: " + (t.manager ? t.manager.reason : "the manager did not approve it"); $("msg").className = t.manager && t.manager.approved ? "good" : "bad"; load(); }
   catch (e) { $("msg").textContent = e.message; $("msg").className = "bad"; }
 };
-load(); setInterval(() => { if (!document.hidden && !busy) load(); }, 5000);
+load(); setInterval(() => { if (!document.hidden) load(); }, 4000);   // during a shift too: she walks to her desk
 loadWaiting(); setInterval(() => { if (!document.hidden) loadWaiting(); }, 15000);
 </script>
 </body>

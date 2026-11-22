@@ -122,7 +122,8 @@ def cmd_models(a):
         if not sys.stdin.isatty():
             raise PermissionError("this action must be taken by a human at a terminal")
         try:
-            now = P.tune(Path("/etc/bau"), P.run_cmd, draft=a.draft, kv=a.kv, reset=a.reset)
+            now = P.tune(Path("/etc/bau"), P.run_cmd, draft=a.draft, kv=a.kv, reset=a.reset,
+                         parallel=a.parallel)
         except ValueError as e:
             print(f"tune: {e}", file=sys.stderr)
             return EXIT_ERROR
@@ -530,6 +531,12 @@ def cmd_creator(a):
         from .virtual_creator import set_prices
         who = _human()
         prices = {"subscription": a.subscription, "nude": a.nude, "xxx": a.xxx}
+        if a.clip is not None:
+            prices["clip"] = a.clip
+        else:                             # an earlier clip price stays as it was
+            had = (yaml.safe_load(Path(a.profile).read_text()) or {}).get("prices") or {}
+            if "clip" in had:
+                prices["clip"] = had["clip"]
         try:
             set_prices(Path(a.profile), prices)
         except CreatorError as exc:
@@ -2362,6 +2369,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--draft", help="words an MTP model guesses ahead (1-16), or off")
     x.add_argument("--kv", help="KV cache format: f16 (llama.cpp's default), q8_0 (half the "
                    "memory)")
+    x.add_argument("--parallel", help="conversations sharing the server's window (1-4); 1 "
+                   "gives one conversation all of it (docs/GPU.md)")
     x.add_argument("--reset", action="store_true", help="forget earlier settings first")
     x = ms.add_parser("compare", help="two models' latest lab results side by side "
                       "(e.g. a compressed file against a bigger one)")
@@ -2640,6 +2649,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     x.add_argument("--subscription", type=float, required=True, help="a month")
     x.add_argument("--nude", type=float, required=True, help="level 2, each unlock")
     x.add_argument("--xxx", type=float, required=True, help="level 3, each unlock")
+    x.add_argument("--clip", type=float, help="a clip (levels 2-3), each unlock")
     s.set_defaults(fn=cmd_creator)
 
     s = sub.add_parser("toolbox", help="researched open-source tools; ask before guessing")

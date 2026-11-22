@@ -90,6 +90,38 @@ def _capability(tool_name: str) -> str:
     return tool_name.replace("__", ".")
 
 
+LOCAL_ANSWER = 2048      # the longest answer asked of the local model in one step
+CUT = "\n[... cut to fit the model's window ...]\n"
+
+
+def fit_local(spec: AgentSpec, system: str, messages: list[dict[str, Any]],
+              tools: list[ToolSpec]) -> int:
+    """Make the next request fit the local server's real window, as Jarvis's chat does
+    (assistant._fit): a shorter answer, then the longest texts cut in place, their last
+    words kept so an untrusted block stays closed. Returns the answer's token limit.
+    Without it an agent's history grew to 6,653 tokens of the 8,192 the desktop's server
+    shares (2026-11-21); the server's stop that night was the card falling off the bus
+    (docs/GPU.md), not this, but a request past the window fails either way."""
+    if spec.model.get("deployment") != "local":
+        return spec.max_tokens
+    from .assistant import CHARS_PER_TOKEN, LOCAL_SERVER_CTX, _longest_text
+    window = min(int(spec.model.get("context") or LOCAL_SERVER_CTX), LOCAL_SERVER_CTX)
+    answer = min(spec.max_tokens, LOCAL_ANSWER)
+    budget = (window - answer - 256) * CHARS_PER_TOKEN
+    fixed = len(system) + len(json.dumps([t.__dict__ for t in tools], default=str))
+    for _ in range(60):
+        over = fixed + len(json.dumps(messages, default=str)) - budget
+        if over <= 0:
+            break
+        spot = _longest_text(messages)
+        if spot is None:
+            break
+        holder, key, text = spot
+        keep = max(200, len(text) - over - len(CUT) - 40)
+        holder[key] = text[:keep] + CUT + text[-40:]
+    return answer
+
+
 def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
         jobs: JobStore | None = None, context: str = "", mission_id: str = "",
         job: Job | None = None) -> RunResult:
@@ -141,7 +173,8 @@ def run(spec: AgentSpec, objective: str, provider: Provider, gateway: Gateway,
             job.next_action = f"{why}: optimize, change model, or request approval"
             jobs.checkpoint(job)
             return RunResult("PAUSED", why, step - 1, log, cost, flags, evidence)
-        resp: ModelResponse = provider.complete(system, messages, tools, spec.max_tokens)
+        answer = fit_local(spec, system, messages, tools)
+        resp: ModelResponse = provider.complete(system, messages, tools, answer)
         step_cost = estimate_usd(spec.model, resp.tokens_in, resp.tokens_out)
         cost += step_cost
         if step_cost:

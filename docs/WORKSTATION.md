@@ -1,8 +1,30 @@
 # The AI workstation
 
 Open it from Jarvis (the **WORKSTATION** link) or at `/workstation` with Jarvis's key. It is an
-office where each approved agent folder is a worker at a desk. When a worker finishes a job it
-walks to the outbox and drops the work off; when it fails, its health drops.
+office where each approved agent folder is a worker. When a worker finishes a job its health
+goes up; when it fails, its health drops.
+
+## The floor (2026-11-21)
+
+Every department of the operations world is a station on the floor: Headquarters, Research
+library, Development Forge, Testing lab, Innovation Workshop, Creative Studio, Finance Office,
+Market, Review (waiting for you), Stopped and Delivered. Jarvis and every worker are the same
+AI models as in the WORLD view, each her own character from its sprite sheet, and each stands
+at the station her latest real job puts her in, the same room the WORLD view gives:
+
+| Their job | Where they stand | What they do |
+|---|---|---|
+| none, or only handed over | Headquarters | her idle animation |
+| running | her own department's desk | her work animation; the station lights up |
+| waits for your approval | Review | her waiting animation |
+| failed, paused or interrupted | Stopped | her blocked animation |
+| finished and checked (last 24 hours) | Delivered | her done animation; the pile grows |
+
+When a job changes she **walks** to the new station with her walk animation (her back to you
+when she walks up the floor, facing you when she walks down). A delivery ends
+with a little hop. Nothing moves on a timer or at random: no change in the job logs, no walk.
+Hover over a figure for its name, state, task and the model it used. With "reduce motion" on
+in your computer's settings, they stand still at their stations.
 
 Nothing on the page is invented: every worker is a real agent folder, and its health moves only
 with what really happened in BAU's job logs and shifts.
@@ -16,6 +38,13 @@ with choices to make (prices, limits, an audience) opens in the pop-up.
 Not now on a picture drops it, as in Jarvis. The list refreshes every 15 seconds.
 
 Each new card also **pops up** over the workstation, with its picture and its choices (prices, limits, audience), so every confirm can be answered here; Accept stays locked until each choice is made. **Later** closes the pop-up and the card stays in the list.
+
+**Work the manager held** (2026-11-21) is a card too. When the productivity manager stops a
+task (it would post, pay, send or touch keys, or the worker is too tired), the card says who
+was asked, what, and why it was held. **Accept** approves it: it runs on the next shift
+(**RUN SHIFT** runs it now), and anything it then wants to post, pay or send still pops up for
+you again. **Not now** drops it. So the office keeps working by itself and stops only where
+you have to say yes. Work that mentions minors never gets a card.
 
 **Tell Jarvis** (at the top) takes any request you would type in Jarvis's chat, and whatever he stages pops up at once. **FULL SCREEN** (top row) fills the screen; Esc leaves it.
 
@@ -99,3 +128,21 @@ Work that finished without the check earns nothing.
 
 Only you or the autopilot can assign work or run a shift; Jarvis's model cannot. The autopilot
 runs one approved task per shift (`workstation` job, Go lane).
+
+## Why the workers were failing (2026-11-21)
+
+On the desktop every shift failed for three hours one night and three workers fell close to
+zero health. Two causes, both fixed:
+
+- **The researcher had no model.** Its brain is the strong one, and a shift did not give it
+  Jarvis's model to fall back on. A shift now gives it the team's boss model (`bau team`).
+- **The local model stopped answering.** The graphics card fell off the bus at 02:21 (it has
+  at the end of every boot since 2026-11-19), so the model on it could not answer until the
+  computer restarted; every job in between waited 10 minutes and failed. See docs/GPU.md,
+  "When the card falls off the bus", for the checks and the watchdog. (First written up as
+  the model's memory window filling: that was wrong.) Separately, an agent's request to the
+  local model now always fits the window (the longest search results are cut, and an answer
+  is at most 2,048 word-pieces).
+
+A retry that fails too is no longer retried a third time; it stays in the workload for you.
+

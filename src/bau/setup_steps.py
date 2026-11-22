@@ -112,6 +112,13 @@ STEPS = (
          "download, once, checked file by file). It joins the picture maker on this computer; "
          "every picture still gets the age check and waits for your Accept. A terminal "
          "opens; type your password."),
+    Step("video", "Set up short clips for paid levels 2 and 3",
+         "Wan 2.2, a free video model, turns her approved pictures into short clips of her "
+         "alone (about 18 GB download, once, checked file by file). Every frame gets the age "
+         "check. A terminal opens; type your password."),
+    Step("clip_price", "Set your clip price",
+         "What a fan pays to unlock one of her clips. Filled in from Fanvue's own advice "
+         "(source under the box). Change it, then Accept; no clip posts before that."),
     Step("prices", "Set your Fanvue prices",
          "Filled in from Fanvue's own advice (source under each box). Change any price, "
          "then Accept; nothing is set before that."),
@@ -173,6 +180,9 @@ def _probe(what: str) -> object:
     if what == "explicit":
         from .media import comfy
         return comfy.chroma_ready()
+    if what == "video":
+        from .media import comfy
+        return comfy.wan_ready()
     if what == "update":
         from . import update
         return update.mode() or "off"
@@ -267,6 +277,17 @@ def _done(step: str, home: Path, probe: Probe) -> bool | None:
         if not limits or _done("pictures", home, probe) is not True:
             return None
         return bool(probe("explicit"))
+    if step == "video":                   # after the explicit pictures
+        if _done("explicit", home, probe) is not True:
+            return None
+        return bool(probe("video"))
+    if step == "clip_price":              # once clips can be made, until he sets it
+        import yaml
+        prof = _profile(home)
+        prices = prof and (yaml.safe_load(prof.read_text()) or {}).get("prices")
+        if not prices or _done("video", home, probe) is not True:
+            return None
+        return "clip" in prices
     if step in ("boundaries", "prices"):
         import yaml
         prof = _profile(home)
@@ -321,6 +342,8 @@ def _command(step: str, home: Path) -> str:
         return f"sudo bash {q(str(script('bau-make-room.sh')))}"
     if step == "explicit":
         return f"sudo bash {q(str(script('bau-explicit-setup.sh')))}"
+    if step == "video":
+        return f"sudo bash {q(str(script('bau-video-setup.sh')))}"
     if step == "search":
         return f"sudo bash {q(str(script('bau-search-setup.sh')))}"
     if step == "updates":
@@ -357,6 +380,8 @@ SUGGESTED = {
                     "ending in .99. " + PPV_GUIDE),
     "xxx": (14.99, "Fanvue: price by what's inside; the most explicit level gets the top "
                    "of the $10 to $15 floor. " + PPV_GUIDE),
+    "clip": (14.99, "Fanvue: $10 to $15 is a sensible floor for the cheapest PPV, ending in "
+                    ".99; Fanvue gives no separate advice for video. " + PPV_GUIDE),
     "per_day": (1, "Fanvue: post daily, or at least every other day. " + SUB_GUIDE),
     "audience": ("subscribers", "Keeps subscriber posts behind the subscription. Fanvue "
                                 "gives no advice on this one: change it if you want free "
@@ -380,10 +405,15 @@ def form(step: str) -> dict[str, object] | None:
     if step == "prices":
         from .virtual_creator import PRICE_LIMITS
         names = {"subscription": "Monthly subscription", "nude": "Level 2 (nude) unlock",
-                 "xxx": "Level 3 (xxx) unlock"}
+                 "xxx": "Level 3 (xxx) unlock", "clip": "Clip unlock"}
         return {"fields": [_fill({"name": k, "type": "number", "min": lo, "max": hi,
                                   "label": f"{names[k]} in dollars (${lo:.2f} to ${hi:.2f})"})
                            for k, (lo, hi) in PRICE_LIMITS.items()]}
+    if step == "clip_price":
+        from .virtual_creator import PRICE_LIMITS
+        lo, hi = PRICE_LIMITS["clip"]
+        return {"fields": [_fill({"name": "clip", "type": "number", "min": lo, "max": hi,
+                                  "label": f"Clip unlock in dollars (${lo:.2f} to ${hi:.2f})"})]}
     if step == "autopost":
         from .fanvue import AUDIENCES, MAX_PER_DAY
         return {"fields": [
@@ -547,7 +577,7 @@ def run(step: str, home: Path, probe: Probe | None = None,
             return {"error": f"fill in every box: {e}" if isinstance(e, KeyError) else str(e)}
         return {"done": True, "said": f"The automaton is running: {s['die_after_days']} days "
                                       "to earn something. Tier: " + s["tier"] + "."}
-    if step in ("prices", "boundaries"):
+    if step in ("prices", "boundaries", "clip_price"):
         from . import virtual_creator as V
         prof, values = _profile(home), values or {}
         if prof is None:
@@ -555,6 +585,10 @@ def run(step: str, home: Path, probe: Probe | None = None,
         try:
             if step == "prices":
                 V.set_prices(prof, {k: float(values[k]) for k in V.PRICE_LIMITS})
+            elif step == "clip_price":         # his other prices stay as he set them
+                import yaml
+                have = (yaml.safe_load(prof.read_text()) or {}).get("prices") or {}
+                V.set_prices(prof, {**have, "clip": float(values["clip"])})
             else:
                 V.set_explicit_boundaries(prof, str(values.get("limits", "")).splitlines())
         except (KeyError, ValueError, TypeError, V.CreatorError) as e:

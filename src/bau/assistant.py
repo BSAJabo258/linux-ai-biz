@@ -32,6 +32,7 @@ import math
 import os
 import re
 import secrets
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -382,6 +383,9 @@ class Assistant:
         self.selflab = SelfLab(home=self.home, audit=self.audit)
         self.messages: list[dict[str, Any]] = []
         self.pending: dict[str, Pending] = {}
+        # Jarvis's page and the workstation both ask for the cards every few seconds; one at a
+        # time, or two asks at once each made a card for the same held task (2026-11-21).
+        self._cards = threading.Lock()
         self.tainted = False                  # this turn read outside content
         self.setup_started: dict[str, float] = {}     # step -> when its terminal opened
         self.setup_snoozed: dict[str, float] = {}     # step -> when the owner said Not now
@@ -422,6 +426,9 @@ class Assistant:
             "work_review": Tool("work_review", "The owner files a department's delivered work.",
                                 _schema({"task": {"type": "string"}}), self.t_work_review,
                                 kind="confirm"),
+            "work_hold": Tool("work_hold", "The owner lets held workstation work go on.",
+                              _schema({"task": {"type": "string"}}), self.t_work_hold,
+                              kind="confirm"),
             "fanvue_review": Tool("fanvue_review", "The owner approves a drafted picture.",
                                   _schema({"item": {"type": "string"}}),
                                   self.t_fanvue_approve, kind="confirm")}
@@ -1461,6 +1468,10 @@ class Assistant:
     def setup_waiting(self) -> list[dict[str, Any]]:
         """Every setup step still waiting here, as a card with Accept (the owner's ask,
         2026-11-02). Each step is staged once; a step done meanwhile is taken down."""
+        with self._cards:
+            return self._setup_waiting()
+
+    def _setup_waiting(self) -> list[dict[str, Any]]:
         from . import setup_steps
         steps = {s.id: s for s in setup_steps.waiting(self.home)}
         for pid, p in list(self.pending.items()):
@@ -1596,10 +1607,29 @@ class Assistant:
                  + "\n\nThe full draft is in your drafts folder. Accept: filed as good. "
                  "Not now: filed as not good enough."),
                 _now())
+        # Work the productivity manager held: the office stops here for his yes, and only
+        # here (the owner, 2026-11-21).
+        held = W.held(self.home)
+        still = {t["id"] for t in held}
+        for pid, p in list(self.pending.items()):   # approved elsewhere, or it ran: taken down
+            if p.tool == "work_hold" and p.args.get("task") not in still:
+                del self.pending[pid]
+        shown = {p.args.get("task") for p in self.pending.values() if p.tool == "work_hold"}
+        for t in held:
+            if t["id"] in shown:
+                continue
+            pid = "wh_" + secrets.token_hex(4)
+            self.pending[pid] = Pending(
+                pid, "work_hold", {"task": t["id"]},
+                (f"{t['role']} was asked: {t['objective']}\n"
+                 f"The productivity manager held it: {t['manager'].get('reason', 'held')}.\n\n"
+                 "Accept: you approve it and it runs on the next shift (RUN SHIFT runs it "
+                 "now). Posting, paying or sending still asks you again. Not now: dropped."),
+                _now(), click_only=True)
         return [p.public() for p in self.pending.values()
                 if p.tool in ("setup_step", "autopilot_answer", "fanvue_review", "fan_reply",
                               "fanvue_drop", "governor_finding", "agent_approve",
-                              "work_review")]
+                              "work_review", "work_hold")]
 
     def t_agent_approve(self, agent: str) -> dict[str, Any]:
         from . import agentfolders as AF
@@ -1610,6 +1640,14 @@ class Assistant:
         from . import workstation as W
         W.mark_seen(self.home, task, self.owner, True)
         return {"done": True, "said": "Filed as good."}
+
+    def t_work_hold(self, task: str) -> dict[str, Any]:
+        from . import workstation as W
+        try:
+            t = W.owner_decide(self.home, task, self.owner, True)
+        except KeyError:                  # already answered on another card, or it ran
+            return {"done": True, "said": "Already taken care of: nothing more to approve."}
+        return {"done": True, "said": f"Approved: {t['role']} takes it on the next shift."}
 
     def t_fan_reply(self, draft: str) -> dict[str, Any]:
         from . import fan_chat
@@ -1786,6 +1824,12 @@ class Assistant:
         if not approve and p.tool == "fanvue_drop":          # Not now: skipped this week
             from . import drops
             drops.skip(self.home, p.args["drop"], by)
+        if not approve and p.tool == "work_hold":            # Not now on held work = dropped
+            from . import workstation as W
+            try:
+                W.owner_decide(self.home, p.args["task"], by, False)
+            except KeyError:              # already answered or run: nothing left to drop
+                pass
         if not approve and p.tool == "fan_reply":            # Not now on a reply = dropped
             from . import fan_chat
             fan_chat.drop(self.home, p.args["draft"], by)

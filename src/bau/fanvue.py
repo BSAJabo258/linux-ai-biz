@@ -80,6 +80,7 @@ LEVELS = {0: "teaser (free, sfw)", 1: "subscriber (no nudity)", 2: "nude unlock"
           3: "xxx unlock"}
 MIN_PRICE_CENTS = 300                    # POST /v1/posts price: USD cents, >= 300, needs media
 IMAGE_TYPES = {".png", ".jpg", ".jpeg"}
+VIDEO_TYPES = {".mp4"}                  # her clips (media/comfy.animate), levels 2 and 3 only
 
 
 class FanvueError(RuntimeError):
@@ -214,10 +215,11 @@ class FanvueClient:
         return self.call("GET", "/v1/users/me")
 
     def upload_image(self, path: Path, poll: int = 30) -> str:
-        """The picture's mediaUuid once Fanvue says it is ready."""
+        """The picture's (or clip's: mediaType video) mediaUuid once Fanvue says it is ready."""
         body = path.read_bytes()
+        kind = "video" if path.suffix.lower() in VIDEO_TYPES else "image"
         s = self.call("POST", "/v1/media/uploads", {"name": path.stem, "filename": path.name,
-                                                    "mediaType": "image",
+                                                    "mediaType": kind,
                                                     "sizeBytes": len(body)})
         part = int(s["partSize"])
         total = int(s.get("totalParts") or math.ceil(len(body) / part))
@@ -501,7 +503,9 @@ class Queue:
         if MINOR_REFERENCE.search(caption):
             problems.append("the caption refers to minors or youth-coded words")
         p = self.home / "artifacts" / "media" / Path(picture).name
-        if Path(picture).name != picture or p.suffix.lower() not in IMAGE_TYPES \
+        if p.suffix.lower() in VIDEO_TYPES and level < 2:
+            problems.append("clips are for levels 2 and 3 only")
+        if Path(picture).name != picture or p.suffix.lower() not in IMAGE_TYPES | VIDEO_TYPES \
                 or not p.is_file():
             problems.append("the picture must be a file in artifacts/media (bau creator draw)")
             return problems

@@ -34,12 +34,13 @@ On the floor:
 
 Click an agent and her panel shows, besides her record:
 - **Health:** her number, her mood and a bar (the workstation's own, `docs/WORKSTATION.md`).
-- **Needs you:** her cards: approve her as a new worker, or read what she delivered. **Open**
+- **Needs you:** her cards: approve her as a new worker, read what she delivered, or answer
+  held work. **Open**
   shows the card in the confirm box, with Accept and Not now.
 - **Her work:** each task with what is happening to it: queued, approved (runs on the next
   shift), working on it now, held for you (and why), delivered (**Read what she delivered**).
-  A held task can be taken back with **Remove it**: agents only read and draft, so posting,
-  money and legal stay on your own cards; give her the drafting part instead.
+  A held task has its own card under **Needs you**: Accept lets it go on (her gateway still
+  stops at every post, payment or send), Not now drops it.
 - **Give her work:** type what she should do, pick the kind (research, draft, review,
   organise, test, fix) and press **Give it to her**. The productivity manager approves
   low-risk work at once and says so; anything with an outside effect is held for you.
@@ -58,7 +59,7 @@ never the data: every line is a real record, the same ones the floor reads.
 
 - **Behind it:** a neon headquarters at night painted by the computer (a city through tall
   windows, a holographic globe, desks with their screens off, a glossy floor), without any
-  words, so it can never show a status that is not true. Nothing in it moves.
+  words, so it can never show a status that is not true. The picture itself never moves.
 - **Jarvis agents:** the roles in your picture, then your other agents, the autopilot and the
   automaton (`bau automaton`). A role BAU has no agent for (architect, developer, tester,
   coordinator) says "not set up yet". An agent shows its real state (working, waiting for
@@ -75,9 +76,14 @@ never the data: every line is a real record, the same ones the floor reads.
   "Finish Strong Friday" on Fridays, and so on), from this computer's date.
 - **Our virtual world:** your eight rooms, each a picture of that room from the floor with how
   many agents are in it. Click one to open it on the floor, zoomed in.
-- **The women:** each character stands in her pose for her real job: working, waiting for you,
-  done, or idle (stopped shows a red tag). Jarvis is in the middle. Click one to see her
-  record on the floor. Until her painted pictures exist she is shown as her floor character.
+- **The women:** each character plays her animation for her real job: working, waiting for
+  you, done, or idle (stopped shows a red tag). Jarvis is in the middle; the others stand in
+  the order of the departments their jobs put them in (Headquarters, Research, Forge, ...,
+  Review, Stopped, Delivered). When a real job moves one to another department she **walks**
+  to her new place, with "→ the department" under her name, and the others step aside
+  (2026-11-21). Nothing walks without a change in the records; with "reduce motion" on in
+  your computer's settings, they stand still. Click one to see her record on the floor.
+  Until her painted pictures exist she is shown as her floor character.
 
 The rooms in your picture and the rooms we have. You named four of them in prompt 2 (2026-11-20):
 

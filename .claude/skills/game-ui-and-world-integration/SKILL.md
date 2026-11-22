@@ -30,8 +30,8 @@ an autopilot kind), with a test in `tests/test_world.py`. Never invent a state o
   cost, errors, files made, and the exact `bau mission cancel` command.
 - Controls (2026-11-21, `workPanel`): her workstation record from `/api/world` (`rec["work"]`,
   read from the saved state only, never `W.view`, which ages workers), her cards
-  (`pending[].about`), give work (`/api/workstation/assign`), run a shift, remove a held task
-  (`/api/workstation/withdraw`). Every change goes through the workstation's own functions
+  (`pending[].about`, held work's `work_hold` card too), give work (`/api/workstation/assign`),
+  run a shift. Every change goes through the workstation's own functions
   and the confirm box (`focusCard`); the floor's drawing still only shows records.
 
 ## Rules

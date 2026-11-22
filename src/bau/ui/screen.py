@@ -142,16 +142,6 @@ def workstation_assign(asst: Any, role: str, objective: str, kind: str = "") -> 
     return t
 
 
-def workstation_withdraw(asst: Any, task: str) -> dict[str, Any]:
-    from .. import workstation as W
-    try:
-        t = W.withdraw(asst.home, task, asst.owner)
-    except (ValueError, PermissionError) as e:
-        return {"error": str(e)[:300]}
-    asst.activity.emit("workstation", "done", f"{t['role']}: a task removed by you")
-    return t
-
-
 def workstation_shift(asst: Any, max_tasks: int = 1) -> dict[str, Any]:
     from .. import workstation as W
     asst.activity.emit("workstation", "start", "Productivity manager starting a shift")

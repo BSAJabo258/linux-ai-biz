@@ -424,8 +424,6 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     n = 1
                 self._json(*answer(lambda: screen.workstation_shift(assistant, n),
                                    lanes["workstation"]))
-            elif self.path == "/api/workstation/withdraw":
-                self._json(200, screen.workstation_withdraw(assistant, str(data.get("task", ""))))
             elif self.path == "/api/workstation/assign":
                 self._json(200, screen.workstation_assign(
                     assistant, str(data.get("role", "")), str(data.get("objective", "")),

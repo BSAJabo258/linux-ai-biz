@@ -65,6 +65,10 @@ Chroma is set up and you have written your explicit limits and prices, the feed 
 your base level, then a level 2 nude unlock, then a level 3 xxx unlock. Your limits are added
 to what those pictures must never show, and each unlock card shows its price.
 
+Once clips are set up and you set your clip price (docs/PICTURES.md, "Clips for levels 2
+and 3"), at most one post a day is a short clip of her alone, uploaded to Fanvue as a video at
+your clip price.
+
 ## Set it up once
 
 Fanvue gives out no API keys. Every app signs in through Fanvue's own Allow page. So:
