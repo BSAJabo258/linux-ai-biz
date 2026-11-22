@@ -36,8 +36,12 @@ When you press Accept, everything is checked again:
 - Fanvue's $3.00 minimum;
 - HOLD.
 
-Each drop goes to Fanvue with its own retry key, so a retry can never send it twice. What
-fans pay for drops comes into the money ledger with the rest of her Fanvue earnings.
+Each drop goes to Fanvue with its own retry key, so a retry can never send it twice. If a
+send does not go through (or the computer stops in the middle), the card comes back within a
+day: Accept tries again with the same key. A HOLD set while the pictures upload stops it
+before anything is sent. When Fanvue answers that it is still delivering, Jarvis says so
+instead of "sent"; a drop Fanvue's moderation refuses is not offered again. What fans pay for
+drops comes into the money ledger with the rest of her Fanvue earnings.
 
 ## Fanvue's rules this follows
 

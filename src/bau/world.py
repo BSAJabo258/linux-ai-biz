@@ -255,7 +255,7 @@ def world(home: Path | None = None, now: dt.datetime | None = None) -> dict[str,
     return {"rooms": [{"id": r, "name": n, "who": w} for r, n, w in ROOMS], "agents": agents,
             "hold": held, "counts": counts, "at": now.isoformat(timespec="seconds"),
             "tasks": [{"agent": a["name"], "state": a["state"],
-                       "task": a["job"]["objective"] if a["job"] else a["work"]["now"]}
+                       "task": (a.get("work") or {}).get("now") or a["job"]["objective"]}
                       for a in agents if (a["job"] or (a.get("work") or {}).get("now"))
                       and a["state"] in ("assigned", "working", "waiting for you")],
             "system": sys_, "roster": roster(home, agents, sys_),
@@ -292,6 +292,11 @@ def _workstation(rec: dict[str, Any], st: dict[str, Any], name: str) -> None:
                    "report": (t.get("report") or t.get("result") or "")[:4000]
                    if t["status"] in ("done", "review") else ""} for t in tasks],
         "now": None}
+    job = rec.get("job") or {}
+    if rec["state"] == "waiting for you" and any(
+            t.get("source_job") == job.get("job_id") and (t["status"] == "filed" or t.get("seen"))
+            for t in st.get("tasks", []) if job.get("job_id")):
+        rec["state"], rec["room"] = "idle", "hq"  # the owner filed that job's report: no wait
     best = min(tasks, key=lambda t: TASK_PLACE[t["status"]][1], default=None)
     if best is None or rec["state"] not in ("idle", "assigned", "done"):
         return

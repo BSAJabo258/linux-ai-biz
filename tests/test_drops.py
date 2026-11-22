@@ -163,3 +163,67 @@ def test_each_drop_is_a_click_only_card_in_jarvis(home, monkeypatch):
         {"subscribers": "SENT", "vip": "SKIPPED"}
     assert len(fv.sent) == 1 and fv.sent[0]["list"] == "subscribers"
     assert not [p for p in j.setup_waiting() if p["tool"] == "fanvue_drop"]   # gone
+
+
+def test_a_failed_drop_comes_back_and_its_retry_uses_the_same_key(home):
+    """CodeRabbit, 2026-11-22: a failed send could never be retried, so the week was lost."""
+    stock(home)
+    sub = next(r for r in D.plan(home) if r["kind"] == "subscribers")
+    with pytest.raises(F.FanvueError):
+        D.send(home, sub["drop_id"], FakeFanvue(fail=True), "human:owner")
+    again = [r for r in D.plan(home) if r["drop_id"] == sub["drop_id"]]
+    assert again and again[0]["status"] == "FAILED"          # its card comes back
+    fv = FakeFanvue()
+    assert D.send(home, sub["drop_id"], fv, "human:owner")["status"] == "SENT"
+    assert fv.sent[0]["key"] == sub["drop_id"]               # Fanvue replays, never twice
+    later = dt.datetime.now(dt.UTC) + dt.timedelta(days=2)
+    rows = D.all_drops(home)
+    rows[0].update(status="FAILED", sending_at=dt.datetime.now(dt.UTC).isoformat())
+    (home / "fanvue" / "drops.json").write_text(json.dumps(rows))
+    assert sub["drop_id"] not in [r["drop_id"] for r in D.plan(home, later)]  # key forgotten
+
+
+def test_a_hold_set_while_the_pictures_upload_stops_the_send(home):
+    from bau.audit import AuditLog
+    from bau.governor import Governor
+    stock(home)
+    sub = next(r for r in D.plan(home) if r["kind"] == "subscribers")
+
+    class HoldDuringUpload(FakeFanvue):
+        def upload_image(self, path):
+            Governor(home, audit=AuditLog(home / "audit" / "chain.jsonl", key=b""),
+                     systemctl="").hold("test", by="human:owner")
+            return super().upload_image(path)
+    fv = HoldDuringUpload()
+    with pytest.raises(D.DropError, match="HOLD"):
+        D.send(home, sub["drop_id"], fv, "human:owner")
+    assert fv.sent == []
+    row = next(r for r in D.all_drops(home) if r["drop_id"] == sub["drop_id"])
+    assert row["status"] == "PROPOSED"                       # sent after the release
+
+
+@pytest.mark.parametrize("said,status", [("SENDING", "DELIVERING"), ("SCHEDULED", "DELIVERING"),
+                                         (None, "SENT"), ("SENT", "SENT")])
+def test_what_fanvue_answers_is_what_the_drop_says(home, said, status):
+    stock(home)
+    sub = next(r for r in D.plan(home) if r["kind"] == "subscribers")
+
+    class Says(FakeFanvue):
+        def mass_message(self, *a, **k):
+            super().mass_message(*a, **k)
+            return {"uuid": "mm-1", "recipientCount": None, **({"status": said} if said else {})}
+    assert D.send(home, sub["drop_id"], Says(), "human:owner")["status"] == status
+
+
+def test_a_moderated_drop_is_refused_and_not_offered_again(home):
+    stock(home)
+    sub = next(r for r in D.plan(home) if r["kind"] == "subscribers")
+
+    class Moderated(FakeFanvue):
+        def mass_message(self, *a, **k):
+            return {"uuid": "mm-1", "recipientCount": 0, "status": "MODERATED"}
+    with pytest.raises(D.DropError, match="MODERATED"):
+        D.send(home, sub["drop_id"], Moderated(), "human:owner")
+    row = next(r for r in D.all_drops(home) if r["drop_id"] == sub["drop_id"])
+    assert row["status"] == "REFUSED"
+    assert sub["drop_id"] not in [r["drop_id"] for r in D.plan(home)]

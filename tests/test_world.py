@@ -462,3 +462,19 @@ def test_the_hq_line_up_moves_with_the_records():
     assert "walks = was !== undefined && was !== a.room" in page          # only a real change
     assert 'const seen = W_MODE === "hq" && !REDUCED' in page             # reduced motion: still
     assert "[a.name, a.room, a.state," in page                            # a room change redraws
+
+
+def test_a_filed_report_releases_her_and_current_tasks_name_her_new_work(tmp_path):
+    """CodeRabbit, 2026-11-22: a filed report kept her waiting, and Current tasks showed the
+    old job's words for new workstation work."""
+    job(tmp_path, "producer", "COMPLETED", job_id="job_aaaaaaaaaaaa")
+    j = json.loads((tmp_path / "jobs" / "job_aaaaaaaaaaaa.json").read_text())
+    j["verification"] = "FAILED"
+    (tmp_path / "jobs" / "job_aaaaaaaaaaaa.json").write_text(json.dumps(j))
+    assert rooms(tmp_path)["producer"] == ("approvals", "waiting for you")
+    desk_task(tmp_path, "producer", "filed", source_job="job_aaaaaaaaaaaa")
+    desk_task(tmp_path, "producer", "approved", objective="draft the weekend captions")
+    w = world(tmp_path, NOW)
+    assert {a["name"]: (a["room"], a["state"]) for a in w["agents"]}["producer"] == \
+        ("hq", "assigned")
+    assert {t["agent"]: t["task"] for t in w["tasks"]}["producer"] == "draft the weekend captions"

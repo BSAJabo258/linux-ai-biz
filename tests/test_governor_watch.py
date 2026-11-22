@@ -57,3 +57,17 @@ def test_each_problem_pops_up_once_in_jarvis_until_seen(tmp_path):
     assert j.confirm(cards[0]["id"], True, "human:owner")["done"]
     assert not [p for p in j.setup_waiting() if p["tool"] == "governor_finding"]
     assert not [f for f in gov(tmp_path, links).open_findings() if f["check"] == "money"]
+
+
+def test_a_problem_card_goes_away_once_the_problem_clears(tmp_path):
+    """CodeRabbit, 2026-11-22: a card stayed after its problem was fixed."""
+    from bau.assistant import Assistant
+    links = [link("autopost (Fanvue posts by themselves)", True)]
+    gov(tmp_path, links).tick()
+    links[0] = link("autopost (Fanvue posts by themselves)", False, "off", "bau fanvue autopost on")
+    gov(tmp_path, links).tick()
+    j = Assistant(tmp_path)
+    assert [p for p in j.setup_waiting() if p["tool"] == "governor_finding"]
+    links[0] = link("autopost (Fanvue posts by themselves)", True)
+    gov(tmp_path, links).tick()                              # fixed
+    assert not [p for p in j.setup_waiting() if p["tool"] == "governor_finding"]

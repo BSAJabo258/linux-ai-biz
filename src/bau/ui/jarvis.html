@@ -3819,7 +3819,7 @@ const CARD_LABEL = { setup_step: "Setup", autopilot_answer: "Jarvis asks", fanvu
 const TASK_STATE = { queued: "queued", approved: "approved, runs on the next shift", running: "working on it now",
   waiting_owner: "held for you", review: "finished, its check did not pass: read it", done: "delivered: read it", failed: "failed" };
 const KINDS = [["research", "Research"], ["draft", "Draft"], ["review", "Review"], ["organise", "Organise"], ["test", "Test"], ["fix", "Fix"]];
-const W_DRAFT = {}, W_SAID = {};          // what she is typing, and the last answer she got, kept across redraws
+const W_DRAFT = {}, W_SAID = {}, W_KIND = {};          // what she is typing, and the last answer she got, kept across redraws
 function say(el2, name, cls, text) { W_SAID[name] = [cls, text]; el2.className = "w-said " + cls; el2.textContent = text; }
 const typingIn = (box) => box.contains(document.activeElement) && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
 function cardRow(c) { const r = el("div", "w-card"); r.appendChild(el("b", null, CARD_LABEL[c.tool] || "Confirm"));
@@ -3844,16 +3844,16 @@ function workPanel(box, a) {
   const ta = el("textarea"); ta.placeholder = "What should she do? For example: research three new ways to promote the creator";
   ta.setAttribute("aria-label", "Work for " + a.name); ta.value = W_DRAFT[a.name] || ""; ta.oninput = () => { W_DRAFT[a.name] = ta.value; };
   // The kind of work as big buttons, nothing picked until she is told (the page's rule: no drop-downs).
-  const kind = el("div", "opts w-kinds"); kind.setAttribute("aria-label", "Kind of work"); kind.value = "";
-  KINDS.forEach(([v, l]) => { const b = el("button", "opt", l); b.type = "button";
-    b.onclick = () => { kind.value = v; kind.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === b)); }; kind.appendChild(b); });
+  const kind = el("div", "opts w-kinds"); kind.setAttribute("aria-label", "Kind of work"); kind.value = W_KIND[a.name] || "";
+  KINDS.forEach(([v, l]) => { const b = el("button", "opt" + (v === kind.value ? " on" : ""), l); b.type = "button";   // kept across redraws
+    b.onclick = () => { kind.value = W_KIND[a.name] = v; kind.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === b)); }; kind.appendChild(b); });
   const send = el("button", "act", "Give it to her"), run = el("button", "act", "Run a shift now"), said = el("p", "w-said");
   if (W_SAID[a.name]) say(said, a.name, ...W_SAID[a.name]);
   send.onclick = async () => { if (!kind.value) { say(said, a.name, "bad", "First choose the kind of work."); return; }
     say(said, a.name, "", "Giving it to her…");
     try { const t = await apiJson("/api/workstation/assign", { role: a.name, objective: ta.value, kind: kind.value });
       if (t.error) { say(said, a.name, "bad", t.error); return; }
-      const ok = t.manager && t.manager.approved; W_DRAFT[a.name] = ""; ta.value = "";
+      const ok = t.manager && t.manager.approved; W_DRAFT[a.name] = ""; W_KIND[a.name] = ""; ta.value = "";
       say(said, a.name, ok ? "good" : "bad", ok ? "The productivity manager approved it: it runs on the next shift (or press Run a shift now)." : "Held for you: " + ((t.manager && t.manager.reason) || "the manager did not approve it"));
       loadWorld(); } catch (e) { say(said, a.name, "bad", e.message); } };
   run.onclick = () => runShift(said, a.name);

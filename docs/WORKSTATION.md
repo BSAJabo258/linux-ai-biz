@@ -87,7 +87,8 @@ They only read and draft: no agent posts, sends, pays or signs anything.
 Moods: thriving (80+), steady (50+), strained (25+), critical (below 25). A critical worker gets
 no new work: the manager tells it to rest, and each day of rest gives back 4 health up to 25;
 then its held work goes on by itself. A worker whose folder you have not approved yet is not on
-the job, so its health does not move. Only failed work can take a worker to 0. At **0 health it
+the job, so its health does not move. A day without work never takes a worker to 0;
+failed or stalled work (the table above) can. At **0 health it
 retires** to the graveyard (nothing
 is deleted), and a **successor** of the same role clocks in at 80 health. The successor takes
 over every open task, carries the last six lines of its predecessor's log as a brief, and its

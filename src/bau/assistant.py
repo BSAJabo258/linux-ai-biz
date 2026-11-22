@@ -1534,9 +1534,14 @@ class Assistant:
         # until the owner has seen it. Its other findings stay in the night report.
         from .governor import Governor
         now = time.monotonic()
+        found = Governor(self.home, audit=self.audit, systemctl="").open_findings()
+        still = {f["id"] for f in found}
+        for pid, p in list(self.pending.items()):
+            if p.tool == "governor_finding" and p.args["finding"] not in still:
+                self.pending.pop(pid)                 # it cleared: no card for a fixed problem
         shown = {p.args["finding"] for p in self.pending.values()
                  if p.tool == "governor_finding"}
-        for f in Governor(self.home, audit=self.audit, systemctl="").open_findings():
+        for f in found:
             snooze = self.setup_snoozed.get("finding:" + f["id"])
             if (f["check"] not in ("money", "services", "disk") or f["id"] in shown
                     or (snooze and now - snooze < SETUP_SNOOZE_S)):
@@ -1559,7 +1564,11 @@ class Assistant:
                    else "her VIPs (fans who spent more than $50)")
             self.pending[pid] = Pending(
                 pid, "fanvue_drop", {"drop": row["drop_id"]},
-                (f"This week's drop to {who}: a locked level {row['level']} picture at "
+                (("The last try did not go through" + (f" ({row['error']})" if row.get("error")
+                                                         else "") + ". Accept tries again with "
+                  "the same key: Fanvue never sends it twice.\n\n")
+                 if row["status"] != "PROPOSED" else "")
+                + (f"This week's drop to {who}: a locked level {row['level']} picture at "
                  f"${row['price_cents'] / 100:.2f}"
                  + (", with a free preview picture" if row.get("preview") else "")
                  + f".\n\n{row['text']}\n\nAccept: sent once on Fanvue. Not now: skipped "
@@ -1666,6 +1675,9 @@ class Assistant:
         from .fanvue import FanvueClient
         row = drops.send(self.home, drop, FanvueClient(self.home), self.owner)
         n = row.get("recipients")
+        if row["status"] == "DELIVERING":
+            return {"done": True, "said": "Fanvue accepted the drop and is still delivering it"
+                                          + (f" to {n} fans." if n is not None else ".")}
         return {"done": True, "said": "Drop sent" + (f" to {n} fans." if n is not None
                                                       else ".")}
 
