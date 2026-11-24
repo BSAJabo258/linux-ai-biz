@@ -248,5 +248,10 @@ def seed(home: Path, days: int = 7) -> int:
         if A.add(home, "workstation", "run the workstation shift", {"max_tasks": 3},
                  source="autopilot (workstation)"):
             n += 1
+    from . import clips
+    try:
+        n += clips.tick(home)                 # campaign clips: new streams cut, on cards
+    except Exception:  # noqa: BLE001 - the rest of the autopilot's work goes on
+        pass
     from .creator_feed import fill
     return n + fill(home)                     # the creator's posts, while autopost is on

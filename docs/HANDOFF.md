@@ -25,6 +25,14 @@ only shows the desktop's Jarvis through an SSH tunnel (`docs/LAPTOP-STATION.md`)
 nightly updates. Older notes below that put models, keys or the business on the laptop are
 history.
 
+2026-11-24, the desktop down: the owner asked to run the whole business from the laptop with
+Colibri (`docs/COLIBRI.md`). `installer/bau-colibri-setup.sh` builds Colibri v2.2.0 (Apache-2.0,
+commit e479104) and serves Qwen3-Coder-30B-A3B (57 pinned files) on 127.0.0.1:8000; record
+`qwen3-coder-30b-colibri`, REGISTERED until the owner benches and approves it. Grow-BAU steps:
+Scout flagged 12 secrets and 2 patterns, all test placeholders or text (reviewed by hand);
+built offline in a sandbox (39 s) and its own suite ran there with no network (3652 tests OK,
+542 skipped). Not yet run on the laptop: speed and memory there are unmeasured.
+
 Latest (2026-10-27): merged #97-#105: the stick's llama.cpp is b11747; desktop art fixed
 (Xfce's own picture no longer shows); seven live scenes; GPU work (`bau hw` card details,
 lab `--repeat`/`--tag`, `sudo bau-llm-cuda`, docs/GPU.md); speed settings (MTP files,

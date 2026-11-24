@@ -417,6 +417,9 @@ class Assistant:
             "governor_finding": Tool("governor_finding", "The owner has seen a problem.",
                                      _schema({"finding": {"type": "string"}}),
                                      self.t_governor_finding, kind="confirm"),
+            "clip_post": Tool("clip_post", "The owner posts a campaign clip to YouTube Shorts.",
+                              _schema({"clip": {"type": "string"}}), self.t_clip_post,
+                              kind="confirm"),
             "fanvue_drop": Tool("fanvue_drop", "The owner sends this week's Fanvue drop.",
                                 _schema({"drop": {"type": "string"}}), self.t_fanvue_drop,
                                 kind="confirm"),
@@ -945,12 +948,18 @@ class Assistant:
             synced = sync_if_due(self.home)
         except Exception as e:  # noqa: BLE001 - the ledger still answers without Fanvue
             synced = {"error": f"Fanvue earnings not read: {e}"[:200]}
+        paid = None
+        try:                                   # PayPal's settled payments, once checked
+            from .paypal import sync_if_due as paypal_sync
+            paid = paypal_sync(self.home)
+        except Exception as e:  # noqa: BLE001 - the ledger still answers without PayPal
+            paid = {"error": f"PayPal payments not read: {e}"[:200]}
         since = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
         m = metrics(Ledger(self.home), since=since)
         keep = ("revenue", "profit", "fees", "costs_by_kind", "gross_margin", "net_margin",
                 "ai_cost_to_revenue")
         return {"days": days, **{k: m[k] for k in keep if k in m},
-                **({"fanvue": synced} if synced else {})}
+                **({"fanvue": synced} if synced else {}), **({"paypal": paid} if paid else {})}
 
     def t_brain_lookup(self, query: str) -> dict[str, Any]:
         from .brain import Brain
@@ -1553,6 +1562,27 @@ class Assistant:
                  + (f"\nWhat the watch did: {f['remedy']}" if f.get("remedy") else "")
                  + "\n\nAccept: you've seen it (it pops up again only if it clears and "
                  "breaks again). Not now: asked again later."), _now())
+        # Campaign clips (docs/CLIPS.md): one card each, the owner's privacy and kids answer.
+        from . import clips
+        from .youtube import PRIVACY
+        shown = {p.args["clip"] for p in self.pending.values() if p.tool == "clip_post"}
+        for c in clips.review(self.home):
+            if c["clip_id"] in shown:
+                continue
+            pid = "cl_" + secrets.token_hex(4)
+            self.pending[pid] = Pending(
+                pid, "clip_post", {"clip": c["clip_id"]},
+                (f"New clip for {c['campaign']} ({c['seconds']:.0f} s, from {c['source_url']}"
+                 f" at {int(c['start'] // 60)}:{int(c['start'] % 60):02d}).\n{c['title']}\n\n"
+                 f"{c['description']}\n\nAccept: it goes up on YouTube Shorts, then submit its"
+                 f" link within 30 minutes in the campaign: {c['campaign_url']}\n"
+                 "Not now: it is dropped."),
+                _now(), preview=str(self.home / c["file"]), click_only=True,
+                form={"fields": [
+                    {"name": "privacy", "label": "Who sees it on YouTube?",
+                     "options": [[k, v] for k, v in PRIVACY.items()]},
+                    {"name": "kids", "label": "Made for kids?",
+                     "options": [["no", "No, not made for kids (GTA 6 is rated M)"]]}]})
         # This week's drops (docs/DROPS.md): one card each.
         from . import drops
         shown = {p.args["drop"] for p in self.pending.values() if p.tool == "fanvue_drop"}
@@ -1637,7 +1667,7 @@ class Assistant:
                 _now(), click_only=True)
         return [p.public() for p in self.pending.values()
                 if p.tool in ("setup_step", "autopilot_answer", "fanvue_review", "fan_reply",
-                              "fanvue_drop", "governor_finding", "agent_approve",
+                              "fanvue_drop", "governor_finding", "clip_post", "agent_approve",
                               "work_review", "work_hold")]
 
     def t_agent_approve(self, agent: str) -> dict[str, Any]:
@@ -1669,6 +1699,18 @@ class Assistant:
         Governor(self.home, audit=self.audit, systemctl="").close(finding, self.owner,
                                                                   "seen on its Jarvis card")
         return {"done": True, "said": "Noted."}
+
+    def t_clip_post(self, clip: str, privacy: str = "", kids: str = "") -> dict[str, Any]:
+        from . import clips
+        from .youtube import YouTubeClient
+        if kids != "no":
+            raise ValueError("answer made-for-kids on the card first")
+        item = clips.post(self.home, clip, YouTubeClient(self.home), self.owner, privacy,
+                          made_for_kids=False)
+        url = item["result"].get("url", "")
+        return {"done": True, "open": item["campaign_url"],
+                "said": f"It's up: {url}. Submit that link in the campaign within 30 minutes: "
+                        f"{item['campaign_url']}"}
 
     def t_fanvue_drop(self, drop: str) -> dict[str, Any]:
         from . import drops
@@ -1833,6 +1875,9 @@ class Assistant:
             W.mark_seen(self.home, p.args["task"], by, False)
         if not approve and p.tool == "governor_finding":     # Not now: asked again later
             self.setup_snoozed["finding:" + p.args["finding"]] = time.monotonic()
+        if not approve and p.tool == "clip_post":            # Not now: the clip is dropped
+            from . import clips
+            clips.drop(self.home, p.args["clip"], by)
         if not approve and p.tool == "fanvue_drop":          # Not now: skipped this week
             from . import drops
             drops.skip(self.home, p.args["drop"], by)

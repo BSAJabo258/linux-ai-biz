@@ -603,6 +603,17 @@ entries:
     last_activity: "2026-10-10"
     sources: [https://github.com/ggml-org/llama.cpp]
     caveats: Changes fast; pin a version.
+  - name: Colibri
+    repo: JustVugg/colibri
+    url: https://github.com/JustVugg/colibri
+    category: local-models
+    problem: Running mixture-of-experts models bigger than the computer's memory, with the rarely used experts read from the disk.
+    how_used: installer/bau-colibri-setup.sh builds it at a pinned commit and serves Qwen3-Coder-30B-A3B on 127.0.0.1:8000 (OpenAI-compatible, tool calls) for the 8 GB laptop (docs/COLIBRI.md).
+    licence: Apache-2.0
+    stars: "~53.2k (2026-11-24)"
+    last_activity: "2026-11-22"
+    sources: [https://github.com/JustVugg/colibri, https://huggingface.co/Justvugg/Qwen3-Coder-30B-A3B-colibri-int4]
+    caveats: "Slow on a laptop CPU (its own figures for an 8-core desktop are about 5 tokens a second and minutes to read a long prompt from a cold cache); bench it on the machine. Scout flagged 12 secrets and two code patterns, all test placeholders or text (checked 2026-11-24)."
   - name: Ollama
     repo: ollama/ollama
     url: https://github.com/ollama/ollama

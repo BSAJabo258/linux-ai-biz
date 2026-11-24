@@ -12,6 +12,7 @@ searches: 2
 # What BAU already runs (the shortlist says "running in BAU", not "new").
 integrated:
   - ggml-org/llama.cpp
+  - JustVugg/colibri
 
 categories:
   agents:

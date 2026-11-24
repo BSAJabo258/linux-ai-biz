@@ -1,0 +1,32 @@
+# PayPal policy record (bau platform add examples/platform-paypal.yaml), for the business's
+# payments (src/bau/paypal.py). Facts checked on 2026-11-24 against developer.paypal.com and
+# paypal.com/us/legalhub. Re-verify and bump last_verified at least every 90 days.
+platform: paypal
+policy_version: "REST APIs: Invoicing v2, Orders v2, Payments v2, Payouts v1, Transaction Search v1; Acceptable Use Policy of 2026-11-04 (checked 2026-11-24)"
+ai_content_policy: >-
+  Nothing is posted to PayPal. Invoices and checkouts carry plain item names; BAU's AI label
+  rules apply where the thing sold is shown, not on the payment.
+copyright_policy: >-
+  The Acceptable Use Policy bars items that "infringe or violate any copyright, trademark,
+  right of publicity or privacy"; BAU sells only what it may sell.
+music_policy: Not applicable (payments only).
+advertising_policy: Not applicable (payments only).
+commercial_content_policy: >-
+  The Acceptable Use Policy bars "certain sexually oriented materials or services" and lists
+  "Mature Audience Content: Any adult content delivered digitally" among items needing PayPal's
+  approval first. BAU never sells the creator's content through PayPal (Fanvue takes that
+  payment) and refuses an invoice or checkout that names adult content.
+api_policy: >-
+  OAuth 2.0 client credentials (POST /v1/oauth2/token, Basic client id and secret); sandbox
+  api-m.sandbox.paypal.com, live api-m.paypal.com; PayPal-Request-Id for idempotency; the
+  transaction report allows 31 days per request and lists a payment up to three hours late.
+automation_policy: >-
+  BAU creates invoices and checkout links, captures approved checkouts and reads the
+  transaction report by itself. Sending an invoice, recording an outside payment and
+  cancelling are the owner's commands at a terminal. Refunds and payouts are request files
+  sent only with the owner's SSH-signed approval (move.money), once each.
+account_limits: Up to 15,000 payments per payout call; a payout's sender_batch_id is never paid twice within 30 days.
+appeal_process: PayPal Resolution Center and customer support (paypal.com/smarthelp/contact-us).
+requires_ai_label: false
+source_url: https://developer.paypal.com/api/rest/
+last_verified: 2026-11-24

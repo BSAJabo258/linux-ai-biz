@@ -195,6 +195,7 @@ layers:
       - {path: src/bau/models/bench.py, does: a real test before any model is approved}
     tools:
       - {name: llama.cpp, plan: direct, why: "Already runs the local model on the live USB."}
+      - {name: Colibri, plan: direct, why: "Runs Qwen3-Coder-30B-A3B on the 8 GB laptop, most of it read from the disk (installer/bau-colibri-setup.sh)."}
       - {name: LiteLLM, plan: skip, why: "BAU's router already switches between providers with backups and metering."}
       - {name: Claude Code Router, plan: skip, why: "Routes Claude Code itself, not Jarvis; BAU's router covers Jarvis."}
     risk: low
