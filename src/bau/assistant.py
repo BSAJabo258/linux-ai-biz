@@ -948,12 +948,18 @@ class Assistant:
             synced = sync_if_due(self.home)
         except Exception as e:  # noqa: BLE001 - the ledger still answers without Fanvue
             synced = {"error": f"Fanvue earnings not read: {e}"[:200]}
+        paid = None
+        try:                                   # PayPal's settled payments, once checked
+            from .paypal import sync_if_due as paypal_sync
+            paid = paypal_sync(self.home)
+        except Exception as e:  # noqa: BLE001 - the ledger still answers without PayPal
+            paid = {"error": f"PayPal payments not read: {e}"[:200]}
         since = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
         m = metrics(Ledger(self.home), since=since)
         keep = ("revenue", "profit", "fees", "costs_by_kind", "gross_margin", "net_margin",
                 "ai_cost_to_revenue")
         return {"days": days, **{k: m[k] for k in keep if k in m},
-                **({"fanvue": synced} if synced else {})}
+                **({"fanvue": synced} if synced else {}), **({"paypal": paid} if paid else {})}
 
     def t_brain_lookup(self, query: str) -> dict[str, Any]:
         from .brain import Brain

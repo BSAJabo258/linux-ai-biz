@@ -27,7 +27,7 @@ so. `CLAUDE.md` is the project index the spec asks for (one row per module).
 | Materials, production, inventory (V, VI) | none | **missing** |
 | Sales and commerce (VII) | subscriptions (`commerce/subscriptions.py`), Fanvue sales and fan chat | **missing** for goods: customers, quotes, orders, fulfillment, invoices |
 | Treasury and ledger (VIII) | cost and revenue lines, budgets, per-mission profit and loss (`economics.py`), Fanvue earnings synced once each | partial: single-entry lines; **no double-entry journal**, no reconciliation runs, no allocation policy |
-| Payment providers (VIII.17) | none (Fanvue pays the creator directly) | **missing**: Stripe, Plaid |
+| Payment providers (VIII.17) | PayPal (`paypal.py`, 2026-11-24: invoices, checkout, capture, signed refunds and payouts, settled payments into the ledger once; `docs/PAYPAL.md`); Fanvue pays the creator directly | have PayPal; Stripe, Plaid not built |
 | Metrics (XX) | usage meter (`usage.py`), money machine status (`money.py`), economics dashboard | partial |
 
 ## The stack the spec names, against BAU's rules

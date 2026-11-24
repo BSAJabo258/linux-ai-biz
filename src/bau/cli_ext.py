@@ -908,6 +908,110 @@ def cmd_youtube(a):
     return EXIT_OK
 
 
+def _paypal_sync(home):
+    from .paypal import sync_if_due
+    return sync_if_due(home)
+
+
+def cmd_paypal(a):
+    """The business's PayPal (docs/PAYPAL.md)."""
+    from . import paypal as P
+    home = bau_home()
+    try:
+        if a.pp_cmd in (None, "status"):
+            _out(P.status(home))
+            return EXIT_OK
+        if a.pp_cmd == "mode":
+            who = _human()
+            P.set_mode(home, a.mode)
+            AuditLog().append("paypal.mode", who, {"mode": a.mode})
+            print(f"PayPal is on {a.mode} now. Run: bau paypal check")
+            return EXIT_OK
+        if a.pp_cmd == "prepare-refund":
+            path = P.prepare(home, "refund", capture_id=a.capture, amount=a.amount,
+                             note=a.note or "")
+        elif a.pp_cmd == "prepare-payout":
+            path = P.prepare(home, "payout", subject=a.subject or "", items=[
+                {"receiver": a.receiver, "amount": a.amount, "note": a.note or ""}])
+        else:
+            path = None
+        if path is not None:
+            AuditLog().append("paypal.prepared", "bau", {"request": path.stem})
+            print(path.read_text())
+            print(f"Read it. To send it: bau paypal send {path}"
+                  + ("" if P.mode(home) == "sandbox" else
+                     f" --approval {path.with_suffix('.sig.json')}  (after bau approve "
+                     f"--capability move.money --request-id {path.stem} --requester bau "
+                     f"--bind {path} --out {path.with_suffix('.sig.json')})"))
+            return EXIT_OK
+        client = P.PayPalClient(home)
+        if a.pp_cmd == "check":
+            rec = P.check(home, client)
+            _out(rec)
+            return EXIT_OK if rec["connected"] else EXIT_BLOCKED
+        if a.pp_cmd == "test":
+            steps = P.test(home, client, a.buyer, a.order)
+            for st in steps:
+                mark = {True: "PASS", False: "FAIL", None: "NEXT"}[st["ok"]]
+                print(f"{mark}  {st['step']}: {st.get('result', st.get('error'))}")
+            return EXIT_BLOCKED if any(st["ok"] is False for st in steps) else EXIT_OK
+        if a.pp_cmd == "invoice":
+            items = []
+            for it in a.item:
+                name, sep, price = it.rpartition("=")
+                if not sep or not name:
+                    raise P.PayPalError(f"an item is NAME=PRICE, not {it!r}")
+                items.append({"name": name, "price": price})
+            inv = client.create_invoice(a.email, items, a.currency, a.note or "",
+                                        client.next_invoice_number())
+            out = {"invoice": inv.get("id"), "status": inv.get("status")}
+            if a.send:
+                who = _human()
+                out["pay_link"] = client.send_invoice(inv["id"])
+                out["status"] = "SENT"
+                AuditLog().append("paypal.invoice_sent", who, {"invoice": inv.get("id")})
+            _out(out)
+        elif a.pp_cmd == "invoices":
+            res = (client.search_invoices([a.status]) if a.status else client.invoices())
+            _out([{"id": i.get("id"), "status": i.get("status"),
+                   "number": (i.get("detail") or {}).get("invoice_number"),
+                   "amount": (i.get("amount") or {}).get("value")}
+                  for i in res.get("items") or []])
+        elif a.pp_cmd == "invoice-show":
+            _out(client.invoice(a.id))
+        elif a.pp_cmd == "invoice-paid":
+            _human()
+            client.record_invoice_payment(a.id, a.amount, a.method, note=a.note or "")
+            print(f"Recorded. Invoice {a.id}: {client.invoice(a.id).get('status')}")
+        elif a.pp_cmd == "invoice-cancel":
+            _human()
+            client.cancel_invoice(a.id, a.note or "")
+            print(f"Cancelled invoice {a.id}.")
+        elif a.pp_cmd == "checkout":
+            _out(client.create_order(a.amount, a.currency, a.description or ""))
+        elif a.pp_cmd == "order":
+            o = client.order(a.id)
+            _out({"id": o.get("id"), "status": o.get("status")})
+        elif a.pp_cmd == "capture":
+            _out(client.capture(a.id))
+        elif a.pp_cmd == "send":
+            from .cli import _approved
+            who = _human()
+            path = Path(a.file)
+            rec = json.loads(path.read_text())
+            ok = _approved(a.approval, "move.money", rec.get("id", ""), rec)
+            out = P.send(home, path, client, ok)
+            AuditLog().append("paypal.sent", who, {k: out.get(k) for k in
+                                                   ("request", "kind", "mode", "status")})
+            _out(out)
+        elif a.pp_cmd == "sync":
+            _out(P.sync_payments(home, client, days=a.days))
+    except (P.PayPalError, PermissionError, OSError, ValueError) as e:
+        print(e, file=sys.stderr)
+        return EXIT_BLOCKED
+    return EXIT_OK
+
+
 def cmd_hq(a):
     """The desktop as headquarters for the laptop station (docs/LAPTOP-STATION.md)."""
     import pwd
@@ -1370,10 +1474,11 @@ def cmd_autopilot(a):
         from . import automaton
         alive = None
         if automaton.running(home):          # make money or die: count the money, then judge
-            try:
-                fanvue.sync_if_due(home)
-            except Exception:  # noqa: BLE001 - offline or not connected: judged on what we have
-                pass
+            for sync in (fanvue.sync_if_due, _paypal_sync):
+                try:
+                    sync(home)
+                except Exception:  # noqa: BLE001 - offline or not connected: judged on the rest
+                    pass
             alive = automaton.check(home)
         _out({"seeded": seeded, **out, "fanvue": posted, "automaton": alive,
               "status": A.status(home)})
@@ -2794,6 +2899,58 @@ def register(sub: argparse._SubParsersAction) -> None:
     w.add_parser("login", help="sign in once in this computer's browser")
     w.add_parser("status", help="app keys here, connected or not")
     s.set_defaults(fn=cmd_youtube)
+
+    s = sub.add_parser("paypal", help="the business's PayPal: invoices, checkout, refunds, "
+                       "payouts, payments into the ledger (docs/PAYPAL.md)")
+    w = s.add_subparsers(dest="pp_cmd")
+    w.add_parser("status", help="sandbox or live, connected or not (the last check)")
+    x = w.add_parser("mode", help="you: sandbox (play money) or live")
+    x.add_argument("mode", choices=["sandbox", "live"])
+    w.add_parser("check", help="real requests to PayPal: connected only if they answer")
+    x = w.add_parser("test", help="sandbox: every method, step by step")
+    x.add_argument("--buyer", required=True, help="the sandbox personal account's email")
+    x.add_argument("--order", help="the order you approved as the sandbox buyer")
+    x = w.add_parser("invoice", help="a draft invoice (--send: email it, you only)")
+    x.add_argument("email")
+    x.add_argument("--item", action="append", required=True, help="NAME=PRICE, repeatable")
+    x.add_argument("--currency", default="USD")
+    x.add_argument("--note")
+    x.add_argument("--send", action="store_true")
+    x = w.add_parser("invoices", help="your invoices")
+    x.add_argument("--status", help="e.g. SENT, PAID, UNPAID")
+    x = w.add_parser("invoice-show")
+    x.add_argument("id")
+    x = w.add_parser("invoice-paid", help="you: a payment made outside PayPal")
+    x.add_argument("id")
+    x.add_argument("amount")
+    x.add_argument("--method", default="CASH")
+    x.add_argument("--note")
+    x = w.add_parser("invoice-cancel", help="you: cancel a sent invoice")
+    x.add_argument("id")
+    x.add_argument("--note")
+    x = w.add_parser("checkout", help="a payment link for one amount")
+    x.add_argument("amount")
+    x.add_argument("--currency", default="USD")
+    x.add_argument("--description")
+    x = w.add_parser("order", help="a checkout's status")
+    x.add_argument("id")
+    x = w.add_parser("capture", help="take an approved checkout's money")
+    x.add_argument("id")
+    x = w.add_parser("prepare-refund", help="a refund request for you to sign")
+    x.add_argument("capture")
+    x.add_argument("--amount", help="leave out for a full refund")
+    x.add_argument("--note")
+    x = w.add_parser("prepare-payout", help="a payout request for you to sign")
+    x.add_argument("receiver", help="their PayPal email")
+    x.add_argument("amount")
+    x.add_argument("--note")
+    x.add_argument("--subject")
+    x = w.add_parser("send", help="you: send a prepared refund or payout (live: signed)")
+    x.add_argument("file")
+    x.add_argument("--approval")
+    x = w.add_parser("sync", help="settled PayPal payments into the ledger, once each")
+    x.add_argument("--days", type=int, default=30)
+    s.set_defaults(fn=cmd_paypal)
 
     s = sub.add_parser("station", help="the laptop as Jarvis's operations station "
                        "(docs/LAPTOP-STATION.md)")
