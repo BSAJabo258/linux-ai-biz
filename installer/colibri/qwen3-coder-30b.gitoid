@@ -1,0 +1,8 @@
+4e69cd012b7276096e9d90f6e50bb22d01eb2f9e  config.json
+55a5a950a2926507ae506d5e6549b022bac27834  config.hf.json
+ba3e8d9206508daab666e1aaa9dcc9c435bfa541  generation_config.json
+49b0e8d0ee7e655434942233b4b0ab2104d5247e  chat_template.jinja
+83d8a4c588dfe88f43d2fa33c8d8dd52b398b05a  qwen36_meta.json
+90c73275ae7b61cd2b6c4f263018057d516f0c95  tokenizer.json
+cc8cf0649efea42a8c099d852b1525fcfc42c222  tokenizer_config.json
+6634c8cc3133b3848ec74b9f275acaaa1ea618ab  LICENSE

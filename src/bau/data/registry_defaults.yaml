@@ -313,6 +313,37 @@ model:
     chat_template_kwargs: {enable_thinking: false}
     notes: For the desktop's graphics card (docs/DESKTOP.md). On a processor only it is
       slow; bench it on the machine that will run it before approving.
+  qwen3-coder-30b-colibri:
+    model_id: qwen3-coder-30b-colibri
+    name: Qwen3-Coder-30B-A3B on Colibri - the laptop's model, most of it read from the disk
+    version: int4-gs64
+    provider: local
+    # Checked 2026-11-24: Colibri v2.2.0 (github.com/JustVugg/colibri, Apache-2.0), model
+    # huggingface.co/Justvugg/Qwen3-Coder-30B-A3B-colibri-int4 at commit d839110a (Apache-2.0,
+    # quantized from Qwen/Qwen3-Coder-30B-A3B-Instruct). Colibri's catalog: 19.4 GB, 8 GB RAM
+    # at least; docs/qwen36.md: tool calls, no thinking, about 6.5 GB in memory at --cap 32.
+    # Installed and checked file by file by installer/bau-colibri-setup.sh, not bau models
+    # fetch (49 files). See docs/COLIBRI.md.
+    source: huggingface.co/Justvugg/Qwen3-Coder-30B-A3B-colibri-int4 (Colibri int4 of Qwen/Qwen3-Coder-30B-A3B-Instruct)
+    license: Apache-2.0
+    commercial_use: true
+    deployment: local
+    adapter: local_http
+    endpoint: http://127.0.0.1:8000
+    api_model: qwen3-coder-30b-a3b-colibri
+    trust_level: QUANTIZED
+    privacy: local
+    context: 16384
+    tools: true
+    input_types: [text]
+    quality: 0.75
+    latency_ms: 120000
+    cost_in_per_mtok: 0
+    cost_out_per_mtok: 0
+    status: REGISTERED
+    notes: For an 8 GB laptop without a graphics card (docs/COLIBRI.md). Colibri's own
+      figures (an 8-core desktop) are about 5 words a second and two minutes to read a long
+      prompt from a cold cache; bench it on the laptop before approving.
   qwen3.5-9b-mtp:
     model_id: qwen3.5-9b-mtp
     name: Qwen3.5-9B with its own draft head (MTP) - the 9B, guessing ahead to write faster; to be measured
