@@ -1,0 +1,42 @@
+# YouTube platform policy record (bau platform add examples/platform-youtube.yaml), for campaign
+# clips as Shorts (src/bau/clips.py, src/bau/youtube.py). Facts checked on 2026-11-24 against
+# developers.google.com and support.google.com. Re-verify and bump last_verified at least every
+# 90 days; posting is blocked once it goes stale.
+platform: youtube
+policy_version: "YouTube Data API v3 videos.insert + resumable upload; channel monetization policies (checked 2026-11-24)"
+ai_content_policy: >-
+  Campaign clips are real gameplay from the streamer's own streams, not AI-made; YouTube's
+  altered or synthetic content disclosure (status.containsSyntheticMedia) does not apply. BAU
+  never posts AI-made video here.
+copyright_policy: >-
+  Only footage a campaign's brief allows (its streamer's own streams and replays); BAU checks
+  each video's channel against the brief before cutting. Rockstar's policy (updated 2025-01-10)
+  permits fans' gameplay footage for non-commercial use only and takes down pre-release and
+  cheating or exploit videos; a campaign pays from the streamer's own budget for his streams.
+music_policy: >-
+  GTA's in-game radio is licensed music: a clip with radio playing can get a Content ID claim
+  (the music's owner may take ad revenue or block it in some countries). Campaign pay is per
+  verified view from the campaign, not YouTube ads.
+advertising_policy: >-
+  A campaign clip is paid promotion of the streamer: every one says so in its title (#ad) and
+  first description line (us-ftc-endorsement-guides). The API's
+  paidProductPlacementDetails.hasPaidProductPlacement was not confirmed settable on insert.
+commercial_content_policy: >-
+  YouTube's reused-content policy keeps "compilations or clips edited together with little or
+  no narrative (examples include movies, sports, or gameplay)" out of the Partner Program; the
+  money here is the campaign's per-view pay, not YouTube ads.
+api_policy: >-
+  OAuth 2.0 for desktop apps (PKCE, loopback 127.0.0.1); scope youtube.upload; videos.insert
+  costs 1 unit of the Video Uploads quota; videos from unverified API projects are not
+  restricted to private (page updated 2026-11-23). A consent screen left in "Testing" gives
+  refresh tokens that expire in 7 days.
+automation_policy: >-
+  BAU finds streams, cuts clips and puts each on a card by itself; it uploads only on the
+  owner's Accept, with the privacy he picks (no default) and his made-for-kids answer. A
+  campaign pays only for clips whose link is submitted within 30 minutes of posting, by the
+  owner, in the campaign.
+account_limits: Shorts are square or vertical videos up to three minutes.
+appeal_process: YouTube Studio (Content > Restrictions) for claims and removals.
+requires_ai_label: false
+source_url: https://developers.google.com/youtube/v3/docs/videos/insert
+last_verified: 2026-11-24

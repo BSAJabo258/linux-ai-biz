@@ -862,6 +862,52 @@ def cmd_accounts(a):
     return EXIT_OK
 
 
+def cmd_clips(a):
+    """Clips for paid clipping campaigns (docs/CLIPS.md)."""
+    from . import clips as CL
+    home, c = bau_home(), a.clips_cmd or "list"
+    try:
+        if c == "campaign":
+            _out(CL.add_campaign(home, _human(), a.name, a.url, a.source, a.caption,
+                                 a.hashtag or [], a.rate, a.overlay, a.seconds, a.per_day))
+        elif c == "campaigns":
+            _out(CL.campaigns(home))
+        elif c == "make":
+            _human()
+            made = CL.make(home, a.campaign, a.url, count=a.count)
+            print(f"{len(made)} clip(s) made; each waits on its card in Jarvis (Accept posts "
+                  "it to YouTube Shorts).")
+        elif c == "run":
+            print(f"{CL.tick(home)} new clip(s) on cards.")
+        else:
+            _out([{k: i[k] for k in ("clip_id", "campaign", "status", "seconds", "title",
+                                     "source_url")} | {"url": i["result"].get("url", "")}
+                  for i in CL.items(home)])
+    except (CL.ClipError, PermissionError) as e:
+        print(e, file=sys.stderr)
+        return EXIT_BLOCKED
+    return EXIT_OK
+
+
+def cmd_youtube(a):
+    """The owner's YouTube channel for clips (docs/CLIPS.md)."""
+    from . import youtube as Y
+    client = Y.YouTubeClient(bau_home())
+    try:
+        if a.yt_cmd == "login":
+            _human()
+            Y.login(client)
+            print("YouTube connected.")
+        else:
+            Y.app_credentials()
+            print("YouTube: " + ("connected" if client.connected() else
+                                 "not connected (bau youtube login)"))
+    except (Y.YouTubeError, PermissionError) as e:
+        print(e, file=sys.stderr)
+        return EXIT_BLOCKED
+    return EXIT_OK
+
+
 def cmd_hq(a):
     """The desktop as headquarters for the laptop station (docs/LAPTOP-STATION.md)."""
     import pwd
@@ -2718,6 +2764,36 @@ def register(sub: argparse._SubParsersAction) -> None:
     x = w.add_parser("password", help="show one password, at this terminal only")
     x.add_argument("platform", choices=["reddit", "x", "instagram", "tiktok"])
     s.set_defaults(fn=cmd_accounts)
+
+    s = sub.add_parser("clips", help="clips for paid clipping campaigns: found, cut and put "
+                       "on cards by Jarvis, posted on your Accept (docs/CLIPS.md)")
+    w = s.add_subparsers(dest="clips_cmd")
+    x = w.add_parser("campaign", help="add a campaign you joined, with its brief's rules")
+    x.add_argument("name")
+    x.add_argument("--url", required=True, help="the campaign's own link")
+    x.add_argument("--source", action="append", required=True,
+                   help="a channel the brief allows clips from (repeat for more)")
+    x.add_argument("--caption", required=True, help="the text every clip must carry")
+    x.add_argument("--hashtag", action="append", help="a hashtag the brief asks for (repeat)")
+    x.add_argument("--rate", type=float, default=0.0, help="dollars per 1,000 views")
+    x.add_argument("--overlay", default="", help="the brief's overlay picture, placed in "
+                   "BAU_HOME/clips/overlays")
+    x.add_argument("--seconds", type=int, default=40, help="clip length (5 to 180)")
+    x.add_argument("--per-day", type=int, default=3, help="clips a day for this campaign")
+    w.add_parser("campaigns", help="the campaigns you added")
+    x = w.add_parser("make", help="clip one stream now")
+    x.add_argument("campaign")
+    x.add_argument("url")
+    x.add_argument("--count", type=int, default=1)
+    w.add_parser("run", help="what the autopilot does: new streams, cut, on cards")
+    w.add_parser("list", help="every clip and its state")
+    s.set_defaults(fn=cmd_clips)
+
+    s = sub.add_parser("youtube", help="your YouTube channel for clips (docs/CLIPS.md)")
+    w = s.add_subparsers(dest="yt_cmd")
+    w.add_parser("login", help="sign in once in this computer's browser")
+    w.add_parser("status", help="app keys here, connected or not")
+    s.set_defaults(fn=cmd_youtube)
 
     s = sub.add_parser("station", help="the laptop as Jarvis's operations station "
                        "(docs/LAPTOP-STATION.md)")
