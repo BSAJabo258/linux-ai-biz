@@ -188,6 +188,47 @@ def lifecycle(job: Any, mission: dict[str, Any] | None) -> list[dict[str, str]]:
     return out
 
 
+BOARD = ("waiting", "working", "your review", "done", "stopped")
+
+
+def column(job: Any, mission: dict[str, Any] | None) -> str:
+    """Where one real job stands on the task board, from its record only."""
+    st, ver = job.status, getattr(job, "verification", "UNCHECKED")
+    if st == "PENDING":
+        return "waiting"
+    if st in WORKING:
+        return "working"
+    if st == "WAITING_FOR_APPROVAL" or ver == "FAILED" or (
+            st == "COMPLETED" and (mission or {}).get("status") == "PAUSED"):
+        return "your review"
+    if st == "COMPLETED":
+        return "done"
+    return "stopped"
+
+
+def board(home: Path | None = None, limit: int = 40) -> dict[str, Any]:
+    """The tablet's task board (the owner's ask 2026-11-24: "watch all the tasks being
+    complete on one screen"): the newest jobs of every agent, each in its column with its
+    steps. Read only; every value from the job store and the missions."""
+    from .jarvis import _latest as latest_missions
+    from .jobs import JobStore
+    home = home or bau_home()
+    missions = latest_missions(home)
+    jobs = sorted(JobStore(home).all(), key=lambda j: j.updated_at or "", reverse=True)
+    cards = []
+    for job in jobs[:max(1, min(limit, 200))]:
+        m = missions.get(job.mission_id)
+        cards.append({"job_id": job.job_id, "agent": _agent_name(job.agent),
+                      "look": look(_agent_name(job.agent)), "objective": job.objective[:200],
+                      "status": job.status, "column": column(job, m),
+                      "verification": getattr(job, "verification", "UNCHECKED"),
+                      "updated_at": job.updated_at, "cost_usd": round(job.cost_usd, 4),
+                      "steps": lifecycle(job, m)})
+    counts = {c: sum(1 for x in cards if x["column"] == c) for c in BOARD}
+    return {"columns": list(BOARD), "counts": counts, "cards": cards,
+            "at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}
+
+
 def look(name: str) -> str:
     """Her character on the sprite sheet: her own, or always the same one of the others."""
     return LOOK.get(name) or OTHER_LOOKS[zlib.crc32(name.encode()) % len(OTHER_LOOKS)]

@@ -1,0 +1,64 @@
+name: android
+
+# BAU Watch, the tablet app (docs/TABLET.md): tests its tunnel, builds the APK, and on main
+# publishes it as the release "bau-watch" with its SHA-256.
+
+on:
+  push:
+    branches: [main]
+    paths: ["android/**", ".github/workflows/android.yml"]
+  pull_request:
+    paths: ["android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write          # the release on main; nothing else
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      # Android Gradle plugin 9.5.0 needs Gradle 9.6.0 and JDK 17 (its release notes, read
+      # 2026-11-24); Gradle's own published SHA-256 of the download
+      GRADLE_VERSION: "9.6.0"
+      GRADLE_SHA256: "bbaeb2fef8710818cf0e261201dab964c572f92b942812df0c3620d62a529a01"
+    steps:
+      - uses: actions/checkout@v5
+      - name: JDK 17 and Gradle (checked against its SHA-256)
+        run: |
+          echo "JAVA_HOME=${JAVA_HOME_17_X64}" >> "$GITHUB_ENV"
+          curl -fsSL -o gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+          echo "${GRADLE_SHA256}  gradle.zip" | sha256sum -c -
+          unzip -q gradle.zip -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+      - name: the tunnel's tests
+        run: gradle -p android :tunnel:test -PtunnelOnly --no-daemon
+      - name: build the app
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          gradle -p android :app:assembleDebug --no-daemon
+          mkdir -p dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/bau-watch.apk
+          (cd dist && sha256sum bau-watch.apk > bau-watch.apk.sha256 && cat bau-watch.apk.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bau-watch-apk
+          path: dist/
+      - name: publish the release (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="BAU Watch for your tablet, built from ${GITHUB_SHA} on $(date -u +%Y-%m-%d). Install it and pair it: docs/TABLET.md. SHA-256: $(cut -d' ' -f1 dist/bau-watch.apk.sha256)"
+          if gh release view bau-watch > /dev/null 2>&1; then
+            gh release upload bau-watch dist/bau-watch.apk dist/bau-watch.apk.sha256 --clobber
+            gh release edit bau-watch --notes "$notes"
+          else
+            gh release create bau-watch dist/bau-watch.apk dist/bau-watch.apk.sha256 \
+              --title "BAU Watch (tablet app)" --notes "$notes" --target "${GITHUB_SHA}"
+          fi
