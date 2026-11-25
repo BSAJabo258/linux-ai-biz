@@ -47,6 +47,7 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                  ) -> type[BaseHTTPRequestHandler]:
     page = (resources.files("bau.ui") / "jarvis.html").read_bytes()
     workstation_page = (resources.files("bau.ui") / "workstation.html").read_bytes()
+    watch_page = (resources.files("bau.ui") / "watch.html").read_bytes()   # docs/TABLET.md
     allowed_hosts = allowed_hosts_from_env()
     lock = threading.Lock()               # one conversation, one turn at a time
     # GitHub wants requests one at a time, so one search or inspection at a time; testing
@@ -186,6 +187,15 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     return
                 self._send(200, workstation_page, "text/html; charset=utf-8")
                 return
+            if path in ("/watch", "/watch.html"):      # the tablet's task board
+                if not self._guard(api=False):
+                    return
+                got = dict(p.partition("=")[::2] for p in query.split("&") if p)
+                if not hmac.compare_digest(got.get("k", ""), key):
+                    self._send(403, b"Open the task board with Jarvis's key.", "text/plain")
+                    return
+                self._send(200, watch_page, "text/html; charset=utf-8")
+                return
             if path == "/icon.svg":                 # the tab icon
                 self._send(200, (resources.files("bau.ui") / "icon.svg").read_bytes(),
                            "image/svg+xml")
@@ -247,6 +257,9 @@ def make_handler(assistant: Assistant, voice: Voice, key: str
                     shutil.copyfileobj(f, self.wfile, 1024 * 1024)
             elif path == "/api/state":
                 self._json(200, self._state())
+            elif path == "/api/board":               # the task board (docs/TABLET.md)
+                from ..world import board
+                self._json(200, board(assistant.home))
             elif path == "/api/world":               # the operations world (docs/WORLD.md)
                 from ..world import world
                 self._json(200, world(assistant.home))
